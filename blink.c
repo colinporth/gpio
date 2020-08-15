@@ -1,5 +1,5 @@
 #include <stdio.h>
-#include <pigpio.h>
+#include "pigpio/pigpio.h"
 
 int main(int argc, char *argv[]) {
 

@@ -1,9 +1,12 @@
 TARGET    = blink
-SRCS      = blink.c
+SRCS      = blink.c \
+	    pigpio/pigpio.c \
+	    pigpio/command.c
+
 
 BUILD_DIR = ./build
 CLEAN_DIRS = $(BUILD_DIR)
-LIBS      = -lpthread -lpigpio -lrt
+LIBS      = -lpthread -lrt
 #
 #
 OBJS      = $(SRCS:%=$(BUILD_DIR)/%.o)
