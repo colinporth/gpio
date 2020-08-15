@@ -31,8 +31,7 @@ For more information, please refer to <http://unlicense.org/>
 #include <pthread.h>
 //}}}
 #define PIGPIO_VERSION 77
-//{{{
-//pigpio is a C library for the Raspberry which allows control of the GPIO.
+//{{{  pigpio is a C library for the Raspberry which allows control of the GPIO.
 //*Features*
 //o hardware timed PWM on any of GPIO 0-31
 //o hardware timed servo pulses on any of GPIO 0-31
@@ -90,7 +89,6 @@ For more information, please refer to <http://unlicense.org/>
 //int status = gpioInitialise();
 //}}}
 //{{{  OVERVIEW
-
 //ESSENTIAL
 
 //gpioInitialise             Initialise library
@@ -547,7 +545,7 @@ typedef void (*gpioISRFuncEx_t)    (int      gpio,
                                     uint32_t tick,
                                     void    *userdata);
 
-typedef void (*gpioTimerFunc_t)    (void);
+typedef void (*gpioTimerFunc_t)    ();
 
 typedef void (*gpioTimerFuncEx_t)  (void *userdata);
 
@@ -566,16 +564,16 @@ typedef void (*gpioGetSamplesFuncEx_t) (const gpioSample_t *samples,
 typedef void *(gpioThreadFunc_t) (void *);
 //}}}
 //{{{  defines
-/* gpio: 0-53 */
+//{{{  gpio: 0-53
 
 #define PI_MIN_GPIO       0
 #define PI_MAX_GPIO      53
-
-/* user_gpio: 0-31 */
+//}}}
+//{{{  user_gpio: 0-31 */
 
 #define PI_MAX_USER_GPIO 31
-
-/* level: 0-1 */
+//}}}
+//{{{  level: 0-1 */
 
 #define PI_OFF   0
 #define PI_ON    1
@@ -585,11 +583,14 @@ typedef void *(gpioThreadFunc_t) (void *);
 
 #define PI_LOW   0
 #define PI_HIGH  1
+//}}}
 
+//{{{
 /* level: only reported for GPIO time-out, see gpioSetWatchdog */
 
 #define PI_TIMEOUT 2
-
+//}}}
+//{{{
 /* mode: 0-7 */
 
 #define PI_INPUT  0
@@ -600,49 +601,58 @@ typedef void *(gpioThreadFunc_t) (void *);
 #define PI_ALT3   7
 #define PI_ALT4   3
 #define PI_ALT5   2
-
+//}}}
+//{{{
 /* pud: 0-2 */
 
 #define PI_PUD_OFF  0
 #define PI_PUD_DOWN 1
 #define PI_PUD_UP   2
-
+//}}}
+//{{{
 /* dutycycle: 0-range */
 
 #define PI_DEFAULT_DUTYCYCLE_RANGE   255
-
+//}}}
+//{{{
 /* range: 25-40000 */
 
 #define PI_MIN_DUTYCYCLE_RANGE        25
 #define PI_MAX_DUTYCYCLE_RANGE     40000
-
+//}}}
+//{{{
 /* pulsewidth: 0, 500-2500 */
 
 #define PI_SERVO_OFF 0
 #define PI_MIN_SERVO_PULSEWIDTH 500
 #define PI_MAX_SERVO_PULSEWIDTH 2500
-
+//}}}
+//{{{
 /* hardware PWM */
 
 #define PI_HW_PWM_MIN_FREQ 1
 #define PI_HW_PWM_MAX_FREQ      125000000
 #define PI_HW_PWM_MAX_FREQ_2711 187500000
 #define PI_HW_PWM_RANGE 1000000
-
+//}}}
+//{{{
 /* hardware clock */
 
 #define PI_HW_CLK_MIN_FREQ       4689
 #define PI_HW_CLK_MIN_FREQ_2711 13184
 #define PI_HW_CLK_MAX_FREQ      250000000
 #define PI_HW_CLK_MAX_FREQ_2711 375000000
+//}}}
 
+//{{{  notify
 #define PI_NOTIFY_SLOTS  32
 
 #define PI_NTFY_FLAGS_EVENT    (1 <<7)
 #define PI_NTFY_FLAGS_ALIVE    (1 <<6)
 #define PI_NTFY_FLAGS_WDOG     (1 <<5)
 #define PI_NTFY_FLAGS_BIT(x) (((x)<<0)&31)
-
+//}}}
+//{{{  wave
 #define PI_WAVE_BLOCKS     4
 #define PI_WAVE_MAX_PULSES (PI_WAVE_BLOCKS * 3000)
 #define PI_WAVE_MAX_CHARS  (PI_WAVE_BLOCKS *  300)
@@ -679,19 +689,23 @@ typedef void *(gpioThreadFunc_t) (void *);
 #define PI_MAX_WAVE_DELAY  65535
 
 #define PI_WAVE_COUNT_PAGES 10
+//}}}
 
+//{{{
 /* wave tx mode */
 
 #define PI_WAVE_MODE_ONE_SHOT      0
 #define PI_WAVE_MODE_REPEAT        1
 #define PI_WAVE_MODE_ONE_SHOT_SYNC 2
 #define PI_WAVE_MODE_REPEAT_SYNC   3
-
+//}}}
+//{{{
 /* special wave at return values */
 
 #define PI_WAVE_NOT_FOUND  9998 /* Transmitted wave not found. */
 #define PI_NO_TX_WAVE      9999 /* No wave being transmitted. */
-
+//}}}
+//{{{
 /* Files, I2C, SPI, SER */
 
 #define PI_FILE_SLOTS 16
@@ -734,7 +748,8 @@ typedef void *(gpioThreadFunc_t) (void *);
 #define PI_I2C_FLAGS        5
 #define PI_I2C_READ         6
 #define PI_I2C_WRITE        7
-
+//}}}
+//{{{
 /* SPI */
 
 #define PI_SPI_FLAGS_BITLEN(x) ((x&63)<<16)
@@ -746,7 +761,8 @@ typedef void *(gpioThreadFunc_t) (void *);
 #define PI_SPI_FLAGS_RESVD(x)   ((x&7)<<5)
 #define PI_SPI_FLAGS_CSPOLS(x)  ((x&7)<<2)
 #define PI_SPI_FLAGS_MODE(x)    ((x&3))
-
+//}}}
+//{{{
 /* BSC registers */
 
 #define BSC_DR         0
@@ -782,7 +798,8 @@ typedef void *(gpioThreadFunc_t) (void *);
 #define BSC_FR_TXFF    4
 #define BSC_FR_RXFE    2
 #define BSC_FR_TXBUSY  1
-
+//}}}
+//{{{
 /* BSC GPIO */
 
 #define BSC_SDA_MOSI 18
@@ -794,32 +811,40 @@ typedef void *(gpioThreadFunc_t) (void *);
 #define BSC_SCL_SCLK_2711 11
 #define BSC_MISO_2711      9
 #define BSC_CE_N_2711      8
-
+//}}}
+//{{{
 /* Longest busy delay */
 
 #define PI_MAX_BUSY_DELAY 100
-
+//}}}
+//{{{
 /* timeout: 0-60000 */
 
 #define PI_MIN_WDOG_TIMEOUT 0
 #define PI_MAX_WDOG_TIMEOUT 60000
-
+//}}}
+//{{{
 /* timer: 0-9 */
 
 #define PI_MIN_TIMER 0
 #define PI_MAX_TIMER 9
-
+//}}}
+//{{{
 /* millis: 10-60000 */
 
 #define PI_MIN_MS 10
 #define PI_MAX_MS 60000
+//}}}
 
+//{{{  scripts
 #define PI_MAX_SCRIPTS       32
 
 #define PI_MAX_SCRIPT_TAGS   50
 #define PI_MAX_SCRIPT_VARS  150
 #define PI_MAX_SCRIPT_PARAMS 10
+//}}}
 
+//{{{
 /* script status */
 
 #define PI_SCRIPT_INITING 0
@@ -827,12 +852,14 @@ typedef void *(gpioThreadFunc_t) (void *);
 #define PI_SCRIPT_RUNNING 2
 #define PI_SCRIPT_WAITING 3
 #define PI_SCRIPT_FAILED  4
-
+//}}}
+//{{{
 /* signum: 0-63 */
 
 #define PI_MIN_SIGNUM 0
 #define PI_MAX_SIGNUM 63
-
+//}}}
+//{{{
 /* timetype: 0-1 */
 
 #define PI_TIME_RELATIVE 0
@@ -840,48 +867,55 @@ typedef void *(gpioThreadFunc_t) (void *);
 
 #define PI_MAX_MICS_DELAY 1000000 /* 1 second */
 #define PI_MAX_MILS_DELAY 60000   /* 60 seconds */
-
+//}}}
+//{{{
 /* cfgMillis */
 
 #define PI_BUF_MILLIS_MIN 100
 #define PI_BUF_MILLIS_MAX 10000
-
+//}}}
+//{{{
 /* cfgMicros: 1, 2, 4, 5, 8, or 10 */
 
 /* cfgPeripheral: 0-1 */
 
 #define PI_CLOCK_PWM 0
 #define PI_CLOCK_PCM 1
-
+//}}}
+//{{{
 /* DMA channel: 0-15, 15 is unset */
 
 #define PI_MIN_DMA_CHANNEL 0
 #define PI_MAX_DMA_CHANNEL 15
-
+//}}}
+//{{{
 /* port */
 
 #define PI_MIN_SOCKET_PORT 1024
 #define PI_MAX_SOCKET_PORT 32000
-
-
+//}}}
+//{{{
 /* ifFlags: */
 
 #define PI_DISABLE_FIFO_IF   1
 #define PI_DISABLE_SOCK_IF   2
 #define PI_LOCALHOST_SOCK_IF 4
 #define PI_DISABLE_ALERT     8
-
+//}}}
+//{{{
 /* memAllocMode */
 
 #define PI_MEM_ALLOC_AUTO    0
 #define PI_MEM_ALLOC_PAGEMAP 1
 #define PI_MEM_ALLOC_MAILBOX 2
-
+//}}}
+//{{{
 /* filters */
 
 #define PI_MAX_STEADY  300000
 #define PI_MAX_ACTIVE 1000000
-
+//}}}
+//{{{
 /* gpioCfgInternals */
 
 #define PI_CFG_DBG_LEVEL         0 /* bits 0-3 */
@@ -891,22 +925,23 @@ typedef void *(gpioThreadFunc_t) (void *);
 #define PI_CFG_NOSIGHANDLER      (1<<10)
 
 #define PI_CFG_ILLEGAL_VAL       (1<<11)
-
-
+//}}}
+//{{{
 /* gpioISR */
 
 #define RISING_EDGE  0
 #define FALLING_EDGE 1
 #define EITHER_EDGE  2
-
-
+//}}}
+//{{{
 /* pads */
 
 #define PI_MAX_PAD 2
 
 #define PI_MIN_PAD_STRENGTH 1
 #define PI_MAX_PAD_STRENGTH 16
-
+//}}}
+//{{{
 /* files */
 
 #define PI_FILE_NONE   0
@@ -922,23 +957,27 @@ typedef void *(gpioThreadFunc_t) (void *);
 #define PI_FROM_START   0
 #define PI_FROM_CURRENT 1
 #define PI_FROM_END     2
-
+//}}}
+//{{{
 /* Allowed socket connect addresses */
 
 #define MAX_CONNECT_ADDRESSES 256
-
+//}}}
+//{{{
 /* events */
 
 #define PI_MAX_EVENT 31
-
+//}}}
+//{{{
 /* Event auto generated on BSC slave activity */
 
 #define PI_EVENT_BSC 31
 //}}}
+//}}}
 
 //{{{
 /*F*/
-int gpioInitialise(void);
+int gpioInitialise();
 /*D
 Initialises the library.
 
@@ -967,7 +1006,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-void gpioTerminate(void);
+void gpioTerminate();
 /*D
 Terminates the library.
 
@@ -1620,7 +1659,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioNotifyOpen(void);
+int gpioNotifyOpen();
 /*D
 This function requests a free notification handle.
 
@@ -1778,7 +1817,7 @@ D*/
 
 //{{{
 /*F*/
-int gpioWaveClear(void);
+int gpioWaveClear();
 /*D
 This function clears all waveforms and any data added by calls to the
 [*gpioWaveAdd**] functions.
@@ -1792,7 +1831,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioWaveAddNew(void);
+int gpioWaveAddNew();
 /*D
 This function starts a new empty waveform.
 
@@ -1931,7 +1970,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioWaveCreate(void);
+int gpioWaveCreate();
 /*D
 This function creates a waveform from the data provided by the prior
 calls to the [*gpioWaveAdd**] functions.  Upon success a wave id
@@ -2176,7 +2215,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioWaveTxAt(void);
+int gpioWaveTxAt();
 /*D
 This function returns the id of the waveform currently being
 transmitted using [*gpioWaveTxSend*].  Chained waves are not supported.
@@ -2189,7 +2228,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioWaveTxBusy(void);
+int gpioWaveTxBusy();
 /*D
 This function checks to see if a waveform is currently being
 transmitted.
@@ -2199,7 +2238,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioWaveTxStop(void);
+int gpioWaveTxStop();
 /*D
 This function aborts the transmission of the current waveform.
 
@@ -2210,7 +2249,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioWaveGetMicros(void);
+int gpioWaveGetMicros();
 /*D
 This function returns the length in microseconds of the current
 waveform.
@@ -2218,7 +2257,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioWaveGetHighMicros(void);
+int gpioWaveGetHighMicros();
 /*D
 This function returns the length in microseconds of the longest waveform
 created since [*gpioInitialise*] was called.
@@ -2226,7 +2265,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioWaveGetMaxMicros(void);
+int gpioWaveGetMaxMicros();
 /*D
 This function returns the maximum possible size of a waveform in
 microseconds.
@@ -2234,14 +2273,14 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioWaveGetPulses(void);
+int gpioWaveGetPulses();
 /*D
 This function returns the length in pulses of the current waveform.
 D*/
 //}}}
 //{{{
 /*F*/
-int gpioWaveGetHighPulses(void);
+int gpioWaveGetHighPulses();
 /*D
 This function returns the length in pulses of the longest waveform
 created since [*gpioInitialise*] was called.
@@ -2249,14 +2288,14 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioWaveGetMaxPulses(void);
+int gpioWaveGetMaxPulses();
 /*D
 This function returns the maximum possible size of a waveform in pulses.
 D*/
 //}}}
 //{{{
 /*F*/
-int gpioWaveGetCbs(void);
+int gpioWaveGetCbs();
 /*D
 This function returns the length in DMA control blocks of the current
 waveform.
@@ -2264,7 +2303,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioWaveGetHighCbs(void);
+int gpioWaveGetHighCbs();
 /*D
 This function returns the length in DMA control blocks of the longest
 waveform created since [*gpioInitialise*] was called.
@@ -2272,7 +2311,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioWaveGetMaxCbs(void);
+int gpioWaveGetMaxCbs();
 /*D
 This function returns the maximum possible size of a waveform in DMA
 control blocks.
@@ -3742,7 +3781,7 @@ One function may be registered per timer.
 The timer may be cancelled by passing NULL as the function.
 
 ...
-void bFunction(void)
+void bFunction()
 {
    printf("two seconds have elapsed");
 }
@@ -4025,14 +4064,14 @@ D*/
 
 //{{{
 /*F*/
-uint32_t gpioRead_Bits_0_31(void);
+uint32_t gpioRead_Bits_0_31();
 /*D
 Returns the current level of GPIO 0-31.
 D*/
 //}}}
 //{{{
 /*F*/
-uint32_t gpioRead_Bits_32_53(void);
+uint32_t gpioRead_Bits_32_53();
 /*D
 Returns the current level of GPIO 32-53.
 D*/
@@ -4274,7 +4313,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-uint32_t gpioTick(void);
+uint32_t gpioTick();
 /*D
 Returns the current system tick.
 
@@ -4306,7 +4345,7 @@ D*/
 
 //{{{
 /*F*/
-unsigned gpioHardwareRevision(void);
+unsigned gpioHardwareRevision();
 /*D
 Returns the hardware revision.
 
@@ -4334,7 +4373,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-unsigned gpioVersion(void);
+unsigned gpioVersion();
 /*D
 Returns the pigpio version.
 D*/
@@ -5020,7 +5059,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-uint32_t gpioCfgGetInternals(void);
+uint32_t gpioCfgGetInternals();
 /*D
 This function returns the current library internal configuration
 settings.
@@ -5145,7 +5184,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-unsigned rawWaveCB(void);
+unsigned rawWaveCB();
 /*D
 Returns the number of the cb being currently output.
 
@@ -5300,7 +5339,7 @@ D*/
 
 //{{{
 /*F*/
-double time_time(void);
+double time_time();
 /*D
 Return the current time in seconds since the Epoch.
 D*/
@@ -5318,7 +5357,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-void rawDumpWave(void);
+void rawDumpWave();
 /*D
 Used to print a readable version of the current waveform to stderr.
 
@@ -5659,7 +5698,7 @@ D*/
 
 //gpioTimerFunc_t::
 //. .
-//typedef void (*gpioTimerFunc_t) (void);
+//typedef void (*gpioTimerFunc_t) ();
 //. .
 
 //gpioTimerFuncEx_t::
