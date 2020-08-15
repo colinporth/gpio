@@ -1522,7 +1522,7 @@ static void closeOrphanedNotifications (int slot, int fd);
 
 //{{{  my routines
 //{{{
-int myScriptNameValid (char *name)
+int myScriptNameValid (char* name)
 {
    int i, c, len, valid;
 
@@ -1544,7 +1544,7 @@ int myScriptNameValid (char *name)
 }
 //}}}
 //{{{
-static char * myTimeStamp()
+static char* myTimeStamp()
 {
    static struct timeval last;
    static char buf[32];
@@ -1565,7 +1565,7 @@ static char * myTimeStamp()
 }
 //}}}
 //{{{
-int myPathBad (char *name)
+int myPathBad (char* name)
 {
    int i, c, len, in_part, parts, last_char_dot;
    char *bad="/*?.";
@@ -1665,6 +1665,7 @@ static void myGpioWrite (unsigned gpio, unsigned level)
    else                 *(gpioReg + GPSET0 + BANK) = BIT;
 }
 //}}}
+
 //{{{
 static void myGpioSleep (int seconds, int micros)
 {
@@ -1796,56 +1797,6 @@ static int myPermit (unsigned gpio)
       else return 0;
    }
    return 1; /* will fail for bad gpio number */
-}
-//}}}
-//}}}
-
-//{{{
-static void flushMemory()
-{
-   static int val = 0;
-
-   void *dummy;
-
-   dummy = mmap(
-       0, (FLUSH_PAGES*PAGE_SIZE),
-       PROT_READ|PROT_WRITE|PROT_EXEC,
-       MAP_SHARED|MAP_ANONYMOUS|MAP_NORESERVE|MAP_LOCKED,
-       -1, 0);
-
-   if (dummy == MAP_FAILED)
-   {
-      DBG(DBG_STARTUP, "mmap dummy failed (%m)");
-   }
-   else
-   {
-      memset(dummy, val++, (FLUSH_PAGES*PAGE_SIZE));
-      memset(dummy, val++, (FLUSH_PAGES*PAGE_SIZE));
-      munmap(dummy, FLUSH_PAGES*PAGE_SIZE);
-   }
-}
-//}}}
-
-//{{{
-static void wfRx_lock (int i)
-{
-   pthread_mutex_lock(&wfRx[i].mutex);
-}
-//}}}
-//{{{
-static void wfRx_unlock (int i)
-{
-   pthread_mutex_unlock(&wfRx[i].mutex);
-}
-//}}}
-//{{{
-static void spinWhileStarting()
-{
-   while (runState == PI_STARTING)
-   {
-      if (piCores == 1) myGpioDelay(1000);
-      else flushMemory();
-   }
 }
 //}}}
 
@@ -2706,6 +2657,48 @@ static void myGpioSetServo (unsigned gpio, int oldVal, int newVal)
       }
    }
 }
+//}}}
+//}}}
+//{{{
+static void flushMemory() {
+
+  static int val = 0;
+
+  void* dummy = mmap (0, (FLUSH_PAGES * PAGE_SIZE),
+                      PROT_READ | PROT_WRITE | PROT_EXEC,
+                      MAP_SHARED | MAP_ANONYMOUS |MAP_NORESERVE | MAP_LOCKED,
+                      -1, 0);
+
+  if (dummy == MAP_FAILED) {
+    DBG(DBG_STARTUP, "mmap dummy failed (%m)");
+    }
+  else {
+    memset (dummy, val++, (FLUSH_PAGES*PAGE_SIZE));
+    memset (dummy, val++, (FLUSH_PAGES*PAGE_SIZE));
+    munmap (dummy, FLUSH_PAGES*PAGE_SIZE);
+    }
+  }
+//}}}
+//{{{
+static void wfRx_lock (int i) {
+  pthread_mutex_lock (&wfRx[i].mutex);
+  }
+//}}}
+//{{{
+static void wfRx_unlock (int i) {
+  pthread_mutex_unlock(&wfRx[i].mutex);
+  }
+//}}}
+//{{{
+static void spinWhileStarting() {
+
+  while (runState == PI_STARTING) {
+    if (piCores == 1) 
+      myGpioDelay (1000);
+    else 
+      flushMemory();
+    }
+  }
 //}}}
 
 //{{{  mailbox
@@ -7242,7 +7235,7 @@ static int initGrabLockFile()
 //}}}
 
 //{{{
-static uint32_t * initMapMem (int fd, uint32_t addr, uint32_t len)
+static uint32_t* initMapMem (int fd, uint32_t addr, uint32_t len)
 {
     return (uint32_t *) mmap(0, len,
        PROT_READ|PROT_WRITE|PROT_EXEC,
@@ -8347,7 +8340,7 @@ int initInitialise()
 //}}}
 
 //{{{
-int getBitInBytes(int bitPos, char *buf, int numBits)
+int getBitInBytes (int bitPos, char *buf, int numBits)
 {
    int bitp, bufp;
 
@@ -8362,7 +8355,7 @@ int getBitInBytes(int bitPos, char *buf, int numBits)
 }
 //}}}
 //{{{
-void putBitInBytes(int bitPos, char *buf, int bit)
+void putBitInBytes (int bitPos, char *buf, int bit)
 {
    int bitp, bufp;
 
@@ -8597,7 +8590,7 @@ void gpioTerminate() {
    int i;
    DBG(DBG_USER, "");
 
-   if (!libInitialised) 
+   if (!libInitialised)
      return;
 
    DBG(DBG_STARTUP, "initialised, terminating");
@@ -9791,6 +9784,8 @@ int gpioWaveTxSend (unsigned wave_id, unsigned wave_mode)
 }
 //}}}
 
+//{{{  gpio wave
+// chain
 //{{{
 static int chainGetCB (int n)
 {
@@ -9820,6 +9815,7 @@ static void chainSetVal (int n, uint32_t val)
    }
 }
 //}}}
+
 //{{{
 static uint32_t chainGetValPadr (int n)
 {
@@ -9838,6 +9834,7 @@ static uint32_t chainGetValPadr (int n)
    return 0;
 }
 //}}}
+
 //{{{
 static uint32_t chainGetCntVal (int counter, int slot)
 {
@@ -9883,13 +9880,7 @@ static int chainGetCntCB (int counter)
 }
 //}}}
 //{{{
-static void chainMakeCounter(
-   unsigned counter,
-   unsigned blklen,
-   unsigned blocks,
-   unsigned count,
-   uint32_t repeat,
-   uint32_t next)
+static void chainMakeCounter (unsigned counter, unsigned blklen, unsigned blocks, unsigned count, uint32_t repeat, uint32_t next)
 {
    rawCbs_t *p=NULL;
 
@@ -10285,6 +10276,7 @@ int gpioWaveChain (char* buf, unsigned bufSize)
    return 0;
 }
 //}}}
+
 //{{{
 int gpioWaveTxBusy()
 {
@@ -10335,6 +10327,7 @@ int gpioWaveTxStop()
    return 0;
 }
 //}}}
+
 //{{{
 int gpioWaveGetMicros()
 {
@@ -10425,29 +10418,30 @@ int gpioWaveGetMaxCbs()
    return wfStats.maxCbs;
 }
 //}}}
-
+//}}}
+//{{{  bitBang i2c
 //{{{
-static int read_SDA (wfRx_t *w)
+static int read_SDA (wfRx_t* w)
 {
    myGpioSetMode(w->I.SDA, PI_INPUT);
    return myGpioRead(w->I.SDA);
 }
 //}}}
 //{{{
-static void set_SDA (wfRx_t *w)
+static void set_SDA (wfRx_t* w)
 {
    myGpioSetMode(w->I.SDA, PI_INPUT);
 }
 //}}}
 //{{{
-static void clear_SDA (wfRx_t *w)
+static void clear_SDA (wfRx_t* w)
 {
    myGpioSetMode(w->I.SDA, PI_OUTPUT);
    myGpioWrite(w->I.SDA, 0);
 }
 //}}}
 //{{{
-static void clear_SCL (wfRx_t *w)
+static void clear_SCL (wfRx_t* w)
 {
    myGpioSetMode(w->I.SCL, PI_OUTPUT);
    myGpioWrite(w->I.SCL, 0);
@@ -10455,13 +10449,13 @@ static void clear_SCL (wfRx_t *w)
 //}}}
 
 //{{{
-static void I2C_delay (wfRx_t *w)
+static void I2C_delay (wfRx_t* w)
 {
    myGpioDelay(w->I.delay);
 }
 //}}}
 //{{{
-static void I2C_clock_stretch (wfRx_t *w)
+static void I2C_clock_stretch (wfRx_t* w)
 {
    uint32_t now, max_stretch=100000;
 
@@ -10471,7 +10465,7 @@ static void I2C_clock_stretch (wfRx_t *w)
 }
 //}}}
 //{{{
-static void I2CStart (wfRx_t *w)
+static void I2CStart (wfRx_t* w)
 {
    if (w->I.started)
    {
@@ -10490,7 +10484,7 @@ static void I2CStart (wfRx_t *w)
 }
 //}}}
 //{{{
-static void I2CStop( wfRx_t *w)
+static void I2CStop( wfRx_t* w)
 {
    clear_SDA(w);
    I2C_delay(w);
@@ -10503,7 +10497,7 @@ static void I2CStop( wfRx_t *w)
 }
 //}}}
 //{{{
-static void I2CPutBit (wfRx_t *w, int bit)
+static void I2CPutBit (wfRx_t* w, int bit)
 {
    if (bit) set_SDA(w);
    else     clear_SDA(w);
@@ -10515,7 +10509,7 @@ static void I2CPutBit (wfRx_t *w, int bit)
 }
 //}}}
 //{{{
-static int I2CGetBit (wfRx_t *w)
+static int I2CGetBit (wfRx_t* w)
 {
    int bit;
 
@@ -10530,7 +10524,7 @@ static int I2CGetBit (wfRx_t *w)
 }
 //}}}
 //{{{
-static int I2CPutByte (wfRx_t *w, int byte)
+static int I2CPutByte (wfRx_t* w, int byte)
 {
    int bit, nack;
 
@@ -10546,7 +10540,7 @@ static int I2CPutByte (wfRx_t *w, int byte)
 }
 //}}}
 //{{{
-static uint8_t I2CGetByte (wfRx_t *w, int nack)
+static uint8_t I2CGetByte (wfRx_t* w, int nack)
 {
    int bit, byte=0;
 
@@ -10775,6 +10769,7 @@ int bbI2CZip (unsigned SDA, char *inBuf, unsigned inLen, char *outBuf, unsigned 
    return status;
 }
 //}}}
+//}}}
 
 //{{{
 void bscInit (int mode)
@@ -10928,7 +10923,7 @@ int bscXfer (bsc_xfer_t *xfer)
    return (copied<<16) | bscFR;
 }
 //}}}
-
+//{{{  bitBank spi
 //{{{
 static void set_CS (wfRx_t *w)
 {
@@ -11276,6 +11271,7 @@ int bbSPIXfer (unsigned CS, char *inBuf, char *outBuf, unsigned count)
 
    return count;
 }
+//}}}
 //}}}
 
 //{{{
@@ -13026,7 +13022,7 @@ int shell(char *scriptName, char *scriptString)
 //}}}
 
 //{{{
-int fileApprove (char *filename)
+int fileApprove (char* filename)
 {
    char match[PI_MAX_PATH];
    char buffer[PI_MAX_PATH];
@@ -13092,7 +13088,7 @@ int fileApprove (char *filename)
 }
 //}}}
 //{{{
-int fileOpen (char *file, unsigned mode)
+int fileOpen (char* file, unsigned mode)
 {
    static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
    int fd=-1;
@@ -13212,7 +13208,7 @@ int fileClose (unsigned handle)
 }
 //}}}
 //{{{
-int fileWrite (unsigned handle, char *buf, unsigned count)
+int fileWrite (unsigned handle, char* buf, unsigned count)
 {
    int w;
 
@@ -13245,7 +13241,7 @@ int fileWrite (unsigned handle, char *buf, unsigned count)
 }
 //}}}
 //{{{
-int fileRead (unsigned handle, char *buf, unsigned count)
+int fileRead (unsigned handle, char* buf, unsigned count)
 {
    int r;
 
@@ -13326,7 +13322,7 @@ int fileSeek (unsigned handle, int32_t seekOffset, int seekFrom)
 }
 //}}}
 //{{{
-int fileList (char *fpat,  char *buf, unsigned count)
+int fileList (char* fpat,  char* buf, unsigned count)
 {
    int len, bufpos;
    glob_t pglob;
@@ -13366,7 +13362,7 @@ int fileList (char *fpat,  char *buf, unsigned count)
 //}}}
 
 //{{{
-int gpioTime (unsigned timetype, int *seconds, int *micros)
+int gpioTime (unsigned timetype, int* seconds, int* micros)
 {
    struct timespec ts;
 
@@ -13469,12 +13465,12 @@ uint32_t gpioTick()
 unsigned gpioVersion()
 {
    DBG(DBG_USER, "");
-
    return PIGPIO_VERSION;
 }
 //}}}
 //{{{
-/* ----------------------------------------------------------------------- */
+unsigned gpioHardwareRevision()
+{
 /*
 2 2  2  2 2 2  1 1 1 1  1 1 1 1  1 1 0 0 0 0 0 0  0 0 0 0
 5 4  3  2 1 0  9 8 7 6  5 4 3 2  1 0 9 8 7 6 5 4  3 2 1 0
@@ -13488,8 +13484,6 @@ T  0=A 1=B 2=A+ 3=B+ 4=Pi2B 5=Alpha 6=CM1 8=Pi3B 9=Zero a=CM3 c=Zero W
    d=3B+ e=3A+ 10=CM3+ 11=4B
 R  PCB board revision
 */
-unsigned gpioHardwareRevision()
-{
    static unsigned rev = 0;
 
    FILE * filp;
@@ -13519,7 +13513,6 @@ unsigned gpioHardwareRevision()
    }
 
    /* (some) arm64 operating systems get revision number here  */
-
    if (rev == 0)
    {
       DBG(DBG_USER, "searching /proc/device-tree for revision");
@@ -13530,11 +13523,7 @@ unsigned gpioHardwareRevision()
          uint32_t tmp;
          if (fread(&tmp,1 , 4, filp) == 4)
          {
-            /*
-               for some reason the value returned by reading
-               this /proc entry seems to be big endian,
-               convert it.
-            */
+            //* for some reason the value returned by reading this /proc entry seems to be big endian, convert it.
             rev = ntohl(tmp);
             rev &= 0xFFFFFF; /* mask out warranty bit */
          }
@@ -13547,7 +13536,6 @@ unsigned gpioHardwareRevision()
    rev &= 0xFFFFFF; /* mask out warranty bit */
 
    /* Decode revision code */
-
    if ((rev & 0x800000) == 0) /* old rev code */
    {
       if (rev < 0x0016) /* all BCM2835 */
