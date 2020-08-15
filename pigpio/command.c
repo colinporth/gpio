@@ -37,6 +37,7 @@ This version is for pigpio version 70+
 #include <stdlib.h>
 #include <ctype.h>
 #include <inttypes.h>
+#include <strings.h>
 
 #include "pigpio.h"
 #include "command.h"

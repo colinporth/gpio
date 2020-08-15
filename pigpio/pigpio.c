@@ -29,8 +29,6 @@ For more information, please refer to <http://unlicense.org/>
 /* pigpio version 77 */
 //}}}
 //{{{  includes
-/* include ------------------------------------------------------- */
-
 #define _GNU_SOURCE
 
 #include <stdio.h>
@@ -38,12 +36,15 @@ For more information, please refer to <http://unlicense.org/>
 #include <strings.h>
 #include <stdlib.h>
 #include <stdint.h>
+
 #include <inttypes.h>
 #include <stdarg.h>
 #include <ctype.h>
+
 #include <syslog.h>
 #include <poll.h>
 #include <unistd.h>
+
 #include <fcntl.h>
 #include <termios.h>
 #include <signal.h>
@@ -52,6 +53,7 @@ For more information, please refer to <http://unlicense.org/>
 #include <sys/ioctl.h>
 #include <limits.h>
 #include <pthread.h>
+
 #include <sys/time.h>
 #include <sys/mman.h>
 #include <sys/types.h>
@@ -59,15 +61,16 @@ For more information, please refer to <http://unlicense.org/>
 #include <sys/file.h>
 #include <sys/socket.h>
 #include <sys/sysmacros.h>
+
 #include <netinet/tcp.h>
 #include <arpa/inet.h>
 #include <sys/select.h>
+
 #include <fnmatch.h>
 #include <glob.h>
 #include <arpa/inet.h>
 
 #include "pigpio.h"
-
 #include "command.h"
 //}}}
 //{{{  bits
@@ -2506,7 +2509,6 @@ static int myDoCommand (uintptr_t *p, unsigned bufSize, char *buf)
    return res;
 }
 //}}}
-
 //{{{
 static void mySetGpioOff (unsigned gpio, int pos)
 {
@@ -2706,6 +2708,7 @@ static void myGpioSetServo (unsigned gpio, int oldVal, int newVal)
 }
 //}}}
 
+//{{{  mailbox
 //{{{
 /*
 https://github.com/raspberrypi/firmware/wiki/Mailbox-property-interface
@@ -2878,7 +2881,8 @@ static int mbDMAAlloc (DMAMem_t *DMAMemP, unsigned size, uint32_t pi_mem_flag)
    return 0;
 }
 //}}}
-
+//}}}
+//{{{  wave
 //{{{
 rawCbs_t * rawWaveCBAdr (int cbNum)
 {
@@ -3417,7 +3421,7 @@ int rawWaveAddGeneric (unsigned numIn1, rawWave_t *in1)
    else return PI_TOO_MANY_PULSES;
 }
 //}}}
-
+//}}}
 //{{{  i2c
 //{{{
 int i2cWriteQuick(unsigned handle, unsigned bit)
@@ -5120,49 +5124,6 @@ int serDataAvailable (unsigned handle)
 }
 //}}}
 //}}}
-//{{{
-static int chooseBestClock (clkInf_t *clkInf, unsigned f, unsigned numc, unsigned *cf)
-{
-   int c, valid;
-   double fdiv, offby, best_offby;
-   unsigned div, frac;
-
-   valid = 0;
-   best_offby = 0;
-
-   for (c=0; c<numc; c++)
-   {
-      fdiv = (double)cf[c] / (double)f;
-      if (f < PI_MASH_MAX_FREQ)
-      {
-         fdiv += (0.5 / 4096.0);
-         div = fdiv;
-         frac = (fdiv - div) * 4096.0;
-      }
-      else
-      {
-         fdiv += 0.5;
-         div = fdiv;
-         frac = 0;
-      }
-
-      if ((div > 1) && (div < 4096))
-      {
-         offby = f - (cf[c] / (div + (frac / 4096.0)));
-         if (offby < 0) offby = - offby;
-         if ((!valid) || (offby <= best_offby))
-         {
-            valid = 1;
-            clkInf->div = div;
-            clkInf->frac = frac;
-            clkInf->clock = c;
-            best_offby = offby;
-         }
-      }
-   }
-   return valid;
-}
-//}}}
 //{{{  dma
 //{{{
 static rawCbs_t * dmaCB2adr(int pos)
@@ -6583,7 +6544,7 @@ static int scrSys(char *cmd, uint32_t p1, uint32_t p2)
 //}}}
 
 //{{{
-static void* pthScript (void *x)
+static void* pthScript (void* x)
 {
    gpioScript_t *s;
    cmdInstr_t instr;
@@ -6822,7 +6783,7 @@ static void* pthScript (void *x)
 }
 //}}}
 //{{{
-static void* pthTimerTick (void *x)
+static void* pthTimerTick (void* x)
 {
    gpioTimer_t *tp;
    struct timespec req, rem;
@@ -6848,7 +6809,7 @@ static void* pthTimerTick (void *x)
 }
 //}}}
 //{{{
-static void* pthFifoThread (void *x)
+static void* pthFifoThread (void* x)
 {
    char buf[CMD_MAX_EXTENSION];
    int idx, flags, len, res, i;
@@ -6965,7 +6926,7 @@ static void* pthFifoThread (void *x)
 }
 //}}}
 //{{{
-static void* pthSocketThreadHandler (void *fdC)
+static void* pthSocketThreadHandler (void* fdC)
 {
    int sock = *(int*)fdC;
    uintptr_t p[10];
@@ -7113,7 +7074,7 @@ static void* pthSocketThreadHandler (void *fdC)
 }
 //}}}
 //{{{
-static int addrAllowed (struct sockaddr *saddr)
+static int addrAllowed (struct sockaddr* saddr)
 {
    int i;
    uint32_t addr;
@@ -7132,9 +7093,8 @@ static int addrAllowed (struct sockaddr *saddr)
    return 0;
 }
 //}}}
-
 //{{{
-static void* pthSocketThread (void *x)
+static void* pthSocketThread (void* x)
 {
    int fdC=0, c, *sock;
    struct sockaddr_storage client;
@@ -7167,11 +7127,11 @@ static void* pthSocketThread (void *x)
    {
       pthread_t thr;
 
-      fdC = accept(fdSock, (struct sockaddr *)&client, (socklen_t*)&c);
+      fdC = accept (fdSock, (struct sockaddr *)&client, (socklen_t*)&c);
 
       closeOrphanedNotifications(-1, fdC);
 
-      if (addrAllowed((struct sockaddr *)&client))
+      if (addrAllowed ((struct sockaddr *)&client))
       {
          DBG(DBG_USER, "Connection accepted on socket %d", fdC);
 
@@ -8225,7 +8185,6 @@ int initInitialise()
       else
       {
          model = (rev >> 4) & 0xFF;
-
          /* model
          0=A 1=B
          2=A+ 3=B+
@@ -8380,8 +8339,7 @@ int initInitialise()
    flushMemory();
 
    //cast twice to suppress compiler warning, I belive this cast
-   //is ok because dmaIBus contains bus addresses, not virtual
-   //addresses.
+   //is ok because dmaIBus contains bus addresses, not virtual addresses.
    initDMAgo((uint32_t *)dmaIn, (uint32_t)(uintptr_t)dmaIBus[0]);
 
    return PIGPIO_VERSION;
@@ -8483,8 +8441,6 @@ uint32_t rawWaveGetIn (int pos)
 }
 //}}}
 //{{{
-/* ----------------------------------------------------------------------- */
-
 void rawWaveSetIn (int pos, uint32_t value)
 {
    int page, slot;
@@ -8604,47 +8560,45 @@ void rawDumpScript (unsigned script_id)
 //}}}
 
 //{{{
-int gpioInitialise()
-{
-   int status;
+int gpioInitialise() {
 
-   if (libInitialised) return PIGPIO_VERSION;
+  int status;
 
-   DBG(DBG_STARTUP, "not initialised, initialising");
+  if (libInitialised)
+    return PIGPIO_VERSION;
 
-   runState = PI_STARTING;
+  DBG(DBG_STARTUP, "not initialised, initialising");
 
-   status = initInitialise();
+  runState = PI_STARTING;
 
-   if (status < 0)
-   {
-      runState = PI_ENDING;
-      initReleaseResources();
-   }
-   else
-   {
-      libInitialised = 1;
+  status = initInitialise();
 
-      runState = PI_RUNNING;
+  if (status < 0) {
+    runState = PI_ENDING;
+    initReleaseResources();
+    }
+  else {
+   libInitialised = 1;
 
-      if (!(gpioCfg.ifFlags & PI_DISABLE_ALERT))
-      {
-         while (pthAlertRunning != PI_THREAD_RUNNING) myGpioDelay(1000);
+    runState = PI_RUNNING;
+
+    if (!(gpioCfg.ifFlags & PI_DISABLE_ALERT)) {
+      while (pthAlertRunning != PI_THREAD_RUNNING)
+        myGpioDelay(1000);
       }
+    }
 
-   }
-
-   return status;
-}
+  return status;
+  }
 //}}}
 //{{{
-void gpioTerminate()
-{
-   int i;
+void gpioTerminate() {
 
+   int i;
    DBG(DBG_USER, "");
 
-   if (!libInitialised) return;
+   if (!libInitialised) 
+     return;
 
    DBG(DBG_STARTUP, "initialised, terminating");
 
@@ -8653,7 +8607,6 @@ void gpioTerminate()
    gpioMaskSet = 0;
 
    /* reset DMA */
-
    if (dmaReg != MAP_FAILED)
    {
       initKillDMA(dmaIn);
@@ -8697,13 +8650,11 @@ void gpioTerminate()
    }
 
 #endif
+
    initReleaseResources();
-
    fflush(NULL);
-
    libInitialised = 0;
 }
-
 //}}}
 
 //{{{
@@ -12763,6 +12714,49 @@ int gpioWrite_Bits_32_53_Set (uint32_t bits)
 //}}}
 
 //{{{
+static int chooseBestClock (clkInf_t* clkInf, unsigned f, unsigned numc, unsigned* cf)
+{
+   int c, valid;
+   double fdiv, offby, best_offby;
+   unsigned div, frac;
+
+   valid = 0;
+   best_offby = 0;
+
+   for (c=0; c<numc; c++)
+   {
+      fdiv = (double)cf[c] / (double)f;
+      if (f < PI_MASH_MAX_FREQ)
+      {
+         fdiv += (0.5 / 4096.0);
+         div = fdiv;
+         frac = (fdiv - div) * 4096.0;
+      }
+      else
+      {
+         fdiv += 0.5;
+         div = fdiv;
+         frac = 0;
+      }
+
+      if ((div > 1) && (div < 4096))
+      {
+         offby = f - (cf[c] / (div + (frac / 4096.0)));
+         if (offby < 0) offby = - offby;
+         if ((!valid) || (offby <= best_offby))
+         {
+            valid = 1;
+            clkInf->div = div;
+            clkInf->frac = frac;
+            clkInf->clock = c;
+            best_offby = offby;
+         }
+      }
+   }
+   return valid;
+}
+//}}}
+//{{{
 int gpioHardwareClock (unsigned gpio, unsigned frequency)
 {
    int cctl[] = {CLK_GP0_CTL, CLK_GP1_CTL, CLK_GP2_CTL};
@@ -13806,4 +13800,46 @@ int gpioCfgSetInternals (uint32_t cfgVal)
 }
 //}}}
 
-#include "custom.c"
+//{{{
+int gpioCustom1(unsigned arg1, unsigned arg2, char *argx, unsigned count) {
+
+  int i;
+
+  unsigned max;
+
+  DBG(DBG_USER, "arg1=%d arg2=%d count=%d [%s]",
+     arg1, arg2, count, myBuf2Str(count, argx));
+
+  CHECK_INITED;
+
+  /* for dummy just return max parameter */
+  if (arg1 > arg2) max = arg1; else max = arg2;
+
+  for (i=0; i<count; i++) if (argx[i] > max) max = argx[i];
+
+  return max;
+  }
+//}}}
+//{{{
+int gpioCustom2(unsigned arg1, char *argx, unsigned count, char *retBuf, unsigned retMax) {
+
+  int i, j, t;
+
+  DBG(DBG_USER, "arg1=%d count=%d [%s] retMax=%d",
+     arg1, count, myBuf2Str(count, argx), retMax);
+
+  CHECK_INITED;
+
+  /* for dummy just return argx reversed */
+  if (count > retMax) count = retMax;
+
+  for (i=0, j=count-1; i<=j; i++, j--) {
+    /* t used as argx and retBuf may be the same buffer */
+    t = argx[i];
+    retBuf[i] = argx[j];
+    retBuf[j] = t;
+    }
+
+  return count;
+  }
+//}}}

@@ -1,5 +1,5 @@
 TARGET    = blink
-SRCS      = blink.c \
+SRCS      = blink.cpp \
 	    pigpio/pigpio.c \
 	    pigpio/command.c
 
@@ -15,7 +15,7 @@ DEPS      = $(OBJS:.o=.d)
 CFLAGS = -Wall -Wno-unused-result \
 	 -g \
 	 -MMD -MP \
-#         -O2
+	 -O2
 
 $(BUILD_DIR)/%.c.o: %.c
 	mkdir -p $(dir $@)
