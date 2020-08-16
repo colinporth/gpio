@@ -1,18 +1,20 @@
 #include <stdio.h>
 #include "pigpio/pigpio.h"
 
-int main(int argc, char *argv[]) {
+int main (int argc, char *argv[]) {
 
-  double start;
+  unsigned hardwareRevision = gpioHardwareRevision();
+  unsigned version = gpioVersion();
+  printf ("pigpio %d %d\n", hardwareRevision, version);
 
   if (gpioInitialise() < 0) {
-    fprintf(stderr, "pigpio initialisation failed\n");
+    printf ("pigpio initialisation failed\n");
     return 1;
     }
 
   gpioSetMode (18, PI_OUTPUT);
 
-  start = time_time();
+  double start = time_time();
   while ((time_time() - start) < 60.0) {
     gpioWrite (18, 1); /* on */
     time_sleep (0.5);

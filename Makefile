@@ -12,7 +12,7 @@ LIBS      = -lpthread -lrt
 OBJS      = $(SRCS:%=$(BUILD_DIR)/%.o)
 DEPS      = $(OBJS:.o=.d)
 
-CFLAGS = -Wall -Wno-unused-result \
+CFLAGS = -Wall \
 	 -g \
 	 -MMD -MP \
 	 -O2

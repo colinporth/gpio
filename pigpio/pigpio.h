@@ -1,30 +1,4 @@
-//{{{
-/*
-This is free and unencumbered software released into the public domain.
-
-Anyone is free to copy, modify, publish, use, compile, sell, or
-distribute this software, either in source code form or as a compiled
-binary, for any purpose, commercial or non-commercial, and by any
-means.
-
-In jurisdictions that recognize copyright laws, the author or authors
-of this software dedicate any and all copyright interest in the
-software to the public domain. We make this dedication for the benefit
-of the public at large and to the detriment of our heirs and
-successors. We intend this dedication to be an overt act of
-relinquishment in perpetuity of all present and future rights to this
-software under copyright law.
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
-OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
-ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-OTHER DEALINGS IN THE SOFTWARE.
-
-For more information, please refer to <http://unlicense.org/>
-*/
-//}}}
+// pigpio.h
 #pragma once
 //{{{  includes
 #include <stdint.h>
@@ -378,7 +352,6 @@ For more information, please refer to <http://unlicense.org/>
 //OVERVIEW*/
 //}}}
 //{{{  PARAMS
-
 //active :: 0-1000000
 
 //The number of microseconds level changes are reported for once
@@ -1262,6 +1235,376 @@ For more information, please refer to <http://unlicense.org/>
 
 //A 16-bit word value.
 //}}}
+//{{{  defines
+//{{{  gpio: 0-53
+#define PI_MIN_GPIO       0
+#define PI_MAX_GPIO      53
+//}}}
+#define PI_MAX_USER_GPIO 31
+//{{{  level: 0-1 
+#define PI_OFF   0
+#define PI_ON    1
+
+#define PI_CLEAR 0
+#define PI_SET   1
+
+#define PI_LOW   0
+#define PI_HIGH  1
+//}}}
+
+#define PI_TIMEOUT 2
+//{{{  mode: 0-7 
+#define PI_INPUT  0
+#define PI_OUTPUT 1
+
+#define PI_ALT0   4
+#define PI_ALT1   5
+#define PI_ALT2   6
+#define PI_ALT3   7
+#define PI_ALT4   3
+#define PI_ALT5   2
+//}}}
+//{{{  pud 0-2 
+#define PI_PUD_OFF  0
+#define PI_PUD_DOWN 1
+#define PI_PUD_UP   2
+//}}}
+//{{{  dutyCycle
+#define PI_DEFAULT_DUTYCYCLE_RANGE   255
+#define PI_MIN_DUTYCYCLE_RANGE        25
+#define PI_MAX_DUTYCYCLE_RANGE     40000
+//}}}
+//{{{  pulsewidth: 0, 500-2500 
+#define PI_SERVO_OFF 0
+
+#define PI_MIN_SERVO_PULSEWIDTH 500
+#define PI_MAX_SERVO_PULSEWIDTH 2500
+//}}}
+//{{{  hardware PWM 
+#define PI_HW_PWM_MIN_FREQ 1
+
+#define PI_HW_PWM_MAX_FREQ      125000000
+#define PI_HW_PWM_MAX_FREQ_2711 187500000
+
+#define PI_HW_PWM_RANGE 1000000
+//}}}
+//{{{  hardware clock 
+#define PI_HW_CLK_MIN_FREQ       4689
+#define PI_HW_CLK_MIN_FREQ_2711 13184
+
+#define PI_HW_CLK_MAX_FREQ      250000000
+#define PI_HW_CLK_MAX_FREQ_2711 375000000
+//}}}
+
+//{{{  notify
+#define PI_NOTIFY_SLOTS  32
+
+#define PI_NTFY_FLAGS_EVENT    (1 <<7)
+#define PI_NTFY_FLAGS_ALIVE    (1 <<6)
+#define PI_NTFY_FLAGS_WDOG     (1 <<5)
+#define PI_NTFY_FLAGS_BIT(x) (((x)<<0)&31)
+//}}}
+//{{{  wave
+#define PI_WAVE_BLOCKS     4
+#define PI_WAVE_MAX_PULSES (PI_WAVE_BLOCKS * 3000)
+#define PI_WAVE_MAX_CHARS  (PI_WAVE_BLOCKS *  300)
+
+#define PI_BB_I2C_MIN_BAUD     50
+#define PI_BB_I2C_MAX_BAUD 500000
+
+#define PI_BB_SPI_MIN_BAUD     50
+#define PI_BB_SPI_MAX_BAUD 250000
+
+#define PI_BB_SER_MIN_BAUD     50
+#define PI_BB_SER_MAX_BAUD 250000
+
+#define PI_BB_SER_NORMAL 0
+#define PI_BB_SER_INVERT 1
+
+#define PI_WAVE_MIN_BAUD      50
+#define PI_WAVE_MAX_BAUD 1000000
+
+#define PI_SPI_MIN_BAUD     32000
+#define PI_SPI_MAX_BAUD 125000000
+
+#define PI_MIN_WAVE_DATABITS 1
+#define PI_MAX_WAVE_DATABITS 32
+
+#define PI_MIN_WAVE_HALFSTOPBITS 2
+#define PI_MAX_WAVE_HALFSTOPBITS 8
+
+#define PI_WAVE_MAX_MICROS (30 * 60 * 1000000) /* half an hour */
+
+#define PI_MAX_WAVES 250
+
+#define PI_MAX_WAVE_CYCLES 65535
+#define PI_MAX_WAVE_DELAY  65535
+
+#define PI_WAVE_COUNT_PAGES 10
+
+// wave tx mode
+#define PI_WAVE_MODE_ONE_SHOT      0
+#define PI_WAVE_MODE_REPEAT        1
+#define PI_WAVE_MODE_ONE_SHOT_SYNC 2
+#define PI_WAVE_MODE_REPEAT_SYNC   3
+
+// special wave at return values
+#define PI_WAVE_NOT_FOUND  9998 /* Transmitted wave not found. */
+#define PI_NO_TX_WAVE      9999 /* No wave being transmitted. */
+//}}}
+//{{{  Files, I2C, SPI, SER 
+#define PI_FILE_SLOTS 16
+#define PI_I2C_SLOTS  512
+#define PI_SPI_SLOTS  32
+#define PI_SER_SLOTS  16
+
+#define PI_MAX_I2C_ADDR 0x7F
+
+#define PI_NUM_AUX_SPI_CHANNEL 3
+#define PI_NUM_STD_SPI_CHANNEL 2
+
+#define PI_MAX_I2C_DEVICE_COUNT (1<<16)
+#define PI_MAX_SPI_DEVICE_COUNT (1<<16)
+
+/* max pi_i2c_msg_t per transaction */
+#define  PI_I2C_RDRW_IOCTL_MAX_MSGS 42
+
+/* flags for i2cTransaction, pi_i2c_msg_t */
+#define PI_I2C_M_WR           0x0000 /* write data */
+#define PI_I2C_M_RD           0x0001 /* read data */
+#define PI_I2C_M_TEN          0x0010 /* ten bit chip address */
+#define PI_I2C_M_RECV_LEN     0x0400 /* length will be first received byte */
+#define PI_I2C_M_NO_RD_ACK    0x0800 /* if I2C_FUNC_PROTOCOL_MANGLING */
+#define PI_I2C_M_IGNORE_NAK   0x1000 /* if I2C_FUNC_PROTOCOL_MANGLING */
+#define PI_I2C_M_REV_DIR_ADDR 0x2000 /* if I2C_FUNC_PROTOCOL_MANGLING */
+#define PI_I2C_M_NOSTART      0x4000 /* if I2C_FUNC_PROTOCOL_MANGLING */
+
+/* bbI2CZip and i2cZip commands */
+#define PI_I2C_END          0
+#define PI_I2C_ESC          1
+#define PI_I2C_START        2
+#define PI_I2C_COMBINED_ON  2
+#define PI_I2C_STOP         3
+#define PI_I2C_COMBINED_OFF 3
+#define PI_I2C_ADDR         4
+#define PI_I2C_FLAGS        5
+#define PI_I2C_READ         6
+#define PI_I2C_WRITE        7
+//}}}
+//{{{  SPI 
+#define PI_SPI_FLAGS_BITLEN(x) ((x&63)<<16)
+#define PI_SPI_FLAGS_RX_LSB(x)  ((x&1)<<15)
+#define PI_SPI_FLAGS_TX_LSB(x)  ((x&1)<<14)
+#define PI_SPI_FLAGS_3WREN(x)  ((x&15)<<10)
+#define PI_SPI_FLAGS_3WIRE(x)   ((x&1)<<9)
+#define PI_SPI_FLAGS_AUX_SPI(x) ((x&1)<<8)
+#define PI_SPI_FLAGS_RESVD(x)   ((x&7)<<5)
+#define PI_SPI_FLAGS_CSPOLS(x)  ((x&7)<<2)
+#define PI_SPI_FLAGS_MODE(x)    ((x&3))
+//}}}
+//{{{  BSC registers 
+#define BSC_DR         0
+#define BSC_RSR        1
+#define BSC_SLV        2
+#define BSC_CR         3
+#define BSC_FR         4
+#define BSC_IFLS       5
+#define BSC_IMSC       6
+#define BSC_RIS        7
+#define BSC_MIS        8
+#define BSC_ICR        9
+#define BSC_DMACR     10
+#define BSC_TDR       11
+#define BSC_GPUSTAT   12
+#define BSC_HCTRL     13
+#define BSC_DEBUG_I2C 14
+#define BSC_DEBUG_SPI 15
+
+#define BSC_CR_TESTFIFO 2048
+#define BSC_CR_RXE  512
+#define BSC_CR_TXE  256
+#define BSC_CR_BRK  128
+#define BSC_CR_CPOL  16
+#define BSC_CR_CPHA   8
+#define BSC_CR_I2C    4
+#define BSC_CR_SPI    2
+#define BSC_CR_EN     1
+
+#define BSC_FR_RXBUSY 32
+#define BSC_FR_TXFE   16
+#define BSC_FR_RXFF    8
+#define BSC_FR_TXFF    4
+#define BSC_FR_RXFE    2
+#define BSC_FR_TXBUSY  1
+//}}}
+//{{{  BSC GPIO 
+
+#define BSC_SDA_MOSI 18
+#define BSC_SCL_SCLK 19
+#define BSC_MISO     20
+#define BSC_CE_N     21
+
+#define BSC_SDA_MOSI_2711 10
+#define BSC_SCL_SCLK_2711 11
+#define BSC_MISO_2711      9
+#define BSC_CE_N_2711      8
+//}}}
+//{{{  Longest busy delay 
+
+#define PI_MAX_BUSY_DELAY 100
+//}}}
+//{{{  timeout 0-60000 
+
+#define PI_MIN_WDOG_TIMEOUT 0
+#define PI_MAX_WDOG_TIMEOUT 60000
+//}}}
+//{{{  timer 0-9 
+
+#define PI_MIN_TIMER 0
+#define PI_MAX_TIMER 9
+//}}}
+//{{{  millis 10-60000 
+#define PI_MIN_MS 10
+#define PI_MAX_MS 60000
+//}}}
+
+//{{{  scripts
+#define PI_MAX_SCRIPTS       32
+
+#define PI_MAX_SCRIPT_TAGS   50
+#define PI_MAX_SCRIPT_VARS  150
+#define PI_MAX_SCRIPT_PARAMS 10
+//}}}
+//{{{
+/* script status */
+
+#define PI_SCRIPT_INITING 0
+#define PI_SCRIPT_HALTED  1
+#define PI_SCRIPT_RUNNING 2
+#define PI_SCRIPT_WAITING 3
+#define PI_SCRIPT_FAILED  4
+//}}}
+//{{{
+/* signum: 0-63 */
+
+#define PI_MIN_SIGNUM 0
+#define PI_MAX_SIGNUM 63
+//}}}
+//{{{
+/* timetype: 0-1 */
+
+#define PI_TIME_RELATIVE 0
+#define PI_TIME_ABSOLUTE 1
+
+#define PI_MAX_MICS_DELAY 1000000 /* 1 second */
+#define PI_MAX_MILS_DELAY 60000   /* 60 seconds */
+//}}}
+//{{{
+/* cfgMillis */
+
+#define PI_BUF_MILLIS_MIN 100
+#define PI_BUF_MILLIS_MAX 10000
+//}}}
+//{{{
+/* cfgMicros: 1, 2, 4, 5, 8, or 10 */
+
+/* cfgPeripheral: 0-1 */
+
+#define PI_CLOCK_PWM 0
+#define PI_CLOCK_PCM 1
+//}}}
+//{{{
+/* DMA channel: 0-15, 15 is unset */
+
+#define PI_MIN_DMA_CHANNEL 0
+#define PI_MAX_DMA_CHANNEL 15
+//}}}
+//{{{
+/* port */
+
+#define PI_MIN_SOCKET_PORT 1024
+#define PI_MAX_SOCKET_PORT 32000
+//}}}
+//{{{
+/* ifFlags: */
+
+#define PI_DISABLE_FIFO_IF   1
+#define PI_DISABLE_SOCK_IF   2
+#define PI_LOCALHOST_SOCK_IF 4
+#define PI_DISABLE_ALERT     8
+//}}}
+//{{{
+/* memAllocMode */
+
+#define PI_MEM_ALLOC_AUTO    0
+#define PI_MEM_ALLOC_PAGEMAP 1
+#define PI_MEM_ALLOC_MAILBOX 2
+//}}}
+//{{{
+/* filters */
+
+#define PI_MAX_STEADY  300000
+#define PI_MAX_ACTIVE 1000000
+//}}}
+//{{{
+/* gpioCfgInternals */
+
+#define PI_CFG_DBG_LEVEL         0 /* bits 0-3 */
+#define PI_CFG_ALERT_FREQ        4 /* bits 4-7 */
+#define PI_CFG_RT_PRIORITY       (1<<8)
+#define PI_CFG_STATS             (1<<9)
+#define PI_CFG_NOSIGHANDLER      (1<<10)
+
+#define PI_CFG_ILLEGAL_VAL       (1<<11)
+//}}}
+//{{{
+/* gpioISR */
+
+#define RISING_EDGE  0
+#define FALLING_EDGE 1
+#define EITHER_EDGE  2
+//}}}
+//{{{
+/* pads */
+
+#define PI_MAX_PAD 2
+
+#define PI_MIN_PAD_STRENGTH 1
+#define PI_MAX_PAD_STRENGTH 16
+//}}}
+//{{{
+/* files */
+
+#define PI_FILE_NONE   0
+#define PI_FILE_MIN    1
+#define PI_FILE_READ   1
+#define PI_FILE_WRITE  2
+#define PI_FILE_RW     3
+#define PI_FILE_APPEND 4
+#define PI_FILE_CREATE 8
+#define PI_FILE_TRUNC  16
+#define PI_FILE_MAX    31
+
+#define PI_FROM_START   0
+#define PI_FROM_CURRENT 1
+#define PI_FROM_END     2
+//}}}
+//{{{
+/* Allowed socket connect addresses */
+
+#define MAX_CONNECT_ADDRESSES 256
+//}}}
+//{{{
+/* events */
+
+#define PI_MAX_EVENT 31
+//}}}
+//{{{
+/* Event auto generated on BSC slave activity */
+
+#define PI_EVENT_BSC 31
+//}}}
+
 //{{{  DEF_S Socket Command Codes
 #define PI_CMD_MODES  0
 #define PI_CMD_MODEG  1
@@ -1403,19 +1746,16 @@ For more information, please refer to <http://unlicense.org/>
 
 #define PI_CMD_PROCU 117
 #define PI_CMD_WVCAP 118
-
-/*DEF_E*/
-
+//}}}
+//{{{  DEF_E
 /*
 PI CMD_NOIB only works on the socket interface.
 It returns a spare notification handle.  Notifications for
 that handle will be sent to the socket (rather than a
 /dev/pigpiox pipe).
-
 The socket should be dedicated to receiving notifications
 after this command is issued.
 */
-
 /* pseudo commands */
 
 #define PI_CMD_SCRIPT 800
@@ -1464,8 +1804,8 @@ after this command is issued.
 #define PI_CMD_XOR   841
 #define PI_CMD_EVTWT 842
 
-/*DEF_S Error Codes*/
-
+//}}}
+//{{{  DEF_S Error Codes
 #define PI_INIT_FAILED       -1 // gpioInitialise failed
 #define PI_BAD_USER_GPIO     -2 // GPIO not 0-31
 #define PI_BAD_GPIO          -3 // GPIO not 0-53
@@ -1621,22 +1961,28 @@ after this command is issued.
 
 #define PI_CUSTOM_ERR_0   -3000
 #define PI_CUSTOM_ERR_999 -3999
+
 //}}}
-//{{{  DEF_E
+//{{{  default
 #define PI_DEFAULT_BUFFER_MILLIS           120
+
 #define PI_DEFAULT_CLK_MICROS              5
 #define PI_DEFAULT_CLK_PERIPHERAL          PI_CLOCK_PCM
+
 #define PI_DEFAULT_IF_FLAGS                0
 #define PI_DEFAULT_FOREGROUND              0
+
 #define PI_DEFAULT_DMA_CHANNEL             14
 #define PI_DEFAULT_DMA_PRIMARY_CHANNEL     14
 #define PI_DEFAULT_DMA_SECONDARY_CHANNEL   6
 #define PI_DEFAULT_DMA_PRIMARY_CH_2711     7
 #define PI_DEFAULT_DMA_SECONDARY_CH_2711   6
 #define PI_DEFAULT_DMA_NOT_SET             15
+
 #define PI_DEFAULT_SOCKET_PORT             8888
 #define PI_DEFAULT_SOCKET_PORT_STR         "8888"
 #define PI_DEFAULT_SOCKET_ADDR_STR         "localhost"
+
 #define PI_DEFAULT_UPDATE_MASK_UNKNOWN     0x0000000FFFFFFCLL
 #define PI_DEFAULT_UPDATE_MASK_B1          0x03E7CF93
 #define PI_DEFAULT_UPDATE_MASK_A_B2        0xFBC7CF9C
@@ -1646,11 +1992,12 @@ after this command is issued.
 #define PI_DEFAULT_UPDATE_MASK_PI3B        0x0000000FFFFFFCLL
 #define PI_DEFAULT_UPDATE_MASK_PI4B        0x0000000FFFFFFCLL
 #define PI_DEFAULT_UPDATE_MASK_COMPUTE     0x00FFFFFFFFFFFFLL
+
 #define PI_DEFAULT_MEM_ALLOC_MODE          PI_MEM_ALLOC_AUTO
 
 #define PI_DEFAULT_CFG_INTERNALS           0
 //}}}
-//{{{  defines
+
 #define PI_INPFIFO "/dev/pigpio"
 #define PI_OUTFIFO "/dev/pigout"
 #define PI_ERRFIFO "/dev/pigerr"
@@ -1659,7 +2006,6 @@ after this command is issued.
 #define PI_ENVADDR "PIGPIO_ADDR"
 
 #define PI_LOCKFILE "/var/run/pigpio.pid"
-
 #define PI_I2C_COMBINED "/sys/module/i2c_bcm2708/parameters/combined"
 //}}}
 
@@ -1793,459 +2139,25 @@ typedef struct
 } bsc_xfer_t;
 //}}}
 //{{{
-typedef void (*gpioAlertFunc_t)    (int      gpio,
-                                    int      level,
-                                    uint32_t tick);
+typedef void (*gpioAlertFunc_t) (int gpio, int level, uint32_t tick);
+typedef void (*gpioAlertFuncEx_t) (int gpio, int level, uint32_t tick, void* userdata);
 
-typedef void (*gpioAlertFuncEx_t)  (int      gpio,
-                                    int      level,
-                                    uint32_t tick,
-                                    void    *userdata);
+typedef void (*eventFunc_t) (int event, uint32_t tick);
+typedef void (*eventFuncEx_t) (int event, uint32_t tick, void* userdata);
 
-typedef void (*eventFunc_t)        (int      event,
-                                    uint32_t tick);
+typedef void (*gpioISRFunc_t) (int gpio, int level, uint32_t tick);
+typedef void (*gpioISRFuncEx_t) (int gpio, int level, uint32_t tick, void* userdata);
 
-typedef void (*eventFuncEx_t)      (int      event,
-                                    uint32_t tick,
-                                    void    *userdata);
+typedef void (*gpioTimerFunc_t) ();
+typedef void (*gpioTimerFuncEx_t) (void* userdata);
 
-typedef void (*gpioISRFunc_t)      (int      gpio,
-                                    int      level,
-                                    uint32_t tick);
+typedef void (*gpioSignalFunc_t) (int signum);
+typedef void (*gpioSignalFuncEx_t) (int signum, void* userdata);
 
-typedef void (*gpioISRFuncEx_t)    (int      gpio,
-                                    int      level,
-                                    uint32_t tick,
-                                    void    *userdata);
+typedef void (*gpioGetSamplesFunc_t) (const gpioSample_t *samples, int numSamples);
+typedef void (*gpioGetSamplesFuncEx_t) (const gpioSample_t *samples, int numSamples, void* userdata);
 
-typedef void (*gpioTimerFunc_t)    ();
-
-typedef void (*gpioTimerFuncEx_t)  (void *userdata);
-
-typedef void (*gpioSignalFunc_t)   (int signum);
-
-typedef void (*gpioSignalFuncEx_t) (int    signum,
-                                    void  *userdata);
-
-typedef void (*gpioGetSamplesFunc_t)   (const gpioSample_t *samples,
-                                        int                 numSamples);
-
-typedef void (*gpioGetSamplesFuncEx_t) (const gpioSample_t *samples,
-                                        int                 numSamples,
-                                        void               *userdata);
-
-typedef void *(gpioThreadFunc_t) (void *);
-//}}}
-//{{{  defines
-//{{{  gpio: 0-53
-
-#define PI_MIN_GPIO       0
-#define PI_MAX_GPIO      53
-//}}}
-//{{{  user_gpio: 0-31 */
-
-#define PI_MAX_USER_GPIO 31
-//}}}
-//{{{  level: 0-1 */
-
-#define PI_OFF   0
-#define PI_ON    1
-
-#define PI_CLEAR 0
-#define PI_SET   1
-
-#define PI_LOW   0
-#define PI_HIGH  1
-//}}}
-
-//{{{
-/* level: only reported for GPIO time-out, see gpioSetWatchdog */
-
-#define PI_TIMEOUT 2
-//}}}
-//{{{
-/* mode: 0-7 */
-
-#define PI_INPUT  0
-#define PI_OUTPUT 1
-#define PI_ALT0   4
-#define PI_ALT1   5
-#define PI_ALT2   6
-#define PI_ALT3   7
-#define PI_ALT4   3
-#define PI_ALT5   2
-//}}}
-//{{{
-/* pud: 0-2 */
-
-#define PI_PUD_OFF  0
-#define PI_PUD_DOWN 1
-#define PI_PUD_UP   2
-//}}}
-//{{{
-/* dutycycle: 0-range */
-
-#define PI_DEFAULT_DUTYCYCLE_RANGE   255
-//}}}
-//{{{
-/* range: 25-40000 */
-
-#define PI_MIN_DUTYCYCLE_RANGE        25
-#define PI_MAX_DUTYCYCLE_RANGE     40000
-//}}}
-//{{{
-/* pulsewidth: 0, 500-2500 */
-
-#define PI_SERVO_OFF 0
-#define PI_MIN_SERVO_PULSEWIDTH 500
-#define PI_MAX_SERVO_PULSEWIDTH 2500
-//}}}
-//{{{
-/* hardware PWM */
-
-#define PI_HW_PWM_MIN_FREQ 1
-#define PI_HW_PWM_MAX_FREQ      125000000
-#define PI_HW_PWM_MAX_FREQ_2711 187500000
-#define PI_HW_PWM_RANGE 1000000
-//}}}
-//{{{
-/* hardware clock */
-
-#define PI_HW_CLK_MIN_FREQ       4689
-#define PI_HW_CLK_MIN_FREQ_2711 13184
-#define PI_HW_CLK_MAX_FREQ      250000000
-#define PI_HW_CLK_MAX_FREQ_2711 375000000
-//}}}
-
-//{{{  notify
-#define PI_NOTIFY_SLOTS  32
-
-#define PI_NTFY_FLAGS_EVENT    (1 <<7)
-#define PI_NTFY_FLAGS_ALIVE    (1 <<6)
-#define PI_NTFY_FLAGS_WDOG     (1 <<5)
-#define PI_NTFY_FLAGS_BIT(x) (((x)<<0)&31)
-//}}}
-//{{{  wave
-#define PI_WAVE_BLOCKS     4
-#define PI_WAVE_MAX_PULSES (PI_WAVE_BLOCKS * 3000)
-#define PI_WAVE_MAX_CHARS  (PI_WAVE_BLOCKS *  300)
-
-#define PI_BB_I2C_MIN_BAUD     50
-#define PI_BB_I2C_MAX_BAUD 500000
-
-#define PI_BB_SPI_MIN_BAUD     50
-#define PI_BB_SPI_MAX_BAUD 250000
-
-#define PI_BB_SER_MIN_BAUD     50
-#define PI_BB_SER_MAX_BAUD 250000
-
-#define PI_BB_SER_NORMAL 0
-#define PI_BB_SER_INVERT 1
-
-#define PI_WAVE_MIN_BAUD      50
-#define PI_WAVE_MAX_BAUD 1000000
-
-#define PI_SPI_MIN_BAUD     32000
-#define PI_SPI_MAX_BAUD 125000000
-
-#define PI_MIN_WAVE_DATABITS 1
-#define PI_MAX_WAVE_DATABITS 32
-
-#define PI_MIN_WAVE_HALFSTOPBITS 2
-#define PI_MAX_WAVE_HALFSTOPBITS 8
-
-#define PI_WAVE_MAX_MICROS (30 * 60 * 1000000) /* half an hour */
-
-#define PI_MAX_WAVES 250
-
-#define PI_MAX_WAVE_CYCLES 65535
-#define PI_MAX_WAVE_DELAY  65535
-
-#define PI_WAVE_COUNT_PAGES 10
-//}}}
-
-//{{{
-/* wave tx mode */
-
-#define PI_WAVE_MODE_ONE_SHOT      0
-#define PI_WAVE_MODE_REPEAT        1
-#define PI_WAVE_MODE_ONE_SHOT_SYNC 2
-#define PI_WAVE_MODE_REPEAT_SYNC   3
-//}}}
-//{{{
-/* special wave at return values */
-
-#define PI_WAVE_NOT_FOUND  9998 /* Transmitted wave not found. */
-#define PI_NO_TX_WAVE      9999 /* No wave being transmitted. */
-//}}}
-//{{{
-/* Files, I2C, SPI, SER */
-
-#define PI_FILE_SLOTS 16
-#define PI_I2C_SLOTS  512
-#define PI_SPI_SLOTS  32
-#define PI_SER_SLOTS  16
-
-#define PI_MAX_I2C_ADDR 0x7F
-
-#define PI_NUM_AUX_SPI_CHANNEL 3
-#define PI_NUM_STD_SPI_CHANNEL 2
-
-#define PI_MAX_I2C_DEVICE_COUNT (1<<16)
-#define PI_MAX_SPI_DEVICE_COUNT (1<<16)
-
-/* max pi_i2c_msg_t per transaction */
-
-#define  PI_I2C_RDRW_IOCTL_MAX_MSGS 42
-
-/* flags for i2cTransaction, pi_i2c_msg_t */
-
-#define PI_I2C_M_WR           0x0000 /* write data */
-#define PI_I2C_M_RD           0x0001 /* read data */
-#define PI_I2C_M_TEN          0x0010 /* ten bit chip address */
-#define PI_I2C_M_RECV_LEN     0x0400 /* length will be first received byte */
-#define PI_I2C_M_NO_RD_ACK    0x0800 /* if I2C_FUNC_PROTOCOL_MANGLING */
-#define PI_I2C_M_IGNORE_NAK   0x1000 /* if I2C_FUNC_PROTOCOL_MANGLING */
-#define PI_I2C_M_REV_DIR_ADDR 0x2000 /* if I2C_FUNC_PROTOCOL_MANGLING */
-#define PI_I2C_M_NOSTART      0x4000 /* if I2C_FUNC_PROTOCOL_MANGLING */
-
-/* bbI2CZip and i2cZip commands */
-
-#define PI_I2C_END          0
-#define PI_I2C_ESC          1
-#define PI_I2C_START        2
-#define PI_I2C_COMBINED_ON  2
-#define PI_I2C_STOP         3
-#define PI_I2C_COMBINED_OFF 3
-#define PI_I2C_ADDR         4
-#define PI_I2C_FLAGS        5
-#define PI_I2C_READ         6
-#define PI_I2C_WRITE        7
-//}}}
-//{{{
-/* SPI */
-
-#define PI_SPI_FLAGS_BITLEN(x) ((x&63)<<16)
-#define PI_SPI_FLAGS_RX_LSB(x)  ((x&1)<<15)
-#define PI_SPI_FLAGS_TX_LSB(x)  ((x&1)<<14)
-#define PI_SPI_FLAGS_3WREN(x)  ((x&15)<<10)
-#define PI_SPI_FLAGS_3WIRE(x)   ((x&1)<<9)
-#define PI_SPI_FLAGS_AUX_SPI(x) ((x&1)<<8)
-#define PI_SPI_FLAGS_RESVD(x)   ((x&7)<<5)
-#define PI_SPI_FLAGS_CSPOLS(x)  ((x&7)<<2)
-#define PI_SPI_FLAGS_MODE(x)    ((x&3))
-//}}}
-//{{{
-/* BSC registers */
-
-#define BSC_DR         0
-#define BSC_RSR        1
-#define BSC_SLV        2
-#define BSC_CR         3
-#define BSC_FR         4
-#define BSC_IFLS       5
-#define BSC_IMSC       6
-#define BSC_RIS        7
-#define BSC_MIS        8
-#define BSC_ICR        9
-#define BSC_DMACR     10
-#define BSC_TDR       11
-#define BSC_GPUSTAT   12
-#define BSC_HCTRL     13
-#define BSC_DEBUG_I2C 14
-#define BSC_DEBUG_SPI 15
-
-#define BSC_CR_TESTFIFO 2048
-#define BSC_CR_RXE  512
-#define BSC_CR_TXE  256
-#define BSC_CR_BRK  128
-#define BSC_CR_CPOL  16
-#define BSC_CR_CPHA   8
-#define BSC_CR_I2C    4
-#define BSC_CR_SPI    2
-#define BSC_CR_EN     1
-
-#define BSC_FR_RXBUSY 32
-#define BSC_FR_TXFE   16
-#define BSC_FR_RXFF    8
-#define BSC_FR_TXFF    4
-#define BSC_FR_RXFE    2
-#define BSC_FR_TXBUSY  1
-//}}}
-//{{{
-/* BSC GPIO */
-
-#define BSC_SDA_MOSI 18
-#define BSC_SCL_SCLK 19
-#define BSC_MISO     20
-#define BSC_CE_N     21
-
-#define BSC_SDA_MOSI_2711 10
-#define BSC_SCL_SCLK_2711 11
-#define BSC_MISO_2711      9
-#define BSC_CE_N_2711      8
-//}}}
-//{{{
-/* Longest busy delay */
-
-#define PI_MAX_BUSY_DELAY 100
-//}}}
-//{{{
-/* timeout: 0-60000 */
-
-#define PI_MIN_WDOG_TIMEOUT 0
-#define PI_MAX_WDOG_TIMEOUT 60000
-//}}}
-//{{{
-/* timer: 0-9 */
-
-#define PI_MIN_TIMER 0
-#define PI_MAX_TIMER 9
-//}}}
-//{{{
-/* millis: 10-60000 */
-
-#define PI_MIN_MS 10
-#define PI_MAX_MS 60000
-//}}}
-
-//{{{  scripts
-#define PI_MAX_SCRIPTS       32
-
-#define PI_MAX_SCRIPT_TAGS   50
-#define PI_MAX_SCRIPT_VARS  150
-#define PI_MAX_SCRIPT_PARAMS 10
-//}}}
-
-//{{{
-/* script status */
-
-#define PI_SCRIPT_INITING 0
-#define PI_SCRIPT_HALTED  1
-#define PI_SCRIPT_RUNNING 2
-#define PI_SCRIPT_WAITING 3
-#define PI_SCRIPT_FAILED  4
-//}}}
-//{{{
-/* signum: 0-63 */
-
-#define PI_MIN_SIGNUM 0
-#define PI_MAX_SIGNUM 63
-//}}}
-//{{{
-/* timetype: 0-1 */
-
-#define PI_TIME_RELATIVE 0
-#define PI_TIME_ABSOLUTE 1
-
-#define PI_MAX_MICS_DELAY 1000000 /* 1 second */
-#define PI_MAX_MILS_DELAY 60000   /* 60 seconds */
-//}}}
-//{{{
-/* cfgMillis */
-
-#define PI_BUF_MILLIS_MIN 100
-#define PI_BUF_MILLIS_MAX 10000
-//}}}
-//{{{
-/* cfgMicros: 1, 2, 4, 5, 8, or 10 */
-
-/* cfgPeripheral: 0-1 */
-
-#define PI_CLOCK_PWM 0
-#define PI_CLOCK_PCM 1
-//}}}
-//{{{
-/* DMA channel: 0-15, 15 is unset */
-
-#define PI_MIN_DMA_CHANNEL 0
-#define PI_MAX_DMA_CHANNEL 15
-//}}}
-//{{{
-/* port */
-
-#define PI_MIN_SOCKET_PORT 1024
-#define PI_MAX_SOCKET_PORT 32000
-//}}}
-//{{{
-/* ifFlags: */
-
-#define PI_DISABLE_FIFO_IF   1
-#define PI_DISABLE_SOCK_IF   2
-#define PI_LOCALHOST_SOCK_IF 4
-#define PI_DISABLE_ALERT     8
-//}}}
-//{{{
-/* memAllocMode */
-
-#define PI_MEM_ALLOC_AUTO    0
-#define PI_MEM_ALLOC_PAGEMAP 1
-#define PI_MEM_ALLOC_MAILBOX 2
-//}}}
-//{{{
-/* filters */
-
-#define PI_MAX_STEADY  300000
-#define PI_MAX_ACTIVE 1000000
-//}}}
-//{{{
-/* gpioCfgInternals */
-
-#define PI_CFG_DBG_LEVEL         0 /* bits 0-3 */
-#define PI_CFG_ALERT_FREQ        4 /* bits 4-7 */
-#define PI_CFG_RT_PRIORITY       (1<<8)
-#define PI_CFG_STATS             (1<<9)
-#define PI_CFG_NOSIGHANDLER      (1<<10)
-
-#define PI_CFG_ILLEGAL_VAL       (1<<11)
-//}}}
-//{{{
-/* gpioISR */
-
-#define RISING_EDGE  0
-#define FALLING_EDGE 1
-#define EITHER_EDGE  2
-//}}}
-//{{{
-/* pads */
-
-#define PI_MAX_PAD 2
-
-#define PI_MIN_PAD_STRENGTH 1
-#define PI_MAX_PAD_STRENGTH 16
-//}}}
-//{{{
-/* files */
-
-#define PI_FILE_NONE   0
-#define PI_FILE_MIN    1
-#define PI_FILE_READ   1
-#define PI_FILE_WRITE  2
-#define PI_FILE_RW     3
-#define PI_FILE_APPEND 4
-#define PI_FILE_CREATE 8
-#define PI_FILE_TRUNC  16
-#define PI_FILE_MAX    31
-
-#define PI_FROM_START   0
-#define PI_FROM_CURRENT 1
-#define PI_FROM_END     2
-//}}}
-//{{{
-/* Allowed socket connect addresses */
-
-#define MAX_CONNECT_ADDRESSES 256
-//}}}
-//{{{
-/* events */
-
-#define PI_MAX_EVENT 31
-//}}}
-//{{{
-/* Event auto generated on BSC slave activity */
-
-#define PI_EVENT_BSC 31
-//}}}
+typedef void *(gpioThreadFunc_t) (void*);
 //}}}
 
 //{{{
@@ -2298,7 +2210,7 @@ D*/
 
 //{{{
 /*F*/
-int gpioSetMode(unsigned gpio, unsigned mode);
+int gpioSetMode (unsigned gpio, unsigned mode);
 /*D
 Sets the GPIO mode, typically input or output.
 
@@ -2324,7 +2236,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioGetMode(unsigned gpio);
+int gpioGetMode (unsigned gpio);
 /*D
 Gets the GPIO mode.
 
@@ -2344,7 +2256,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioSetPullUpDown(unsigned gpio, unsigned pud);
+int gpioSetPullUpDown (unsigned gpio, unsigned pud);
 /*D
 Sets or clears resistor pull ups or downs on the GPIO.
 
@@ -2408,7 +2320,7 @@ D*/
 
 //{{{
 /*F*/
-int gpioPWM(unsigned user_gpio, unsigned dutycycle);
+int gpioPWM (unsigned user_gpio, unsigned dutycycle);
 /*D
 Starts PWM on the GPIO, dutycycle between 0 (off) and range (fully on).
 Range defaults to 255.
@@ -2439,7 +2351,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioGetPWMdutycycle(unsigned user_gpio);
+int gpioGetPWMdutycycle (unsigned user_gpio);
 /*D
 Returns the PWM dutycycle setting for the GPIO.
 
@@ -2464,7 +2376,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioSetPWMrange(unsigned user_gpio, unsigned range);
+int gpioSetPWMrange (unsigned user_gpio, unsigned range);
 /*D
 Selects the dutycycle range to be used for the GPIO.  Subsequent calls
 to gpioPWM will use a dutycycle between 0 (off) and range (fully on).
@@ -2499,7 +2411,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioGetPWMrange(unsigned user_gpio);
+int gpioGetPWMrange (unsigned user_gpio);
 /*D
 Returns the dutycycle range used for the GPIO if OK, otherwise
 PI_BAD_USER_GPIO.
@@ -2518,7 +2430,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioGetPWMrealRange(unsigned user_gpio);
+int gpioGetPWMrealRange (unsigned user_gpio);
 /*D
 Returns the real range used for the GPIO if OK, otherwise
 PI_BAD_USER_GPIO.
@@ -2540,7 +2452,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioSetPWMfrequency(unsigned user_gpio, unsigned frequency);
+int gpioSetPWMfrequency (unsigned user_gpio, unsigned frequency);
 /*D
 Sets the frequency in hertz to be used for the GPIO.
 
@@ -2597,7 +2509,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioGetPWMfrequency(unsigned user_gpio);
+int gpioGetPWMfrequency (unsigned user_gpio);
 /*D
 Returns the frequency (in hertz) used for the GPIO if OK, otherwise
 PI_BAD_USER_GPIO.
@@ -2622,7 +2534,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioServo(unsigned user_gpio, unsigned pulsewidth);
+int gpioServo (unsigned user_gpio, unsigned pulsewidth);
 /*D
 Starts servo pulses on the GPIO, 0 (off), 500 (most anti-clockwise) to
 2500 (most clockwise).
@@ -2681,7 +2593,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioGetServoPulsewidth(unsigned user_gpio);
+int gpioGetServoPulsewidth (unsigned user_gpio);
 /*D
 Returns the servo pulsewidth setting for the GPIO.
 
@@ -2695,7 +2607,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioSetAlertFunc(unsigned user_gpio, gpioAlertFunc_t f);
+int gpioSetAlertFunc (unsigned user_gpio, gpioAlertFunc_t f);
 /*D
 Registers a function to be called (a callback) when the specified
 GPIO changes state.
@@ -2776,8 +2688,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioSetAlertFuncEx(
-   unsigned user_gpio, gpioAlertFuncEx_t f, void *userdata);
+int gpioSetAlertFuncEx (unsigned user_gpio, gpioAlertFuncEx_t f, void* userdata);
 /*D
 Registers a function to be called (a callback) when the specified
 GPIO changes state.
@@ -2819,8 +2730,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioSetISRFunc(
-   unsigned gpio, unsigned edge, int timeout, gpioISRFunc_t f);
+int gpioSetISRFunc (unsigned gpio, unsigned edge, int timeout, gpioISRFunc_t f);
 /*D
 Registers a function to be called (a callback) whenever the specified
 GPIO interrupt occurs.
@@ -2884,12 +2794,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioSetISRFuncEx(
-   unsigned gpio,
-   unsigned edge,
-   int timeout,
-   gpioISRFuncEx_t f,
-   void *userdata);
+int gpioSetISRFuncEx (unsigned gpio, unsigned edge, int timeout, gpioISRFuncEx_t f, void* userdata);
 /*D
 Registers a function to be called (a callback) whenever the specified
 GPIO interrupt occurs.
@@ -2977,7 +2882,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioNotifyOpenWithSize(int bufSize);
+int gpioNotifyOpenWithSize (int bufSize);
 /*D
 This function requests a free notification handle.
 
@@ -2989,7 +2894,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioNotifyBegin(unsigned handle, uint32_t bits);
+int gpioNotifyBegin (unsigned handle, uint32_t bits);
 /*D
 This function starts notifications on a previously opened handle.
 
@@ -3051,7 +2956,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioNotifyPause(unsigned handle);
+int gpioNotifyPause (unsigned handle);
 /*D
 This function pauses notifications on a previously opened handle.
 
@@ -3071,7 +2976,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioNotifyClose(unsigned handle);
+int gpioNotifyClose (unsigned handle);
 /*D
 This function stops notifications on a previously opened handle
 and releases the handle for reuse.
@@ -3120,7 +3025,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioWaveAddGeneric(unsigned numPulses, gpioPulse_t *pulses);
+int gpioWaveAddGeneric (unsigned numPulses, gpioPulse_t* pulses);
 /*D
 This function adds a number of pulses to the current waveform.
 
@@ -3179,14 +3084,8 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioWaveAddSerial
-   (unsigned user_gpio,
-    unsigned baud,
-    unsigned data_bits,
-    unsigned stop_bits,
-    unsigned offset,
-    unsigned numBytes,
-    char     *str);
+int gpioWaveAddSerial (unsigned user_gpio, unsigned baud, unsigned data_bits, unsigned stop_bits, unsigned offset,
+                       unsigned numBytes, char     *str);
 /*D
 This function adds a waveform representing serial data to the
 existing waveform (if any).  The serial data starts offset
@@ -3298,7 +3197,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioWaveCreatePad(int pctCB, int pctBOOL, int pctTOOL);
+int gpioWaveCreatePad (int pctCB, int pctBOOL, int pctTOOL);
 /*D
 Similar to [*gpioWaveCreate*], this function creates a waveform but pads the consumed
 resources. Padded waves of equal dimension can be re-cycled efficiently allowing
@@ -3342,7 +3241,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioWaveDelete(unsigned wave_id);
+int gpioWaveDelete (unsigned wave_id);
 /*D
 This function deletes the waveform with id wave_id.
 
@@ -3366,7 +3265,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioWaveTxSend(unsigned wave_id, unsigned wave_mode);
+int gpioWaveTxSend (unsigned wave_id, unsigned wave_mode);
 /*D
 This function transmits the waveform with id wave_id.  The mode
 determines whether the waveform is sent once or cycles endlessly.
@@ -3390,7 +3289,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioWaveChain(char *buf, unsigned bufSize);
+int gpioWaveChain (char* buf, unsigned bufSize);
 /*D
 This function transmits a chain of waveforms.
 
@@ -3593,7 +3492,7 @@ D*/
 
 //{{{
 /*F*/
-int gpioSerialReadOpen(unsigned user_gpio, unsigned baud, unsigned data_bits);
+int gpioSerialReadOpen (unsigned user_gpio, unsigned baud, unsigned data_bits);
 /*D
 This function opens a GPIO for bit bang reading of serial data.
 
@@ -3615,7 +3514,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioSerialReadInvert(unsigned user_gpio, unsigned invert);
+int gpioSerialReadInvert (unsigned user_gpio, unsigned invert);
 /*D
 This function configures the level logic for bit bang serial reads.
 
@@ -3636,7 +3535,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioSerialRead(unsigned user_gpio, void *buf, size_t bufSize);
+int gpioSerialRead (unsigned user_gpio, void *buf, size_t bufSize);
 /*D
 This function copies up to bufSize bytes of data read from the
 bit bang serial cyclic buffer to the buffer starting at buf.
@@ -3660,7 +3559,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioSerialReadClose(unsigned user_gpio);
+int gpioSerialReadClose (unsigned user_gpio);
 /*D
 This function closes a GPIO for bit bang reading of serial data.
 
@@ -3674,7 +3573,7 @@ D*/
 
 //{{{
 /*F*/
-int i2cOpen(unsigned i2cBus, unsigned i2cAddr, unsigned i2cFlags);
+int i2cOpen (unsigned i2cBus, unsigned i2cAddr, unsigned i2cFlags);
 /*D
 This returns a handle for the device at the address on the I2C bus.
 
@@ -3717,7 +3616,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int i2cClose(unsigned handle);
+int i2cClose (unsigned handle);
 /*D
 This closes the I2C device associated with the handle.
 
@@ -3730,7 +3629,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int i2cWriteQuick(unsigned handle, unsigned bit);
+int i2cWriteQuick (unsigned handle, unsigned bit);
 /*D
 This sends a single bit (in the Rd/Wr bit) to the device associated
 with handle.
@@ -3751,7 +3650,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int i2cWriteByte(unsigned handle, unsigned bVal);
+int i2cWriteByte (unsigned handle, unsigned bVal);
 /*D
 This sends a single byte to the device associated with handle.
 
@@ -3772,7 +3671,7 @@ D*/
 //{{{
 
 /*F*/
-int i2cReadByte(unsigned handle);
+int i2cReadByte (unsigned handle);
 /*D
 This reads a single byte from the device associated with handle.
 
@@ -3792,7 +3691,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int i2cWriteByteData(unsigned handle, unsigned i2cReg, unsigned bVal);
+int i2cWriteByteData (unsigned handle, unsigned i2cReg, unsigned bVal);
 /*D
 This writes a single byte to the specified register of the device
 associated with handle.
@@ -3814,7 +3713,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int i2cWriteWordData(unsigned handle, unsigned i2cReg, unsigned wVal);
+int i2cWriteWordData (unsigned handle, unsigned i2cReg, unsigned wVal);
 /*D
 This writes a single 16 bit word to the specified register of the device
 associated with handle.
@@ -3836,7 +3735,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int i2cReadByteData(unsigned handle, unsigned i2cReg);
+int i2cReadByteData (unsigned handle, unsigned i2cReg);
 /*D
 This reads a single byte from the specified register of the device
 associated with handle.
@@ -3857,7 +3756,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int i2cReadWordData(unsigned handle, unsigned i2cReg);
+int i2cReadWordData (unsigned handle, unsigned i2cReg);
 /*D
 This reads a single 16 bit word from the specified register of the device
 associated with handle.
@@ -3878,7 +3777,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int i2cProcessCall(unsigned handle, unsigned i2cReg, unsigned wVal);
+int i2cProcessCall (unsigned handle, unsigned i2cReg, unsigned wVal);
 /*D
 This writes 16 bits of data to the specified register of the device
 associated with handle and reads 16 bits of data in return.
@@ -3901,8 +3800,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int i2cWriteBlockData(
-unsigned handle, unsigned i2cReg, char *buf, unsigned count);
+int i2cWriteBlockData (unsigned handle, unsigned i2cReg, char* buf, unsigned count);
 /*D
 This writes up to 32 bytes to the specified register of the device
 associated with handle.
@@ -3926,7 +3824,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int i2cReadBlockData(unsigned handle, unsigned i2cReg, char *buf);
+int i2cReadBlockData (unsigned handle, unsigned i2cReg, char* buf);
 /*D
 This reads a block of up to 32 bytes from the specified register of
 the device associated with handle.
@@ -3951,8 +3849,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int i2cBlockProcessCall(
-unsigned handle, unsigned i2cReg, char *buf, unsigned count);
+int i2cBlockProcessCall (unsigned handle, unsigned i2cReg, char* buf, unsigned count);
 /*D
 This writes data bytes to the specified register of the device
 associated with handle and reads a device specified number
@@ -3981,8 +3878,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int i2cReadI2CBlockData(
-unsigned handle, unsigned i2cReg, char *buf, unsigned count);
+int i2cReadI2CBlockData (unsigned handle, unsigned i2cReg, char* buf, unsigned count);
 /*D
 This reads count bytes from the specified register of the device
 associated with handle .  The count may be 1-32.
@@ -4005,8 +3901,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int i2cWriteI2CBlockData(
-unsigned handle, unsigned i2cReg, char *buf, unsigned count);
+int i2cWriteI2CBlockData (unsigned handle, unsigned i2cReg, char* buf, unsigned count);
 /*D
 This writes 1 to 32 bytes to the specified register of the device
 associated with handle.
@@ -4028,7 +3923,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int i2cReadDevice(unsigned handle, char *buf, unsigned count);
+int i2cReadDevice (unsigned handle, char* buf, unsigned count);
 /*D
 This reads count bytes from the raw device into buf.
 
@@ -4048,7 +3943,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int i2cWriteDevice(unsigned handle, char *buf, unsigned count);
+int i2cWriteDevice (unsigned handle, char* buf, unsigned count);
 /*D
 This writes count bytes from buf to the raw device.
 
@@ -4068,7 +3963,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-void i2cSwitchCombined(int setting);
+void i2cSwitchCombined (int setting);
 /*D
 This sets the I2C (i2c-bcm2708) module "use combined transactions"
 parameter on or off.
@@ -4084,7 +3979,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int i2cSegments(unsigned handle, pi_i2c_msg_t *segs, unsigned numSegs);
+int i2cSegments(unsigned handle, pi_i2c_msg_t* segs, unsigned numSegs);
 /*D
 This function executes multiple I2C segments in one transaction by
 calling the I2C_RDWR ioctl.
@@ -4100,12 +3995,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int i2cZip(
-   unsigned handle,
-   char    *inBuf,
-   unsigned inLen,
-   char    *outBuf,
-   unsigned outLen);
+int i2cZip (unsigned handle, char* inBuf, unsigned inLen, char* outBuf, unsigned outLen);
 /*D
 This function executes a sequence of I2C operations.  The
 operations to be performed are specified by the contents of inBuf
@@ -4162,7 +4052,7 @@ D*/
 
 //{{{
 /*F*/
-int bbI2COpen(unsigned SDA, unsigned SCL, unsigned baud);
+int bbI2COpen (unsigned SDA, unsigned SCL, unsigned baud);
 /*D
 This function selects a pair of GPIO for bit banging I2C at a
 specified baud rate.
@@ -4192,7 +4082,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int bbI2CClose(unsigned SDA);
+int bbI2CClose (unsigned SDA);
 /*D
 This function stops bit banging I2C on a pair of GPIO previously
 opened with [*bbI2COpen*].
@@ -4206,12 +4096,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int bbI2CZip(
-   unsigned SDA,
-   char    *inBuf,
-   unsigned inLen,
-   char    *outBuf,
-   unsigned outLen);
+int bbI2CZip (unsigned SDA, char* inBuf, unsigned inLen, char* outBuf, unsigned outLen);
 /*D
 This function executes a sequence of bit banged I2C operations.  The
 operations to be performed are specified by the contents of inBuf
@@ -4279,7 +4164,7 @@ D*/
 
 //{{{
 /*F*/
-int bscXfer(bsc_xfer_t *bsc_xfer);
+int bscXfer (bsc_xfer_t* bsc_xfer);
 /*D
 This function provides a low-level interface to the SPI/I2C Slave
 peripheral on the BCM chip.
@@ -4419,9 +4304,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int bbSPIOpen(
-   unsigned CS, unsigned MISO, unsigned MOSI, unsigned SCLK,
-   unsigned baud, unsigned spiFlags);
+int bbSPIOpen (unsigned CS, unsigned MISO, unsigned MOSI, unsigned SCLK, unsigned baud, unsigned spiFlags);
 /*D
 This function selects a set of GPIO for bit banging SPI with
 a specified baud rate and mode.
@@ -4476,7 +4359,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int bbSPIClose(unsigned CS);
+int bbSPIClose (unsigned CS);
 /*D
 This function stops bit banging SPI on a set of GPIO
 opened with [*bbSPIOpen*].
@@ -4490,11 +4373,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int bbSPIXfer(
-   unsigned CS,
-   char    *inBuf,
-   char    *outBuf,
-   unsigned count);
+int bbSPIXfer (unsigned CS, char* inBuf, char* outBuf, unsigned count);
 /*D
 This function executes a bit banged SPI transfer.
 
@@ -4578,7 +4457,7 @@ D*/
 
 //{{{
 /*F*/
-int spiOpen(unsigned spiChan, unsigned baud, unsigned spiFlags);
+int spiOpen (unsigned spiChan, unsigned baud, unsigned spiFlags);
 /*D
 This function returns a handle for the SPI device on the channel.
 Data will be transferred at baud bits per second.  The flags may
@@ -4671,7 +4550,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int spiClose(unsigned handle);
+int spiClose (unsigned handle);
 /*D
 This functions closes the SPI device identified by the handle.
 
@@ -4684,7 +4563,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int spiRead(unsigned handle, char *buf, unsigned count);
+int spiRead (unsigned handle, char* buf, unsigned count);
 /*D
 This function reads count bytes of data from the SPI
 device associated with the handle.
@@ -4701,7 +4580,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int spiWrite(unsigned handle, char *buf, unsigned count);
+int spiWrite (unsigned handle, char* buf, unsigned count);
 /*D
 This function writes count bytes of data from buf to the SPI
 device associated with the handle.
@@ -4718,7 +4597,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int spiXfer(unsigned handle, char *txBuf, char *rxBuf, unsigned count);
+int spiXfer (unsigned handle, char* txBuf, char* rxBuf, unsigned count);
 /*D
 This function transfers count bytes of data from txBuf to the SPI
 device associated with the handle.  Simultaneously count bytes of
@@ -4738,7 +4617,7 @@ D*/
 
 //{{{
 /*F*/
-int serOpen(char *sertty, unsigned baud, unsigned serFlags);
+int serOpen (char* sertty, unsigned baud, unsigned serFlags);
 /*D
 This function opens a serial device at a specified baud rate
 and with specified flags.  The device name must start with
@@ -4762,7 +4641,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int serClose(unsigned handle);
+int serClose (unsigned handle);
 /*D
 This function closes the serial device associated with handle.
 
@@ -4775,7 +4654,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int serWriteByte(unsigned handle, unsigned bVal);
+int serWriteByte (unsigned handle, unsigned bVal);
 /*D
 This function writes bVal to the serial port associated with handle.
 
@@ -4789,7 +4668,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int serReadByte(unsigned handle);
+int serReadByte (unsigned handle);
 /*D
 This function reads a byte from the serial port associated with handle.
 
@@ -4805,7 +4684,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int serWrite(unsigned handle, char *buf, unsigned count);
+int serWrite (unsigned handle, char *buf, unsigned count);
 /*D
 This function writes count bytes from buf to the the serial port
 associated with handle.
@@ -4822,7 +4701,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int serRead(unsigned handle, char *buf, unsigned count);
+int serRead (unsigned handle, char *buf, unsigned count);
 /*D
 This function reads up count bytes from the the serial port
 associated with handle and writes them to buf.
@@ -4841,7 +4720,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int serDataAvailable(unsigned handle);
+int serDataAvailable (unsigned handle);
 /*D
 This function returns the number of bytes available
 to be read from the device associated with handle.
@@ -4857,7 +4736,7 @@ D*/
 
 //{{{
 /*F*/
-int gpioTrigger(unsigned user_gpio, unsigned pulseLen, unsigned level);
+int gpioTrigger (unsigned user_gpio, unsigned pulseLen, unsigned level);
 /*D
 This function sends a trigger pulse to a GPIO.  The GPIO is set to
 level for pulseLen microseconds and then reset to not level.
@@ -4875,7 +4754,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioSetWatchdog(unsigned user_gpio, unsigned timeout);
+int gpioSetWatchdog (unsigned user_gpio, unsigned timeout);
 /*D
 Sets a watchdog for a GPIO.
 
@@ -4919,7 +4798,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioNoiseFilter(unsigned user_gpio, unsigned steady, unsigned active);
+int gpioNoiseFilter (unsigned user_gpio, unsigned steady, unsigned active);
 /*D
 Sets a noise filter on a GPIO.
 
@@ -4951,7 +4830,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioGlitchFilter(unsigned user_gpio, unsigned steady);
+int gpioGlitchFilter (unsigned user_gpio, unsigned steady);
 /*D
 Sets a glitch filter on a GPIO.
 
@@ -4981,7 +4860,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioSetGetSamplesFunc(gpioGetSamplesFunc_t f, uint32_t bits);
+int gpioSetGetSamplesFunc (gpioGetSamplesFunc_t f, uint32_t bits);
 /*D
 Registers a function to be called (a callback) every millisecond
 with the latest GPIO samples.
@@ -5010,8 +4889,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioSetGetSamplesFuncEx(
-   gpioGetSamplesFuncEx_t f, uint32_t bits, void *userdata);
+int gpioSetGetSamplesFuncEx (gpioGetSamplesFuncEx_t f, uint32_t bits, void* userdata);
 /*D
 Registers a function to be called (a callback) every millisecond
 with the latest GPIO samples.
@@ -5035,7 +4913,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioSetTimerFunc(unsigned timer, unsigned millis, gpioTimerFunc_t f);
+int gpioSetTimerFunc (unsigned timer, unsigned millis, gpioTimerFunc_t f);
 /*D
 Registers a function to be called (a callback) every millis milliseconds.
 
@@ -5066,8 +4944,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioSetTimerFuncEx(
-   unsigned timer, unsigned millis, gpioTimerFuncEx_t f, void *userdata);
+int gpioSetTimerFuncEx (unsigned timer, unsigned millis, gpioTimerFuncEx_t f, void* userdata);
 /*D
 Registers a function to be called (a callback) every millis milliseconds.
 
@@ -5090,7 +4967,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-pthread_t *gpioStartThread(gpioThreadFunc_t f, void *userdata);
+pthread_t* gpioStartThread (gpioThreadFunc_t f, void* userdata);
 /*D
 Starts a new thread of execution with f as the main routine.
 
@@ -5144,7 +5021,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-void gpioStopThread(pthread_t *pth);
+void gpioStopThread (pthread_t *pth);
 /*D
 Cancels the thread pointed at by pth.
 
@@ -5160,7 +5037,7 @@ D*/
 
 //{{{
 /*F*/
-int gpioStoreScript(char *script);
+int gpioStoreScript (char* script);
 /*D
 This function stores a null terminated script for later execution.
 
@@ -5176,7 +5053,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioRunScript(unsigned script_id, unsigned numPar, uint32_t *param);
+int gpioRunScript (unsigned script_id, unsigned numPar, uint32_t* param);
 /*D
 This function runs a stored script.
 
@@ -5195,7 +5072,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioRunScript(unsigned script_id, unsigned numPar, uint32_t *param);
+int gpioRunScript (unsigned script_id, unsigned numPar, uint32_t* param);
 /*D
 This function runs a stored script.
 
@@ -5214,7 +5091,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioUpdateScript(unsigned script_id, unsigned numPar, uint32_t *param);
+int gpioUpdateScript (unsigned script_id, unsigned numPar, uint32_t* param);
 /*D
 This function sets the parameters of a script.  The script may or
 may not be running.  The first numPar parameters of the script are
@@ -5235,7 +5112,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioScriptStatus(unsigned script_id, uint32_t *param);
+int gpioScriptStatus (unsigned script_id, uint32_t* param);
 /*D
 This function returns the run status of a stored script as well as
 the current values of parameters 0 to 9.
@@ -5263,7 +5140,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioStopScript(unsigned script_id);
+int gpioStopScript (unsigned script_id);
 /*D
 This function stops a running script.
 
@@ -5276,7 +5153,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioDeleteScript(unsigned script_id);
+int gpioDeleteScript (unsigned script_id);
 /*D
 This function deletes a stored script.
 
@@ -5290,7 +5167,7 @@ D*/
 
 //{{{
 /*F*/
-int gpioSetSignalFunc(unsigned signum, gpioSignalFunc_t f);
+int gpioSetSignalFunc (unsigned signum, gpioSignalFunc_t f);
 /*D
 Registers a function to be called (a callback) when a signal occurs.
 
@@ -5313,8 +5190,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioSetSignalFuncEx(
-   unsigned signum, gpioSignalFuncEx_t f, void *userdata);
+int gpioSetSignalFuncEx (unsigned signum, gpioSignalFuncEx_t f, void* userdata);
 /*D
 Registers a function to be called (a callback) when a signal occurs.
 
@@ -5351,7 +5227,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioWrite_Bits_0_31_Clear(uint32_t bits);
+int gpioWrite_Bits_0_31_Clear (uint32_t bits);
 /*D
 Clears GPIO 0-31 if the corresponding bit in bits is set.
 
@@ -5369,7 +5245,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioWrite_Bits_32_53_Clear(uint32_t bits);
+int gpioWrite_Bits_32_53_Clear (uint32_t bits);
 /*D
 Clears GPIO 32-53 if the corresponding bit (0-21) in bits is set.
 
@@ -5382,7 +5258,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioWrite_Bits_0_31_Set(uint32_t bits);
+int gpioWrite_Bits_0_31_Set (uint32_t bits);
 /*D
 Sets GPIO 0-31 if the corresponding bit in bits is set.
 
@@ -5395,7 +5271,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioWrite_Bits_32_53_Set(uint32_t bits);
+int gpioWrite_Bits_32_53_Set (uint32_t bits);
 /*D
 Sets GPIO 32-53 if the corresponding bit (0-21) in bits is set.
 
@@ -5414,7 +5290,7 @@ D*/
 
 //{{{
 /*F*/
-int gpioHardwareClock(unsigned gpio, unsigned clkfreq);
+int gpioHardwareClock (unsigned gpio, unsigned clkfreq);
 /*D
 Starts a hardware clock on a GPIO at the specified frequency.
 Frequencies above 30MHz are unlikely to work.
@@ -5453,7 +5329,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioHardwarePWM(unsigned gpio, unsigned PWMfreq, unsigned PWMduty);
+int gpioHardwarePWM (unsigned gpio, unsigned PWMfreq, unsigned PWMduty);
 /*D
 Starts hardware PWM on a GPIO at the specified frequency and dutycycle.
 Frequencies above 30MHz are unlikely to work.
@@ -5507,7 +5383,7 @@ D*/
 
 //{{{
 /*F*/
-int gpioTime(unsigned timetype, int *seconds, int *micros);
+int gpioTime (unsigned timetype, int* seconds, int* micros);
 /*D
 Updates the seconds and micros variables with the current time.
 
@@ -5536,7 +5412,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioSleep(unsigned timetype, int seconds, int micros);
+int gpioSleep (unsigned timetype, int seconds, int micros);
 /*D
 Sleeps for the number of seconds and microseconds specified by seconds
 and micros.
@@ -5571,7 +5447,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-uint32_t gpioDelay(uint32_t micros);
+uint32_t gpioDelay (uint32_t micros);
 /*D
 Delays for at least the number of microseconds specified by micros.
 
@@ -5654,7 +5530,7 @@ D*/
 
 //{{{
 /*F*/
-int gpioGetPad(unsigned pad);
+int gpioGetPad (unsigned pad);
 /*D
 This function returns the pad drive strength in mA.
 
@@ -5676,7 +5552,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioSetPad(unsigned pad, unsigned padStrength);
+int gpioSetPad (unsigned pad, unsigned padStrength);
 /*D
 This function sets the pad drive strength in mA.
 
@@ -5700,7 +5576,7 @@ D*/
 
 //{{{
 /*F*/
-int eventMonitor(unsigned handle, uint32_t bits);
+int eventMonitor (unsigned handle, uint32_t bits);
 /*D
 This function selects the events to be reported on a previously
 opened handle.
@@ -5730,7 +5606,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int eventSetFunc(unsigned event, eventFunc_t f);
+int eventSetFunc (unsigned event, eventFunc_t f);
 /*D
 Registers a function to be called (a callback) when the specified
 event occurs.
@@ -5751,7 +5627,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int eventSetFuncEx(unsigned event, eventFuncEx_t f, void *userdata);
+int eventSetFuncEx (unsigned event, eventFuncEx_t f, void* userdata);
 /*D
 Registers a function to be called (a callback) when the specified
 event occurs.
@@ -5776,7 +5652,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int eventTrigger(unsigned event);
+int eventTrigger (unsigned event);
 /*D
 This function signals the occurrence of an event.
 
@@ -5803,7 +5679,7 @@ D*/
 
 //{{{
 /*F*/
-int shell(char *scriptName, char *scriptString);
+int shell (char* scriptName, char* scriptString);
 /*D
 This function uses the system call to execute a shell script
 with the given string as its parameter.
@@ -5846,7 +5722,7 @@ D*/
 //}}}
 
 //{{{
-int fileOpen(char *file, unsigned mode);
+int fileOpen (char* file, unsigned mode);
 //This function returns a handle to a file opened in a specified mode.
 //. .
 //file: the file to open
@@ -5950,7 +5826,7 @@ int fileOpen(char *file, unsigned mode);
 //}}}
 //{{{
 /*F*/
-int fileClose(unsigned handle);
+int fileClose (unsigned handle);
 /*D
 This function closes the file associated with handle.
 
@@ -5967,7 +5843,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int fileWrite(unsigned handle, char *buf, unsigned count);
+int fileWrite (unsigned handle, char* buf, unsigned count);
 /*D
 This function writes count bytes from buf to the the file
 associated with handle.
@@ -5996,7 +5872,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int fileRead(unsigned handle, char *buf, unsigned count);
+int fileRead (unsigned handle, char* buf, unsigned count);
 /*D
 This function reads up to count bytes from the the file
 associated with handle and writes them to buf.
@@ -6019,7 +5895,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int fileSeek(unsigned handle, int32_t seekOffset, int seekFrom);
+int fileSeek (unsigned handle, int32_t seekOffset, int seekFrom);
 /*D
 This function seeks to a position within the file associated
 with handle.
@@ -6044,7 +5920,7 @@ pos = fileSeek(0, 0, PI_FROM_CURRENT); // Return current position
 D*/
 //}}}
 //{{{
-int fileList(char *fpat,  char *buf, unsigned count);
+int fileList (char* fpat, char* buf, unsigned count);
 //This function returns a list of files which match a pattern.  The
 //pattern may contain wildcards.
 
@@ -6095,7 +5971,7 @@ int fileList(char *fpat,  char *buf, unsigned count);
 
 //{{{
 /*F*/
-int gpioCfgBufferSize(unsigned cfgMillis);
+int gpioCfgBufferSize (unsigned cfgMillis);
 /*D
 Configures pigpio to buffer cfgMillis milliseconds of GPIO samples.
 
@@ -6130,8 +6006,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioCfgClock(
-   unsigned cfgMicros, unsigned cfgPeripheral, unsigned cfgSource);
+int gpioCfgClock (unsigned cfgMicros, unsigned cfgPeripheral, unsigned cfgSource);
 /*D
 Configures pigpio to use a particular sample rate timed by a specified
 peripheral.
@@ -6167,7 +6042,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioCfgDMAchannel(unsigned DMAchannel); /* DEPRECATED */
+int gpioCfgDMAchannel (unsigned DMAchannel); /* DEPRECATED */
 /*D
 Configures pigpio to use the specified DMA channel.
 
@@ -6182,7 +6057,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioCfgDMAchannels(unsigned primaryChannel, unsigned secondaryChannel);
+int gpioCfgDMAchannels (unsigned primaryChannel, unsigned secondaryChannel);
 /*D
 Configures pigpio to use the specified DMA channels.
 
@@ -6216,7 +6091,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioCfgPermissions(uint64_t updateMask);
+int gpioCfgPermissions (uint64_t updateMask);
 /*D
 Configures pigpio to restrict GPIO updates via the socket or pipe
 interfaces to the GPIO specified by the mask.  Programs directly
@@ -6243,7 +6118,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioCfgSocketPort(unsigned port);
+int gpioCfgSocketPort (unsigned port);
 /*D
 Configures pigpio to use the specified socket port.
 
@@ -6258,7 +6133,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioCfgInterfaces(unsigned ifFlags);
+int gpioCfgInterfaces (unsigned ifFlags);
 /*D
 Configures pigpio support of the fifo and socket interfaces.
 
@@ -6281,7 +6156,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioCfgMemAlloc(unsigned memAllocMode);
+int gpioCfgMemAlloc (unsigned memAllocMode);
 /*D
 Selects the method of DMA memory allocation.
 
@@ -6301,7 +6176,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioCfgNetAddr(int numSockAddr, uint32_t *sockAddr);
+int gpioCfgNetAddr (int numSockAddr, uint32_t *sockAddr);
 /*D
 Sets the network addresses which are allowed to talk over the
 socket interface.
@@ -6337,7 +6212,7 @@ D*/
 
 //{{{
 /*F*/
-int gpioCustom1(unsigned arg1, unsigned arg2, char *argx, unsigned argc);
+int gpioCustom1 (unsigned arg1, unsigned arg2, char* argx, unsigned argc);
 /*D
 This function is available for user customisation.
 
@@ -6355,7 +6230,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int gpioCustom2(unsigned arg1, char *argx, unsigned argc,
+int gpioCustom2 (unsigned arg1, char* argx, unsigned argc,
                 char *retBuf, unsigned retMax);
 /*D
 This function is available for user customisation.
@@ -6380,15 +6255,8 @@ D*/
 
 //{{{
 /*F*/
-int rawWaveAddSPI(
-   rawSPI_t *spi,
-   unsigned offset,
-   unsigned spiSS,
-   char *buf,
-   unsigned spiTxBits,
-   unsigned spiBitFirst,
-   unsigned spiBitLast,
-   unsigned spiBits);
+int rawWaveAddSPI (rawSPI_t* spi, unsigned offset, unsigned spiSS, char* buf, unsigned spiTxBits,
+                   unsigned spiBitFirst, unsigned spiBitLast, unsigned spiBits);
 /*D
 This function adds a waveform representing SPI data to the
 existing waveform (if any).
@@ -6412,7 +6280,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-int rawWaveAddGeneric(unsigned numPulses, rawWave_t *pulses);
+int rawWaveAddGeneric (unsigned numPulses, rawWave_t* pulses);
 /*D
 This function adds a number of pulses to the current waveform.
 
@@ -6450,7 +6318,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-rawCbs_t *rawWaveCBAdr(int cbNum);
+rawCbs_t* rawWaveCBAdr (int cbNum);
 /*D
 Return the (Linux) address of contol block cbNum.
 
@@ -6463,7 +6331,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-uint32_t rawWaveGetOOL(int pos);
+uint32_t rawWaveGetOOL (int pos);
 /*D
 Gets the OOL parameter stored at pos.
 
@@ -6476,7 +6344,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-void rawWaveSetOOL(int pos, uint32_t lVal);
+void rawWaveSetOOL (int pos, uint32_t lVal);
 /*D
 Sets the OOL parameter stored at pos to value.
 
@@ -6490,7 +6358,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-uint32_t rawWaveGetOut(int pos);
+uint32_t rawWaveGetOut (int pos);
 /*D
 Gets the wave output parameter stored at pos.
 
@@ -6505,7 +6373,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-void rawWaveSetOut(int pos, uint32_t lVal);
+void rawWaveSetOut (int pos, uint32_t lVal);
 /*D
 Sets the wave output parameter stored at pos to value.
 
@@ -6521,7 +6389,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-uint32_t rawWaveGetIn(int pos);
+uint32_t rawWaveGetIn (int pos);
 /*D
 Gets the wave input value parameter stored at pos.
 
@@ -6536,7 +6404,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-void rawWaveSetIn(int pos, uint32_t lVal);
+void rawWaveSetIn (int pos, uint32_t lVal);
 /*D
 Sets the wave input value stored at pos to value.
 
@@ -6552,7 +6420,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-rawWaveInfo_t rawWaveInfo(int wave_id);
+rawWaveInfo_t rawWaveInfo (int wave_id);
 /*D
 Gets details about the wave with id wave_id.
 
@@ -6566,7 +6434,7 @@ D*/
 
 //{{{
 /*F*/
-int getBitInBytes(int bitPos, char *buf, int numBits);
+int getBitInBytes (int bitPos, char* buf, int numBits);
 /*D
 Returns the value of the bit bitPos bits from the start of buf.  Returns
 0 if bitPos is greater than or equal to numBits.
@@ -6581,7 +6449,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-void putBitInBytes(int bitPos, char *buf, int bit);
+void putBitInBytes (int bitPos, char* buf, int bit);
 /*D
 Sets the bit bitPos bits from the start of buf to bit.
 
@@ -6603,7 +6471,7 @@ D*/
 //}}}
 //{{{
 /*F*/
-void time_sleep(double seconds);
+void time_sleep (double seconds);
 /*D
 Delay execution for a given number of seconds
 
@@ -6624,7 +6492,7 @@ D*/
 
 //{{{
 /*F*/
-void rawDumpScript(unsigned script_id);
+void rawDumpScript (unsigned script_id);
 /*D
 Used to print a readable version of a script to stderr.
 
