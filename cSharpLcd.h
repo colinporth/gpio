@@ -35,16 +35,12 @@ private:
   static const int kHeight = 240;
 
   char reverseByte (int b);
-  static void* hardToggleVCOM (void* arg);
+  static void* toggleVcomThread (void* arg);
 
-  int handle;
-  char commandByte;
-  char vcomByte;
-  char clearByte;
-  char paddingByte;
-  char SI;
-  char SCLK;
-  bool enablePWM;
-  char lineBuffer [kWidth/8];
-  char frameBuffer [kWidth*kHeight/8];
+  int mHandle;
+  char mCommandByte;
+  char mClearByte;
+  char mPaddingByte;
+  char mLineBuffer [kWidth/8];
+  char mFrameBuffer [kWidth*kHeight/8];
   };
