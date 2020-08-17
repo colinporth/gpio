@@ -425,7 +425,6 @@ static int sharp_remove (struct spi_device* spi) {
   return 0;
   }
 //}}}
-
 //{{{
 static struct spi_driver sharp_driver = {
   .probe  = sharp_probe,
@@ -436,7 +435,6 @@ static struct spi_driver sharp_driver = {
     },
   };
 //}}}
-
 module_spi_driver(sharp_driver);
 
 MODULE_AUTHOR("Ael Gain <ael.gain@free.fr>");
