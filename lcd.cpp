@@ -129,11 +129,11 @@ int main() {
     //{{{  print chequerboard patterns
     numRepetitions = 8;
 
-    for (char i = 0; i < numRepetitions; i++) {
+    for (int i = 0; i < numRepetitions; i++) {
       sharpLcd.clearDisplay();
 
       for (int y = 1; y <= lcdHeight; y++) {
-        for (int x = 1; x <= lcdWidth/8; x++) {
+        for (int x = 1; x <= lcdWidth / 8; x++) {
           if (toggle)
             sharpLcd.writeByteToLineBuffer (x, 0xFF);
           else
@@ -146,7 +146,7 @@ int main() {
           toggle = !toggle;
         }
 
-      usleep (10000);
+      usleep (250000);
       toggle = !toggle;
       }
     //}}}
