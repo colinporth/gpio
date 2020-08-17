@@ -2101,6 +2101,13 @@ typedef void *(gpioThreadFunc_t) (void*);
 
 //{{{
 /*F*/
+unsigned gpioVersion();
+/*D
+Returns the pigpio version.
+D*/
+//}}}
+//{{{
+/*F*/
 unsigned gpioHardwareRevision();
 /*D
 Returns the hardware revision.
@@ -2127,14 +2134,6 @@ for "Revision       : 000f" the function returns 15.
 for "Revision       : 000g" the function returns 0.
 D*/
 //}}}
-//{{{
-/*F*/
-unsigned gpioVersion();
-/*D
-Returns the pigpio version.
-D*/
-//}}}
-
 //{{{
 /*F*/
 int gpioInitialise();

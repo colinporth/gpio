@@ -8346,9 +8346,9 @@ int initInitialise() {
       sigSetHandler();
   #endif
 
-  if (initPeripherals() < 0) 
+  if (initPeripherals() < 0)
     return PI_INIT_FAILED;
-  if (initAllocDMAMem() < 0) 
+  if (initAllocDMAMem() < 0)
     return PI_INIT_FAILED;
 
   /* done with /dev/mem */
@@ -8387,9 +8387,9 @@ int initInitialise() {
   if (!(gpioCfg.ifFlags & PI_DISABLE_SOCK_IF)) {
     //{{{  sockets
     portStr = getenv(PI_ENVPORT);
-    if (portStr) 
-      port = atoi(portStr); 
-    else 
+    if (portStr)
+      port = atoi(portStr);
+    else
       port = gpioCfg.socketPort;
 
     // Accept connections on IPv6, unless we have an IPv4-only whitelist
@@ -8457,152 +8457,141 @@ int initInitialise() {
 //}}}
 
 //{{{
-unsigned gpioVersion()
-{
-   DBG(DBG_USER, "");
-   return PIGPIO_VERSION;
-}
+unsigned gpioVersion() {
+
+  DBG(DBG_USER, "");
+  return PIGPIO_VERSION;
+  }
 //}}}
 //{{{
-unsigned gpioHardwareRevision()
-{
-/*
-2 2  2  2 2 2  1 1 1 1  1 1 1 1  1 1 0 0 0 0 0 0  0 0 0 0
-5 4  3  2 1 0  9 8 7 6  5 4 3 2  1 0 9 8 7 6 5 4  3 2 1 0
-W W  S  M M M  B B B B  P P P P  T T T T T T T T  R R R R
-W  warranty void if either bit is set
-S  0=old (bits 0-22 are revision number) 1=new (following fields apply)
-M  0=256 1=512 2=1024 3=2GB 4=4GB
-B  0=Sony 1=Egoman 2=Embest 3=Sony Japan 4=Embest 5=Stadium
-P  0=2835, 1=2836, 2=2837 3=2711
-T  0=A 1=B 2=A+ 3=B+ 4=Pi2B 5=Alpha 6=CM1 8=Pi3B 9=Zero a=CM3 c=Zero W
-   d=3B+ e=3A+ 10=CM3+ 11=4B
-R  PCB board revision
-*/
-   static unsigned rev = 0;
+unsigned gpioHardwareRevision() {
+// 2 2  2  2 2 2  1 1 1 1  1 1 1 1  1 1 0 0 0 0 0 0  0 0 0 0
+// 5 4  3  2 1 0  9 8 7 6  5 4 3 2  1 0 9 8 7 6 5 4  3 2 1 0
+// W W  S  M M M  B B B B  P P P P  T T T T T T T T  R R R R
+// W  warranty void if either bit is set
+// S  0=old (bits 0-22 are revision number) 1=new (following fields apply)
+// M  0=256 1=512 2=1024 3=2GB 4=4GB
+// B  0=Sony 1=Egoman 2=Embest 3=Sony Japan 4=Embest 5=Stadium
+// P  0=2835, 1=2836, 2=2837 3=2711
+// T  0=A 1=B 2=A+ 3=B+ 4=Pi2B 5=Alpha 6=CM1 8=Pi3B 9=Zero a=CM3 c=Zero W d=3B+ e=3A+ 10=CM3+ 11=4B
+// R  PCB board revision
+  static unsigned rev = 0;
 
-   FILE * filp;
-   char buf[512];
-   char term;
+  char buf[512];
+  char term;
+  DBG(DBG_USER, "");
 
-   DBG(DBG_USER, "");
+  if (rev) 
+    return rev;
 
-   if (rev) return rev;
-
-   filp = fopen ("/proc/cpuinfo", "r");
-
-
-   if (filp != NULL)
-   {
-      while (fgets(buf, sizeof(buf), filp) != NULL)
-      {
-         if (!strncasecmp("revision\t:", buf, 10))
-         {
-            if (sscanf(buf+10, "%x%c", &rev, &term) == 2)
-            {
-               if (term != '\n') rev = 0;
-            }
-         }
+  FILE* filp = fopen ("/proc/cpuinfo", "r");
+  if (filp != NULL) {
+    while (fgets (buf, sizeof(buf), filp) != NULL) {
+      if (!strncasecmp ("revision\t:", buf, 10)) {
+        if (sscanf (buf+10, "%x%c", &rev, &term) == 2) {
+          if (term != '\n') 
+            rev = 0;
+          }
+        }
       }
-      fclose(filp);
-   }
+    fclose (filp);
+    }
 
-   /* (some) arm64 operating systems get revision number here  */
-   if (rev == 0)
-   {
-      DBG(DBG_USER, "searching /proc/device-tree for revision");
-      filp = fopen ("/proc/device-tree/system/linux,revision", "r");
+  // (some) arm64 operating systems get revision number here
+  if (rev == 0) {
+    DBG(DBG_USER, "searching /proc/device-tree for revision");
+    filp = fopen ("/proc/device-tree/system/linux,revision", "r");
 
-      if (filp != NULL)
-      {
-         uint32_t tmp;
-         if (fread(&tmp,1 , 4, filp) == 4)
-         {
-            //* for some reason the value returned by reading this /proc entry seems to be big endian, convert it.
-            rev = ntohl(tmp);
-            rev &= 0xFFFFFF; /* mask out warranty bit */
-         }
+    if (filp != NULL) {
+      uint32_t tmp;
+      if (fread (&tmp,1 , 4, filp) == 4) {
+        // for some reason the value returned by reading this /proc entry seems to be big endian, convert it.
+        rev = ntohl (tmp);
+        rev &= 0xFFFFFF; /* mask out warranty bit */
+        }
+       }
+    fclose (filp);
+    }
+
+  piCores = 0;
+  pi_ispi = 0;
+  rev &= 0xFFFFFF; /* mask out warranty bit */
+
+  // Decode revision code
+  if ((rev & 0x800000) == 0) { 
+    // old rev code
+    if (rev < 0x0016) { /* all BCM2835 */
+      pi_ispi = 1;
+      piCores = 1;
+      pi_peri_phys = 0x20000000;
+      pi_dram_bus = 0x40000000;
+      pi_mem_flag = 0x0C;
       }
-      fclose(filp);
-   }
-
-   piCores = 0;
-   pi_ispi = 0;
-   rev &= 0xFFFFFF; /* mask out warranty bit */
-
-   /* Decode revision code */
-   if ((rev & 0x800000) == 0) /* old rev code */
-   {
-      if (rev < 0x0016) /* all BCM2835 */
-      {
+    else {
+      DBG(DBG_ALWAYS, "unknown revision=%x", rev);
+      rev = 0;
+      }
+    }
+  else { 
+    // new rev code
+    switch ((rev >> 12) & 0xF) { /* just interested in BCM model */
+      //{{{
+      case 0x0: // BCM2835 
          pi_ispi = 1;
          piCores = 1;
          pi_peri_phys = 0x20000000;
          pi_dram_bus  = 0x40000000;
          pi_mem_flag  = 0x0C;
+         break;
+      //}}}
+      case 0x1:      // BCM2836
+      //{{{
+      case 0x2: // BCM2837 
+         pi_ispi = 1;
+         piCores = 4;
+         pi_peri_phys = 0x3F000000;
+         pi_dram_bus  = 0xC0000000;
+         pi_mem_flag  = 0x04;
+         break;
+      //}}}
+      //{{{
+      case 0x3: // BCM2711 
+         pi_ispi = 1;
+         piCores = 4;
+
+         pi_peri_phys = 0xFE000000;
+         pi_dram_bus  = 0xC0000000;
+         pi_mem_flag  = 0x04;
+         pi_is_2711   = 1;
+
+         clk_osc_freq = CLK_OSC_FREQ_2711;
+         clk_plld_freq = CLK_PLLD_FREQ_2711;
+
+         hw_pwm_max_freq = PI_HW_PWM_MAX_FREQ_2711;
+         hw_clk_min_freq = PI_HW_CLK_MIN_FREQ_2711;
+         hw_clk_max_freq = PI_HW_CLK_MAX_FREQ_2711;
+         break;
+      //}}}
+      //{{{
+      default:
+         DBG(DBG_ALWAYS, "unknown rev code (%x)", rev);
+         rev=0;
+         pi_ispi = 0;
+         break;
+      //}}}
       }
-      else
-      {
-         DBG(DBG_ALWAYS, "unknown revision=%x", rev);
-         rev = 0;
-      }
-   }
-   else /* new rev code */
-   {
-      switch ((rev >> 12) & 0xF)  /* just interested in BCM model */
-      {
+    }
 
-         case 0x0:   /* BCM2835 */
-            pi_ispi = 1;
-            piCores = 1;
-            pi_peri_phys = 0x20000000;
-            pi_dram_bus  = 0x40000000;
-            pi_mem_flag  = 0x0C;
-            break;
+  DBG(DBG_USER, "revision=%x", rev);
+  DBG(DBG_USER, "pi_peri_phys=%x", pi_peri_phys);
+  DBG(DBG_USER, "pi_dram_bus=%x", pi_dram_bus);
+  DBG(DBG_USER, "pi_mem_flag=%x", pi_mem_flag);
 
-         case 0x1:   /* BCM2836 */
-         case 0x2:   /* BCM2837 */
-            pi_ispi = 1;
-            piCores = 4;
-            pi_peri_phys = 0x3F000000;
-            pi_dram_bus  = 0xC0000000;
-            pi_mem_flag  = 0x04;
-            break;
-
-         case 0x3:   /* BCM2711 */
-            pi_ispi = 1;
-            piCores = 4;
-            pi_peri_phys = 0xFE000000;
-            pi_dram_bus  = 0xC0000000;
-            pi_mem_flag  = 0x04;
-            pi_is_2711   = 1;
-            clk_osc_freq = CLK_OSC_FREQ_2711;
-            clk_plld_freq = CLK_PLLD_FREQ_2711;
-            hw_pwm_max_freq = PI_HW_PWM_MAX_FREQ_2711;
-            hw_clk_min_freq = PI_HW_CLK_MIN_FREQ_2711;
-            hw_clk_max_freq = PI_HW_CLK_MAX_FREQ_2711;
-            break;
-
-         default:
-            DBG(DBG_ALWAYS, "unknown rev code (%x)", rev);
-            rev=0;
-            pi_ispi = 0;
-            break;
-      }
-   }
-
-   DBG(DBG_USER, "revision=%x", rev);
-   DBG(DBG_USER, "pi_peri_phys=%x", pi_peri_phys);
-   DBG(DBG_USER, "pi_dram_bus=%x", pi_dram_bus);
-   DBG(DBG_USER, "pi_mem_flag=%x", pi_mem_flag);
-
-   return rev;
-}
+  return rev;
+  }
 //}}}
 //{{{
 int gpioInitialise() {
-
-  int status;
 
   if (libInitialised)
     return PIGPIO_VERSION;
@@ -8611,20 +8600,19 @@ int gpioInitialise() {
 
   runState = PI_STARTING;
 
-  status = initInitialise();
-
+  int status = initInitialise();
   if (status < 0) {
     runState = PI_ENDING;
     initReleaseResources();
     }
-  else {
-   libInitialised = 1;
 
+  else {
+    libInitialised = 1;
     runState = PI_RUNNING;
 
     if (!(gpioCfg.ifFlags & PI_DISABLE_ALERT)) {
       while (pthAlertRunning != PI_THREAD_RUNNING)
-        myGpioDelay(1000);
+        myGpioDelay (1000);
       }
     }
 
@@ -8697,122 +8685,158 @@ void gpioTerminate() {
 }
 //}}}
 
+// utils
 //{{{
-int getBitInBytes (int bitPos, char* buf, int numBits)
-{
-   int bitp, bufp;
+int getBitInBytes (int bitPos, char* buf, int numBits) {
 
-   if (bitPos < numBits)
-   {
-      bufp =      bitPos / 8;
-      bitp = 7 - (bitPos % 8);
-      if (buf[bufp] & (1<<bitp)) return 1;
-   }
+  if (bitPos < numBits) {
+    int bufp = bitPos / 8;
+    int bitp = 7 - (bitPos % 8);
+    if (buf[bufp] & (1 << bitp))
+      return 1;
+    }
 
-   return 0;
-}
+  return 0;
+  }
 //}}}
 //{{{
-void putBitInBytes (int bitPos, char* buf, int bit)
-{
-   int bitp, bufp;
+void putBitInBytes (int bitPos, char* buf, int bit) {
 
-   bufp =      bitPos / 8;
-   bitp = 7 - (bitPos % 8);
+  int bufp = bitPos / 8;
+  int bitp = 7 - (bitPos % 8);
 
-   if (bit) buf[bufp] |=   (1<<bitp);
-   else     buf[bufp] &= (~(1<<bitp));
-}
-//}}}
-
-//{{{
-uint32_t rawWaveGetOOL (int pos)
-{
-   int page, slot;
-
-   if ((pos >= 0) && (pos < NUM_WAVE_OOL))
-   {
-      waveOOLPageSlot(pos, &page, &slot);
-      return (dmaOVirt[page]->OOL[slot]);
-   }
-
-   return -1;
-}
+  if (bit) 
+    buf[bufp] |= 1 << bitp;
+   else     
+    buf[bufp] &= ~(1 << bitp);
+  }
 //}}}
 //{{{
-void rawWaveSetOOL (int pos, uint32_t value)
-{
-   int page, slot;
+uint32_t rawWaveGetOOL (int pos) {
 
-   if ((pos >= 0) && (pos < NUM_WAVE_OOL))
-   {
-      waveOOLPageSlot(pos, &page, &slot);
-      dmaOVirt[page]->OOL[slot] = value;
-   }
-}
+  int page, slot;
+  if ((pos >= 0) && (pos < NUM_WAVE_OOL)) {
+    waveOOLPageSlot(pos, &page, &slot);
+    return (dmaOVirt[page]->OOL[slot]);
+    }
+
+  return -1;
+  }
 //}}}
 //{{{
-uint32_t rawWaveGetOut (int pos)
-{
-   int page, slot;
+void rawWaveSetOOL (int pos, uint32_t value) {
 
-   if ((pos >= 0) && (pos < NUM_WAVE_OOL))
-   {
-      waveOOLPageSlot(pos, &page, &slot);
-      return (dmaOVirt[page]->OOL[slot]);
-   }
+  int page, slot;
 
-   return -1;
-}
+  if ((pos >= 0) && (pos < NUM_WAVE_OOL)) {
+    waveOOLPageSlot(pos, &page, &slot);
+    dmaOVirt[page]->OOL[slot] = value;
+    }
+  }
 //}}}
 //{{{
-void rawWaveSetOut (int pos, uint32_t value)
-{
-   int page, slot;
+uint32_t rawWaveGetOut (int pos) {
 
-   if ((pos >= 0) && (pos < NUM_WAVE_OOL))
-   {
-      waveOOLPageSlot(pos, &page, &slot);
-      dmaOVirt[page]->OOL[slot] = value;
-   }
-}
+  int page, slot;
+
+  if ((pos >= 0) && (pos < NUM_WAVE_OOL)) {
+    waveOOLPageSlot(pos, &page, &slot);
+    return (dmaOVirt[page]->OOL[slot]);
+    }
+
+  return -1;
+  }
 //}}}
 //{{{
-uint32_t rawWaveGetIn (int pos)
-{
-   int page, slot;
+void rawWaveSetOut (int pos, uint32_t value) {
 
-   if ((pos >= 0) && (pos < NUM_WAVE_OOL))
-   {
-      waveOOLPageSlot((NUM_WAVE_OOL-1)-pos, &page, &slot);
-      return (dmaOVirt[page]->OOL[slot]);
-   }
+  int page, slot;
 
-   return -1;
-}
+  if ((pos >= 0) && (pos < NUM_WAVE_OOL)) {
+    waveOOLPageSlot(pos, &page, &slot);
+    dmaOVirt[page]->OOL[slot] = value;
+    }
+  }
 //}}}
 //{{{
-void rawWaveSetIn (int pos, uint32_t value)
-{
-   int page, slot;
+uint32_t rawWaveGetIn (int pos) {
 
-   if ((pos >= 0) && (pos < NUM_WAVE_OOL))
-   {
-      waveOOLPageSlot((NUM_WAVE_OOL-1)-pos, &page, &slot);
-      dmaOVirt[page]->OOL[slot] = value;
-   }
-}
+  int page, slot;
+
+  if ((pos >= 0) && (pos < NUM_WAVE_OOL)) {
+    waveOOLPageSlot((NUM_WAVE_OOL-1)-pos, &page, &slot);
+    return (dmaOVirt[page]->OOL[slot]);
+    }
+
+  return -1;
+  }
 //}}}
 //{{{
-rawWaveInfo_t rawWaveInfo (int wave_id)
-{
-   rawWaveInfo_t dummy = {0, 0, 0, 0, 0, 0, 0, 0};
+void rawWaveSetIn (int pos, uint32_t value) {
 
-   if ((wave_id >=0) && (wave_id < PI_MAX_WAVES)) return waveInfo[wave_id];
-   else                                           return dummy;
-}
+  int page, slot;
+  if ((pos >= 0) && (pos < NUM_WAVE_OOL)) {
+    waveOOLPageSlot((NUM_WAVE_OOL-1)-pos, &page, &slot);
+    dmaOVirt[page]->OOL[slot] = value;
+    }
+  }
+//}}}
+//{{{
+rawWaveInfo_t rawWaveInfo (int wave_id) {
+
+  rawWaveInfo_t dummy = {0, 0, 0, 0, 0, 0, 0, 0};
+
+  if ((wave_id >=0) && (wave_id < PI_MAX_WAVES))
+    return waveInfo[wave_id];
+  else
+    return dummy;
+  }
+//}}}
+//{{{
+void rawDumpWave() {
+
+  unsigned numWaves = wfc[wfcur];
+  rawWave_t* waves = wf [wfcur];
+
+  unsigned t = 0;
+  for (int i = 0; i < numWaves; i++) {
+    fprintf(stderr, "%10u %08X %08X %08X %10u\n", t, waves[i].gpioOn, waves[i].gpioOff, waves[i].flags, waves[i].usDelay);
+    t += waves[i].usDelay;
+    }
+  }
+//}}}
+//{{{
+void rawDumpScript (unsigned script_id) {
+
+  if (script_id >= PI_MAX_SCRIPTS) 
+    return;
+
+   if (gpioScript[script_id].state == PI_SCRIPT_IN_USE) {
+    for (int i=0; i < PI_MAX_SCRIPT_PARAMS; i++)
+      fprintf (stderr, "p%d=%d ", i, gpioScript[script_id].script.par[i]);
+
+    fprintf (stderr, "\n");
+
+    for (int i = 0; i < PI_MAX_SCRIPT_VARS; i++)
+      fprintf (stderr, "v%d=%d ", i, gpioScript[script_id].script.var[i]);
+
+    fprintf (stderr, "\n");
+
+    for (int i = 0; i < gpioScript[script_id].script.instrs; i++)
+      fprintf (stderr, "c%d=[%"PRIdPTR", %"PRIdPTR"(%d), %"PRIdPTR"(%d), %"PRIdPTR", %"PRIdPTR"]\n",
+                       i,
+                       gpioScript[script_id].script.instr[i].p[0],
+                       gpioScript[script_id].script.instr[i].p[1],
+                       gpioScript[script_id].script.instr[i].opt[1],
+                       gpioScript[script_id].script.instr[i].p[2],
+                       gpioScript[script_id].script.instr[i].opt[2],
+                       gpioScript[script_id].script.instr[i].p[3],
+                       gpioScript[script_id].script.instr[i].p[4]);
+    }
+  }
 //}}}
 
+// time
 //{{{
 double time_time()
 {
@@ -8930,70 +8954,6 @@ uint32_t gpioTick() {
   }
 //}}}
 
-//{{{
-void rawDumpWave()
-{
-   int i;
-
-   unsigned numWaves, t;
-
-   rawWave_t *waves;
-
-   numWaves = wfc[wfcur];
-   waves    = wf [wfcur];
-
-   t = 0;
-
-   for (i=0; i<numWaves; i++)
-   {
-      fprintf(stderr, "%10u %08X %08X %08X %10u\n",
-         t, waves[i].gpioOn, waves[i].gpioOff,
-         waves[i].flags, waves[i].usDelay);
-      t += waves[i].usDelay;
-   }
-}
-//}}}
-//{{{
-void rawDumpScript (unsigned script_id)
-{
-   int i;
-
-   if (script_id >= PI_MAX_SCRIPTS) return;
-
-   if (gpioScript[script_id].state == PI_SCRIPT_IN_USE)
-   {
-
-      for (i=0; i<PI_MAX_SCRIPT_PARAMS; i++)
-      {
-         fprintf(stderr, "p%d=%d ", i, gpioScript[script_id].script.par[i]);
-      }
-
-      fprintf(stderr, "\n");
-
-      for (i=0; i<PI_MAX_SCRIPT_VARS; i++)
-      {
-         fprintf(stderr, "v%d=%d ", i, gpioScript[script_id].script.var[i]);
-      }
-
-      fprintf(stderr, "\n");
-
-      for (i=0; i<gpioScript[script_id].script.instrs; i++)
-      {
-         fprintf(stderr,
-            "c%d=[%"PRIdPTR", %"PRIdPTR"(%d), %"PRIdPTR"(%d), %"PRIdPTR", %"PRIdPTR"]\n",
-            i,
-            gpioScript[script_id].script.instr[i].p[0],
-            gpioScript[script_id].script.instr[i].p[1],
-            gpioScript[script_id].script.instr[i].opt[1],
-            gpioScript[script_id].script.instr[i].p[2],
-            gpioScript[script_id].script.instr[i].opt[2],
-            gpioScript[script_id].script.instr[i].p[3],
-            gpioScript[script_id].script.instr[i].p[4]);
-      }
-   }
-}
-//}}}
-
 // gpio
 //{{{
 int gpioSetMode (unsigned gpio, unsigned mode)
@@ -9028,71 +8988,60 @@ int gpioSetMode (unsigned gpio, unsigned mode)
 }
 //}}}
 //{{{
-int gpioGetMode (unsigned gpio)
-{
-   int reg, shift;
+int gpioGetMode (unsigned gpio) {
 
-   DBG(DBG_USER, "gpio=%d", gpio);
+  DBG(DBG_USER, "gpio=%d", gpio);
+  CHECK_INITED;
 
-   CHECK_INITED;
+  if (gpio > PI_MAX_GPIO)
+    SOFT_ERROR(PI_BAD_GPIO, "bad gpio (%d)", gpio);
 
-   if (gpio > PI_MAX_GPIO)
-      SOFT_ERROR(PI_BAD_GPIO, "bad gpio (%d)", gpio);
-
-   reg   =  gpio/10;
-   shift = (gpio%10) * 3;
-
-   return (gpioReg[reg] >> shift) & 7;
-}
+  int reg   =  gpio/10;
+  int shift = (gpio%10) * 3;
+  return (gpioReg[reg] >> shift) & 7;
+  }
 //}}}
 //{{{
-int gpioSetPullUpDown (unsigned gpio, unsigned pud)
-{
-   int shift = (gpio & 0xf) << 1;
-   uint32_t bits;
-   uint32_t pull;
+int gpioSetPullUpDown (unsigned gpio, unsigned pud) {
 
-   DBG(DBG_USER, "gpio=%d pud=%d", gpio, pud);
+  int shift = (gpio & 0xf) << 1;
 
-   CHECK_INITED;
+  DBG(DBG_USER, "gpio=%d pud=%d", gpio, pud);
+  CHECK_INITED;
 
-   if (gpio > PI_MAX_GPIO)
-      SOFT_ERROR(PI_BAD_GPIO, "bad gpio (%d)", gpio);
+  if (gpio > PI_MAX_GPIO)
+    SOFT_ERROR(PI_BAD_GPIO, "bad gpio (%d)", gpio);
 
-   if (pud > PI_PUD_UP)
-      SOFT_ERROR(PI_BAD_PUD, "gpio %d, bad pud (%d)", gpio, pud);
+  if (pud > PI_PUD_UP)
+    SOFT_ERROR(PI_BAD_PUD, "gpio %d, bad pud (%d)", gpio, pud);
 
-   if (pi_is_2711)
-   {
-      switch (pud)
-      {
-         case PI_PUD_OFF:  pull = 0; break;
-         case PI_PUD_UP:   pull = 1; break;
-         case PI_PUD_DOWN: pull = 2; break;
+  if (pi_is_2711) {
+    uint32_t pull;
+    switch (pud) {
+      case PI_PUD_OFF:  pull = 0; break;
+      case PI_PUD_UP:   pull = 1; break;
+      case PI_PUD_DOWN: pull = 2; break;
       }
 
-      bits = *(gpioReg + GPPUPPDN0 + (gpio>>4));
-      bits &= ~(3 << shift);
-      bits |= (pull << shift);
-      *(gpioReg + GPPUPPDN0 + (gpio>>4)) = bits;
-   }
-   else
-   {
-      *(gpioReg + GPPUD) = pud;
+    uint32_t bits = *(gpioReg + GPPUPPDN0 + (gpio>>4));
+    bits &= ~(3 << shift);
+    bits |= (pull << shift);
+    *(gpioReg + GPPUPPDN0 + (gpio>>4)) = bits;
+    }
 
-      myGpioDelay(1);
+  else {
+    *(gpioReg + GPPUD) = pud;
+    myGpioDelay (1);
 
-      *(gpioReg + GPPUDCLK0 + BANK) = BIT;
+    *(gpioReg + GPPUDCLK0 + BANK) = BIT;
+    myGpioDelay (1);
 
-      myGpioDelay(1);
+    *(gpioReg + GPPUD) = 0;
+    *(gpioReg + GPPUDCLK0 + BANK) = 0;
+    }
 
-      *(gpioReg + GPPUD) = 0;
-
-      *(gpioReg + GPPUDCLK0 + BANK) = 0;
-   }
-
-   return 0;
-}
+  return 0;
+  }
 //}}}
 
 //{{{
@@ -9168,6 +9117,7 @@ int gpioWrite_Bits_0_31_Clear (uint32_t bits) {
 
   DBG(DBG_USER, "bits=%08X", bits);
   CHECK_INITED;
+
   *(gpioReg + GPCLR0) = bits;
   return 0;
   }
@@ -9177,6 +9127,7 @@ int gpioWrite_Bits_32_53_Clear (uint32_t bits) {
 
   DBG(DBG_USER, "bits=%08X", bits);
   CHECK_INITED;
+
   *(gpioReg + GPCLR1) = bits;
   return 0;
   }
@@ -9186,6 +9137,7 @@ int gpioWrite_Bits_0_31_Set (uint32_t bits) {
 
   DBG(DBG_USER, "bits=%08X", bits);
   CHECK_INITED;
+
   *(gpioReg + GPSET0) = bits;
   return 0;
   }
@@ -9195,6 +9147,7 @@ int gpioWrite_Bits_32_53_Set (uint32_t bits) {
 
   DBG(DBG_USER, "bits=%08X", bits);
   CHECK_INITED;
+
   *(gpioReg + GPSET1) = bits;
   return 0;
   }
@@ -9261,63 +9214,53 @@ int gpioGetPWMdutycycle (unsigned gpio)
 }
 //}}}
 //{{{
-int gpioSetPWMrange (unsigned gpio, unsigned range)
-{
-   int oldWidth, newWidth;
+int gpioSetPWMrange (unsigned gpio, unsigned range) {
 
-   DBG(DBG_USER, "gpio=%d range=%d", gpio, range);
+  DBG(DBG_USER, "gpio=%d range=%d", gpio, range);
+  CHECK_INITED;
 
-   CHECK_INITED;
+  if (gpio > PI_MAX_USER_GPIO)
+    SOFT_ERROR(PI_BAD_USER_GPIO, "bad gpio (%d)", gpio);
 
-   if (gpio > PI_MAX_USER_GPIO)
-      SOFT_ERROR(PI_BAD_USER_GPIO, "bad gpio (%d)", gpio);
+  if ((range < PI_MIN_DUTYCYCLE_RANGE)  || (range > PI_MAX_DUTYCYCLE_RANGE))
+    SOFT_ERROR(PI_BAD_DUTYRANGE, "gpio %d, bad range (%d)", gpio, range);
 
-   if ((range < PI_MIN_DUTYCYCLE_RANGE)  || (range > PI_MAX_DUTYCYCLE_RANGE))
-      SOFT_ERROR(PI_BAD_DUTYRANGE, "gpio %d, bad range (%d)", gpio, range);
+   int oldWidth = gpioInfo[gpio].width;
+   if (oldWidth) {
+     if (gpioInfo[gpio].is == GPIO_PWM) {
+       int newWidth = (range * oldWidth) / gpioInfo[gpio].range;
 
-   oldWidth = gpioInfo[gpio].width;
-
-   if (oldWidth)
-   {
-      if (gpioInfo[gpio].is == GPIO_PWM)
-      {
-         newWidth = (range * oldWidth) / gpioInfo[gpio].range;
-
-         myGpioSetPwm(gpio, oldWidth, 0);
-         gpioInfo[gpio].range = range;
-         gpioInfo[gpio].width = newWidth;
-         myGpioSetPwm(gpio, 0, newWidth);
+       myGpioSetPwm (gpio, oldWidth, 0);
+       gpioInfo[gpio].range = range;
+       gpioInfo[gpio].width = newWidth;
+       myGpioSetPwm(gpio, 0, newWidth);
       }
-   }
+     }
 
    gpioInfo[gpio].range = range;
 
    /* return the actual range for the current gpio frequency */
-
    return pwmRealRange[gpioInfo[gpio].freqIdx];
-}
-
+  }
 //}}}
 //{{{
-int gpioGetPWMrange (unsigned gpio)
-{
-   DBG(DBG_USER, "gpio=%d", gpio);
+int gpioGetPWMrange (unsigned gpio) {
 
-   CHECK_INITED;
+  DBG(DBG_USER, "gpio=%d", gpio);
+  CHECK_INITED;
 
-   if (gpio > PI_MAX_USER_GPIO)
-      SOFT_ERROR(PI_BAD_USER_GPIO, "bad gpio (%d)", gpio);
+  if (gpio > PI_MAX_USER_GPIO)
+    SOFT_ERROR(PI_BAD_USER_GPIO, "bad gpio (%d)", gpio);
 
-   switch (gpioInfo[gpio].is)
-   {
-      case GPIO_HW_PWM:
-      case GPIO_HW_CLK:
-         return PI_HW_PWM_RANGE;
+  switch (gpioInfo[gpio].is) {
+    case GPIO_HW_PWM:
+    case GPIO_HW_CLK:
+      return PI_HW_PWM_RANGE;
 
-      default:
-         return gpioInfo[gpio].range;
-   }
-}
+    default:
+      return gpioInfo[gpio].range;
+    }
+  }
 //}}}
 //{{{
 int gpioGetPWMrealRange (unsigned gpio)
