@@ -9,5 +9,6 @@ Makefile~
 *.o
 *.a
 
+lcd
 blink
 

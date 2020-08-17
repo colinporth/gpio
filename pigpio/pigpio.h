@@ -1241,7 +1241,7 @@
 #define PI_MAX_GPIO      53
 //}}}
 #define PI_MAX_USER_GPIO 31
-//{{{  level: 0-1 
+//{{{  level: 0-1
 #define PI_OFF   0
 #define PI_ON    1
 
@@ -1253,7 +1253,7 @@
 //}}}
 
 #define PI_TIMEOUT 2
-//{{{  mode: 0-7 
+//{{{  mode: 0-7
 #define PI_INPUT  0
 #define PI_OUTPUT 1
 
@@ -1264,7 +1264,7 @@
 #define PI_ALT4   3
 #define PI_ALT5   2
 //}}}
-//{{{  pud 0-2 
+//{{{  pud 0-2
 #define PI_PUD_OFF  0
 #define PI_PUD_DOWN 1
 #define PI_PUD_UP   2
@@ -1274,13 +1274,13 @@
 #define PI_MIN_DUTYCYCLE_RANGE        25
 #define PI_MAX_DUTYCYCLE_RANGE     40000
 //}}}
-//{{{  pulsewidth: 0, 500-2500 
+//{{{  pulsewidth: 0, 500-2500
 #define PI_SERVO_OFF 0
 
 #define PI_MIN_SERVO_PULSEWIDTH 500
 #define PI_MAX_SERVO_PULSEWIDTH 2500
 //}}}
-//{{{  hardware PWM 
+//{{{  hardware PWM
 #define PI_HW_PWM_MIN_FREQ 1
 
 #define PI_HW_PWM_MAX_FREQ      125000000
@@ -1288,7 +1288,7 @@
 
 #define PI_HW_PWM_RANGE 1000000
 //}}}
-//{{{  hardware clock 
+//{{{  hardware clock
 #define PI_HW_CLK_MIN_FREQ       4689
 #define PI_HW_CLK_MIN_FREQ_2711 13184
 
@@ -1352,7 +1352,7 @@
 #define PI_WAVE_NOT_FOUND  9998 /* Transmitted wave not found. */
 #define PI_NO_TX_WAVE      9999 /* No wave being transmitted. */
 //}}}
-//{{{  Files, I2C, SPI, SER 
+//{{{  Files, I2C, SPI, SER
 #define PI_FILE_SLOTS 16
 #define PI_I2C_SLOTS  512
 #define PI_SPI_SLOTS  32
@@ -1391,7 +1391,7 @@
 #define PI_I2C_READ         6
 #define PI_I2C_WRITE        7
 //}}}
-//{{{  SPI 
+//{{{  SPI
 #define PI_SPI_FLAGS_BITLEN(x) ((x&63)<<16)
 #define PI_SPI_FLAGS_RX_LSB(x)  ((x&1)<<15)
 #define PI_SPI_FLAGS_TX_LSB(x)  ((x&1)<<14)
@@ -1402,7 +1402,7 @@
 #define PI_SPI_FLAGS_CSPOLS(x)  ((x&7)<<2)
 #define PI_SPI_FLAGS_MODE(x)    ((x&3))
 //}}}
-//{{{  BSC registers 
+//{{{  BSC registers
 #define BSC_DR         0
 #define BSC_RSR        1
 #define BSC_SLV        2
@@ -1437,7 +1437,7 @@
 #define BSC_FR_RXFE    2
 #define BSC_FR_TXBUSY  1
 //}}}
-//{{{  BSC GPIO 
+//{{{  BSC GPIO
 
 #define BSC_SDA_MOSI 18
 #define BSC_SCL_SCLK 19
@@ -1449,21 +1449,21 @@
 #define BSC_MISO_2711      9
 #define BSC_CE_N_2711      8
 //}}}
-//{{{  Longest busy delay 
+//{{{  Longest busy delay
 
 #define PI_MAX_BUSY_DELAY 100
 //}}}
-//{{{  timeout 0-60000 
+//{{{  timeout 0-60000
 
 #define PI_MIN_WDOG_TIMEOUT 0
 #define PI_MAX_WDOG_TIMEOUT 60000
 //}}}
-//{{{  timer 0-9 
+//{{{  timer 0-9
 
 #define PI_MIN_TIMER 0
 #define PI_MAX_TIMER 9
 //}}}
-//{{{  millis 10-60000 
+//{{{  millis 10-60000
 #define PI_MIN_MS 10
 #define PI_MAX_MS 60000
 //}}}
@@ -4461,13 +4461,11 @@ int spiOpen (unsigned spiChan, unsigned baud, unsigned spiFlags);
 /*D
 This function returns a handle for the SPI device on the channel.
 Data will be transferred at baud bits per second.  The flags may
-be used to modify the default behaviour of 4-wire operation, mode 0,
-active low chip select.
+be used to modify the default behaviour of 4-wire operation, mode 0, active low chip select.
 
 The Pi has two SPI peripherals: main and auxiliary.
 
-The main SPI has two chip selects (channels), the auxiliary has
-three.
+The main SPI has two chip selects (channels), the auxiliary has three.
 
 The auxiliary SPI is available on all models but the A and B.
 
@@ -4477,75 +4475,57 @@ The GPIO used are given in the following table.
 Main SPI @    9 @   10 @   11 @   8 @   7 @   -
 Aux SPI  @   19 @   20 @   21 @  18 @  17 @  16
 
-. .
  spiChan: 0-1 (0-2 for the auxiliary SPI)
     baud: 32K-125M (values above 30M are unlikely to work)
-spiFlags: see below
-. .
+
+  spiFlags: see below
 
 Returns a handle (>=0) if OK, otherwise PI_BAD_SPI_CHANNEL,
 PI_BAD_SPI_SPEED, PI_BAD_FLAGS, PI_NO_AUX_SPI, or PI_SPI_OPEN_FAILED.
 
 spiFlags consists of the least significant 22 bits.
+  21 20 19 18 17 16 15 14 13 12 11 10  9  8  7  6  5  4  3  2  1  0
+   b  b  b  b  b  b  R  T  n  n  n  n  W  A u2 u1 u0 p2 p1 p0  m  m
 
-. .
-21 20 19 18 17 16 15 14 13 12 11 10  9  8  7  6  5  4  3  2  1  0
- b  b  b  b  b  b  R  T  n  n  n  n  W  A u2 u1 u0 p2 p1 p0  m  m
-. .
+  mm defines the SPI mode.
+    Warning: modes 1 and 3 do not appear to work on the auxiliary SPI.
+    Mode POL PHA
+     0    0   0
+     1    0   1
+     2    1   0
+     3    1   1
 
-mm defines the SPI mode.
+  px is 0 if CEx is active low (default) and 1 for active high.
 
-Warning: modes 1 and 3 do not appear to work on the auxiliary SPI.
+  ux is 0 if the CEx GPIO is reserved for SPI (default) and 1 otherwise.
 
-. .
-Mode POL PHA
- 0    0   0
- 1    0   1
- 2    1   0
- 3    1   1
-. .
+  A is 0 for the main SPI, 1 for the auxiliary SPI.
 
-px is 0 if CEx is active low (default) and 1 for active high.
+  W is 0 if the device is not 3-wire, 1 if the device is 3-wire. Main SPI only.
 
-ux is 0 if the CEx GPIO is reserved for SPI (default) and 1 otherwise.
+  nnnn defines the number of bytes (0-15) to write before switching
+  the MOSI line to MISO to read data.  This field is ignored if W is not set.  Main SPI only.
 
-A is 0 for the main SPI, 1 for the auxiliary SPI.
+  T is 1 if the least significant bit is transmitted on MOSI first, the
+  default (0) shifts the most significant bit out first.  Auxiliary SPI only.
 
-W is 0 if the device is not 3-wire, 1 if the device is 3-wire.  Main
-SPI only.
+  R is 1 if the least significant bit is received on MISO first, the
+  default (0) receives the most significant bit first.  Auxiliary SPI only.
 
-nnnn defines the number of bytes (0-15) to write before switching
-the MOSI line to MISO to read data.  This field is ignored
-if W is not set.  Main SPI only.
+  bbbbbb defines the word size in bits (0-32).  The default (0) sets 8 bits per word.  Auxiliary SPI only.
 
-T is 1 if the least significant bit is transmitted on MOSI first, the
-default (0) shifts the most significant bit out first.  Auxiliary SPI
-only.
+    The [*spiRead*], [*spiWrite*], and [*spiXfer*] functions
+    transfer data packed into 1, 2, or 4 bytes according to the word size in bits.
 
-R is 1 if the least significant bit is received on MISO first, the
-default (0) receives the most significant bit first.  Auxiliary SPI
-only.
+    For bits 1-8 there will be one byte per word.
+    For bits 9-16 there will be two bytes per word.
+    For bits 17-32 there will be four bytes per word.
 
-bbbbbb defines the word size in bits (0-32).  The default (0)
-sets 8 bits per word.  Auxiliary SPI only.
+    Multi-byte transfers are made in least significant byte first order.
+    E.g. to transfer 32 11-bit words buf should contain 64 bytes and count should be 64.
+    E.g. to transfer the 14 bit value 0x1ABC send the bytes 0xBC followed by 0x1A.
 
-The [*spiRead*], [*spiWrite*], and [*spiXfer*] functions
-transfer data packed into 1, 2, or 4 bytes according to
-the word size in bits.
-
-For bits 1-8 there will be one byte per word.
-For bits 9-16 there will be two bytes per word.
-For bits 17-32 there will be four bytes per word.
-
-Multi-byte transfers are made in least significant byte first order.
-
-E.g. to transfer 32 11-bit words buf should contain 64 bytes
-and count should be 64.
-
-E.g. to transfer the 14 bit value 0x1ABC send the bytes 0xBC followed
-by 0x1A.
-
-The other bits in flags should be set to zero.
+  other bits in flags should be set to zero.
 D*/
 //}}}
 //{{{

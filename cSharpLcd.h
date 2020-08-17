@@ -5,7 +5,7 @@
 
 class cSharpLcd {
 public:
-  cSharpLcd (char SCSpin, char DISPpin, char EXTCOMINpin, bool useEXTCOMIN);
+  cSharpLcd();
   ~cSharpLcd();
 
   // return display parameters
@@ -18,18 +18,18 @@ public:
 
   // Write data to line buffer
   void writePixelToLineBuffer (unsigned int pixel, bool isWhite);
-  void writeByteToLineBuffer (char byteNumber, char byteToWrite);
-  void copyByteWithinLineBuffer (char sourceByte, char destinationByte);
+  void writeByteToLineBuffer (int byteNumber, char byteToWrite);
+  void copyByteWithinLineBuffer (int sourceByte, int destinationByte);
   void setLineBufferBlack();
   void setLineBufferWhite();
 
   // write data from line buffer to display
-  void writeLineBufferToDisplay (char lineNumber);
-  void writeLineBufferToDisplayRepeatedly (char lineNumber, char numLines);
+  void writeLineBufferToDisplay (int lineNumber);
+  void writeLineBufferToDisplayRepeatedly (int lineNumber, int numLines);
 
   // Write data to frame buffer
-  void writePixelToFrameBuffer (unsigned int pixel, char lineNumber, bool isWhite);
-  void writeByteToFrameBuffer (char byteNumber, char lineNumber, char byteToWrite);
+  void writePixelToFrameBuffer (unsigned int pixel, int lineNumber, bool isWhite);
+  void writeByteToFrameBuffer (int byteNumber, int lineNumber, char byteToWrite);
   void setFrameBufferBlack();
   void setFrameBufferWhite();
 
@@ -52,15 +52,13 @@ private:
   static void* hardToggleVCOM (void* arg);
   char reverseByte (char b);
 
+  int handle;
   char commandByte;
   char vcomByte;
   char clearByte;
   char paddingByte;
-  char DISP;
-  char SCS;
   char SI;
   char SCLK;
-  char EXTCOMIN;
   bool enablePWM;
   char lineBuffer [LCDWIDTH/8];
   char frameBuffer [LCDWIDTH*LCDHEIGHT/8];

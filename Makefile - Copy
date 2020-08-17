@@ -1,6 +1,5 @@
-TARGET    = lcd
-SRCS      = lcd.cpp \
-	    cSharpLcd.cpp \
+TARGET    = blink
+SRCS      = blink.cpp \
 	    pigpio/pigpio.c \
 	    pigpio/command.c
 

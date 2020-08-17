@@ -5,22 +5,11 @@
 #include <iostream>
 
 using namespace std;
-// The Raspberry Pi GPIO pins used for SPI are:
-// P1-19 (MOSI)
-// P1-21 (MISO)
-// P1-23 (CLK)
-// P1-24 (CE0)
-// P1-26 (CE1)
 
-// use the pin name/number, not the number based on physical header position
-char SCS      = 23; // Use any pin except the dedicated SPI SS pins?
-char DISP     = 24; // Use any non-specialised GPIO pin
-char EXTCOMIN = 25; // Use any non-specialised GPIO pin
+cSharpLcd sharpLcd;
 
-cSharpLcd sharpLcd (SCS, DISP, EXTCOMIN, true);
-
-unsigned int lcdWidth;
-unsigned int lcdHeight;
+int lcdWidth;
+int lcdHeight;
 char numRepetitions = 4;
 bool toggle = true;
 
@@ -35,10 +24,10 @@ int main() {
     //{{{  print sinewave
     //float increment = 360.00/lcdWidth;  // one number MUST have a decimal point here!
     float increment = 6.2831/lcdWidth;
-    unsigned int sinValue = 0;
+    int sinValue = 0;
     for(float theta=0; theta<50.26; theta += 0.1256) {
-      for(unsigned int y=1; y<=lcdHeight; y++) {
-        for(unsigned int x=1; x<=lcdWidth; x++) {
+      for(int y=1; y<=lcdHeight; y++) {
+        for(int x=1; x<=lcdWidth; x++) {
           sinValue = ( sin( theta+(x*increment) ) * lcdHeight/2 ) + lcdHeight/2;
           if(sinValue >= y && y > lcdHeight/2) {
             sharpLcd.writePixelToLineBuffer(x, 0);
@@ -64,7 +53,7 @@ int main() {
       for(unsigned int radius = 5; radius < expandingCircleRadius; radius++) {
         for(unsigned int y = originY - radius; y <= originY; y++) {
           // need to calculate left and right limits of the circle
-          float theta = acos(float(abs(originY-y))/float(radius));
+          float theta = acos(float(abs(originY-(float)y))/float(radius));
           theta -= 1.5708;
           unsigned int xLength = cos(theta)*float(radius);
           for(unsigned int x = originX - xLength; x <= originX; x++) {
@@ -80,7 +69,7 @@ int main() {
       for(unsigned int radius = expandingCircleRadius; radius > 2; radius--) {
         for(unsigned int y = originY - radius; y <= originY; y++) {
           // need to calculate left and right limits of the circle
-          float theta = acos(float(abs(originY-y))/float(radius));
+          float theta = acos(float(abs(originY-(float)y))/float(radius));
           theta -= 1.5708;
           unsigned int xLength = cos(theta)*float(radius);
           for(unsigned int x = originX - xLength; x <= originX ; x++) {
@@ -113,7 +102,7 @@ int main() {
       // draw circle about the centre
       for(unsigned int y = circleOriginY - circleRadius; y <= circleOriginY; y++) {
         // need to calculate left and right limits of the circle
-        float theta = acos(float(std::abs(circleOriginY-y))/float(circleRadius));
+        float theta = acos(float(std::abs(circleOriginY-(float)y))/float(circleRadius));
         theta -= 1.5708;
         unsigned int xLength = cos(theta)*float(circleRadius);
         for(unsigned int x = circleOriginX - xLength; x <= circleOriginX; x++) {
@@ -135,15 +124,15 @@ int main() {
     numRepetitions = 4;
     toggle = false;
     for(char i=0; i< numRepetitions; i++) {
-      for(unsigned int y=1; y<=lcdHeight; y++) {
-        for(unsigned int x=1; x<y+((lcdWidth-lcdHeight)/2); x++) {
+      for(int y=1; y<=lcdHeight; y++) {
+        for(int x=1; x<y+((lcdWidth-lcdHeight)/2); x++) {
           sharpLcd.writePixelToLineBuffer(x, toggle);
           }
         sharpLcd.writeLineBufferToDisplay(y);
         usleep(5000);
         }
-      for(unsigned int y=lcdHeight; y>0; y--) {
-        for(unsigned int x=lcdWidth; x>y+((lcdWidth-lcdHeight)/2); x--) {
+      for(int y=lcdHeight; y>0; y--) {
+        for(int x=lcdWidth; x>y+((lcdWidth-lcdHeight)/2); x--) {
           sharpLcd.writePixelToLineBuffer(x, toggle);
           }
         sharpLcd.writeLineBufferToDisplay(y);
@@ -161,8 +150,8 @@ int main() {
     //{{{  print chequerboard patterns
     numRepetitions = 8;
     for(char i=0; i<numRepetitions; i++) {
-      for(unsigned int y=1; y<=lcdHeight; y++) {
-        for(unsigned int x=1; x <=lcdWidth/8; x++) {
+      for(int y=1; y<=lcdHeight; y++) {
+        for(int x=1; x <=lcdWidth/8; x++) {
           if(toggle) {
             sharpLcd.writeByteToLineBuffer(x, 0xFF);
             toggle = false;
@@ -176,11 +165,12 @@ int main() {
         sharpLcd.writeLineBufferToDisplay(y);
         sharpLcd.clearLineBuffer();
 
-        if(y%8 == 0)
-          if(toggle)
+        if ((y % 8) == 0) {
+          if (toggle)
             toggle = false;
           else
             toggle = true;
+          }
         }
       usleep(500000);
       if(toggle)
@@ -194,13 +184,12 @@ int main() {
 
     numRepetitions = 4;
     for(char i=0; i<numRepetitions; i++) {
-      char colour = 0x00;
-      if(i%2 == 0)
+      if (i%2 == 0)
         sharpLcd.setLineBufferBlack();
       else
         sharpLcd.setLineBufferWhite();
-      for(char y=1; y<lcdHeight+1; y++) {
-        sharpLcd.writeLineBufferToDisplay(y);
+      for (int y = 1; y < lcdHeight+1; y++) {
+        sharpLcd.writeLineBufferToDisplay (y);
         usleep(5000);
         }
       }
@@ -210,8 +199,8 @@ int main() {
     //}}}
     //{{{  print horizontal line descending down the screen
     char lineThickness = 10;
-    for(unsigned int i=0; i<numRepetitions; i++) {
-      for(char y=1; y<lcdHeight+lineThickness+1; y++) {  // lcdHeight+10 to give the line some thickness
+    for (int i=0; i<numRepetitions; i++) {
+      for (char y=1; y<lcdHeight+lineThickness+1; y++) {  // lcdHeight+10 to give the line some thickness
         int blackLine = y;
         int whiteLine = y - lineThickness;
         if(whiteLine > 0 && whiteLine < lcdHeight+1) {
