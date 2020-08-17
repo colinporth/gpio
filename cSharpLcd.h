@@ -6,44 +6,32 @@ public:
   cSharpLcd();
   ~cSharpLcd();
 
-  // return display parameters
-  unsigned int getDisplayWidth() { return kWidth; }
-  unsigned int getDisplayHeight() { return kHeight; }
+  int getDisplayWidth() { return kWidth; }
+  int getDisplayHeight() { return kHeight; }
 
-  // Write data direct to display
-  void writeMultipleLinesToDisplay (int lineNumber, int numLines, char* lines);
-  void writeLineToDisplay (int lineNumber, char* line);
-
-  // Write data to line buffer
-  void writePixelToLineBuffer (unsigned int pixel, bool isWhite);
-  void writeByteToLineBuffer (int byteNumber, char byteToWrite);
-  void setLineBufferBlack();
-  void setLineBufferWhite();
-
-  // write data from line buffer to display
-  void writeLineBufferToDisplay (int lineNumber);
-  void writeLineBufferToDisplayRepeatedly (int lineNumber, int numLines);
-
-  // Write data to frame buffer
-  void writePixelToFrameBuffer (unsigned int pixel, int lineNumber, bool isWhite);
-  void writeByteToFrameBuffer (int byteNumber, int lineNumber, char byteToWrite);
-  void setFrameBufferBlack();
-  void setFrameBufferWhite();
-
-  // write data from frame buffer to display
-  void writeFrameBufferToDisplay();
-
-  // clear functions
-  void clearLineBuffer();
-  void clearFrameBuffer();
   void clearDisplay();
-
-  // turn display on/off
   void turnOff();
   void turnOn();
 
-  // software VCOM control
-  void softToggleVCOM();
+  void writeLinesToDisplay (int lineNumber, int numLines, char* linesData);
+  void writeLineToDisplay (int lineNumber, char* lineData);
+  void writeLineBufferToDisplay (int lineNumber);
+  void writeLineBufferToDisplayRepeatedly (int lineNumber, int numLines);
+  void writeFrameBufferToDisplay();
+
+  // line buffer
+  void clearLineBuffer();
+  void setLineBufferBlack();
+  void setLineBufferWhite();
+  void writeByteToLineBuffer (int byteNumber, char byteToWrite);
+  void writePixelToLineBuffer (int pixel, bool on);
+
+  // frame buffer
+  void clearFrameBuffer();
+  void setFrameBufferBlack();
+  void setFrameBufferWhite();
+  void writeByteToFrameBuffer (int byteNumber, int lineNumber, char byteToWrite);
+  void writePixelToFrameBuffer (unsigned int pixel, int lineNumber, bool on);
 
 private:
   static const int kWidth = 400;
