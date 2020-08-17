@@ -3,6 +3,7 @@
 #include "cSharpLcd.h"
 
 #include <unistd.h>
+#include <cstring>
 #include <pthread.h>
 #include <iostream>
 
@@ -126,23 +127,10 @@ void cSharpLcd::writeLinesToDisplay (int lineNumber, int numLines, char* linesDa
 //}}}
 void cSharpLcd::writeLineToDisplay (int lineNumber, char* lineData) { writeLinesToDisplay (lineNumber, 1, lineData); }
 void cSharpLcd::writeLineBufferToDisplay (int lineNumber) { writeLinesToDisplay (lineNumber, 1, lineBuffer); }
-//{{{
 void cSharpLcd::writeFrameBufferToDisplay() { writeLinesToDisplay (1, kHeight, frameBuffer); }
-//}}}
 
-//{{{
-void cSharpLcd::clearLineBuffer() {
-  for (int i = 0; i < kWidth/8; i++)
-    lineBuffer[i] = 0xFF;
-  }
-//}}}
-//{{{
-void cSharpLcd::setLineBuffer() {
-
-  for (int i = 0; i < kWidth/8; i++)
-    lineBuffer[i] = 0x00;
-  }
-//}}}
+void cSharpLcd::clearLineBuffer() { memset (lineBuffer, 0xFF, kWidth/8); }
+void cSharpLcd::setLineBuffer() { memset (lineBuffer, 0x00, kWidth/8); }
 //{{{
 void cSharpLcd::writeByteToLineBuffer (int byteNumber, char byteToWrite) {
 // char location expected in the fn args has been extrapolated from the pixel location
@@ -169,19 +157,8 @@ void cSharpLcd::writePixelToLineBuffer (int pixel, bool isWhite) {
   }
 //}}}
 
-//{{{
-void cSharpLcd::clearFrameBuffer() {
-  for  (int i = 0; i < kWidth*kHeight/8; i++)
-    frameBuffer[i] = 0xFF;
-  }
-//}}}
-//{{{
-void cSharpLcd::setFrameBuffer() {
-
-  for (int i = 0; i < kWidth * kHeight / 8; i++)
-    frameBuffer[i] = 0x00;
-  }
-//}}}
+void cSharpLcd::clearFrameBuffer() { memset (frameBuffer, 0xFF, kWidth*kHeight/8); }
+void cSharpLcd::setFrameBuffer() { memset (frameBuffer, 0x00, kWidth*kHeight/8); }
 //{{{
 void cSharpLcd::writeByteToFrameBuffer (int byteNumber, int lineNumber, char byteToWrite) {
 // char location expected in the fn args has been extrapolated from the pixel location
