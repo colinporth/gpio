@@ -2,21 +2,20 @@
 //{{{  includes
 #include "cSharpLcd.h"
 
-#include <unistd.h>
+#include <stdio.h>
 #include <cstring>
 #include <pthread.h>
-#include <iostream>
 
 #include "pigpio/pigpio.h"
 
 using namespace std;
 //}}}
-static const char SCS      = 23; // J8 - pin16
-static const char DISP     = 24; // J8 - pin18
-static const char EXTCOMIN = 25; // J8 - pin22
-static const char MOSI     = 10; // J8 - pin19
+static const char SCS      = 23; // J8 - pin16 - used
+static const char DISP     = 24; // J8 - pin18 - used
+static const char EXTCOMIN = 25; // J8 - pin22 - used
+static const char MOSI     = 10; // J8 - pin19 - used
 static const char MISO     =  9; // J8 - pin21
-static const char CLK      = 11; // J8 - pin23
+static const char CLK      = 11; // J8 - pin23 - used
 static const char CE0      =  8; // J8 - pin24
 static const char CE1      =  7; // J8 - pin26
 
@@ -51,9 +50,9 @@ cSharpLcd::cSharpLcd() {
     // NB: this leaves the Memory LCD vulnerable if an image is left displayed after the program stops.
     pthread_t threadId;
     if (pthread_create (&threadId, NULL, &hardToggleVCOM, 0))
-      cout << "Error creating EXTCOMIN thread" << endl;
+      printf ("Error creating EXTCOMIN thread\n");
     else
-      cout << "PWM thread started successfully" << endl;
+      printf ("PWM thread started successfully\n");
 
     handle = spiOpen (0, kSpiClock, 0);
 

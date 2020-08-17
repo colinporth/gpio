@@ -5,7 +5,9 @@
 #include <pthread.h>
 //}}}
 #define PIGPIO_VERSION 77
-//{{{  pigpio is a C library for the Raspberry which allows control of the GPIO.
+//{{{  description
+// pigpio is a C library for the Raspberry which allows control of the GPIO.
+
 //*Features*
 //o hardware timed PWM on any of GPIO 0-31
 //o hardware timed servo pulses on any of GPIO 0-31
@@ -62,14 +64,12 @@
 //gpioCfgSetInternals(cfg);
 //int status = gpioInitialise();
 //}}}
-//{{{  OVERVIEW
+//{{{  functions
 //ESSENTIAL
-
 //gpioInitialise             Initialise library
 //gpioTerminate              Stop library
 
 //BASIC
-
 //gpioSetMode                Set a GPIO mode
 //gpioGetMode                Get a GPIO mode
 
@@ -79,7 +79,6 @@
 //gpioWrite                  Write a GPIO
 
 //PWM_(overrides_servo_commands_on_same_GPIO)
-
 //gpioPWM                    Start/stop PWM pulses on a GPIO
 //gpioSetPWMfrequency        Configure PWM frequency for a GPIO
 //gpioSetPWMrange            Configure PWM range for a GPIO
@@ -91,13 +90,10 @@
 //gpioGetPWMrealRange        Get underlying PWM range for a GPIO
 
 //Servo_(overrides_PWM_commands_on_same_GPIO)
-
 //gpioServo                  Start/stop servo pulses on a GPIO
-
 //gpioGetServoPulsewidth     Get pulsewidth setting on a GPIO
 
 //INTERMEDIATE
-
 //gpioTrigger                Send a trigger pulse to a GPIO
 
 //gpioSetWatchdog            Set a watchdog on a GPIO
@@ -121,7 +117,6 @@
 //gpioStopThread             Stop a previously started thread
 
 //ADVANCED
-
 //gpioNotifyOpen             Request a notification handle
 //gpioNotifyClose            Close a notification
 //gpioNotifyOpenWithSize     Request a notification with sized pipe
@@ -129,7 +124,6 @@
 //gpioNotifyPause            Pause notifications
 
 //gpioHardwareClock          Start hardware clock on supported GPIO
-
 //gpioHardwarePWM            Start hardware PWM on supported GPIO
 
 //gpioGlitchFilter           Set a glitch filter on a GPIO
@@ -150,20 +144,16 @@
 //gpioSetGetSamplesFuncEx    Requests a GPIO samples callback, extended
 
 //Custom
-
 //gpioCustom1                User custom function 1
 //gpioCustom2                User custom function 2
 
 //Events
-
 //eventMonitor               Sets the events to monitor
 //eventSetFunc               Request an event callback
 //eventSetFuncEx             Request an event callback, extended
-
 //eventTrigger               Trigger an event
 
 //Scripts
-
 //gpioStoreScript            Store a script
 //gpioRunScript              Run a stored script
 //gpioUpdateScript           Set a scripts parameters
@@ -172,149 +162,102 @@
 //gpioDeleteScript           Delete a stored script
 
 //I2C
-
 //i2cOpen                    Opens an I2C device
 //i2cClose                   Closes an I2C device
-
 //i2cWriteQuick              SMBus write quick
-
 //i2cReadByte                SMBus read byte
 //i2cWriteByte               SMBus write byte
-
 //i2cReadByteData            SMBus read byte data
 //i2cWriteByteData           SMBus write byte data
-
 //i2cReadWordData            SMBus read word data
 //i2cWriteWordData           SMBus write word data
-
 //i2cReadBlockData           SMBus read block data
 //i2cWriteBlockData          SMBus write block data
-
 //i2cReadI2CBlockData        SMBus read I2C block data
 //i2cWriteI2CBlockData       SMBus write I2C block data
-
 //i2cReadDevice              Reads the raw I2C device
 //i2cWriteDevice             Writes the raw I2C device
-
 //i2cProcessCall             SMBus process call
 //i2cBlockProcessCall        SMBus block process call
-
 //i2cSwitchCombined          Sets or clears the combined flag
-
 //i2cSegments                Performs multiple I2C transactions
-
 //i2cZip                     Performs multiple I2C transactions
 
 //I2C_BIT_BANG
-
 //bbI2COpen                  Opens GPIO for bit banging I2C
 //bbI2CClose                 Closes GPIO for bit banging I2C
-
 //bbI2CZip                   Performs bit banged I2C transactions
 
 //I2C/SPI_SLAVE
-
 //bscXfer                    I2C/SPI as slave transfer
 
 //SERIAL
-
 //serOpen                    Opens a serial device
 //serClose                   Closes a serial device
-
 //serReadByte                Reads a byte from a serial device
 //serWriteByte               Writes a byte to a serial device
-
 //serRead                    Reads bytes from a serial device
 //serWrite                   Writes bytes to a serial device
-
 //serDataAvailable           Returns number of bytes ready to be read
 
 //SERIAL_BIT_BANG_(read_only)
-
 //gpioSerialReadOpen         Opens a GPIO for bit bang serial reads
 //gpioSerialReadClose        Closes a GPIO for bit bang serial reads
-
 //gpioSerialReadInvert       Configures normal/inverted for serial reads
-
 //gpioSerialRead             Reads bit bang serial data from a GPIO
 
 //SPI
-
 //spiOpen                    Opens a SPI device
 //spiClose                   Closes a SPI device
-
 //spiRead                    Reads bytes from a SPI device
 //spiWrite                   Writes bytes to a SPI device
 //spiXfer                    Transfers bytes with a SPI device
 
 //SPI_BIT_BANG
-
 //bbSPIOpen                  Opens GPIO for bit banging SPI
 //bbSPIClose                 Closes GPIO for bit banging SPI
-
 //bbSPIXfer                  Performs bit banged SPI transactions
 
 //FILES
-
 //fileOpen                   Opens a file
 //fileClose                  Closes a file
-
 //fileRead                   Reads bytes from a file
 //fileWrite                  Writes bytes to a file
-
 //fileSeek                   Seeks to a position within a file
-
 //fileList                   List files which match a pattern
 
 //WAVES
-
 //gpioWaveClear              Deletes all waveforms
-
 //gpioWaveAddNew             Starts a new waveform
 //gpioWaveAddGeneric         Adds a series of pulses to the waveform
 //gpioWaveAddSerial          Adds serial data to the waveform
-
 //gpioWaveCreate             Creates a waveform from added data
 //gpioWaveCreatePad          Creates a waveform of fixed size from added data
 //gpioWaveDelete             Deletes a waveform
-
 //gpioWaveTxSend             Transmits a waveform
-
 //gpioWaveChain              Transmits a chain of waveforms
-
 //gpioWaveTxAt               Returns the current transmitting waveform
-
 //gpioWaveTxBusy             Checks to see if the waveform has ended
-
 //gpioWaveTxStop             Aborts the current waveform
-
 //gpioWaveGetCbs             Length in CBs of the current waveform
 //gpioWaveGetHighCbs         Length of longest waveform so far
 //gpioWaveGetMaxCbs          Absolute maximum allowed CBs
-
 //gpioWaveGetMicros          Length in micros of the current waveform
 //gpioWaveGetHighMicros      Length of longest waveform so far
 //gpioWaveGetMaxMicros       Absolute maximum allowed micros
-
 //gpioWaveGetPulses          Length in pulses of the current waveform
 //gpioWaveGetHighPulses      Length of longest waveform so far
 //gpioWaveGetMaxPulses       Absolute maximum allowed pulses
 
 //UTILITIES
-
 //gpioDelay                  Delay for a number of microseconds
-
 //gpioTick                   Get current tick (microseconds)
-
 //gpioHardwareRevision       Get hardware revision
 //gpioVersion                Get the pigpio version
-
 //getBitInBytes              Get the value of a bit
 //putBitInBytes              Set the value of a bit
-
 //gpioTime                   Get current time
 //gpioSleep                  Sleep for specified time
-
 //time_sleep                 Sleeps for a float number of seconds
 //time_time                  Float number of seconds since the epoch
 
@@ -329,12 +272,10 @@
 //gpioCfgSocketPort          Configure socket port
 //gpioCfgMemAlloc            Configure DMA memory allocation mode
 //gpioCfgNetAddr             Configure allowed network addresses
-
 //gpioCfgGetInternals        Get internal configuration settings
 //gpioCfgSetInternals        Set internal configuration settings
 
 //EXPERT
-
 //rawWaveAddSPI              Not intended for general use
 //rawWaveAddGeneric          Not intended for general use
 //rawWaveCB                  Not intended for general use
@@ -348,10 +289,8 @@
 //rawWaveInfo                Not intended for general use
 //rawDumpWave                Not intended for general use
 //rawDumpScript              Not intended for general use
-
-//OVERVIEW*/
 //}}}
-//{{{  PARAMS
+//{{{  params
 //active :: 0-1000000
 
 //The number of microseconds level changes are reported for once
