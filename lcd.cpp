@@ -21,14 +21,14 @@ int main() {
     //{{{  print sinewave
     float increment = 6.2831f / lcdWidth;
 
-    for (float theta = 0; theta < 10.f; theta += 0.1256.f) {
+    for (float theta = 0; theta < 10.f; theta += 0.1256f) {
       for (int y = 1; y <= lcdHeight; y++) {
         sharpLcd.clearLineBuffer();
         for (int x = 1; x <= lcdWidth; x++) {
           int sinValue = (sin(theta + (x * increment)) * lcdHeight/2) + lcdHeight/2;
-          if (sinValue >= y && y > lcdHeight / 2)
+          if (sinValue >= y && y > lcdHeight/2)
             sharpLcd.writePixelToLineBuffer (x, 0);
-          if (sinValue <= y && y <= lcdHeight / 2)
+          if (sinValue <= y && y <= lcdHeight/2)
             sharpLcd.writePixelToLineBuffer (x, 0);
           }
         sharpLcd.writeLineBufferToDisplay (y);
@@ -40,9 +40,9 @@ int main() {
 
     printf ("circles\n");
     //{{{  print expanding and contracting circles
-    unsigned int originX = lcdWidth / 2;
-    unsigned int originY = lcdHeight / 2;
-    unsigned int expandingCircleRadius = (lcdHeight / 2) * 0.9;
+    unsigned int originX = lcdWidth/2;
+    unsigned int originY = lcdHeight/2;
+    unsigned int expandingCircleRadius = (lcdHeight/2) * 0.9;
 
     for (unsigned int repeat = 0; repeat < 2; repeat++) {
       for (unsigned int radius = 5; radius < expandingCircleRadius; radius++) {
@@ -92,10 +92,10 @@ int main() {
     //{{{  print circling circle
     numRepetitions = 4;
 
-    unsigned int sweepRadius = (lcdHeight / 2) * 0.8;
-    unsigned int sweepOriginX = lcdWidth / 2;
-    unsigned int sweepOriginY = lcdHeight / 2;
-    unsigned int circleRadius = 0.7 * ((lcdHeight / 2) - sweepRadius);
+    unsigned int sweepRadius = (lcdHeight/2) * 0.8;
+    unsigned int sweepOriginX = lcdWidth/2;
+    unsigned int sweepOriginY = lcdHeight/2;
+    unsigned int circleRadius = 0.7 * ((lcdHeight/2) - sweepRadius);
 
     for (float rads = 0; rads < 6.2824 * numRepetitions; rads += 0.04) {
       sharpLcd.clearDisplay();
@@ -133,7 +133,7 @@ int main() {
       sharpLcd.clearDisplay();
 
       for (int y = 1; y <= lcdHeight; y++) {
-        for (int x = 1; x <= lcdWidth / 8; x++) {
+        for (int x = 1; x <= lcdWidth/8; x++) {
           if (toggle)
             sharpLcd.writeByteToLineBuffer (x, 0xFF);
           else
