@@ -35,7 +35,7 @@ private:
   static const int kWidth = 400;
   static const int kHeight = 240;
 
-  char reverseByte (int b);
+  uint8_t reverseByte (uint8_t b);
   static void* toggleVcomThread (void* arg);
 
   int mHandle;

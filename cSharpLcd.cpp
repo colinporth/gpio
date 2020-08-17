@@ -123,29 +123,29 @@ void cSharpLcd::writeLinesToDisplay (uint8_t lineNumber, uint8_t numLines, uint8
   }
 //}}}
 //{{{
-void cSharpLcd::writeLineToDisplay (uint8_t lineNumber, uint8_t* lineData) { 
-  writeLinesToDisplay (lineNumber, 1, lineData); 
+void cSharpLcd::writeLineToDisplay (uint8_t lineNumber, uint8_t* lineData) {
+  writeLinesToDisplay (lineNumber, 1, lineData);
   }
 //}}}
 //{{{
-void cSharpLcd::writeLineBufferToDisplay (uint8_t lineNumber) { 
-  writeLinesToDisplay (lineNumber, 1, mLineBuffer); 
+void cSharpLcd::writeLineBufferToDisplay (uint8_t lineNumber) {
+  writeLinesToDisplay (lineNumber, 1, mLineBuffer);
   }
 //}}}
 //{{{
-void cSharpLcd::writeFrameBufferToDisplay() { 
-  writeLinesToDisplay (1, kHeight, mFrameBuffer); 
+void cSharpLcd::writeFrameBufferToDisplay() {
+  writeLinesToDisplay (1, kHeight, mFrameBuffer);
   }
 //}}}
 
 //{{{
-void cSharpLcd::setLineBuffer() { 
-  memset (mLineBuffer, 0x00, kWidth/8); 
+void cSharpLcd::setLineBuffer() {
+  memset (mLineBuffer, 0x00, kWidth/8);
   }
 //}}}
 //{{{
-void cSharpLcd::clearLineBuffer() { 
-  memset (mLineBuffer, 0xFF, kWidth/8); 
+void cSharpLcd::clearLineBuffer() {
+  memset (mLineBuffer, 0xFF, kWidth/8);
   }
 //}}}
 //{{{
@@ -175,13 +175,13 @@ void cSharpLcd::writePixelToLineBuffer (uint16_t pixel, bool on) {
 //}}}
 
 //{{{
-void cSharpLcd::setFrameBuffer() { 
-  memset (mFrameBuffer, 0x00, kWidth*kHeight/8); 
+void cSharpLcd::setFrameBuffer() {
+  memset (mFrameBuffer, 0x00, kWidth*kHeight/8);
   }
 //}}}
 //{{{
-void cSharpLcd::clearFrameBuffer() { 
-  memset (mFrameBuffer, 0xFF, kWidth*kHeight/8); 
+void cSharpLcd::clearFrameBuffer() {
+  memset (mFrameBuffer, 0xFF, kWidth*kHeight/8);
   }
 //}}}
 //{{{
@@ -214,13 +214,12 @@ void cSharpLcd::writePixelToFrameBuffer (uint16_t pixel, uint8_t lineNumber, boo
 
 // private
 //{{{
-char cSharpLcd::reverseByte (int b) {
+uint8_t cSharpLcd::reverseByte (uint8_t b) {
 // reverses the bit order of an unsigned char
 
-  b = (b & 0xF0) >> 4 | (b & 0x0F) << 4;
-  b = (b & 0xCC) >> 2 | (b & 0x33) << 2;
-  b = (b & 0xAA) >> 1 | (b & 0x55) << 1;
-  return b;
+  b = ((b & 0xF0) >> 4) | ((b & 0x0F) << 4);
+  b = ((b & 0xCC) >> 2) | ((b & 0x33) << 2);
+  return ((b & 0xAA) >> 1) | ((b & 0x55) << 1);
   }
 //}}}
 //{{{
