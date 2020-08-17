@@ -16,7 +16,6 @@ public:
   void writeLinesToDisplay (int lineNumber, int numLines, char* linesData);
   void writeLineToDisplay (int lineNumber, char* lineData);
   void writeLineBufferToDisplay (int lineNumber);
-  void writeLineBufferToDisplayRepeatedly (int lineNumber, int numLines);
   void writeFrameBufferToDisplay();
 
   // line buffer

@@ -107,18 +107,15 @@ void cSharpLcd::turnOn() {
 //{{{
 void cSharpLcd::writeLinesToDisplay (int lineNumber, int numLines, char* linesData) {
 
-  char* linePtr = linesData;
-
   gpioWrite (SCS, 1);
   gpioDelay (SCS_HIGH_DELAY);
   spiWrite (handle, &commandByte, 1);
 
-  for (int x = 0; x < numLines; x++) {
-    char reversedLineNumber = reverseByte (lineNumber);
+  for (int i = 0; i < numLines; i++) {
+    char reversedLineNumber = reverseByte (lineNumber++);
     spiWrite (handle, &reversedLineNumber, 1);
-    spiWrite (handle, linePtr++, kWidth/8);
+    spiWrite (handle, linesData++, kWidth/8);
     spiWrite (handle, &paddingByte, 1);
-    lineNumber++;
     }
 
   spiWrite (handle, &paddingByte, 1);
@@ -127,25 +124,10 @@ void cSharpLcd::writeLinesToDisplay (int lineNumber, int numLines, char* linesDa
   gpioDelay (INTERFRAME_DELAY);
   }
 //}}}
+void cSharpLcd::writeLineToDisplay (int lineNumber, char* lineData) { writeLinesToDisplay (lineNumber, 1, lineData); }
+void cSharpLcd::writeLineBufferToDisplay (int lineNumber) { writeLinesToDisplay (lineNumber, 1, lineBuffer); }
 //{{{
-void cSharpLcd::writeLineToDisplay (int lineNumber, char* lineData) {
-  writeLinesToDisplay (lineNumber, 1, lineData);
-  }
-//}}}
-//{{{
-void cSharpLcd::writeLineBufferToDisplay (int lineNumber) {
-  writeLinesToDisplay (lineNumber, 1, lineBuffer);
-  }
-//}}}
-//{{{
-void cSharpLcd::writeLineBufferToDisplayRepeatedly (int lineNumber, int numLines) {
-  writeLinesToDisplay (lineNumber, numLines, lineBuffer);
-  }
-//}}}
-//{{{
-void cSharpLcd::writeFrameBufferToDisplay() {
-  writeLinesToDisplay (1, kHeight, frameBuffer);
-  }
+void cSharpLcd::writeFrameBufferToDisplay() { writeLinesToDisplay (1, kHeight, frameBuffer); }
 //}}}
 
 //{{{
