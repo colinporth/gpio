@@ -23,6 +23,7 @@ int main() {
 
     for (float theta = 0; theta < 50.26; theta += 0.1256) {
       for (int y = 1; y <= lcdHeight; y++) {
+        sharpLcd.clearLineBuffer();
         for (int x = 1; x <= lcdWidth; x++) {
           int sinValue = (sin(theta + (x * increment)) * lcdHeight/2) + lcdHeight/2;
           if (sinValue >= y && y > lcdHeight / 2)
