@@ -13,11 +13,12 @@ using namespace std;
 static const char SCS      = 23; // J8 - pin16 - used
 static const char DISP     = 24; // J8 - pin18 - used
 static const char EXTCOMIN = 25; // J8 - pin22 - used
-static const char MOSI     = 10; // J8 - pin19 - used
-static const char MISO     =  9; // J8 - pin21
-static const char CLK      = 11; // J8 - pin23 - used
-static const char CE0      =  8; // J8 - pin24
+
 static const char CE1      =  7; // J8 - pin26
+static const char CE0      =  8; // J8 - pin24
+static const char MISO     =  9; // J8 - pin21
+static const char MOSI     = 10; // J8 - pin19 - used
+static const char CLK      = 11; // J8 - pin23 - used
 
 static const int kSpiClock = 8000000;
 

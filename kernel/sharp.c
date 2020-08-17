@@ -24,14 +24,14 @@
 #define LCDWIDTH      400
 #define VIDEOMEMSIZE  (1*1024*1024)   /* 1 MB */
 
+char SCS = 23;
+char DISP = 24;
+char VCOM = 25;
+
 char commandByte = 0b10000000;
 char vcomByte    = 0b01000000;
 char clearByte   = 0b00100000;
 char paddingByte = 0b00000000;
-
-char SCS = 23;
-char DISP = 24;
-char VCOM = 25;
 
 int lcdWidth = LCDWIDTH;
 int lcdHeight = 240;
