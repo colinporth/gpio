@@ -20,15 +20,13 @@ public:
 
   // line buffer
   void clearLineBuffer();
-  void setLineBufferBlack();
-  void setLineBufferWhite();
+  void setLineBuffer();
   void writeByteToLineBuffer (int byteNumber, char byteToWrite);
   void writePixelToLineBuffer (int pixel, bool on);
 
   // frame buffer
   void clearFrameBuffer();
-  void setFrameBufferBlack();
-  void setFrameBufferWhite();
+  void setFrameBuffer();
   void writeByteToFrameBuffer (int byteNumber, int lineNumber, char byteToWrite);
   void writePixelToFrameBuffer (unsigned int pixel, int lineNumber, bool on);
 

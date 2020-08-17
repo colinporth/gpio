@@ -190,9 +190,9 @@ int main() {
     for(char i = 0; i < numRepetitions; i++) {
       sharpLcd.clearDisplay();
       if (i%2 == 0)
-        sharpLcd.setLineBufferBlack();
+        sharpLcd.setLineBuffer();
       else
-        sharpLcd.setLineBufferWhite();
+        sharpLcd.clearLineBuffer();
       for (int y = 1; y < lcdHeight+1; y++) {
         sharpLcd.writeLineBufferToDisplay (y);
         usleep (5000);
@@ -209,11 +209,11 @@ int main() {
         int blackLine = y;
         int whiteLine = y - lineThickness;
         if (whiteLine > 0 && whiteLine < lcdHeight+1) {
-          sharpLcd.setLineBufferWhite();
+          sharpLcd.clearLineBuffer();
           sharpLcd.writeLineBufferToDisplay (whiteLine);
           }
         if (blackLine > 0 && blackLine < lcdHeight+1) {
-          sharpLcd.setLineBufferBlack();
+          sharpLcd.setLineBuffer();
           sharpLcd.writeLineBufferToDisplay (blackLine);
           }
         usleep(5000);

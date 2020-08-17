@@ -132,21 +132,15 @@ void cSharpLcd::writeFrameBufferToDisplay() { writeLinesToDisplay (1, kHeight, f
 
 //{{{
 void cSharpLcd::clearLineBuffer() {
-  setLineBufferWhite();
+  for (int i = 0; i < kWidth/8; i++)
+    lineBuffer[i] = 0xFF;
   }
 //}}}
 //{{{
-void cSharpLcd::setLineBufferBlack() {
+void cSharpLcd::setLineBuffer() {
 
   for (int i = 0; i < kWidth/8; i++)
     lineBuffer[i] = 0x00;
-  }
-//}}}
-//{{{
-void cSharpLcd::setLineBufferWhite() {
-
-  for (int i = 0; i < kWidth/8; i++)
-    lineBuffer[i] = 0xFF;
   }
 //}}}
 //{{{
@@ -177,21 +171,15 @@ void cSharpLcd::writePixelToLineBuffer (int pixel, bool isWhite) {
 
 //{{{
 void cSharpLcd::clearFrameBuffer() {
-  setFrameBufferWhite();
+  for  (int i = 0; i < kWidth*kHeight/8; i++)
+    frameBuffer[i] = 0xFF;
   }
 //}}}
 //{{{
-void cSharpLcd::setFrameBufferBlack() {
+void cSharpLcd::setFrameBuffer() {
 
   for (int i = 0; i < kWidth * kHeight / 8; i++)
     frameBuffer[i] = 0x00;
-  }
-//}}}
-//{{{
-void cSharpLcd::setFrameBufferWhite() {
-
-  for  (int i = 0; i < kWidth*kHeight/8; i++)
-    frameBuffer[i] = 0xFF;
   }
 //}}}
 //{{{
