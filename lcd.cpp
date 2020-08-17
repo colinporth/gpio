@@ -1,7 +1,8 @@
 #include "cSharpLcd.h"
+
 #include <unistd.h>
+#include <cstdio>
 #include <cmath>
-#include <iostream>
 
 using namespace std;
 
