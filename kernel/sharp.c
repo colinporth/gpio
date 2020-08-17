@@ -262,13 +262,13 @@ int thread_fn (void* v) {
   clearDisplay();
 
   //unsigned char *screenBufferCompressed;
-  screenBufferCompressed = vzalloc ((50+4)*240*sizeof(unsigned char));   //plante si on met moins
+  screenBufferCompressed = vzalloc ((50+4) * 240 * sizeof(unsigned char));   //plante si on met moins
 
   //char bufferByte = 0;
   //char sendBuffer[1 + (1+50+1)*1 + 1];
   sendBuffer[0] = commandByte;
   sendBuffer[52] = paddingByte;
-  sendBuffer[1 + 52] = paddingByte;
+  sendBuffer[52 + 1] = paddingByte;
 
   // Init screen to black
   for (y = 0 ; y < 240 ; y++) {
@@ -278,7 +278,7 @@ int thread_fn (void* v) {
     screenBufferCompressed[y*(50+4) + 52] = paddingByte;
     screenBufferCompressed[y*(50+4) + 53] = paddingByte;
     //screenBufferCompressed is all to 0 by default (vzalloc)
-    spi_write(screen->spi, (const u8 *)(screenBufferCompressed+(y*(50+4))), 54);
+    spi_write (screen->spi, (const u8 *)(screenBufferCompressed+(y*(50+4))), 54);
     gpio_set_value (SCS, 0);
     }
 
@@ -306,7 +306,7 @@ int thread_fn (void* v) {
         screenBufferCompressed[x+2 + y*(50+4)] = bufferByte;
         }
 
-      if(hasChanged) {
+      if (hasChanged) {
         gpio_set_value (SCS, 1);
         //la memoire allouee avec vzalloc semble trop lente...
         memcpy (sendBuffer, screenBufferCompressed + y * (50 + 4), 54);

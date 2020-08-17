@@ -83,7 +83,7 @@ void cSharpLcd::clearDisplay() {
 
   gpioWrite (SCS, 1);
   gpioDelay (SCS_HIGH_DELAY);
-  spiWrite (mHandle, &mCommandByte, 1);
+  spiWrite (mHandle, &mClearByte, 1);
   spiWrite (mHandle, &mPaddingByte, 1);
   gpioDelay (SCS_LOW_DELAY);
   gpioWrite (SCS, 0);
