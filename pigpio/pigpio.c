@@ -1513,7 +1513,6 @@ int gpioWaveTxStart (unsigned wave_mode); /* deprecated */
 static void closeOrphanedNotifications (int slot, int fd);
 //}}}
 //{{{  helpers
-//{{{  my routines
 //{{{
 int myScriptNameValid (char* name)
 {
@@ -1536,7 +1535,6 @@ int myScriptNameValid (char* name)
    return valid;
 }
 //}}}
-
 //{{{
 static char* myTimeStamp()
 {
@@ -1598,39 +1596,103 @@ int myPathBad (char* name)
    if (parts < 2) return 1; else return 0;
 }
 //}}}
+//{{{
+static char* myBuf2Str (unsigned count, char* buf) {
+
+  static char str[128];
+  int i, c;
+
+  if (count && buf) {
+    if (count > 40)
+      c = 40;
+    else
+      c = count;
+
+    for (i=0; i<c; i++)
+      sprintf(str+(3*i), "%02X ", buf[i]);
+    str[(3*c)-1] = 0;
+    }
+  else
+    str[0] = 0;
+
+  return str;
+  }
+//}}}
 
 //{{{
-static char* myBuf2Str (unsigned count, char *buf)
+static void myOffPageSlot (int pos, int* page, int* slot)
 {
-   static char str[128];
-   int i, c;
-
-   if (count && buf)
-   {
-      if (count > 40) c = 40; else c = count;
-
-      for (i=0; i<c; i++) sprintf(str+(3*i), "%02X ", buf[i]);
-      str[(3*c)-1] = 0;
-   }
-   else str[0] = 0;
-
-   return str;
+   *page = pos/OFF_PER_IPAGE;
+   *slot = pos%OFF_PER_IPAGE;
 }
 //}}}
 //{{{
-static int my_smbus_access (int fd, char rw, uint8_t cmd, int size, union my_smbus_data *data)
+static void myLvsPageSlot (int pos, int* page, int* slot)
 {
-   struct my_smbus_ioctl_data args;
-
-   DBG(DBG_INTERNAL, "rw=%d reg=%d cmd=%d data=%s", rw, cmd, size, myBuf2Str(data->byte+1, (char*)data));
-
-   args.read_write = rw;
-   args.command    = cmd;
-   args.size       = size;
-   args.data       = data;
-
-   return ioctl(fd, PI_I2C_SMBUS, &args);
+   *page = pos/LVS_PER_IPAGE;
+   *slot = pos%LVS_PER_IPAGE;
 }
+//}}}
+//{{{
+static void myTckPageSlot (int pos, int* page, int* slot)
+{
+   *page = pos/TCK_PER_IPAGE;
+   *slot = pos%TCK_PER_IPAGE;
+}
+//}}}
+//{{{
+static int my_smbus_access (int fd, char rw, uint8_t cmd, int size, union my_smbus_data *data) {
+
+  DBG(DBG_INTERNAL, "rw=%d reg=%d cmd=%d data=%s", rw, cmd, size, myBuf2Str(data->byte+1, (char*)data));
+
+  struct my_smbus_ioctl_data args;
+  args.read_write = rw;
+  args.command = cmd;
+  args.size = size;
+  args.data = data;
+  return ioctl (fd, PI_I2C_SMBUS, &args);
+  }
+//}}}
+
+//{{{
+static uint32_t myGetTick (int pos) {
+
+  int page, slot;
+  myTckPageSlot (pos, &page, &slot);
+
+  uint32_t tick = dmaIVirt[page]->tick[slot];
+
+  return tick;
+  }
+//}}}
+//{{{
+static void myGpioSleep (int seconds, int micros) {
+
+  struct timespec ts;
+  ts.tv_sec  = seconds;
+  ts.tv_nsec = micros * 1000;
+
+  struct timespec rem;
+  while (clock_nanosleep(CLOCK_REALTIME, 0, &ts, &rem)) {
+    /* copy remaining time to ts */
+    ts = rem;
+    }
+  }
+//}}}
+//{{{
+static uint32_t myGpioDelay (uint32_t micros) {
+
+  uint32_t start= systReg[SYST_CLO];
+
+  if (micros <= PI_MAX_BUSY_DELAY) {
+    while ((systReg[SYST_CLO] - start) <= micros);
+    }
+  else {
+    myGpioSleep(micros/MILLION, micros % MILLION);
+    }
+
+  return (systReg[SYST_CLO] - start);
+  }
 //}}}
 
 //{{{
@@ -1645,814 +1707,22 @@ static void myGpioSetMode (unsigned gpio, unsigned mode)
 }
 //}}}
 //{{{
-static int myGpioRead (unsigned gpio)
-{
-   if ((*(gpioReg + GPLEV0 + BANK) & BIT) != 0) return PI_ON;
-   else                                         return PI_OFF;
-}
+static int myGpioRead (unsigned gpio) {
 
+ if ((*(gpioReg + GPLEV0 + BANK) & BIT) != 0)
+   return PI_ON;
+ else
+   return PI_OFF;
+  }
 //}}}
 //{{{
-static void myGpioWrite (unsigned gpio, unsigned level)
-{
-   if (level == PI_OFF) *(gpioReg + GPCLR0 + BANK) = BIT;
-   else                 *(gpioReg + GPSET0 + BANK) = BIT;
-}
-//}}}
-
-//{{{
-static void myGpioSleep (int seconds, int micros)
-{
-   struct timespec ts, rem;
-
-   ts.tv_sec  = seconds;
-   ts.tv_nsec = micros * 1000;
-
-   while (clock_nanosleep(CLOCK_REALTIME, 0, &ts, &rem))
-   {
-      /* copy remaining time to ts */
-      ts = rem;
-   }
-}
-//}}}
-//{{{
-static uint32_t myGpioDelay (uint32_t micros)
-{
-   uint32_t start;
-
-   start = systReg[SYST_CLO];
-
-   if (micros <= PI_MAX_BUSY_DELAY)
-   {
-      while ((systReg[SYST_CLO] - start) <= micros);
-   }
-   else
-   {
-      myGpioSleep(micros/MILLION, micros%MILLION);
-   }
-
-   return (systReg[SYST_CLO] - start);
-}
-//}}}
-
-//{{{
-static void myCreatePipe (char * name, int perm)
-{
-   unlink(name);
-
-   mkfifo(name, perm);
-
-   if (chmod(name, perm) < 0)
-   {
-      DBG(DBG_ALWAYS, "Can't set permissions (%d) for %s, %m", perm, name);
-      return;
-   }
-}
-//}}}
-
-//{{{
-static void myOffPageSlot (int pos, int * page, int * slot)
-{
-   *page = pos/OFF_PER_IPAGE;
-   *slot = pos%OFF_PER_IPAGE;
-}
-//}}}
-//{{{
-static void myLvsPageSlot (int pos, int * page, int * slot)
-{
-   *page = pos/LVS_PER_IPAGE;
-   *slot = pos%LVS_PER_IPAGE;
-}
-//}}}
-
-//{{{
-static void myTckPageSlot (int pos, int * page, int * slot)
-{
-   *page = pos/TCK_PER_IPAGE;
-   *slot = pos%TCK_PER_IPAGE;
-}
-//}}}
-//{{{
-static uint32_t myGetLevel (int pos)
-{
-   uint32_t level;
-   int page, slot;
-
-   myLvsPageSlot(pos, &page, &slot);
-
-   level = dmaIVirt[page]->level[slot];
-
-   return level;
-}
-//}}}
-//{{{
-static int myI2CGetPar (char *inBuf, int *inPos, int inLen, int *esc)
-{
-   int bytes;
-
-   if (*esc) bytes = 2; else bytes = 1;
-
-   *esc = 0;
-
-   if (*inPos <= (inLen - bytes))
-   {
-      if (bytes == 1)
-      {
-         return inBuf[(*inPos)++];
-      }
-      else
-      {
-         (*inPos) += 2;
-         return inBuf[*inPos-2] + (inBuf[*inPos-1]<<8);
-      }
-   }
-   return -1;
-}
-//}}}
-//{{{
-static uint32_t myGetTick (int pos)
-{
-   uint32_t tick;
-   int page, slot;
-
-   myTckPageSlot(pos, &page, &slot);
-
-   tick = dmaIVirt[page]->tick[slot];
-
-   return tick;
-}
-//}}}
-//{{{
-static int myPermit (unsigned gpio)
-{
-   if (gpio <= PI_MAX_GPIO)
-   {
-      if (gpioMask & ((uint64_t)(1)<<gpio)) return 1;
-      else return 0;
-   }
-   return 1; /* will fail for bad gpio number */
-}
-//}}}
-
-//{{{
-static int myDoCommand (uintptr_t *p, unsigned bufSize, char *buf)
-{
-   int res, i, j;
-   uint32_t mask;
-   uint32_t tmp1, tmp2, tmp3, tmp4, tmp5;
-   gpioPulse_t *pulse;
-   bsc_xfer_t xfer;
-   int masked;
-   res = 0;
-
-   switch (p[0])
-   {
-      case PI_CMD_BC1:
-         mask = gpioMask;
-
-         res = gpioWrite_Bits_0_31_Clear(p[1]&mask);
-
-         if ((mask | p[1]) != mask)
-         {
-            DBG(DBG_USER,
-               "gpioWrite_Bits_0_31_Clear: bad bits %08"PRIXPTR" (permissions %08X)",
-               p[1], mask);
-            res = PI_SOME_PERMITTED;
-         }
-         break;
-
-      case PI_CMD_BC2:
-         mask = gpioMask>>32;
-
-         res = gpioWrite_Bits_32_53_Clear(p[1]&mask);
-
-         if ((mask | p[1]) != mask)
-         {
-            DBG(DBG_USER,
-               "gpioWrite_Bits_32_53_Clear: bad bits %08"PRIXPTR" (permissions %08X)",
-               p[1], mask);
-            res = PI_SOME_PERMITTED;
-         }
-         break;
-
-      case PI_CMD_BI2CC:
-         res = bbI2CClose(p[1]);
-         break;
-
-      case PI_CMD_BI2CO:
-         memcpy(&p[4], buf, 4);
-         res = bbI2COpen(p[1], p[2], p[4]);
-         break;
-
-      case PI_CMD_BI2CZ:
-         /* use half buffer for write, half buffer for read */
-         if (p[3] > (bufSize/2)) p[3] = bufSize/2;
-         res = bbI2CZip(p[1], buf, p[3], buf+(bufSize/2), bufSize/2);
-         if (res > 0)
-         {
-            memcpy(buf, buf+(bufSize/2), res);
-         }
-         break;
-
-      case PI_CMD_BSCX:
-         xfer.control = p[1];
-         if (p[3] > BSC_FIFO_SIZE) p[3] = BSC_FIFO_SIZE;
-         xfer.txCnt = p[3];
-         if (p[3]) memcpy(&xfer.txBuf, buf, p[3]);
-         res = bscXfer(&xfer);
-         if (res >= 0)
-         {
-            memcpy(buf, &res, 4);
-            res = 4 + xfer.rxCnt;
-            if (res > 4) memcpy(buf+4, &xfer.rxBuf, res-4);
-         }
-         break;
-
-      case PI_CMD_BSPIO:
-
-         memcpy(&tmp1, buf+ 0, 4); // MISO
-         memcpy(&tmp2, buf+ 4, 4); // MOSI
-         memcpy(&tmp3, buf+ 8, 4); // SCLK
-         memcpy(&tmp4, buf+12, 4); // baud
-         memcpy(&tmp5, buf+16, 4); // flags
-
-         if (!myPermit(p[1]))
-         {
-            DBG(DBG_USER,
-               "bbSPIOpen: gpio %"PRIdPTR", no permission to update CS", p[1]);
-            res = PI_NOT_PERMITTED;
-         }
-
-         if (!myPermit(tmp1))
-         {
-            DBG(DBG_USER,
-               "bbSPIOpen: gpio %d, no permission to update MISO", tmp1);
-            res = PI_NOT_PERMITTED;
-         }
-
-         if (!myPermit(tmp2))
-         {
-            DBG(DBG_USER,
-               "bbSPIOpen: gpio %d, no permission to update MOSI", tmp2);
-            res = PI_NOT_PERMITTED;
-         }
-
-         if (!myPermit(tmp3))
-         {
-            DBG(DBG_USER,
-               "bbSPIOpen: gpio %d, no permission to update SCLK", tmp3);
-            res = PI_NOT_PERMITTED;
-         }
-
-         if (!res) res = bbSPIOpen(p[1], tmp1, tmp2, tmp3, tmp4, tmp5);
-         break;
-
-      case PI_CMD_BSPIC:
-         res = bbSPIClose(p[1]);
-         break;
-
-      case PI_CMD_BSPIX:
-         if (p[3] > bufSize) p[3] = bufSize;
-            res = bbSPIXfer(p[1], buf, buf, p[3]);
-         break;
-
-      case PI_CMD_BR1: res = gpioRead_Bits_0_31(); break;
-
-      case PI_CMD_BR2: res = gpioRead_Bits_32_53(); break;
-
-      case PI_CMD_BS1:
-         mask = gpioMask;
-
-         res = gpioWrite_Bits_0_31_Set(p[1]&mask);
-
-         if ((mask | p[1]) != mask)
-         {
-            DBG(DBG_USER,
-               "gpioWrite_Bits_0_31_Set: bad bits %08"PRIXPTR" (permissions %08X)",
-               p[1], mask);
-            res = PI_SOME_PERMITTED;
-         }
-         break;
-
-      case PI_CMD_BS2:
-         mask = gpioMask>>32;
-
-         res = gpioWrite_Bits_32_53_Set(p[1]&mask);
-
-         if ((mask | p[1]) != mask)
-         {
-            DBG(DBG_USER,
-               "gpioWrite_Bits_32_53_Set: bad bits %08"PRIXPTR" (permissions %08X)",
-               p[1], mask);
-            res = PI_SOME_PERMITTED;
-         }
-         break;
-
-      case PI_CMD_CF1:
-         res = gpioCustom1(p[1], p[2], buf, p[3]);
-         break;
-
-      case PI_CMD_CF2:
-         /* a couple of extra precautions for untrusted code */
-         if (p[2] > bufSize) p[2] = bufSize;
-         res = gpioCustom2(p[1], buf, p[3], buf, p[2]);
-         if (res > p[2]) res = p[2];
-         break;
-
-      case PI_CMD_CGI: res = gpioCfgGetInternals(); break;
-
-      case PI_CMD_CSI: res = gpioCfgSetInternals(p[1]); break;
-
-      case PI_CMD_EVM: res = eventMonitor(p[1], p[2]); break;
-
-      case PI_CMD_EVT: res = eventTrigger(p[1]); break;
-
-      case PI_CMD_FC: res = fileClose(p[1]); break;
-
-      case PI_CMD_FG:
-         res = gpioGlitchFilter(p[1], p[2]);
-         break;
-
-      case PI_CMD_FL:
-         if (p[1] > bufSize) p[1] = bufSize;
-         res = fileList(buf, buf, p[1]);
-         break;
-
-      case PI_CMD_FN:
-         memcpy(&p[4], buf, 4);
-         res = gpioNoiseFilter(p[1], p[2], p[4]);
-         break;
-
-      case PI_CMD_FO: res = fileOpen(buf, p[1]); break;
-
-      case PI_CMD_FR:
-         if (p[2] > bufSize) p[2] = bufSize;
-         res = fileRead(p[1], buf, p[2]);
-         break;
-
-      case PI_CMD_FS:
-         memcpy(&p[4], buf, 4);
-         res = fileSeek(p[1], p[2], p[4]);
-         break;
-
-      case PI_CMD_FW: res = fileWrite(p[1], buf, p[3]); break;
-
-      case PI_CMD_GDC: res = gpioGetPWMdutycycle(p[1]); break;
-
-      case PI_CMD_GPW: res = gpioGetServoPulsewidth(p[1]); break;
-
-      case PI_CMD_HC:
-         /* special case to allow password in upper byte */
-         if (myPermit(p[1]&0xFFFFFF)) res = gpioHardwareClock(p[1], p[2]);
-         else
-         {
-            DBG(DBG_USER,
-               "gpioHardwareClock: gpio %"PRIdPTR", no permission to update",
-                p[1] & 0xFFFFFF);
-            res = PI_NOT_PERMITTED;
-         }
-         break;
-
-      case PI_CMD_HELP: break;
-
-      case PI_CMD_HP:
-         if (myPermit(p[1]))
-         {
-            memcpy(&p[4], buf, 4);
-            res = gpioHardwarePWM(p[1], p[2], p[4]);
-         }
-         else
-         {
-            DBG(DBG_USER,
-               "gpioHardwarePWM: gpio %"PRIdPTR", no permission to update", p[1]);
-            res = PI_NOT_PERMITTED;
-         }
-         break;
-
-      case PI_CMD_HWVER: res = gpioHardwareRevision(); break;
-
-
-
-      case PI_CMD_I2CC: res = i2cClose(p[1]); break;
-
-      case PI_CMD_I2CO:
-         memcpy(&p[4], buf, 4);
-         res = i2cOpen(p[1], p[2], p[4]);
-         break;
-
-      case PI_CMD_I2CPC:
-         memcpy(&p[4], buf, 4);
-         res = i2cProcessCall(p[1], p[2], p[4]);
-         break;
-
-      case PI_CMD_I2CPK:
-         res = i2cBlockProcessCall(p[1], p[2], buf, p[3]);
-         break;
-
-      case PI_CMD_I2CRB: res = i2cReadByteData(p[1], p[2]); break;
-
-      case PI_CMD_I2CRD:
-         if (p[2] > bufSize) p[2] = bufSize;
-         res = i2cReadDevice(p[1], buf, p[2]);
-         break;
-
-      case PI_CMD_I2CRI:
-         memcpy(&p[4], buf, 4);
-         res = i2cReadI2CBlockData(p[1], p[2], buf, p[4]);
-         break;
-
-      case PI_CMD_I2CRK:
-         res = i2cReadBlockData(p[1], p[2], buf);
-         break;
-
-      case PI_CMD_I2CRS: res = i2cReadByte(p[1]); break;
-
-      case PI_CMD_I2CRW: res = i2cReadWordData(p[1], p[2]); break;
-
-      case PI_CMD_I2CWB:
-         memcpy(&p[4], buf, 4);
-         res = i2cWriteByteData(p[1], p[2], p[4]);
-         break;
-
-      case PI_CMD_I2CWD:
-         res = i2cWriteDevice(p[1], buf, p[3]);
-         break;
-
-      case PI_CMD_I2CWI:
-         res = i2cWriteI2CBlockData(p[1], p[2], buf, p[3]);
-         break;
-
-      case PI_CMD_I2CWK:
-         res = i2cWriteBlockData(p[1], p[2], buf, p[3]);
-         break;
-
-      case PI_CMD_I2CWQ: res = i2cWriteQuick(p[1], p[2]); break;
-
-      case PI_CMD_I2CWS: res = i2cWriteByte(p[1], p[2]); break;
-
-      case PI_CMD_I2CWW:
-         memcpy(&p[4], buf, 4);
-         res = i2cWriteWordData(p[1], p[2], p[4]);
-         break;
-
-      case PI_CMD_I2CZ:
-         /* use half buffer for write, half buffer for read */
-         if (p[3] > (bufSize/2)) p[3] = bufSize/2;
-         res = i2cZip(p[1], buf, p[3], buf+(bufSize/2), bufSize/2);
-         if (res > 0)
-         {
-            memcpy(buf, buf+(bufSize/2), res);
-         }
-         break;
-
-      case PI_CMD_MICS:
-         if (p[1] <= PI_MAX_MICS_DELAY) myGpioDelay(p[1]);
-         else res = PI_BAD_MICS_DELAY;
-         break;
-
-      case PI_CMD_MILS:
-         if (p[1] <= PI_MAX_MILS_DELAY) myGpioDelay(p[1] * 1000);
-         else res = PI_BAD_MILS_DELAY;
-         break;
-
-      case PI_CMD_MODEG: res = gpioGetMode(p[1]); break;
-
-      case PI_CMD_MODES:
-         if (myPermit(p[1])) res = gpioSetMode(p[1], p[2]);
-         else
-         {
-            DBG(DBG_USER,
-               "gpioSetMode: gpio %"PRIdPTR", no permission to update", p[1]);
-            res = PI_NOT_PERMITTED;
-         }
-         break;
-
-      case PI_CMD_NB: res = gpioNotifyBegin(p[1], p[2]); break;
-
-      case PI_CMD_NC: res = gpioNotifyClose(p[1]); break;
-
-      case PI_CMD_NO: res = gpioNotifyOpen();  break;
-
-      case PI_CMD_NP: res = gpioNotifyPause(p[1]); break;
-
-      case PI_CMD_PADG: res = gpioGetPad(p[1]); break;
-
-      case PI_CMD_PADS: res = gpioSetPad(p[1], p[2]); break;
-
-      case PI_CMD_PFG: res = gpioGetPWMfrequency(p[1]); break;
-
-      case PI_CMD_PFS:
-         if (myPermit(p[1])) res = gpioSetPWMfrequency(p[1], p[2]);
-         else
-         {
-            DBG(DBG_USER,
-               "gpioSetPWMfrequency: gpio %"PRIdPTR", no permission to update", p[1]);
-            res = PI_NOT_PERMITTED;
-         }
-         break;
-
-      case PI_CMD_PIGPV: res = gpioVersion(); break;
-
-      case PI_CMD_PRG: res = gpioGetPWMrange(p[1]); break;
-
-      case PI_CMD_PROC:
-         res = gpioStoreScript(buf);
-         break;
-
-      case PI_CMD_PROCD: res = gpioDeleteScript(p[1]); break;
-
-      case PI_CMD_PROCP:
-         res = gpioScriptStatus(p[1], (uint32_t *)buf);
-         break;
-
-      case PI_CMD_PROCR:
-         res = gpioRunScript(p[1], p[3]/4, (uint32_t *)buf);
-         break;
-
-      case PI_CMD_PROCS: res = gpioStopScript(p[1]); break;
-
-      case PI_CMD_PROCU:
-         res = gpioUpdateScript(p[1], p[3]/4, (uint32_t *)buf);
-         break;
-
-      case PI_CMD_PRRG: res = gpioGetPWMrealRange(p[1]); break;
-
-      case PI_CMD_PRS:
-         if (myPermit(p[1])) res = gpioSetPWMrange(p[1], p[2]);
-         else
-         {
-            DBG(DBG_USER,
-               "gpioSetPWMrange: gpio %"PRIdPTR", no permission to update", p[1]);
-            res = PI_NOT_PERMITTED;
-         }
-         break;
-
-      case PI_CMD_PUD:
-         if (myPermit(p[1])) res = gpioSetPullUpDown(p[1], p[2]);
-         else
-         {
-            DBG(DBG_USER,
-               "gpioSetPullUpDown: gpio %"PRIdPTR", no permission to update", p[1]);
-            res = PI_NOT_PERMITTED;
-         }
-         break;
-
-      case PI_CMD_PWM:
-         if (myPermit(p[1])) res = gpioPWM(p[1], p[2]);
-         else
-         {
-            DBG(DBG_USER, "gpioPWM: gpio %"PRIdPTR", no permission to update", p[1]);
-            res = PI_NOT_PERMITTED;
-         }
-         break;
-
-      case PI_CMD_READ: res = gpioRead(p[1]); break;
-
-      case PI_CMD_SERVO:
-         if (myPermit(p[1])) res = gpioServo(p[1], p[2]);
-         else
-         {
-            DBG(DBG_USER,
-               "gpioServo: gpio %"PRIdPTR", no permission to update", p[1]);
-            res = PI_NOT_PERMITTED;
-         }
-         break;
-
-
-
-      case PI_CMD_SERRB: res = serReadByte(p[1]); break;
-
-      case PI_CMD_SERWB: res = serWriteByte(p[1], p[2]); break;
-
-      case PI_CMD_SERC: res = serClose(p[1]); break;
-
-      case PI_CMD_SERDA: res = serDataAvailable(p[1]); break;
-
-      case PI_CMD_SERO: res = serOpen(buf, p[1], p[2]); break;
-
-      case PI_CMD_SERR:
-         if (p[2] > bufSize) p[2] = bufSize;
-         res = serRead(p[1], buf, p[2]);
-         break;
-
-      case PI_CMD_SERW: res = serWrite(p[1], buf, p[3]); break;
-
-
-      case PI_CMD_SHELL:
-          res = shell(buf, buf+p[1]+1);
-          break;
-
-
-      case PI_CMD_SLR:
-         if (p[2] > bufSize) p[2] = bufSize;
-         res = gpioSerialRead(p[1], buf, p[2]);
-         break;
-
-      case PI_CMD_SLRC: res = gpioSerialReadClose(p[1]); break;
-
-      case PI_CMD_SLRO:
-         memcpy(&p[4], buf, 4);
-         res = gpioSerialReadOpen(p[1], p[2], p[4]); break;
-
-      case PI_CMD_SLRI: res = gpioSerialReadInvert(p[1], p[2]); break;
-
-      case PI_CMD_SPIC:
-         res = spiClose(p[1]);
-         break;
-
-      case PI_CMD_SPIO:
-         memcpy(&p[4], buf, 4);
-         res = spiOpen(p[1], p[2], p[4]);
-         break;
-
-      case PI_CMD_SPIR:
-         if (p[2] > bufSize) p[2] = bufSize;
-         res = spiRead(p[1], buf, p[2]);
-         break;
-
-      case PI_CMD_SPIW:
-         if (p[3] > bufSize) p[3] = bufSize;
-         res = spiWrite(p[1], buf, p[3]);
-         break;
-
-      case PI_CMD_SPIX:
-         if (p[3] > bufSize) p[3] = bufSize;
-         res = spiXfer(p[1], buf, buf, p[3]);
-         break;
-
-      case PI_CMD_TICK: res = gpioTick(); break;
-
-      case PI_CMD_TRIG:
-         if (myPermit(p[1]))
-         {
-            memcpy(&p[4], buf, 4);
-            res = gpioTrigger(p[1], p[2], p[4]);
-         }
-         else
-         {
-            DBG(DBG_USER,
-               "gpioTrigger: gpio %"PRIdPTR", no permission to update", p[1]);
-            res = PI_NOT_PERMITTED;
-         }
-         break;
-
-      case PI_CMD_WDOG: res = gpioSetWatchdog(p[1], p[2]); break;
-
-      case PI_CMD_WRITE:
-         if (myPermit(p[1])) res = gpioWrite(p[1], p[2]);
-         else
-         {
-            DBG(DBG_USER, "gpioWrite: gpio %"PRIdPTR", no permission to update", p[1]);
-            res = PI_NOT_PERMITTED;
-         }
-         break;
-
-
-
-      case PI_CMD_WVAG:
-
-         /* need to mask off any non permitted gpios */
-
-         mask = gpioMask;
-         pulse = (gpioPulse_t *)buf;
-         j = p[3]/sizeof(gpioPulse_t);
-         masked = 0;
-
-         for (i=0; i<j; i++)
-         {
-            tmp1 = pulse[i].gpioOn & mask;
-            if (tmp1 != pulse[i].gpioOn)
-            {
-               pulse[i].gpioOn = tmp1;
-               masked = 1;
-            }
-
-            tmp1 = pulse[i].gpioOff & mask;
-            if (tmp1 != pulse[i].gpioOff)
-            {
-               pulse[i].gpioOff = tmp1;
-               masked = 1;
-            }
-            DBG(DBG_SCRIPT, "on=%X off=%X delay=%d",
-               pulse[i].gpioOn, pulse[i].gpioOff, pulse[i].usDelay);
-         }
-
-         res = gpioWaveAddGeneric(j, pulse);
-
-         /* report permission error unless another error occurred */
-         if (masked && (res >= 0)) res = PI_SOME_PERMITTED;
-
-         break;
-
-      case PI_CMD_WVAS:
-         if (myPermit(p[1]))
-         {
-            memcpy(&tmp1, buf, 4);   /* databits */
-            memcpy(&tmp2, buf+4, 4); /* stophalfbits */
-            memcpy(&tmp3, buf+8, 4); /* offset */
-            res = gpioWaveAddSerial
-               (p[1], p[2], tmp1, tmp2, tmp3, p[3]-12, buf+12);
-         }
-         else
-         {
-            DBG(
-               DBG_USER,
-               "gpioWaveAddSerial: gpio %"PRIdPTR", no permission to update", p[1]);
-            res = PI_NOT_PERMITTED;
-         }
-         break;
-
-      case PI_CMD_WVBSY: res = gpioWaveTxBusy(); break;
-
-      case PI_CMD_WVCHA:
-         if (p[3] > bufSize) p[3] = bufSize;
-         res = gpioWaveChain(buf, p[3]);
-         break;
-
-
-      case PI_CMD_WVCLR: res = gpioWaveClear(); break;
-
-      case PI_CMD_WVCRE: res = gpioWaveCreate(); break;
-
-      case PI_CMD_WVCAP:
-         /* Make WVCAP variadic */
-         if (p[3] == 4)
-         {
-            memcpy(&tmp3, buf, 4); /* percent TOOL */
-            res = gpioWaveCreatePad(p[1], p[2], tmp3); /* rawWaveAdd* usage */
-            break;
-         }
-         if (p[2] && p[3]==0)
-         {
-            res = gpioWaveCreatePad(p[1], p[2], 0);
-            break;
-         }
-         if (p[2]==0 && p[3]==0)
-         {
-            res = gpioWaveCreatePad(p[1], p[1], 0); /* typical usage */
-            break;
-         }
-         res = PI_BAD_WAVE_ID; // FIX?
-         break;
-
-      case PI_CMD_WVDEL: res = gpioWaveDelete(p[1]); break;
-
-      case PI_CMD_WVGO:  res = gpioWaveTxStart(PI_WAVE_MODE_ONE_SHOT); break;
-
-      case PI_CMD_WVGOR: res = gpioWaveTxStart(PI_WAVE_MODE_REPEAT); break;
-
-      case PI_CMD_WVHLT: res = gpioWaveTxStop(); break;
-
-      case PI_CMD_WVNEW: res = gpioWaveAddNew(); break;
-
-      case PI_CMD_WVSC:
-         switch(p[1])
-         {
-            case 0: res = gpioWaveGetCbs();     break;
-            case 1: res = gpioWaveGetHighCbs(); break;
-            case 2: res = gpioWaveGetMaxCbs();  break;
-            default: res = PI_BAD_WVSC_COMMND;
-         }
-         break;
-
-      case PI_CMD_WVSM:
-         switch(p[1])
-         {
-            case 0: res = gpioWaveGetMicros();     break;
-            case 1: res = gpioWaveGetHighMicros(); break;
-            case 2: res = gpioWaveGetMaxMicros();  break;
-            default: res = PI_BAD_WVSM_COMMND;
-         }
-         break;
-
-      case PI_CMD_WVSP:
-         switch(p[1])
-         {
-            case 0: res = gpioWaveGetPulses();     break;
-            case 1: res = gpioWaveGetHighPulses(); break;
-            case 2: res = gpioWaveGetMaxPulses();  break;
-            default: res = PI_BAD_WVSP_COMMND;
-         }
-         break;
-
-      case PI_CMD_WVTAT: res = gpioWaveTxAt(); break;
-
-      case PI_CMD_WVTX:
-         res = gpioWaveTxSend(p[1], PI_WAVE_MODE_ONE_SHOT); break;
-
-      case PI_CMD_WVTXM:
-         res = gpioWaveTxSend(p[1], p[2]); break;
-
-      case PI_CMD_WVTXR:
-         res = gpioWaveTxSend(p[1], PI_WAVE_MODE_REPEAT); break;
-
-      default:
-         res = PI_UNKNOWN_COMMAND;
-         break;
-   }
-
-   return res;
-}
+static void myGpioWrite (unsigned gpio, unsigned level) {
+
+ if (level == PI_OFF)
+   *(gpioReg + GPCLR0 + BANK) = BIT;
+ else
+   *(gpioReg + GPSET0 + BANK) = BIT;
+  }
 //}}}
 //{{{
 static void mySetGpioOff (unsigned gpio, int pos)
@@ -2652,6 +1922,842 @@ static void myGpioSetServo (unsigned gpio, int oldVal, int newVal)
    }
 }
 //}}}
+
+//{{{
+static void myCreatePipe (char* name, int perm)
+{
+   unlink(name);
+
+   mkfifo(name, perm);
+
+   if (chmod(name, perm) < 0)
+   {
+      DBG(DBG_ALWAYS, "Can't set permissions (%d) for %s, %m", perm, name);
+      return;
+   }
+}
+//}}}
+
+//{{{
+static uint32_t myGetLevel (int pos)
+{
+   uint32_t level;
+   int page, slot;
+
+   myLvsPageSlot(pos, &page, &slot);
+
+   level = dmaIVirt[page]->level[slot];
+
+   return level;
+}
+//}}}
+//{{{
+static int myI2CGetPar (char* inBuf, int* inPos, int inLen, int* esc)
+{
+   int bytes;
+
+   if (*esc) bytes = 2; else bytes = 1;
+
+   *esc = 0;
+
+   if (*inPos <= (inLen - bytes))
+   {
+      if (bytes == 1)
+      {
+         return inBuf[(*inPos)++];
+      }
+      else
+      {
+         (*inPos) += 2;
+         return inBuf[*inPos-2] + (inBuf[*inPos-1]<<8);
+      }
+   }
+   return -1;
+}
+//}}}
+//{{{
+static int myPermit (unsigned gpio) {
+
+  if (gpio <= PI_MAX_GPIO) {
+    if (gpioMask & ((uint64_t)(1)<<gpio))
+      return 1;
+    else
+      return 0;
+    }
+
+  return 1; /* will fail for bad gpio number */
+  }
+//}}}
+//{{{
+static int myDoCommand (uintptr_t* p, unsigned bufSize, char* buf) {
+
+  int res, i, j;
+  uint32_t mask;
+  uint32_t tmp1, tmp2, tmp3, tmp4, tmp5;
+  gpioPulse_t *pulse;
+  bsc_xfer_t xfer;
+  int masked;
+  res = 0;
+
+  switch (p[0]) {
+    //{{{
+    case PI_CMD_BC1:
+       mask = gpioMask;
+
+       res = gpioWrite_Bits_0_31_Clear(p[1]&mask);
+
+       if ((mask | p[1]) != mask)
+       {
+          DBG(DBG_USER,
+             "gpioWrite_Bits_0_31_Clear: bad bits %08"PRIXPTR" (permissions %08X)",
+             p[1], mask);
+          res = PI_SOME_PERMITTED;
+       }
+       break;
+    //}}}
+    //{{{
+    case PI_CMD_BC2:
+       mask = gpioMask>>32;
+
+       res = gpioWrite_Bits_32_53_Clear(p[1]&mask);
+
+       if ((mask | p[1]) != mask)
+       {
+          DBG(DBG_USER,
+             "gpioWrite_Bits_32_53_Clear: bad bits %08"PRIXPTR" (permissions %08X)",
+             p[1], mask);
+          res = PI_SOME_PERMITTED;
+       }
+       break;
+    //}}}
+    //{{{
+    case PI_CMD_BI2CC:
+       res = bbI2CClose(p[1]);
+       break;
+    //}}}
+    //{{{
+    case PI_CMD_BI2CO:
+       memcpy(&p[4], buf, 4);
+       res = bbI2COpen(p[1], p[2], p[4]);
+       break;
+
+    //}}}
+    //{{{
+    case PI_CMD_BI2CZ:
+       /* use half buffer for write, half buffer for read */
+       if (p[3] > (bufSize/2)) p[3] = bufSize/2;
+       res = bbI2CZip(p[1], buf, p[3], buf+(bufSize/2), bufSize/2);
+       if (res > 0)
+       {
+          memcpy(buf, buf+(bufSize/2), res);
+       }
+       break;
+    //}}}
+    //{{{
+    case PI_CMD_BSCX:
+       xfer.control = p[1];
+       if (p[3] > BSC_FIFO_SIZE) p[3] = BSC_FIFO_SIZE;
+       xfer.txCnt = p[3];
+       if (p[3]) memcpy(&xfer.txBuf, buf, p[3]);
+       res = bscXfer(&xfer);
+       if (res >= 0)
+       {
+          memcpy(buf, &res, 4);
+          res = 4 + xfer.rxCnt;
+          if (res > 4) memcpy(buf+4, &xfer.rxBuf, res-4);
+       }
+       break;
+    //}}}
+    //{{{
+    case PI_CMD_BSPIO:
+
+       memcpy(&tmp1, buf+ 0, 4); // MISO
+       memcpy(&tmp2, buf+ 4, 4); // MOSI
+       memcpy(&tmp3, buf+ 8, 4); // SCLK
+       memcpy(&tmp4, buf+12, 4); // baud
+       memcpy(&tmp5, buf+16, 4); // flags
+
+       if (!myPermit(p[1]))
+       {
+          DBG(DBG_USER,
+             "bbSPIOpen: gpio %"PRIdPTR", no permission to update CS", p[1]);
+          res = PI_NOT_PERMITTED;
+       }
+
+       if (!myPermit(tmp1))
+       {
+          DBG(DBG_USER,
+             "bbSPIOpen: gpio %d, no permission to update MISO", tmp1);
+          res = PI_NOT_PERMITTED;
+       }
+
+       if (!myPermit(tmp2))
+       {
+          DBG(DBG_USER,
+             "bbSPIOpen: gpio %d, no permission to update MOSI", tmp2);
+          res = PI_NOT_PERMITTED;
+       }
+
+       if (!myPermit(tmp3))
+       {
+          DBG(DBG_USER,
+             "bbSPIOpen: gpio %d, no permission to update SCLK", tmp3);
+          res = PI_NOT_PERMITTED;
+       }
+
+       if (!res) res = bbSPIOpen(p[1], tmp1, tmp2, tmp3, tmp4, tmp5);
+       break;
+    //}}}
+    //{{{
+    case PI_CMD_BSPIC:
+       res = bbSPIClose(p[1]);
+       break;
+    //}}}
+    //{{{
+    case PI_CMD_BSPIX:
+       if (p[3] > bufSize) p[3] = bufSize;
+          res = bbSPIXfer(p[1], buf, buf, p[3]);
+       break;
+    //}}}
+    //{{{
+    case PI_CMD_BR1: res = gpioRead_Bits_0_31(); break;
+
+    //}}}
+    //{{{
+    case PI_CMD_BR2: res = gpioRead_Bits_32_53(); break;
+    //}}}
+    //{{{
+    case PI_CMD_BS1:
+       mask = gpioMask;
+
+       res = gpioWrite_Bits_0_31_Set(p[1]&mask);
+
+       if ((mask | p[1]) != mask)
+       {
+          DBG(DBG_USER,
+             "gpioWrite_Bits_0_31_Set: bad bits %08"PRIXPTR" (permissions %08X)",
+             p[1], mask);
+          res = PI_SOME_PERMITTED;
+       }
+       break;
+    //}}}
+    //{{{
+    case PI_CMD_BS2:
+       mask = gpioMask>>32;
+
+       res = gpioWrite_Bits_32_53_Set(p[1]&mask);
+
+       if ((mask | p[1]) != mask)
+       {
+          DBG(DBG_USER,
+             "gpioWrite_Bits_32_53_Set: bad bits %08"PRIXPTR" (permissions %08X)",
+             p[1], mask);
+          res = PI_SOME_PERMITTED;
+       }
+       break;
+    //}}}
+    //{{{
+    case PI_CMD_CF1:
+       res = gpioCustom1(p[1], p[2], buf, p[3]);
+       break;
+    //}}}
+    //{{{
+    case PI_CMD_CF2:
+       /* a couple of extra precautions for untrusted code */
+       if (p[2] > bufSize) p[2] = bufSize;
+       res = gpioCustom2(p[1], buf, p[3], buf, p[2]);
+       if (res > p[2]) res = p[2];
+       break;
+    //}}}
+    //{{{
+    case PI_CMD_CGI: res = gpioCfgGetInternals(); break;
+    //}}}
+    //{{{
+    case PI_CMD_CSI: res = gpioCfgSetInternals(p[1]); break;
+    //}}}
+    //{{{
+    case PI_CMD_EVM: res = eventMonitor(p[1], p[2]); break;
+    //}}}
+    //{{{
+    case PI_CMD_EVT: res = eventTrigger(p[1]); break;
+    //}}}
+    //{{{
+    case PI_CMD_FC: res = fileClose(p[1]); break;
+    //}}}
+    //{{{
+    case PI_CMD_FG:
+       res = gpioGlitchFilter(p[1], p[2]);
+       break;
+    //}}}
+    //{{{
+    case PI_CMD_FL:
+       if (p[1] > bufSize) p[1] = bufSize;
+       res = fileList(buf, buf, p[1]);
+       break;
+    //}}}
+    //{{{
+    case PI_CMD_FN:
+       memcpy(&p[4], buf, 4);
+       res = gpioNoiseFilter(p[1], p[2], p[4]);
+       break;
+    //}}}
+    //{{{
+    case PI_CMD_FO: res = fileOpen(buf, p[1]); break;
+    //}}}
+    //{{{
+    case PI_CMD_FR:
+       if (p[2] > bufSize) p[2] = bufSize;
+       res = fileRead(p[1], buf, p[2]);
+       break;
+    //}}}
+    //{{{
+    case PI_CMD_FS:
+       memcpy(&p[4], buf, 4);
+       res = fileSeek(p[1], p[2], p[4]);
+       break;
+    //}}}
+    //{{{
+    case PI_CMD_FW: res = fileWrite(p[1], buf, p[3]); break;
+    //}}}
+    //{{{
+    case PI_CMD_GDC: res = gpioGetPWMdutycycle(p[1]); break;
+    //}}}
+    //{{{
+    case PI_CMD_GPW: res = gpioGetServoPulsewidth(p[1]); break;
+    //}}}
+    //{{{
+    case PI_CMD_HC:
+       /* special case to allow password in upper byte */
+       if (myPermit(p[1]&0xFFFFFF)) res = gpioHardwareClock(p[1], p[2]);
+       else
+       {
+          DBG(DBG_USER,
+             "gpioHardwareClock: gpio %"PRIdPTR", no permission to update",
+              p[1] & 0xFFFFFF);
+          res = PI_NOT_PERMITTED;
+       }
+       break;
+    //}}}
+    //{{{
+    case PI_CMD_HELP: break;
+    //}}}
+    //{{{
+    case PI_CMD_HP:
+       if (myPermit(p[1]))
+       {
+          memcpy(&p[4], buf, 4);
+          res = gpioHardwarePWM(p[1], p[2], p[4]);
+       }
+       else
+       {
+          DBG(DBG_USER,
+             "gpioHardwarePWM: gpio %"PRIdPTR", no permission to update", p[1]);
+          res = PI_NOT_PERMITTED;
+       }
+       break;
+    //}}}
+    //{{{
+    case PI_CMD_HWVER: res = gpioHardwareRevision(); break;
+    //}}}
+    //{{{
+    case PI_CMD_I2CC: res = i2cClose(p[1]); break;
+    //}}}
+    //{{{
+    case PI_CMD_I2CO:
+       memcpy(&p[4], buf, 4);
+       res = i2cOpen(p[1], p[2], p[4]);
+       break;
+    //}}}
+    //{{{
+    case PI_CMD_I2CPC:
+       memcpy(&p[4], buf, 4);
+       res = i2cProcessCall(p[1], p[2], p[4]);
+       break;
+    //}}}
+    //{{{
+    case PI_CMD_I2CPK:
+       res = i2cBlockProcessCall(p[1], p[2], buf, p[3]);
+       break;
+    //}}}
+    //{{{
+    case PI_CMD_I2CRB: res = i2cReadByteData(p[1], p[2]); break;
+    //}}}
+    //{{{
+    case PI_CMD_I2CRD:
+       if (p[2] > bufSize) p[2] = bufSize;
+       res = i2cReadDevice(p[1], buf, p[2]);
+       break;
+    //}}}
+    //{{{
+    case PI_CMD_I2CRI:
+       memcpy(&p[4], buf, 4);
+       res = i2cReadI2CBlockData(p[1], p[2], buf, p[4]);
+       break;
+    //}}}
+    //{{{
+    case PI_CMD_I2CRK:
+       res = i2cReadBlockData(p[1], p[2], buf);
+       break;
+    //}}}
+    //{{{
+    case PI_CMD_I2CRS: res = i2cReadByte(p[1]); break;
+    //}}}
+    //{{{
+    case PI_CMD_I2CRW: res = i2cReadWordData(p[1], p[2]); break;
+    //}}}
+    //{{{
+    case PI_CMD_I2CWB:
+       memcpy(&p[4], buf, 4);
+       res = i2cWriteByteData(p[1], p[2], p[4]);
+       break;
+    //}}}
+    //{{{
+    case PI_CMD_I2CWD:
+       res = i2cWriteDevice(p[1], buf, p[3]);
+       break;
+    //}}}
+    //{{{
+    case PI_CMD_I2CWI:
+       res = i2cWriteI2CBlockData(p[1], p[2], buf, p[3]);
+       break;
+    //}}}
+    //{{{
+    case PI_CMD_I2CWK:
+       res = i2cWriteBlockData(p[1], p[2], buf, p[3]);
+       break;
+    //}}}
+    //{{{
+    case PI_CMD_I2CWQ: res = i2cWriteQuick(p[1], p[2]); break;
+    //}}}
+    //{{{
+    case PI_CMD_I2CWS: res = i2cWriteByte(p[1], p[2]); break;
+    //}}}
+    //{{{
+    case PI_CMD_I2CWW:
+       memcpy(&p[4], buf, 4);
+       res = i2cWriteWordData(p[1], p[2], p[4]);
+       break;
+    //}}}
+    //{{{
+    case PI_CMD_I2CZ:
+       /* use half buffer for write, half buffer for read */
+       if (p[3] > (bufSize/2)) p[3] = bufSize/2;
+       res = i2cZip(p[1], buf, p[3], buf+(bufSize/2), bufSize/2);
+       if (res > 0)
+       {
+          memcpy(buf, buf+(bufSize/2), res);
+       }
+       break;
+    //}}}
+    //{{{
+    case PI_CMD_MICS:
+       if (p[1] <= PI_MAX_MICS_DELAY) myGpioDelay(p[1]);
+       else res = PI_BAD_MICS_DELAY;
+       break;
+    //}}}
+    //{{{
+    case PI_CMD_MILS:
+       if (p[1] <= PI_MAX_MILS_DELAY) myGpioDelay(p[1] * 1000);
+       else res = PI_BAD_MILS_DELAY;
+       break;
+    //}}}
+    //{{{
+    case PI_CMD_MODEG: res = gpioGetMode(p[1]); break;
+    //}}}
+    //{{{
+    case PI_CMD_MODES:
+       if (myPermit(p[1])) res = gpioSetMode(p[1], p[2]);
+       else
+       {
+          DBG(DBG_USER,
+             "gpioSetMode: gpio %"PRIdPTR", no permission to update", p[1]);
+          res = PI_NOT_PERMITTED;
+       }
+       break;
+    //}}}
+    //{{{
+    case PI_CMD_NB: res = gpioNotifyBegin(p[1], p[2]); break;
+    //}}}
+    //{{{
+    case PI_CMD_NC: res = gpioNotifyClose(p[1]); break;
+    //}}}
+    //{{{
+    case PI_CMD_NO: res = gpioNotifyOpen();  break;
+    //}}}
+    //{{{
+    case PI_CMD_NP: res = gpioNotifyPause(p[1]); break;
+    //}}}
+    //{{{
+    case PI_CMD_PADG: res = gpioGetPad(p[1]); break;
+    //}}}
+    //{{{
+    case PI_CMD_PADS: res = gpioSetPad(p[1], p[2]); break;
+    //}}}
+    //{{{
+    case PI_CMD_PFG: res = gpioGetPWMfrequency(p[1]); break;
+    //}}}
+    //{{{
+    case PI_CMD_PFS:
+       if (myPermit(p[1])) res = gpioSetPWMfrequency(p[1], p[2]);
+       else
+       {
+          DBG(DBG_USER,
+             "gpioSetPWMfrequency: gpio %"PRIdPTR", no permission to update", p[1]);
+          res = PI_NOT_PERMITTED;
+       }
+       break;
+    //}}}
+    //{{{
+    case PI_CMD_PIGPV: res = gpioVersion(); break;
+    //}}}
+    //{{{
+    case PI_CMD_PRG: res = gpioGetPWMrange(p[1]); break;
+    //}}}
+    //{{{
+    case PI_CMD_PROC:
+       res = gpioStoreScript(buf);
+       break;
+    //}}}
+    //{{{
+    case PI_CMD_PROCD: res = gpioDeleteScript(p[1]); break;
+    //}}}
+    //{{{
+    case PI_CMD_PROCP:
+       res = gpioScriptStatus(p[1], (uint32_t *)buf);
+       break;
+    //}}}
+    //{{{
+    case PI_CMD_PROCR:
+       res = gpioRunScript(p[1], p[3]/4, (uint32_t *)buf);
+       break;
+    //}}}
+    //{{{
+
+    case PI_CMD_PROCS: res = gpioStopScript(p[1]); break;
+    //}}}
+    //{{{
+    case PI_CMD_PROCU:
+       res = gpioUpdateScript(p[1], p[3]/4, (uint32_t *)buf);
+       break;
+    //}}}
+    //{{{
+    case PI_CMD_PRRG: res = gpioGetPWMrealRange(p[1]); break;
+    //}}}
+    //{{{
+    case PI_CMD_PRS:
+       if (myPermit(p[1])) res = gpioSetPWMrange(p[1], p[2]);
+       else
+       {
+          DBG(DBG_USER,
+             "gpioSetPWMrange: gpio %"PRIdPTR", no permission to update", p[1]);
+          res = PI_NOT_PERMITTED;
+       }
+       break;
+    //}}}
+    //{{{
+    case PI_CMD_PUD:
+       if (myPermit(p[1])) res = gpioSetPullUpDown(p[1], p[2]);
+       else
+       {
+          DBG(DBG_USER,
+             "gpioSetPullUpDown: gpio %"PRIdPTR", no permission to update", p[1]);
+          res = PI_NOT_PERMITTED;
+       }
+       break;
+    //}}}
+    //{{{
+    case PI_CMD_PWM:
+       if (myPermit(p[1])) res = gpioPWM(p[1], p[2]);
+       else
+       {
+          DBG(DBG_USER, "gpioPWM: gpio %"PRIdPTR", no permission to update", p[1]);
+          res = PI_NOT_PERMITTED;
+       }
+       break;
+    //}}}
+    //{{{
+    case PI_CMD_READ: res = gpioRead(p[1]); break;
+    //}}}
+    //{{{
+    case PI_CMD_SERVO:
+       if (myPermit(p[1])) res = gpioServo(p[1], p[2]);
+       else
+       {
+          DBG(DBG_USER,
+             "gpioServo: gpio %"PRIdPTR", no permission to update", p[1]);
+          res = PI_NOT_PERMITTED;
+       }
+       break;
+    //}}}
+    //{{{
+    case PI_CMD_SERRB: res = serReadByte(p[1]); break;
+    //}}}
+    //{{{
+    case PI_CMD_SERWB: res = serWriteByte(p[1], p[2]); break;
+    //}}}
+    //{{{
+    case PI_CMD_SERC: res = serClose(p[1]); break;
+    //}}}
+    //{{{
+    case PI_CMD_SERDA: res = serDataAvailable(p[1]); break;
+    //}}}
+    //{{{
+    case PI_CMD_SERO: res = serOpen(buf, p[1], p[2]); break;
+    //}}}
+    //{{{
+    case PI_CMD_SERR:
+       if (p[2] > bufSize) p[2] = bufSize;
+       res = serRead(p[1], buf, p[2]);
+       break;
+    //}}}
+    //{{{
+    case PI_CMD_SERW: res = serWrite(p[1], buf, p[3]); break;
+    //}}}
+    //{{{
+    case PI_CMD_SHELL:
+        res = shell(buf, buf+p[1]+1);
+        break;
+    //}}}
+    //{{{
+    case PI_CMD_SLR:
+       if (p[2] > bufSize) p[2] = bufSize;
+       res = gpioSerialRead(p[1], buf, p[2]);
+       break;
+    //}}}
+    //{{{
+    case PI_CMD_SLRC: res = gpioSerialReadClose(p[1]); break;
+    //}}}
+    //{{{
+    case PI_CMD_SLRO:
+       memcpy(&p[4], buf, 4);
+       res = gpioSerialReadOpen(p[1], p[2], p[4]); break;
+    //}}}
+    //{{{
+    case PI_CMD_SLRI: res = gpioSerialReadInvert(p[1], p[2]); break;
+    //}}}
+    //{{{
+    case PI_CMD_SPIC:
+       res = spiClose(p[1]);
+       break;
+    //}}}
+    //{{{
+    case PI_CMD_SPIO:
+       memcpy(&p[4], buf, 4);
+       res = spiOpen(p[1], p[2], p[4]);
+       break;
+    //}}}
+    //{{{
+    case PI_CMD_SPIR:
+       if (p[2] > bufSize) p[2] = bufSize;
+       res = spiRead(p[1], buf, p[2]);
+       break;
+    //}}}
+    //{{{
+    case PI_CMD_SPIW:
+       if (p[3] > bufSize) p[3] = bufSize;
+       res = spiWrite(p[1], buf, p[3]);
+       break;
+    //}}}
+    //{{{
+    case PI_CMD_SPIX:
+       if (p[3] > bufSize) p[3] = bufSize;
+       res = spiXfer(p[1], buf, buf, p[3]);
+       break;
+    //}}}
+    //{{{
+    case PI_CMD_TICK: res = gpioTick(); break;
+    //}}}
+    //{{{
+    case PI_CMD_TRIG:
+       if (myPermit(p[1]))
+       {
+          memcpy(&p[4], buf, 4);
+          res = gpioTrigger(p[1], p[2], p[4]);
+       }
+       else
+       {
+          DBG(DBG_USER,
+             "gpioTrigger: gpio %"PRIdPTR", no permission to update", p[1]);
+          res = PI_NOT_PERMITTED;
+       }
+       break;
+    //}}}
+    //{{{
+    case PI_CMD_WDOG: res = gpioSetWatchdog(p[1], p[2]); break;
+    //}}}
+    //{{{
+    case PI_CMD_WRITE:
+       if (myPermit(p[1])) res = gpioWrite(p[1], p[2]);
+       else
+       {
+          DBG(DBG_USER, "gpioWrite: gpio %"PRIdPTR", no permission to update", p[1]);
+          res = PI_NOT_PERMITTED;
+       }
+       break;
+
+    //}}}
+    //{{{
+    case PI_CMD_WVAG:
+
+       /* need to mask off any non permitted gpios */
+
+       mask = gpioMask;
+       pulse = (gpioPulse_t *)buf;
+       j = p[3]/sizeof(gpioPulse_t);
+       masked = 0;
+
+       for (i=0; i<j; i++)
+       {
+          tmp1 = pulse[i].gpioOn & mask;
+          if (tmp1 != pulse[i].gpioOn)
+          {
+             pulse[i].gpioOn = tmp1;
+             masked = 1;
+          }
+
+          tmp1 = pulse[i].gpioOff & mask;
+          if (tmp1 != pulse[i].gpioOff)
+          {
+             pulse[i].gpioOff = tmp1;
+             masked = 1;
+          }
+          DBG(DBG_SCRIPT, "on=%X off=%X delay=%d",
+             pulse[i].gpioOn, pulse[i].gpioOff, pulse[i].usDelay);
+       }
+
+       res = gpioWaveAddGeneric(j, pulse);
+
+       /* report permission error unless another error occurred */
+       if (masked && (res >= 0)) res = PI_SOME_PERMITTED;
+
+       break;
+    //}}}
+    //{{{
+    case PI_CMD_WVAS:
+       if (myPermit(p[1]))
+       {
+          memcpy(&tmp1, buf, 4);   /* databits */
+          memcpy(&tmp2, buf+4, 4); /* stophalfbits */
+          memcpy(&tmp3, buf+8, 4); /* offset */
+          res = gpioWaveAddSerial
+             (p[1], p[2], tmp1, tmp2, tmp3, p[3]-12, buf+12);
+       }
+       else
+       {
+          DBG(
+             DBG_USER,
+             "gpioWaveAddSerial: gpio %"PRIdPTR", no permission to update", p[1]);
+          res = PI_NOT_PERMITTED;
+       }
+       break;
+    //}}}
+    //{{{
+    case PI_CMD_WVBSY: res = gpioWaveTxBusy(); break;
+    //}}}
+    //{{{
+    case PI_CMD_WVCHA:
+       if (p[3] > bufSize) p[3] = bufSize;
+       res = gpioWaveChain(buf, p[3]);
+       break;
+    //}}}
+    //{{{
+    case PI_CMD_WVCLR: res = gpioWaveClear(); break;
+    //}}}
+    //{{{
+    case PI_CMD_WVCRE: res = gpioWaveCreate(); break;
+    //}}}
+    //{{{
+    case PI_CMD_WVCAP:
+       /* Make WVCAP variadic */
+       if (p[3] == 4)
+       {
+          memcpy(&tmp3, buf, 4); /* percent TOOL */
+          res = gpioWaveCreatePad(p[1], p[2], tmp3); /* rawWaveAdd* usage */
+          break;
+       }
+       if (p[2] && p[3]==0)
+       {
+          res = gpioWaveCreatePad(p[1], p[2], 0);
+          break;
+       }
+       if (p[2]==0 && p[3]==0)
+       {
+          res = gpioWaveCreatePad(p[1], p[1], 0); /* typical usage */
+          break;
+       }
+       res = PI_BAD_WAVE_ID; // FIX?
+       break;
+    //}}}
+    //{{{
+    case PI_CMD_WVDEL: res = gpioWaveDelete(p[1]); break;
+    //}}}
+    //{{{
+    case PI_CMD_WVGO:  res = gpioWaveTxStart(PI_WAVE_MODE_ONE_SHOT); break;
+    //}}}
+    //{{{
+    case PI_CMD_WVGOR: res = gpioWaveTxStart(PI_WAVE_MODE_REPEAT); break;
+    //}}}
+    //{{{
+    case PI_CMD_WVHLT: res = gpioWaveTxStop(); break;
+    //}}}
+    //{{{
+    case PI_CMD_WVNEW: res = gpioWaveAddNew(); break;
+    //}}}
+    //{{{
+    case PI_CMD_WVSC:
+       switch(p[1])
+       {
+          case 0: res = gpioWaveGetCbs();     break;
+          case 1: res = gpioWaveGetHighCbs(); break;
+          case 2: res = gpioWaveGetMaxCbs();  break;
+          default: res = PI_BAD_WVSC_COMMND;
+       }
+       break;
+    //}}}
+    //{{{
+    case PI_CMD_WVSM:
+       switch(p[1])
+       {
+          case 0: res = gpioWaveGetMicros();     break;
+          case 1: res = gpioWaveGetHighMicros(); break;
+          case 2: res = gpioWaveGetMaxMicros();  break;
+          default: res = PI_BAD_WVSM_COMMND;
+       }
+       break;
+    //}}}
+    //{{{
+    case PI_CMD_WVSP:
+       switch(p[1])
+       {
+          case 0: res = gpioWaveGetPulses();     break;
+          case 1: res = gpioWaveGetHighPulses(); break;
+          case 2: res = gpioWaveGetMaxPulses();  break;
+          default: res = PI_BAD_WVSP_COMMND;
+       }
+       break;
+    //}}}
+    //{{{
+    case PI_CMD_WVTAT: res = gpioWaveTxAt(); break;
+    //}}}
+    //{{{
+    case PI_CMD_WVTX:
+       res = gpioWaveTxSend(p[1], PI_WAVE_MODE_ONE_SHOT); break;
+    //}}}
+    //{{{
+    case PI_CMD_WVTXM:
+       res = gpioWaveTxSend(p[1], p[2]); break;
+    //}}}
+    //{{{
+    case PI_CMD_WVTXR:
+       res = gpioWaveTxSend(p[1], PI_WAVE_MODE_REPEAT); break;
+    //}}}
+    default:
+       res = PI_UNKNOWN_COMMAND;
+       break;
+    }
+
+  return res;
+  }
 //}}}
 
 //{{{
@@ -8154,209 +8260,199 @@ static void initReleaseResources()
    numSockNetAddr = 0;
 }
 //}}}
-//{{{
-int initInitialise()
-{
-   int i;
-   unsigned rev, model;
-   struct sockaddr_in server;
-   struct sockaddr_in6 server6;
-   char * portStr;
-   unsigned port;
-   struct sched_param param;
-   pthread_attr_t pthAttr;
-
-   DBG(DBG_STARTUP, "");
-
-   waveClockInited = 0;
-   PWMClockInited = 0;
-
-   clock_gettime(CLOCK_REALTIME, &libStarted);
-
-   rev = gpioHardwareRevision();
-
-   initClearGlobals();
-
-   if (initCheckPermitted() < 0)
-     return PI_INIT_FAILED;
-
-   fdLock = initGrabLockFile();
-
-   if (fdLock < 0)
-     SOFT_ERROR(PI_INIT_FAILED, "Can't lock %s", PI_LOCKFILE);
-
-   if (!gpioMaskSet)
-   {
-      if      (rev ==  0) gpioMask = PI_DEFAULT_UPDATE_MASK_UNKNOWN;
-      else if (rev <   4) gpioMask = PI_DEFAULT_UPDATE_MASK_B1;
-      else if (rev <  16) gpioMask = PI_DEFAULT_UPDATE_MASK_A_B2;
-      else if (rev == 17) gpioMask = PI_DEFAULT_UPDATE_MASK_COMPUTE;
-      else if (rev  < 20) gpioMask = PI_DEFAULT_UPDATE_MASK_APLUS_BPLUS;
-      else if (rev == 20) gpioMask = PI_DEFAULT_UPDATE_MASK_COMPUTE;
-      else if (rev == 21) gpioMask = PI_DEFAULT_UPDATE_MASK_APLUS_BPLUS;
-      else
-      {
-         model = (rev >> 4) & 0xFF;
-         /* model
-         0=A 1=B
-         2=A+ 3=B+
-         4=Pi2B
-         5=Alpha
-         6=Compute Module
-         7=Unknown
-         8=Pi3B
-         9=Zero
-         12=Zero W
-         13=Pi3B+
-         14=Pi3A+
-         17=Pi4B
-         */
-         if      (model <  2) gpioMask = PI_DEFAULT_UPDATE_MASK_A_B2;
-         else if (model <  4) gpioMask = PI_DEFAULT_UPDATE_MASK_APLUS_BPLUS;
-         else if (model == 4) gpioMask = PI_DEFAULT_UPDATE_MASK_PI2B;
-
-         else if (model == 6
-               || model ==10
-               || model ==16) gpioMask = PI_DEFAULT_UPDATE_MASK_COMPUTE;
-
-         else if (model == 8
-               || model ==13
-               || model ==14) gpioMask = PI_DEFAULT_UPDATE_MASK_PI3B;
-
-         else if (model == 9
-               || model ==12) gpioMask = PI_DEFAULT_UPDATE_MASK_ZERO;
-
-         else if (model ==17) gpioMask = PI_DEFAULT_UPDATE_MASK_PI4B;
-         else                 gpioMask = PI_DEFAULT_UPDATE_MASK_UNKNOWN;
-      }
-
-      gpioMaskSet = 1;
-   }
-
-#ifndef EMBEDDED_IN_VM
-   if (!(gpioCfg.internals & PI_CFG_NOSIGHANDLER))
-      sigSetHandler();
-#endif
-
-   if (initPeripherals() < 0) return PI_INIT_FAILED;
-
-   if (initAllocDMAMem() < 0) return PI_INIT_FAILED;
-
-   /* done with /dev/mem */
-
-   if (fdMem != -1)
-   {
-      close(fdMem);
-      fdMem = -1;
-   }
-
-   param.sched_priority = sched_get_priority_max(SCHED_FIFO);
-
-   if (gpioCfg.internals & PI_CFG_RT_PRIORITY)
-      sched_setscheduler(0, SCHED_FIFO, &param);
-
-   initClock(1); /* initialise main clock */
-
-   atexit(gpioTerminate);
-
-   if (pthread_attr_init(&pthAttr))
-      SOFT_ERROR(PI_INIT_FAILED, "pthread_attr_init failed (%m)");
-
-   if (pthread_attr_setstacksize(&pthAttr, STACK_SIZE))
-      SOFT_ERROR(PI_INIT_FAILED, "pthread_attr_setstacksize failed (%m)");
-
-   if (!(gpioCfg.ifFlags & PI_DISABLE_ALERT))
-   {
-      if (pthread_create(&pthAlert, &pthAttr, pthAlertThread, &i))
-         SOFT_ERROR(PI_INIT_FAILED, "pthread_create alert failed (%m)");
-
-      pthAlertRunning = PI_THREAD_STARTED;
-   }
-
-   if (!(gpioCfg.ifFlags & PI_DISABLE_FIFO_IF))
-   {
-      if (pthread_create(&pthFifo, &pthAttr, pthFifoThread, &i))
-         SOFT_ERROR(PI_INIT_FAILED, "pthread_create fifo failed (%m)");
-
-      pthFifoRunning = PI_THREAD_STARTED;
-   }
-
-   if (!(gpioCfg.ifFlags & PI_DISABLE_SOCK_IF))
-   {
-      portStr = getenv(PI_ENVPORT);
-      if (portStr) port = atoi(portStr); else port = gpioCfg.socketPort;
-
-      // Accept connections on IPv6, unless we have an IPv4-only whitelist
-      if (!numSockNetAddr)
-      {
-         fdSock = socket(AF_INET6, SOCK_STREAM , 0);
-
-         if (fdSock != -1)
-         {
-            bzero((char *)&server6, sizeof(server6));
-            server6.sin6_family = AF_INET6;
-            if (gpioCfg.ifFlags & PI_LOCALHOST_SOCK_IF)
-            {
-               server6.sin6_addr = in6addr_loopback;
-            }
-            else
-            {
-               server6.sin6_addr = in6addr_any;
-            }
-            server6.sin6_port = htons(port);
-
-            int opt = 1;
-            setsockopt(fdSock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
-            if (bind(fdSock,(struct sockaddr *)&server6, sizeof(server6)) < 0)
-               SOFT_ERROR(PI_INIT_FAILED, "bind to port %d failed (%m)", port);
-         }
-      }
-
-      if (numSockNetAddr || fdSock == -1)
-      {
-         fdSock = socket(AF_INET , SOCK_STREAM , 0);
-
-         if (fdSock == -1)
-            SOFT_ERROR(PI_INIT_FAILED, "socket failed (%m)");
-         else
-         {
-           int opt = 1;
-           setsockopt(fdSock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
-         }
-         server.sin_family = AF_INET;
-         if (gpioCfg.ifFlags & PI_LOCALHOST_SOCK_IF)
-         {
-            server.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-         }
-         else
-         {
-            server.sin_addr.s_addr = htonl(INADDR_ANY);
-         }
-         server.sin_port = htons(port);
-
-         if (bind(fdSock,(struct sockaddr *)&server , sizeof(server)) < 0)
-            SOFT_ERROR(PI_INIT_FAILED, "bind to port %d failed (%m)", port);
-      }
-
-      if (pthread_create(&pthSocket, &pthAttr, pthSocketThread, &i))
-         SOFT_ERROR(PI_INIT_FAILED, "pthread_create socket failed (%m)");
-
-      pthSocketRunning = PI_THREAD_STARTED;
-   }
-
-   myGpioDelay(1000);
-
-   dmaInitCbs();
-
-   flushMemory();
-
-   //cast twice to suppress compiler warning, I belive this cast
-   //is ok because dmaIBus contains bus addresses, not virtual addresses.
-   initDMAgo((uint32_t *)dmaIn, (uint32_t)(uintptr_t)dmaIBus[0]);
-
-   return PIGPIO_VERSION;
-}
 //}}}
+//{{{
+int initInitialise() {
+
+  int i;
+  unsigned rev, model;
+  struct sockaddr_in server;
+  struct sockaddr_in6 server6;
+  char * portStr;
+  unsigned port;
+  struct sched_param param;
+  pthread_attr_t pthAttr;
+
+  DBG(DBG_STARTUP, "");
+
+  waveClockInited = 0;
+  PWMClockInited = 0;
+
+  clock_gettime(CLOCK_REALTIME, &libStarted);
+
+  rev = gpioHardwareRevision();
+
+  initClearGlobals();
+
+  if (initCheckPermitted() < 0)
+    return PI_INIT_FAILED;
+
+  fdLock = initGrabLockFile();
+
+  if (fdLock < 0)
+    SOFT_ERROR(PI_INIT_FAILED, "Can't lock %s", PI_LOCKFILE);
+
+  if (!gpioMaskSet) {
+     //{{{  get gpioMask
+     if      (rev ==  0) gpioMask = PI_DEFAULT_UPDATE_MASK_UNKNOWN;
+     else if (rev <   4) gpioMask = PI_DEFAULT_UPDATE_MASK_B1;
+     else if (rev <  16) gpioMask = PI_DEFAULT_UPDATE_MASK_A_B2;
+     else if (rev == 17) gpioMask = PI_DEFAULT_UPDATE_MASK_COMPUTE;
+     else if (rev  < 20) gpioMask = PI_DEFAULT_UPDATE_MASK_APLUS_BPLUS;
+     else if (rev == 20) gpioMask = PI_DEFAULT_UPDATE_MASK_COMPUTE;
+     else if (rev == 21) gpioMask = PI_DEFAULT_UPDATE_MASK_APLUS_BPLUS;
+     else
+     {
+        model = (rev >> 4) & 0xFF;
+        /* model
+        0=A 1=B
+        2=A+ 3=B+
+        4=Pi2B
+        5=Alpha
+        6=Compute Module
+        7=Unknown
+        8=Pi3B
+        9=Zero
+        12=Zero W
+        13=Pi3B+
+        14=Pi3A+
+        17=Pi4B
+        */
+        if      (model <  2) gpioMask = PI_DEFAULT_UPDATE_MASK_A_B2;
+        else if (model <  4) gpioMask = PI_DEFAULT_UPDATE_MASK_APLUS_BPLUS;
+        else if (model == 4) gpioMask = PI_DEFAULT_UPDATE_MASK_PI2B;
+
+        else if (model == 6
+              || model ==10
+              || model ==16) gpioMask = PI_DEFAULT_UPDATE_MASK_COMPUTE;
+
+        else if (model == 8
+              || model ==13
+              || model ==14) gpioMask = PI_DEFAULT_UPDATE_MASK_PI3B;
+
+        else if (model == 9
+              || model ==12) gpioMask = PI_DEFAULT_UPDATE_MASK_ZERO;
+
+        else if (model ==17) gpioMask = PI_DEFAULT_UPDATE_MASK_PI4B;
+        else                 gpioMask = PI_DEFAULT_UPDATE_MASK_UNKNOWN;
+       }
+
+     gpioMaskSet = 1;
+     }
+     //}}}
+
+  #ifndef EMBEDDED_IN_VM
+    if (!(gpioCfg.internals & PI_CFG_NOSIGHANDLER))
+      sigSetHandler();
+  #endif
+
+  if (initPeripherals() < 0) 
+    return PI_INIT_FAILED;
+  if (initAllocDMAMem() < 0) 
+    return PI_INIT_FAILED;
+
+  /* done with /dev/mem */
+  if (fdMem != -1) {
+    close(fdMem);
+    fdMem = -1;
+    }
+
+  param.sched_priority = sched_get_priority_max(SCHED_FIFO);
+  if (gpioCfg.internals & PI_CFG_RT_PRIORITY)
+    sched_setscheduler(0, SCHED_FIFO, &param);
+
+  initClock(1); /* initialise main clock */
+
+  atexit (gpioTerminate);
+
+  if (pthread_attr_init (&pthAttr))
+    SOFT_ERROR(PI_INIT_FAILED, "pthread_attr_init failed (%m)");
+  if (pthread_attr_setstacksize (&pthAttr, STACK_SIZE))
+    SOFT_ERROR(PI_INIT_FAILED, "pthread_attr_setstacksize failed (%m)");
+
+  if (!(gpioCfg.ifFlags & PI_DISABLE_ALERT)) {
+    //{{{  alert thread
+    if (pthread_create(&pthAlert, &pthAttr, pthAlertThread, &i))
+      SOFT_ERROR(PI_INIT_FAILED, "pthread_create alert failed (%m)");
+    pthAlertRunning = PI_THREAD_STARTED;
+    }
+    //}}}
+  if (!(gpioCfg.ifFlags & PI_DISABLE_FIFO_IF)) {
+    //{{{  fifo thread
+    if (pthread_create(&pthFifo, &pthAttr, pthFifoThread, &i))
+      SOFT_ERROR(PI_INIT_FAILED, "pthread_create fifo failed (%m)");
+    pthFifoRunning = PI_THREAD_STARTED;
+    }
+    //}}}
+  if (!(gpioCfg.ifFlags & PI_DISABLE_SOCK_IF)) {
+    //{{{  sockets
+    portStr = getenv(PI_ENVPORT);
+    if (portStr) 
+      port = atoi(portStr); 
+    else 
+      port = gpioCfg.socketPort;
+
+    // Accept connections on IPv6, unless we have an IPv4-only whitelist
+    if (!numSockNetAddr) {
+      fdSock = socket(AF_INET6, SOCK_STREAM , 0);
+
+      if (fdSock != -1) {
+        bzero((char *)&server6, sizeof(server6));
+        server6.sin6_family = AF_INET6;
+        if (gpioCfg.ifFlags & PI_LOCALHOST_SOCK_IF) {
+          server6.sin6_addr = in6addr_loopback;
+          }
+        else {
+          server6.sin6_addr = in6addr_any;
+          }
+        server6.sin6_port = htons(port);
+
+        int opt = 1;
+        setsockopt(fdSock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+        if (bind(fdSock,(struct sockaddr *)&server6, sizeof(server6)) < 0)
+          SOFT_ERROR(PI_INIT_FAILED, "bind to port %d failed (%m)", port);
+        }
+      }
+
+    if (numSockNetAddr || fdSock == -1) {
+      fdSock = socket(AF_INET , SOCK_STREAM , 0);
+
+      if (fdSock == -1)
+        SOFT_ERROR(PI_INIT_FAILED, "socket failed (%m)");
+      else {
+        int opt = 1;
+        setsockopt(fdSock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+        }
+      server.sin_family = AF_INET;
+      if (gpioCfg.ifFlags & PI_LOCALHOST_SOCK_IF) {
+        server.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+        }
+      else {
+        server.sin_addr.s_addr = htonl(INADDR_ANY);
+        }
+      server.sin_port = htons(port);
+
+      if (bind(fdSock,(struct sockaddr *)&server , sizeof(server)) < 0)
+        SOFT_ERROR(PI_INIT_FAILED, "bind to port %d failed (%m)", port);
+      }
+
+    if (pthread_create(&pthSocket, &pthAttr, pthSocketThread, &i))
+      SOFT_ERROR(PI_INIT_FAILED, "pthread_create socket failed (%m)");
+
+    pthSocketRunning = PI_THREAD_STARTED;
+    }
+    //}}}
+
+  myGpioDelay(1000);
+  dmaInitCbs();
+  flushMemory();
+
+  //cast twice to suppress compiler warning, I belive this cast
+  //is ok because dmaIBus contains bus addresses, not virtual addresses.
+  initDMAgo ((uint32_t *)dmaIn, (uint32_t)(uintptr_t)dmaIBus[0]);
+
+  return PIGPIO_VERSION;
+  }
 //}}}
 //}}}
 
