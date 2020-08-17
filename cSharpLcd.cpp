@@ -3,8 +3,6 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <iostream>
-
-//#include <bcm2835.h>
 #include "pigpio/pigpio.h"
 
 // The Raspberry Pi GPIO pins used for SPI are:
@@ -91,7 +89,7 @@ cSharpLcd::cSharpLcd() {
   //bcm2835_spi_setDataMode (BCM2835_SPI_MODE0);
   //bcm2835_spi_chipSelect (BCM2835_SPI_CS_NONE);
   unsigned spiChan = 0;
-  unsigned baud = 0;
+  unsigned baud = 100000;
   unsigned spiFlags = 0;
   handle = spiOpen (spiChan, baud, spiFlags);
 
@@ -114,13 +112,13 @@ cSharpLcd::cSharpLcd() {
   // Memory LCD startup sequence with recommended timings
   //bcm2835_gpio_write (DISP, HIGH);
   //bcm2835_delayMicroseconds (PWRUP_DISP_DELAY);
-  gpioDelay (PWRUP_DISP_DELAY);
   gpioWrite (DISP, 1);
+  gpioDelay (PWRUP_DISP_DELAY);
 
   //bcm2835_gpio_write (EXTCOMIN, LOW);
   //bcm2835_delayMicroseconds (PWRUP_EXTCOMIN_DELAY);
-  gpioDelay (PWRUP_EXTCOMIN_DELAY);
   gpioWrite (EXTCOMIN, 0);
+  gpioDelay (PWRUP_EXTCOMIN_DELAY);
 
   clearLineBuffer();
   }
@@ -368,9 +366,9 @@ void* cSharpLcd::hardToggleVCOM (void* arg) {
     //bcm2835_gpio_write (extcomin, HIGH);
     //bcm2835_delay (250);
     //bcm2835_gpio_write (extcomin, LOW);
-    gpioDelay (250);
+    gpioDelay (250000);
     gpioWrite (EXTCOMIN, 1);
-    gpioDelay (250);
+    gpioDelay (250000);
     gpioWrite (EXTCOMIN, 0);
     }
 

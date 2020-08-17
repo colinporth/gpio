@@ -1,7 +1,7 @@
 #pragma once
 
-#define LCDWIDTH    (96)
-#define LCDHEIGHT   (96)
+#define LCDWIDTH    (400)
+#define LCDHEIGHT   (240)
 
 class cSharpLcd {
 public:

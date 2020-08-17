@@ -21,6 +21,7 @@ int main() {
   sleep(2);
 
   while(1) {
+    printf ("sinewave\n");
     //{{{  print sinewave
     //float increment = 360.00/lcdWidth;  // one number MUST have a decimal point here!
     float increment = 6.2831/lcdWidth;
@@ -45,6 +46,7 @@ int main() {
       sharpLcd.clearDisplay();
       }
     //}}}
+    printf ("circles\n");
     //{{{  print expanding and contracting circles
     unsigned int originX = lcdWidth/2;
     unsigned int originY = lcdHeight/2;
@@ -89,6 +91,7 @@ int main() {
       sharpLcd.clearLineBuffer();
       }
     //}}}
+    printf ("circling circles\n");
     //{{{  print circling circle
     numRepetitions = 4;
     unsigned int sweepRadius = (lcdHeight/2)*0.8;
@@ -120,6 +123,7 @@ int main() {
     sharpLcd.clearDisplay();
     sharpLcd.clearLineBuffer();
     //}}}
+    printf ("triangles\n");
     //{{{  print triangles
     numRepetitions = 4;
     toggle = false;
@@ -147,6 +151,7 @@ int main() {
     sharpLcd.clearDisplay();
     sharpLcd.clearLineBuffer();
     //}}}
+    printf ("chequerboard\n");
     //{{{  print chequerboard patterns
     numRepetitions = 8;
     for(char i=0; i<numRepetitions; i++) {
@@ -197,6 +202,7 @@ int main() {
     sharpLcd.clearLineBuffer();
     sharpLcd.clearDisplay();
     //}}}
+    printf ("horizontal line\n");
     //{{{  print horizontal line descending down the screen
     char lineThickness = 10;
     for (int i=0; i<numRepetitions; i++) {
