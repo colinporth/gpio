@@ -19,9 +19,9 @@ int main() {
   while(1) {
     printf ("sinewave\n");
     //{{{  print sinewave
-    float increment = 6.2831/lcdWidth;
+    float increment = 6.2831f / lcdWidth;
 
-    for (float theta = 0; theta < 50.26; theta += 0.1256) {
+    for (float theta = 0; theta < 10.f; theta += 0.1256.f) {
       for (int y = 1; y <= lcdHeight; y++) {
         sharpLcd.clearLineBuffer();
         for (int x = 1; x <= lcdWidth; x++) {
@@ -103,6 +103,7 @@ int main() {
       // calculate circle centre
       unsigned int circleOriginX = sweepOriginX + cos(rads)*sweepRadius;
       unsigned int circleOriginY = sweepOriginY + sin(rads)*sweepRadius;
+
       // draw circle about the centre
       for(unsigned int y = circleOriginY - circleRadius; y <= circleOriginY; y++) {
         sharpLcd.clearLineBuffer();
@@ -120,7 +121,7 @@ int main() {
         sharpLcd.writeLineBufferToDisplay (circleOriginY + circleOriginY - y);
         }
 
-      usleep (15000);
+      usleep (10000);
       }
     //}}}
 
@@ -132,7 +133,6 @@ int main() {
       sharpLcd.clearDisplay();
 
       for (int y = 1; y <= lcdHeight; y++) {
-        sharpLcd.clearLineBuffer();
         for (int x = 1; x <= lcdWidth/8; x++) {
           if (toggle)
             sharpLcd.writeByteToLineBuffer (x, 0xFF);
@@ -140,18 +140,13 @@ int main() {
             sharpLcd.writeByteToLineBuffer (x, 0x00);
           toggle = !toggle;
           }
-
         sharpLcd.writeLineBufferToDisplay (y);
 
-        if ((y % 8) == 0) {
-          if (toggle)
-            toggle = false;
-          else
-            toggle = true;
-          }
+        if ((y % 8) == 0)
+          toggle = !toggle;
         }
-      usleep (10000);
 
+      usleep (10000);
       toggle = !toggle;
       }
     //}}}
