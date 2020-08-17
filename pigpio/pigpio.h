@@ -2101,6 +2101,42 @@ typedef void *(gpioThreadFunc_t) (void*);
 
 //{{{
 /*F*/
+unsigned gpioHardwareRevision();
+/*D
+Returns the hardware revision.
+
+If the hardware revision can not be found or is not a valid hexadecimal
+number the function returns 0.
+
+The hardware revision is the last few characters on the Revision line of
+/proc/cpuinfo.
+
+The revision number can be used to determine the assignment of GPIO
+to pins (see [*gpio*]).
+
+There are at least three types of board.
+
+Type 1 boards have hardware revision numbers of 2 and 3.
+
+Type 2 boards have hardware revision numbers of 4, 5, 6, and 15.
+
+Type 3 boards have hardware revision numbers of 16 or greater.
+
+for "Revision       : 0002" the function returns 2.
+for "Revision       : 000f" the function returns 15.
+for "Revision       : 000g" the function returns 0.
+D*/
+//}}}
+//{{{
+/*F*/
+unsigned gpioVersion();
+/*D
+Returns the pigpio version.
+D*/
+//}}}
+
+//{{{
+/*F*/
 int gpioInitialise();
 /*D
 Initialises the library.
@@ -2147,6 +2183,7 @@ gpioTerminate();
 D*/
 //}}}
 
+// gpio
 //{{{
 /*F*/
 int gpioSetMode (unsigned gpio, unsigned mode);
@@ -2253,6 +2290,128 @@ Arduino style: digitalWrite
 
 ...
 gpioWrite(24, 1); // Set GPIO24 high.
+...
+D*/
+//}}}
+//{{{
+/*F*/
+int gpioGetPad (unsigned pad);
+/*D
+This function returns the pad drive strength in mA.
+
+. .
+pad: 0-2, the pad to get
+. .
+
+Returns the pad drive strength if OK, otherwise PI_BAD_PAD.
+
+Pad @ GPIO
+0   @ 0-27
+1   @ 28-45
+2   @ 46-53
+
+...
+strength = gpioGetPad(1); // get pad 1 strength
+...
+D*/
+//}}}
+//{{{
+/*F*/
+int gpioSetPad (unsigned pad, unsigned padStrength);
+/*D
+This function sets the pad drive strength in mA.
+
+. .
+        pad: 0-2, the pad to set
+padStrength: 1-16 mA
+. .
+
+Returns 0 if OK, otherwise PI_BAD_PAD, or PI_BAD_STRENGTH.
+
+Pad @ GPIO
+0   @ 0-27
+1   @ 28-45
+2   @ 46-53
+
+...
+gpioSetPad(0, 16); // set pad 0 strength to 16 mA
+...
+D*/
+//}}}
+
+//{{{
+/*F*/
+uint32_t gpioRead_Bits_0_31();
+/*D
+Returns the current level of GPIO 0-31.
+D*/
+//}}}
+//{{{
+/*F*/
+uint32_t gpioRead_Bits_32_53();
+/*D
+Returns the current level of GPIO 32-53.
+D*/
+//}}}
+//{{{
+/*F*/
+int gpioWrite_Bits_0_31_Clear (uint32_t bits);
+/*D
+Clears GPIO 0-31 if the corresponding bit in bits is set.
+
+. .
+bits: a bit mask of GPIO to clear
+. .
+
+Returns 0 if OK.
+
+...
+// To clear (set to 0) GPIO 4, 7, and 15
+gpioWrite_Bits_0_31_Clear( (1<<4) | (1<<7) | (1<<15) );
+...
+D*/
+//}}}
+//{{{
+/*F*/
+int gpioWrite_Bits_32_53_Clear (uint32_t bits);
+/*D
+Clears GPIO 32-53 if the corresponding bit (0-21) in bits is set.
+
+. .
+bits: a bit mask of GPIO to clear
+. .
+
+Returns 0 if OK.
+D*/
+//}}}
+//{{{
+/*F*/
+int gpioWrite_Bits_0_31_Set (uint32_t bits);
+/*D
+Sets GPIO 0-31 if the corresponding bit in bits is set.
+
+. .
+bits: a bit mask of GPIO to set
+. .
+
+Returns 0 if OK.
+D*/
+//}}}
+//{{{
+/*F*/
+int gpioWrite_Bits_32_53_Set (uint32_t bits);
+/*D
+Sets GPIO 32-53 if the corresponding bit (0-21) in bits is set.
+
+. .
+bits: a bit mask of GPIO to set
+. .
+
+Returns 0 if OK.
+
+...
+// To set (set to 1) GPIO 32, 40, and 53
+gpioWrite_Bits_32_53_Set((1<<(32-32)) | (1<<(40-32)) | (1<<(53-32)));
 ...
 D*/
 //}}}
@@ -2932,6 +3091,7 @@ gpioNotifyClose(h);
 D*/
 //}}}
 
+// gpioWave
 //{{{
 /*F*/
 int gpioWaveClear();
@@ -3429,6 +3589,7 @@ control blocks.
 D*/
 //}}}
 
+// serial
 //{{{
 /*F*/
 int gpioSerialReadOpen (unsigned user_gpio, unsigned baud, unsigned data_bits);
@@ -3510,6 +3671,7 @@ Returns 0 if OK, otherwise PI_BAD_USER_GPIO, or PI_NOT_SERIAL_GPIO.
 D*/
 //}}}
 
+// i2c
 //{{{
 /*F*/
 int i2cOpen (unsigned i2cBus, unsigned i2cAddr, unsigned i2cFlags);
@@ -4101,6 +4263,147 @@ End
 D*/
 //}}}
 
+// spi
+//{{{
+/*F*/
+int spiOpen (unsigned spiChan, unsigned baud, unsigned spiFlags);
+/*D
+This function returns a handle for the SPI device on the channel.
+Data will be transferred at baud bits per second.  The flags may
+be used to modify the default behaviour of 4-wire operation, mode 0, active low chip select.
+
+The Pi has two SPI peripherals: main and auxiliary.
+
+The main SPI has two chip selects (channels), the auxiliary has three.
+
+The auxiliary SPI is available on all models but the A and B.
+
+The GPIO used are given in the following table.
+
+         @ MISO @ MOSI @ SCLK @ CE0 @ CE1 @ CE2
+Main SPI @    9 @   10 @   11 @   8 @   7 @   -
+Aux SPI  @   19 @   20 @   21 @  18 @  17 @  16
+
+ spiChan: 0-1 (0-2 for the auxiliary SPI)
+    baud: 32K-125M (values above 30M are unlikely to work)
+
+  spiFlags: see below
+
+Returns a handle (>=0) if OK, otherwise PI_BAD_SPI_CHANNEL,
+PI_BAD_SPI_SPEED, PI_BAD_FLAGS, PI_NO_AUX_SPI, or PI_SPI_OPEN_FAILED.
+
+spiFlags consists of the least significant 22 bits.
+  21 20 19 18 17 16 15 14 13 12 11 10  9  8  7  6  5  4  3  2  1  0
+   b  b  b  b  b  b  R  T  n  n  n  n  W  A u2 u1 u0 p2 p1 p0  m  m
+
+  mm defines the SPI mode.
+    Warning: modes 1 and 3 do not appear to work on the auxiliary SPI.
+    Mode POL PHA
+     0    0   0
+     1    0   1
+     2    1   0
+     3    1   1
+
+  px is 0 if CEx is active low (default) and 1 for active high.
+
+  ux is 0 if the CEx GPIO is reserved for SPI (default) and 1 otherwise.
+
+  A is 0 for the main SPI, 1 for the auxiliary SPI.
+
+  W is 0 if the device is not 3-wire, 1 if the device is 3-wire. Main SPI only.
+
+  nnnn defines the number of bytes (0-15) to write before switching
+  the MOSI line to MISO to read data.  This field is ignored if W is not set.  Main SPI only.
+
+  T is 1 if the least significant bit is transmitted on MOSI first, the
+  default (0) shifts the most significant bit out first.  Auxiliary SPI only.
+
+  R is 1 if the least significant bit is received on MISO first, the
+  default (0) receives the most significant bit first.  Auxiliary SPI only.
+
+  bbbbbb defines the word size in bits (0-32).  The default (0) sets 8 bits per word.  Auxiliary SPI only.
+
+    The [*spiRead*], [*spiWrite*], and [*spiXfer*] functions
+    transfer data packed into 1, 2, or 4 bytes according to the word size in bits.
+
+    For bits 1-8 there will be one byte per word.
+    For bits 9-16 there will be two bytes per word.
+    For bits 17-32 there will be four bytes per word.
+
+    Multi-byte transfers are made in least significant byte first order.
+    E.g. to transfer 32 11-bit words buf should contain 64 bytes and count should be 64.
+    E.g. to transfer the 14 bit value 0x1ABC send the bytes 0xBC followed by 0x1A.
+
+  other bits in flags should be set to zero.
+D*/
+//}}}
+//{{{
+/*F*/
+int spiClose (unsigned handle);
+/*D
+This functions closes the SPI device identified by the handle.
+
+. .
+handle: >=0, as returned by a call to [*spiOpen*]
+. .
+
+Returns 0 if OK, otherwise PI_BAD_HANDLE.
+D*/
+//}}}
+//{{{
+/*F*/
+int spiRead (unsigned handle, char* buf, unsigned count);
+/*D
+This function reads count bytes of data from the SPI
+device associated with the handle.
+
+. .
+handle: >=0, as returned by a call to [*spiOpen*]
+   buf: an array to receive the read data bytes
+ count: the number of bytes to read
+. .
+
+Returns the number of bytes transferred if OK, otherwise
+PI_BAD_HANDLE, PI_BAD_SPI_COUNT, or PI_SPI_XFER_FAILED.
+D*/
+//}}}
+//{{{
+/*F*/
+int spiWrite (unsigned handle, char* buf, unsigned count);
+/*D
+This function writes count bytes of data from buf to the SPI
+device associated with the handle.
+
+. .
+handle: >=0, as returned by a call to [*spiOpen*]
+   buf: the data bytes to write
+ count: the number of bytes to write
+. .
+
+Returns the number of bytes transferred if OK, otherwise
+PI_BAD_HANDLE, PI_BAD_SPI_COUNT, or PI_SPI_XFER_FAILED.
+D*/
+//}}}
+//{{{
+/*F*/
+int spiXfer (unsigned handle, char* txBuf, char* rxBuf, unsigned count);
+/*D
+This function transfers count bytes of data from txBuf to the SPI
+device associated with the handle.  Simultaneously count bytes of
+data are read from the device and placed in rxBuf.
+
+. .
+handle: >=0, as returned by a call to [*spiOpen*]
+ txBuf: the data bytes to write
+ rxBuf: the received data bytes
+ count: the number of bytes to transfer
+. .
+
+Returns the number of bytes transferred if OK, otherwise
+PI_BAD_HANDLE, PI_BAD_SPI_COUNT, or PI_SPI_XFER_FAILED.
+D*/
+//}}}
+
 //{{{
 /*F*/
 int bscXfer (bsc_xfer_t* bsc_xfer);
@@ -4394,146 +4697,7 @@ int main(int argc, char *argv[])
 D*/
 //}}}
 
-//{{{
-/*F*/
-int spiOpen (unsigned spiChan, unsigned baud, unsigned spiFlags);
-/*D
-This function returns a handle for the SPI device on the channel.
-Data will be transferred at baud bits per second.  The flags may
-be used to modify the default behaviour of 4-wire operation, mode 0, active low chip select.
-
-The Pi has two SPI peripherals: main and auxiliary.
-
-The main SPI has two chip selects (channels), the auxiliary has three.
-
-The auxiliary SPI is available on all models but the A and B.
-
-The GPIO used are given in the following table.
-
-         @ MISO @ MOSI @ SCLK @ CE0 @ CE1 @ CE2
-Main SPI @    9 @   10 @   11 @   8 @   7 @   -
-Aux SPI  @   19 @   20 @   21 @  18 @  17 @  16
-
- spiChan: 0-1 (0-2 for the auxiliary SPI)
-    baud: 32K-125M (values above 30M are unlikely to work)
-
-  spiFlags: see below
-
-Returns a handle (>=0) if OK, otherwise PI_BAD_SPI_CHANNEL,
-PI_BAD_SPI_SPEED, PI_BAD_FLAGS, PI_NO_AUX_SPI, or PI_SPI_OPEN_FAILED.
-
-spiFlags consists of the least significant 22 bits.
-  21 20 19 18 17 16 15 14 13 12 11 10  9  8  7  6  5  4  3  2  1  0
-   b  b  b  b  b  b  R  T  n  n  n  n  W  A u2 u1 u0 p2 p1 p0  m  m
-
-  mm defines the SPI mode.
-    Warning: modes 1 and 3 do not appear to work on the auxiliary SPI.
-    Mode POL PHA
-     0    0   0
-     1    0   1
-     2    1   0
-     3    1   1
-
-  px is 0 if CEx is active low (default) and 1 for active high.
-
-  ux is 0 if the CEx GPIO is reserved for SPI (default) and 1 otherwise.
-
-  A is 0 for the main SPI, 1 for the auxiliary SPI.
-
-  W is 0 if the device is not 3-wire, 1 if the device is 3-wire. Main SPI only.
-
-  nnnn defines the number of bytes (0-15) to write before switching
-  the MOSI line to MISO to read data.  This field is ignored if W is not set.  Main SPI only.
-
-  T is 1 if the least significant bit is transmitted on MOSI first, the
-  default (0) shifts the most significant bit out first.  Auxiliary SPI only.
-
-  R is 1 if the least significant bit is received on MISO first, the
-  default (0) receives the most significant bit first.  Auxiliary SPI only.
-
-  bbbbbb defines the word size in bits (0-32).  The default (0) sets 8 bits per word.  Auxiliary SPI only.
-
-    The [*spiRead*], [*spiWrite*], and [*spiXfer*] functions
-    transfer data packed into 1, 2, or 4 bytes according to the word size in bits.
-
-    For bits 1-8 there will be one byte per word.
-    For bits 9-16 there will be two bytes per word.
-    For bits 17-32 there will be four bytes per word.
-
-    Multi-byte transfers are made in least significant byte first order.
-    E.g. to transfer 32 11-bit words buf should contain 64 bytes and count should be 64.
-    E.g. to transfer the 14 bit value 0x1ABC send the bytes 0xBC followed by 0x1A.
-
-  other bits in flags should be set to zero.
-D*/
-//}}}
-//{{{
-/*F*/
-int spiClose (unsigned handle);
-/*D
-This functions closes the SPI device identified by the handle.
-
-. .
-handle: >=0, as returned by a call to [*spiOpen*]
-. .
-
-Returns 0 if OK, otherwise PI_BAD_HANDLE.
-D*/
-//}}}
-//{{{
-/*F*/
-int spiRead (unsigned handle, char* buf, unsigned count);
-/*D
-This function reads count bytes of data from the SPI
-device associated with the handle.
-
-. .
-handle: >=0, as returned by a call to [*spiOpen*]
-   buf: an array to receive the read data bytes
- count: the number of bytes to read
-. .
-
-Returns the number of bytes transferred if OK, otherwise
-PI_BAD_HANDLE, PI_BAD_SPI_COUNT, or PI_SPI_XFER_FAILED.
-D*/
-//}}}
-//{{{
-/*F*/
-int spiWrite (unsigned handle, char* buf, unsigned count);
-/*D
-This function writes count bytes of data from buf to the SPI
-device associated with the handle.
-
-. .
-handle: >=0, as returned by a call to [*spiOpen*]
-   buf: the data bytes to write
- count: the number of bytes to write
-. .
-
-Returns the number of bytes transferred if OK, otherwise
-PI_BAD_HANDLE, PI_BAD_SPI_COUNT, or PI_SPI_XFER_FAILED.
-D*/
-//}}}
-//{{{
-/*F*/
-int spiXfer (unsigned handle, char* txBuf, char* rxBuf, unsigned count);
-/*D
-This function transfers count bytes of data from txBuf to the SPI
-device associated with the handle.  Simultaneously count bytes of
-data are read from the device and placed in rxBuf.
-
-. .
-handle: >=0, as returned by a call to [*spiOpen*]
- txBuf: the data bytes to write
- rxBuf: the received data bytes
- count: the number of bytes to transfer
-. .
-
-Returns the number of bytes transferred if OK, otherwise
-PI_BAD_HANDLE, PI_BAD_SPI_COUNT, or PI_SPI_XFER_FAILED.
-D*/
-//}}}
-
+// serial
 //{{{
 /*F*/
 int serOpen (char* sertty, unsigned baud, unsigned serFlags);
@@ -4653,6 +4817,7 @@ otherwise PI_BAD_HANDLE.
 D*/
 //}}}
 
+// utils
 //{{{
 /*F*/
 int gpioTrigger (unsigned user_gpio, unsigned pulseLen, unsigned level);
@@ -4954,6 +5119,7 @@ The thread to be stopped should have been started with [*gpioStartThread*].
 D*/
 //}}}
 
+// script
 //{{{
 /*F*/
 int gpioStoreScript (char* script);
@@ -5132,83 +5298,6 @@ D*/
 
 //{{{
 /*F*/
-uint32_t gpioRead_Bits_0_31();
-/*D
-Returns the current level of GPIO 0-31.
-D*/
-//}}}
-//{{{
-/*F*/
-uint32_t gpioRead_Bits_32_53();
-/*D
-Returns the current level of GPIO 32-53.
-D*/
-//}}}
-//{{{
-/*F*/
-int gpioWrite_Bits_0_31_Clear (uint32_t bits);
-/*D
-Clears GPIO 0-31 if the corresponding bit in bits is set.
-
-. .
-bits: a bit mask of GPIO to clear
-. .
-
-Returns 0 if OK.
-
-...
-// To clear (set to 0) GPIO 4, 7, and 15
-gpioWrite_Bits_0_31_Clear( (1<<4) | (1<<7) | (1<<15) );
-...
-D*/
-//}}}
-//{{{
-/*F*/
-int gpioWrite_Bits_32_53_Clear (uint32_t bits);
-/*D
-Clears GPIO 32-53 if the corresponding bit (0-21) in bits is set.
-
-. .
-bits: a bit mask of GPIO to clear
-. .
-
-Returns 0 if OK.
-D*/
-//}}}
-//{{{
-/*F*/
-int gpioWrite_Bits_0_31_Set (uint32_t bits);
-/*D
-Sets GPIO 0-31 if the corresponding bit in bits is set.
-
-. .
-bits: a bit mask of GPIO to set
-. .
-
-Returns 0 if OK.
-D*/
-//}}}
-//{{{
-/*F*/
-int gpioWrite_Bits_32_53_Set (uint32_t bits);
-/*D
-Sets GPIO 32-53 if the corresponding bit (0-21) in bits is set.
-
-. .
-bits: a bit mask of GPIO to set
-. .
-
-Returns 0 if OK.
-
-...
-// To set (set to 1) GPIO 32, 40, and 53
-gpioWrite_Bits_32_53_Set((1<<(32-32)) | (1<<(40-32)) | (1<<(53-32)));
-...
-D*/
-//}}}
-
-//{{{
-/*F*/
 int gpioHardwareClock (unsigned gpio, unsigned clkfreq);
 /*D
 Starts a hardware clock on a GPIO at the specified frequency.
@@ -5300,6 +5389,7 @@ automatically scaled to take this into account.
 D*/
 //}}}
 
+// time
 //{{{
 /*F*/
 int gpioTime (unsigned timetype, int* seconds, int* micros);
@@ -5410,89 +5500,26 @@ printf("some processing took %d microseconds", diffTick);
 ...
 D*/
 //}}}
-
 //{{{
 /*F*/
-unsigned gpioHardwareRevision();
+double time_time();
 /*D
-Returns the hardware revision.
-
-If the hardware revision can not be found or is not a valid hexadecimal
-number the function returns 0.
-
-The hardware revision is the last few characters on the Revision line of
-/proc/cpuinfo.
-
-The revision number can be used to determine the assignment of GPIO
-to pins (see [*gpio*]).
-
-There are at least three types of board.
-
-Type 1 boards have hardware revision numbers of 2 and 3.
-
-Type 2 boards have hardware revision numbers of 4, 5, 6, and 15.
-
-Type 3 boards have hardware revision numbers of 16 or greater.
-
-for "Revision       : 0002" the function returns 2.
-for "Revision       : 000f" the function returns 15.
-for "Revision       : 000g" the function returns 0.
+Return the current time in seconds since the Epoch.
 D*/
 //}}}
 //{{{
 /*F*/
-unsigned gpioVersion();
+void time_sleep (double seconds);
 /*D
-Returns the pigpio version.
+Delay execution for a given number of seconds
+
+. .
+seconds: the number of seconds to sleep
+. .
 D*/
 //}}}
 
-//{{{
-/*F*/
-int gpioGetPad (unsigned pad);
-/*D
-This function returns the pad drive strength in mA.
-
-. .
-pad: 0-2, the pad to get
-. .
-
-Returns the pad drive strength if OK, otherwise PI_BAD_PAD.
-
-Pad @ GPIO
-0   @ 0-27
-1   @ 28-45
-2   @ 46-53
-
-...
-strength = gpioGetPad(1); // get pad 1 strength
-...
-D*/
-//}}}
-//{{{
-/*F*/
-int gpioSetPad (unsigned pad, unsigned padStrength);
-/*D
-This function sets the pad drive strength in mA.
-
-. .
-        pad: 0-2, the pad to set
-padStrength: 1-16 mA
-. .
-
-Returns 0 if OK, otherwise PI_BAD_PAD, or PI_BAD_STRENGTH.
-
-Pad @ GPIO
-0   @ 0-27
-1   @ 28-45
-2   @ 46-53
-
-...
-gpioSetPad(0, 16); // set pad 0 strength to 16 mA
-...
-D*/
-//}}}
-
+// event
 //{{{
 /*F*/
 int eventMonitor (unsigned handle, uint32_t bits);
@@ -5596,6 +5623,7 @@ with an event.
 D*/
 //}}}
 
+// shell
 //{{{
 /*F*/
 int shell (char* scriptName, char* scriptString);
@@ -5640,6 +5668,7 @@ status = shell("scr1", "\"hello string with spaces world\"");
 D*/
 //}}}
 
+// file
 //{{{
 int fileOpen (char* file, unsigned mode);
 //This function returns a handle to a file opened in a specified mode.
@@ -5888,6 +5917,7 @@ int fileList (char* fpat, char* buf, unsigned count);
 //}
 //}}}
 
+// config
 //{{{
 /*F*/
 int gpioCfgBufferSize (unsigned cfgMillis);
@@ -6129,6 +6159,7 @@ cfgVal: see source code
 D*/
 //}}}
 
+// custom
 //{{{
 /*F*/
 int gpioCustom1 (unsigned arg1, unsigned arg2, char* argx, unsigned argc);
@@ -6172,6 +6203,7 @@ The number of returned bytes must be retMax or less.
 D*/
 //}}}
 
+// raw
 //{{{
 /*F*/
 int rawWaveAddSPI (rawSPI_t* spi, unsigned offset, unsigned spiSS, char* buf, unsigned spiTxBits,
@@ -6383,24 +6415,6 @@ D*/
 
 //{{{
 /*F*/
-double time_time();
-/*D
-Return the current time in seconds since the Epoch.
-D*/
-//}}}
-//{{{
-/*F*/
-void time_sleep (double seconds);
-/*D
-Delay execution for a given number of seconds
-
-. .
-seconds: the number of seconds to sleep
-. .
-D*/
-//}}}
-//{{{
-/*F*/
 void rawDumpWave();
 /*D
 Used to print a readable version of the current waveform to stderr.
@@ -6408,7 +6422,6 @@ Used to print a readable version of the current waveform to stderr.
 Not intended for general use.
 D*/
 //}}}
-
 //{{{
 /*F*/
 void rawDumpScript (unsigned script_id);
