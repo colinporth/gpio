@@ -1,7 +1,5 @@
+// cSharpLcd.h
 #pragma once
-
-#define LCDWIDTH    (400)
-#define LCDHEIGHT   (240)
 
 class cSharpLcd {
 public:
@@ -9,17 +7,16 @@ public:
   ~cSharpLcd();
 
   // return display parameters
-  unsigned int getDisplayWidth() { return LCDWIDTH; }
-  unsigned int getDisplayHeight() { return LCDHEIGHT; }
+  unsigned int getDisplayWidth() { return kWidth; }
+  unsigned int getDisplayHeight() { return kHeight; }
 
   // Write data direct to display
-  void writeLineToDisplay (char lineNumber, char* line);
-  void writeMultipleLinesToDisplay (char lineNumber, char numLines, char* lines);
+  void writeMultipleLinesToDisplay (int lineNumber, int numLines, char* lines);
+  void writeLineToDisplay (int lineNumber, char* line);
 
   // Write data to line buffer
   void writePixelToLineBuffer (unsigned int pixel, bool isWhite);
   void writeByteToLineBuffer (int byteNumber, char byteToWrite);
-  void copyByteWithinLineBuffer (int sourceByte, int destinationByte);
   void setLineBufferBlack();
   void setLineBufferWhite();
 
@@ -45,12 +42,15 @@ public:
   void turnOff();
   void turnOn();
 
-  // software VCOM control - NOT YET PROPERLY IMPLEMENTED
+  // software VCOM control
   void softToggleVCOM();
 
 private:
+  static const int kWidth = 400;
+  static const int kHeight = 240;
+
+  char reverseByte (int b);
   static void* hardToggleVCOM (void* arg);
-  char reverseByte (char b);
 
   int handle;
   char commandByte;
@@ -60,6 +60,6 @@ private:
   char SI;
   char SCLK;
   bool enablePWM;
-  char lineBuffer [LCDWIDTH/8];
-  char frameBuffer [LCDWIDTH*LCDHEIGHT/8];
+  char lineBuffer [kWidth/8];
+  char frameBuffer [kWidth*kHeight/8];
   };
