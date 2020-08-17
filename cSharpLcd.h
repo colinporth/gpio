@@ -1,5 +1,6 @@
 // cSharpLcd.h
 #pragma once
+#include <stdint.h>
 
 class cSharpLcd {
 public:
@@ -13,22 +14,22 @@ public:
   void turnOff();
   void turnOn();
 
-  void writeLinesToDisplay (int lineNumber, int numLines, char* linesData);
-  void writeLineToDisplay (int lineNumber, char* lineData);
-  void writeLineBufferToDisplay (int lineNumber);
+  void writeLinesToDisplay (uint8_t lineNumber, uint8_t numLines, uint8_t* linesData);
+  void writeLineToDisplay (uint8_t lineNumber, uint8_t* lineData);
+  void writeLineBufferToDisplay (uint8_t lineNumber);
   void writeFrameBufferToDisplay();
 
   // line buffer
-  void clearLineBuffer();
   void setLineBuffer();
-  void writeByteToLineBuffer (int byteNumber, char byteToWrite);
-  void writePixelToLineBuffer (int pixel, bool on);
+  void clearLineBuffer();
+  void writeByteToLineBuffer (uint8_t byteNumber, uint8_t byteToWrite);
+  void writePixelToLineBuffer (uint16_t pixel, bool on);
 
   // frame buffer
-  void clearFrameBuffer();
   void setFrameBuffer();
-  void writeByteToFrameBuffer (int byteNumber, int lineNumber, char byteToWrite);
-  void writePixelToFrameBuffer (unsigned int pixel, int lineNumber, bool on);
+  void clearFrameBuffer();
+  void writeByteToFrameBuffer (uint8_t byteNumber, uint8_t lineNumber, uint8_t byteToWrite);
+  void writePixelToFrameBuffer (uint16_t pixel, uint8_t lineNumber, bool on);
 
 private:
   static const int kWidth = 400;
@@ -38,9 +39,9 @@ private:
   static void* toggleVcomThread (void* arg);
 
   int mHandle;
-  char mCommandByte;
-  char mClearByte;
-  char mPaddingByte;
-  char mLineBuffer [kWidth/8];
-  char mFrameBuffer [kWidth*kHeight/8];
+  uint8_t mCommandByte;
+  uint8_t mClearByte;
+  uint8_t mPaddingByte;
+  uint8_t mLineBuffer [kWidth/8];
+  uint8_t mFrameBuffer [kWidth*kHeight/8];
   };

@@ -72,11 +72,11 @@ int main() {
           float theta = acos (float(abs (originY-(float)y))/float(radius)) - 1.5708f;
           unsigned int xLength = cos (theta) * float(radius);
           for (unsigned int x = originX - xLength; x <= originX ; x++) {
-            sharpLcd.writePixelToLineBuffer(x, 0);
-            sharpLcd.writePixelToLineBuffer(originX + (originX - x), 0);
+            sharpLcd.writePixelToLineBuffer (x, 0);
+            sharpLcd.writePixelToLineBuffer (originX + (originX - x), 0);
             }
-          sharpLcd.writeLineBufferToDisplay(y);
-          sharpLcd.writeLineBufferToDisplay(originY + (originY - y));
+          sharpLcd.writeLineBufferToDisplay (y);
+          sharpLcd.writeLineBufferToDisplay (originY + (originY - y));
           }
 
         sharpLcd.clearLineBuffer();
@@ -134,10 +134,7 @@ int main() {
 
       for (int y = 1; y <= lcdHeight; y++) {
         for (int x = 1; x <= lcdWidth/8; x++) {
-          if (toggle)
-            sharpLcd.writeByteToLineBuffer (x, 0xFF);
-          else
-            sharpLcd.writeByteToLineBuffer (x, 0x00);
+          sharpLcd.writeByteToLineBuffer (x, toggle ? 0xFF : 0x00);
           toggle = !toggle;
           }
         sharpLcd.writeLineBufferToDisplay (y);

@@ -10,15 +10,15 @@
 
 using namespace std;
 //}}}
-static const char SCS      = 23; // J8 - pin16 - used
-static const char DISP     = 24; // J8 - pin18 - used
-static const char EXTCOMIN = 25; // J8 - pin22 - used
+static const uint8_t SCS      = 23; // J8 - pin16 - used
+static const uint8_t DISP     = 24; // J8 - pin18 - used
+static const uint8_t EXTCOMIN = 25; // J8 - pin22 - used
 
-static const char CE1      =  7; // J8 - pin26
-static const char CE0      =  8; // J8 - pin24
-static const char MISO     =  9; // J8 - pin21
-static const char MOSI     = 10; // J8 - pin19 - used
-static const char CLK      = 11; // J8 - pin23 - used
+static const uint8_t CE1      =  7; // J8 - pin26
+static const uint8_t CE0      =  8; // J8 - pin24
+static const uint8_t MISO     =  9; // J8 - pin21
+static const uint8_t MOSI     = 10; // J8 - pin19 - used
+static const uint8_t CLK      = 11; // J8 - pin23 - used
 
 static const int kSpiClock = 8000000;
 
@@ -83,8 +83,8 @@ void cSharpLcd::clearDisplay() {
 
   gpioWrite (SCS, 1);
   gpioDelay (SCS_HIGH_DELAY);
-  spiWrite (mHandle, &mClearByte, 1);
-  spiWrite (mHandle, &mPaddingByte, 1);
+  spiWrite (mHandle, (char*)&mClearByte, 1);
+  spiWrite (mHandle, (char*)&mPaddingByte, 1);
   gpioDelay (SCS_LOW_DELAY);
   gpioWrite (SCS, 0);
 
@@ -103,33 +103,53 @@ void cSharpLcd::turnOn() {
 //}}}
 
 //{{{
-void cSharpLcd::writeLinesToDisplay (int lineNumber, int numLines, char* linesData) {
+void cSharpLcd::writeLinesToDisplay (uint8_t lineNumber, uint8_t numLines, uint8_t* linesData) {
 
   gpioWrite (SCS, 1);
   gpioDelay (SCS_HIGH_DELAY);
-  spiWrite (mHandle, &mCommandByte, 1);
+  spiWrite (mHandle, (char*)&mCommandByte, 1);
 
   for (int i = 0; i < numLines; i++) {
     char reversedLineNumber = reverseByte (lineNumber++);
-    spiWrite (mHandle, &reversedLineNumber, 1);
-    spiWrite (mHandle, linesData++, kWidth/8);
-    spiWrite (mHandle, &mPaddingByte, 1);
+    spiWrite (mHandle, (char*)&reversedLineNumber, 1);
+    spiWrite (mHandle, (char*)linesData++, kWidth/8);
+    spiWrite (mHandle, (char*)&mPaddingByte, 1);
     }
 
-  spiWrite (mHandle, &mPaddingByte, 1);
+  spiWrite (mHandle, (char*)&mPaddingByte, 1);
   gpioDelay (SCS_LOW_DELAY);
   gpioWrite (SCS, 0);
   gpioDelay (INTERFRAME_DELAY);
   }
 //}}}
-void cSharpLcd::writeLineToDisplay (int lineNumber, char* lineData) { writeLinesToDisplay (lineNumber, 1, lineData); }
-void cSharpLcd::writeLineBufferToDisplay (int lineNumber) { writeLinesToDisplay (lineNumber, 1, mLineBuffer); }
-void cSharpLcd::writeFrameBufferToDisplay() { writeLinesToDisplay (1, kHeight, mFrameBuffer); }
-
-void cSharpLcd::clearLineBuffer() { memset (mLineBuffer, 0xFF, kWidth/8); }
-void cSharpLcd::setLineBuffer() { memset (mLineBuffer, 0x00, kWidth/8); }
 //{{{
-void cSharpLcd::writeByteToLineBuffer (int byteNumber, char byteToWrite) {
+void cSharpLcd::writeLineToDisplay (uint8_t lineNumber, uint8_t* lineData) { 
+  writeLinesToDisplay (lineNumber, 1, lineData); 
+  }
+//}}}
+//{{{
+void cSharpLcd::writeLineBufferToDisplay (uint8_t lineNumber) { 
+  writeLinesToDisplay (lineNumber, 1, mLineBuffer); 
+  }
+//}}}
+//{{{
+void cSharpLcd::writeFrameBufferToDisplay() { 
+  writeLinesToDisplay (1, kHeight, mFrameBuffer); 
+  }
+//}}}
+
+//{{{
+void cSharpLcd::setLineBuffer() { 
+  memset (mLineBuffer, 0x00, kWidth/8); 
+  }
+//}}}
+//{{{
+void cSharpLcd::clearLineBuffer() { 
+  memset (mLineBuffer, 0xFF, kWidth/8); 
+  }
+//}}}
+//{{{
+void cSharpLcd::writeByteToLineBuffer (uint8_t byteNumber, uint8_t byteToWrite) {
 // char location expected in the fn args has been extrapolated from the pixel location
 // format (see above), so chars go from 1 to kWidth/8, not from 0
 
@@ -140,13 +160,13 @@ void cSharpLcd::writeByteToLineBuffer (int byteNumber, char byteToWrite) {
   }
 //}}}
 //{{{
-void cSharpLcd::writePixelToLineBuffer (int pixel, bool isWhite) {
+void cSharpLcd::writePixelToLineBuffer (uint16_t pixel, bool on) {
 // pixel location expected in the fn args follows the scheme defined in the datasheet.
 // NB: the datasheet defines pixel addresses starting from 1, NOT 0
 
   if ((pixel <= kWidth) && (pixel != 0)) {
     pixel = pixel - 1;
-    if (isWhite)
+    if (on)
       mLineBuffer[pixel/8] |=  (1 << (7 - pixel%8));
     else
       mLineBuffer[pixel/8] &= ~(1 << (7 - pixel%8));
@@ -154,10 +174,18 @@ void cSharpLcd::writePixelToLineBuffer (int pixel, bool isWhite) {
   }
 //}}}
 
-void cSharpLcd::clearFrameBuffer() { memset (mFrameBuffer, 0xFF, kWidth*kHeight/8); }
-void cSharpLcd::setFrameBuffer() { memset (mFrameBuffer, 0x00, kWidth*kHeight/8); }
 //{{{
-void cSharpLcd::writeByteToFrameBuffer (int byteNumber, int lineNumber, char byteToWrite) {
+void cSharpLcd::setFrameBuffer() { 
+  memset (mFrameBuffer, 0x00, kWidth*kHeight/8); 
+  }
+//}}}
+//{{{
+void cSharpLcd::clearFrameBuffer() { 
+  memset (mFrameBuffer, 0xFF, kWidth*kHeight/8); 
+  }
+//}}}
+//{{{
+void cSharpLcd::writeByteToFrameBuffer (uint8_t byteNumber, uint8_t lineNumber, uint8_t byteToWrite) {
 // char location expected in the fn args has been extrapolated from the pixel location
 // format (see above), so chars go from 1 to kWidth/8, not from 0
 
@@ -169,14 +197,14 @@ void cSharpLcd::writeByteToFrameBuffer (int byteNumber, int lineNumber, char byt
   }
 //}}}
 //{{{
-void cSharpLcd::writePixelToFrameBuffer (unsigned int pixel, int lineNumber, bool isWhite) {
+void cSharpLcd::writePixelToFrameBuffer (uint16_t pixel, uint8_t lineNumber, bool on) {
 // pixel location expected in the fn args follows the scheme defined in the datasheet.
 // NB: the datasheet defines pixel addresses starting from 1, NOT 0
 
   if ((pixel <= kWidth) && (pixel != 0) && (lineNumber <= kHeight) & (lineNumber != 0)) {
     pixel -= 1;
     lineNumber -= 1;
-    if(isWhite)
+    if (on)
       mFrameBuffer[(lineNumber*kWidth/8)+(pixel/8)] |=  (1 << (7 - pixel%8));
     else
       mFrameBuffer[(lineNumber*kWidth/8)+(pixel/8)] &= ~(1 << (7 - pixel%8));
