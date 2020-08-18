@@ -24,17 +24,18 @@ int main() {
 
     for (float theta = 0; theta < 10.f; theta += 0.1256f) {
       for (int y = 1; y <= lcdHeight; y++) {
-        sharpLcd.clearLineBuffer();
+        sharpLcd.clearLine();
         for (int x = 1; x <= lcdWidth; x++) {
           int sinValue = (sin(theta + (x * increment)) * lcdHeight/2) + lcdHeight/2;
           if (sinValue >= y && y > lcdHeight/2)
-            sharpLcd.writePixelToLineBuffer (x, 0);
+            sharpLcd.writePixelToLine (x, 0);
           if (sinValue <= y && y <= lcdHeight/2)
-            sharpLcd.writePixelToLineBuffer (x, 0);
+            sharpLcd.writePixelToLine (x, 0);
           }
-        sharpLcd.writeLineBufferToDisplay (y);
+        sharpLcd.lineToFrame (y);
         }
 
+      sharpLcd.displayFrame();
       usleep (10000);
       }
     //}}}
@@ -49,41 +50,43 @@ int main() {
       for (unsigned int radius = 5; radius < expandingCircleRadius; radius++) {
         sharpLcd.clearDisplay();
         for (unsigned int y = originY - radius; y <= originY; y++) {
-          sharpLcd.clearLineBuffer();
+          sharpLcd.clearLine();
           // need to calculate left and right limits of the circle
           float theta = acos (float(abs (originY - (float)y))/float(radius));
           theta -= 1.5708;
           unsigned int xLength = cos (theta) * float(radius);
           for(unsigned int x = originX - xLength; x <= originX; x++) {
-            sharpLcd.writePixelToLineBuffer (x, 0);
-            sharpLcd.writePixelToLineBuffer (originX + (originX - x), 0);
+            sharpLcd.writePixelToLine (x, 0);
+            sharpLcd.writePixelToLine (originX + (originX - x), 0);
             }
-          sharpLcd.writeLineBufferToDisplay (y);
-          sharpLcd.writeLineBufferToDisplay (originY + (originY - y));
+          sharpLcd.lineToFrame (y);
+          sharpLcd.lineToFrame (originY + (originY - y));
           }
 
+        sharpLcd.displayFrame();
         usleep (20000);
         }
 
       for (unsigned int radius = expandingCircleRadius; radius > 2; radius--) {
         sharpLcd.clearDisplay();
         for (unsigned int y = originY - radius; y <= originY; y++) {
-          sharpLcd.clearLineBuffer();
+          sharpLcd.clearLine();
           // need to calculate left and right limits of the circle
           float theta = acos (float(abs (originY-(float)y))/float(radius)) - 1.5708f;
           unsigned int xLength = cos (theta) * float(radius);
           for (unsigned int x = originX - xLength; x <= originX ; x++) {
-            sharpLcd.writePixelToLineBuffer (x, 0);
-            sharpLcd.writePixelToLineBuffer (originX + (originX - x), 0);
+            sharpLcd.writePixelToLine (x, 0);
+            sharpLcd.writePixelToLine (originX + (originX - x), 0);
             }
-          sharpLcd.writeLineBufferToDisplay (y);
-          sharpLcd.writeLineBufferToDisplay (originY + (originY - y));
+          sharpLcd.lineToFrame (y);
+          sharpLcd.lineToFrame (originY + (originY - y));
           }
 
-        sharpLcd.clearLineBuffer();
-        sharpLcd.writeLineBufferToDisplay (originY + radius);
-        sharpLcd.writeLineBufferToDisplay (originY - radius);
+        sharpLcd.clearLine();
+        sharpLcd.lineToFrame (originY + radius);
+        sharpLcd.lineToFrame (originY - radius);
 
+        sharpLcd.displayFrame();
         usleep (20000);
         }
       }
@@ -107,21 +110,22 @@ int main() {
 
       // draw circle about the centre
       for(unsigned int y = circleOriginY - circleRadius; y <= circleOriginY; y++) {
-        sharpLcd.clearLineBuffer();
+        sharpLcd.clearLine();
 
         // need to calculate left and right limits of the circle
         float theta = acos (float(std::abs (circleOriginY - (float)y)) / float(circleRadius));
         theta -= 1.5708;
         unsigned int xLength = cos (theta) * float(circleRadius);
         for(unsigned int x = circleOriginX - xLength; x <= circleOriginX; x++) {
-          sharpLcd.writePixelToLineBuffer (x, 0);
-          sharpLcd.writePixelToLineBuffer (circleOriginX + (circleOriginX - x), 0);
+          sharpLcd.writePixelToLine (x, 0);
+          sharpLcd.writePixelToLine (circleOriginX + (circleOriginX - x), 0);
           }
 
-        sharpLcd.writeLineBufferToDisplay (y);
-        sharpLcd.writeLineBufferToDisplay (circleOriginY + circleOriginY - y);
+        sharpLcd.lineToFrame (y);
+        sharpLcd.lineToFrame (circleOriginY + circleOriginY - y);
         }
 
+      sharpLcd.displayFrame();
       usleep (10000);
       }
     //}}}
@@ -135,16 +139,18 @@ int main() {
 
       for (int y = 1; y <= lcdHeight; y++) {
         for (int x = 1; x <= lcdWidth/8; x++) {
-          sharpLcd.writeByteToLineBuffer (x, toggle ? 0xFF : 0x00);
+          sharpLcd.writeByteToLine (x, toggle ? 0xFF : 0x00);
           toggle = !toggle;
           }
-        sharpLcd.writeLineBufferToDisplay (y);
+        sharpLcd.lineToFrame (y);
 
         if ((y % 8) == 0)
           toggle = !toggle;
         }
 
+      sharpLcd.displayFrame();
       usleep (250000);
+
       toggle = !toggle;
       }
     //}}}

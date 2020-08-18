@@ -2,7 +2,7 @@
 /plugin/;
 
 / {
-	compatible = "brcm,bcm2835", "brcm,bcm2708", "brcm,bcm2709", "brcm,bcm2837";
+	compatible = "brcm,bcm2835", "brcm,bcm2708", "brcm,bcm2709";
 
 	fragment@0 {
 		target = <&spi0>;
@@ -23,8 +23,8 @@
 		target = <&gpio>;
 		__overlay__ {
 			sharp_pins: sharp_pins {
-				brcm,pins = <25 24 23>;
-				brcm,function = <1 1 1>; /* out */
+				brcm,pins = <25 24>;
+				brcm,function = <1 1>; /* out */
 			};
 		};
 	};

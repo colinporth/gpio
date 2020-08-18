@@ -4155,7 +4155,7 @@ Main SPI    9    10    11    8    7    -
       A = 0 main SPI, 1 for the auxiliary SPI.
 
       W = 0 if the device is not 3-wire, 1 if the device is 3-wire. Main SPI only.
-        nnnn = number of bytes (0-15) to write before switching MOSI line to MISO to read data.  
+        nnnn = number of bytes (0-15) to write before switching MOSI line to MISO to read data.
                This field is ignored if W is not set.  Main SPI only.
 
       T = 1 if the least significant bit is transmitted on MOSI first
@@ -4386,55 +4386,45 @@ D*/
 //{{{
 int bbSPIOpen (unsigned CS, unsigned MISO, unsigned MOSI, unsigned SCLK, unsigned baud, unsigned spiFlags);
 /*D
-This function selects a set of GPIO for bit banging SPI with
-a specified baud rate and mode.
+This function selects a set of GPIO for bit banging SPI with a specified baud rate and mode.
 
-. .
-      CS: 0-31
-    MISO: 0-31
-    MOSI: 0-31
-    SCLK: 0-31
-    baud: 50-250000
-spiFlags: see below
-. .
+    CS: 0-31
+  MISO: 0-31
+  MOSI: 0-31
+  SCLK: 0-31
+  baud: 50-250000
 
 spiFlags consists of the least significant 22 bits.
+  21 20 19 18 17 16 15 14 13 12 11 10  9  8  7  6  5  4  3  2  1  0
+   0  0  0  0  0  0  R  T  0  0  0  0  0  0  0  0  0  0  0  p  m  m
 
-. .
-21 20 19 18 17 16 15 14 13 12 11 10  9  8  7  6  5  4  3  2  1  0
- 0  0  0  0  0  0  R  T  0  0  0  0  0  0  0  0  0  0  0  p  m  m
-. .
+    mm defines the SPI mode, defaults to 0
+      Mode CPOL CPHA
+       0    0    0
+       1    0    1
+       2    1    0
+       3    1    1
 
-mm defines the SPI mode, defaults to 0
+    p = 0 if CS is active low (default) and 1 for active high.
 
-. .
-Mode CPOL CPHA
- 0    0    0
- 1    0    1
- 2    1    0
- 3    1    1
-. .
+    T = 1 if the least significant bit is transmitted on MOSI first, the
+          default (0) shifts the most significant bit out first.
 
-p is 0 if CS is active low (default) and 1 for active high.
+    R = 1 if the least significant bit is received on MISO first, the
+          default (0) receives the most significant bit first.
 
-T is 1 if the least significant bit is transmitted on MOSI first, the
-default (0) shifts the most significant bit out first.
+    other bits in flags should be set to zero.
 
-R is 1 if the least significant bit is received on MISO first, the
-default (0) receives the most significant bit first.
+  Returns 0 if OK, otherwise PI_BAD_USER_GPIO, PI_BAD_SPI_BAUD, or
+  PI_GPIO_IN_USE.
 
-The other bits in flags should be set to zero.
+  If more than one device is connected to the SPI bus (defined by
+  SCLK, MOSI, and MISO) each must have its own CS.
 
-Returns 0 if OK, otherwise PI_BAD_USER_GPIO, PI_BAD_SPI_BAUD, or
-PI_GPIO_IN_USE.
-
-If more than one device is connected to the SPI bus (defined by
-SCLK, MOSI, and MISO) each must have its own CS.
-
-...
-bbSPIOpen(10, MISO, MOSI, SCLK, 10000, 0); // device 1
-bbSPIOpen(11, MISO, MOSI, SCLK, 20000, 3); // device 2
-...
+  ...
+  bbSPIOpen(10, MISO, MOSI, SCLK, 10000, 0); // device 1
+  bbSPIOpen(11, MISO, MOSI, SCLK, 20000, 3); // device 2
+  ...
 D*/
 //}}}
 //{{{

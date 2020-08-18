@@ -14,34 +14,34 @@ public:
   void turnOff();
   void turnOn();
 
-  void writeLinesToDisplay (uint8_t lineNumber, uint8_t numLines, uint8_t* linesData);
-  void writeLineToDisplay (uint8_t lineNumber, uint8_t* lineData);
-  void writeLineBufferToDisplay (uint8_t lineNumber);
-  void writeFrameBufferToDisplay();
+  void displayFrame();
 
   // line buffer
-  void setLineBuffer();
-  void clearLineBuffer();
-  void writeByteToLineBuffer (uint8_t byteNumber, uint8_t byteToWrite);
-  void writePixelToLineBuffer (uint16_t pixel, bool on);
+  void setLine();
+  void clearLine();
+  void writeByteToLine (uint8_t byteNumber, uint8_t byteToWrite);
+  void writePixelToLine (uint16_t pixel, bool on);
+  void lineToFrame (uint8_t lineNumber);
 
   // frame buffer
-  void setFrameBuffer();
-  void clearFrameBuffer();
-  void writeByteToFrameBuffer (uint8_t byteNumber, uint8_t lineNumber, uint8_t byteToWrite);
-  void writePixelToFrameBuffer (uint16_t pixel, uint8_t lineNumber, bool on);
+  void setFrame();
+  void clearFrame();
+  void writeByteToFrame (uint8_t byteNumber, uint8_t lineNumber, uint8_t byteToWrite);
+  void writePixelToFrame (uint16_t pixel, uint8_t lineNumber, bool on);
 
 private:
   static const int kWidth = 400;
   static const int kHeight = 240;
+  static const int kRowHeader = 2;
+  static const int kRowDataBytes = kWidth/8;
+  static const int kRowBytes = kRowHeader + kRowDataBytes;
+  static const int kFrameBytes = (kRowBytes * kHeight) + 1;
 
   uint8_t reverseByte (uint8_t b);
   static void* toggleVcomThread (void* arg);
 
   int mHandle;
-  uint8_t mCommandByte;
-  uint8_t mClearByte;
-  uint8_t mPaddingByte;
-  uint8_t mLineBuffer [kWidth/8];
-  uint8_t mFrameBuffer [kWidth*kHeight/8];
+  char mClear[2] = { 0b00100000, 0 };
+  uint8_t mLineBuffer [kRowDataBytes];
+  char mFrameBuffer [kFrameBytes];
   };
