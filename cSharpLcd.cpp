@@ -18,16 +18,9 @@ static const uint8_t MISO     =  9; // J8 - pin21
 static const uint8_t MOSI     = 10; // J8 - pin19 - used
 static const uint8_t CLK      = 11; // J8 - pin23 - used
 
-//static const uint8_t SCS      = 23; // J8 - pin16 - used
+static const uint8_t SCS      = 23; // J8 - pin16 - used
 static const uint8_t DISP     = 24; // J8 - pin18 - used
 static const uint8_t EXTCOMIN = 25; // J8 - pin22 - used
-
-// Delay constants for LCD timing
-#define PWRUP_DISP_DELAY      40  // > 30us
-#define PWRUP_EXTCOMIN_DELAY  40  // > 30us
-#define SCS_HIGH_DELAY         3  // > 3us
-#define SCS_LOW_DELAY          1  // > 1us
-#define INTERFRAME_DELAY       1  // > 1us
 
 //{{{
 cSharpLcd::cSharpLcd() {
@@ -37,7 +30,7 @@ cSharpLcd::cSharpLcd() {
   printf ("pigpio hwRev:%d version:%d\n", hardwareRevision, version);
 
   if (gpioInitialise() >= 0) {
-    //gpioSetMode (SCS, PI_OUTPUT);
+    gpioSetMode (SCS, PI_OUTPUT);
     gpioSetMode (DISP, PI_OUTPUT);
     gpioSetMode (EXTCOMIN, PI_OUTPUT);
 
@@ -47,18 +40,16 @@ cSharpLcd::cSharpLcd() {
     else
       printf ("toggleVcomThread created\n");
 
-    // use CE0 active hi
+    // set CE0 active hi
     mHandle = spiOpen (0, kSpiClock, 0x00004);
 
-    //gpioWrite (SCS, 0);
+    gpioWrite (SCS, 0);
     gpioWrite (DISP, 0);
     gpioWrite (EXTCOMIN, 0);
 
     // Memory LCD startup sequence with recommended timings
     gpioWrite (DISP, 1);
-    //gpioDelay (PWRUP_DISP_DELAY);
     gpioWrite (EXTCOMIN, 0);
-    //gpioDelay (PWRUP_EXTCOMIN_DELAY);
 
     clearLine();
     clearDisplay();
@@ -80,12 +71,9 @@ cSharpLcd::~cSharpLcd() {
 //{{{
 void cSharpLcd::clearDisplay() {
 
-  //gpioWrite (SCS, 1);
-  //gpioDelay (SCS_HIGH_DELAY);
+  gpioWrite (SCS, 1);
   spiWrite (mHandle, mClear, 2);
-  //gpioDelay (SCS_LOW_DELAY);
-  //gpioWrite (SCS, 0);
-  //gpioDelay (INTERFRAME_DELAY);
+  gpioWrite (SCS, 0);
 
   clearFrame();
   }
@@ -104,12 +92,9 @@ void cSharpLcd::turnOn() {
 //{{{
 void cSharpLcd::displayFrame() {
 
-  //gpioWrite (SCS, 1);
-  //gpioDelay (SCS_HIGH_DELAY);
+  gpioWrite (SCS, 1);
   spiWrite (mHandle, mFrameBuffer, kFrameBytes);
-  //gpioDelay (SCS_LOW_DELAY);
-  //gpioWrite (SCS, 0);
-  //gpioDelay (INTERFRAME_DELAY);
+  gpioWrite (SCS, 0);
   }
 //}}}
 
