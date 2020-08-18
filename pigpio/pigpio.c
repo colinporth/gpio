@@ -106,21 +106,20 @@
 //}}}
 //{{{  DEBUG register bits
 // bit 2 READ_ERROR
-   //Slave Read Response Error RW 0x0
-   //Set if the read operation returned an error value on
-   //the read response bus. It can be cleared by writing
-   //a 1.
+  // Slave Read Response Error RW 0x0
+  // Set if the read operation returned an error value on
+  // the read response bus. It can be cleared by writing a 1.
 
 // bit 1 FIFO_ERROR
-   //Fifo Error RW 0x0
-   //Set if the optional read Fifo records an error
-   //condition. It can be cleared by writing a 1.
+  // Fifo Error RW 0x0
+  // Set if the optional read Fifo records an error
+  // condition. It can be cleared by writing a 1.
 
 // bit 0 READ_LAST_NOT_SET_ERROR
-   //Read Last Not Set Error RW 0x0
-   //If the AXI read last signal was not set when
-   //expected, then this error bit will be set. It can be
-   //cleared by writing a 1.
+  // Read Last Not Set Error RW 0x0
+  // If the AXI read last signal was not set when
+  // expected, then this error bit will be set. It can be
+  // cleared by writing a 1.
 
 // 0 CTL        PWM Control
 // 1 STA        PWM Status
@@ -8481,7 +8480,7 @@ unsigned gpioHardwareRevision() {
   char term;
   DBG(DBG_USER, "");
 
-  if (rev) 
+  if (rev)
     return rev;
 
   FILE* filp = fopen ("/proc/cpuinfo", "r");
@@ -8489,7 +8488,7 @@ unsigned gpioHardwareRevision() {
     while (fgets (buf, sizeof(buf), filp) != NULL) {
       if (!strncasecmp ("revision\t:", buf, 10)) {
         if (sscanf (buf+10, "%x%c", &rev, &term) == 2) {
-          if (term != '\n') 
+          if (term != '\n')
             rev = 0;
           }
         }
@@ -8518,7 +8517,7 @@ unsigned gpioHardwareRevision() {
   rev &= 0xFFFFFF; /* mask out warranty bit */
 
   // Decode revision code
-  if ((rev & 0x800000) == 0) { 
+  if ((rev & 0x800000) == 0) {
     // old rev code
     if (rev < 0x0016) { /* all BCM2835 */
       pi_ispi = 1;
@@ -8532,11 +8531,11 @@ unsigned gpioHardwareRevision() {
       rev = 0;
       }
     }
-  else { 
+  else {
     // new rev code
     switch ((rev >> 12) & 0xF) { /* just interested in BCM model */
       //{{{
-      case 0x0: // BCM2835 
+      case 0x0: // BCM2835
          pi_ispi = 1;
          piCores = 1;
          pi_peri_phys = 0x20000000;
@@ -8546,7 +8545,7 @@ unsigned gpioHardwareRevision() {
       //}}}
       case 0x1:      // BCM2836
       //{{{
-      case 0x2: // BCM2837 
+      case 0x2: // BCM2837
          pi_ispi = 1;
          piCores = 4;
          pi_peri_phys = 0x3F000000;
@@ -8555,7 +8554,7 @@ unsigned gpioHardwareRevision() {
          break;
       //}}}
       //{{{
-      case 0x3: // BCM2711 
+      case 0x3: // BCM2711
          pi_ispi = 1;
          piCores = 4;
 
@@ -8705,9 +8704,9 @@ void putBitInBytes (int bitPos, char* buf, int bit) {
   int bufp = bitPos / 8;
   int bitp = 7 - (bitPos % 8);
 
-  if (bit) 
+  if (bit)
     buf[bufp] |= 1 << bitp;
-   else     
+   else
     buf[bufp] &= ~(1 << bitp);
   }
 //}}}
@@ -8808,7 +8807,7 @@ void rawDumpWave() {
 //{{{
 void rawDumpScript (unsigned script_id) {
 
-  if (script_id >= PI_MAX_SCRIPTS) 
+  if (script_id >= PI_MAX_SCRIPTS)
     return;
 
    if (gpioScript[script_id].state == PI_SCRIPT_IN_USE) {

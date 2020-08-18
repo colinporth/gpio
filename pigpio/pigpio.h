@@ -1,14 +1,7 @@
 // pigpio.h
 #pragma once
-//{{{  includes
-#include <stdint.h>
-#include <pthread.h>
-//}}}
-#define PIGPIO_VERSION 77
-//{{{  description
-// pigpio is a C library for the Raspberry which allows control of the GPIO.
-
-//*Features*
+//{{{  pigpio is a C library for the Raspberry which allows control of the GPIO.
+//{{{  Features
 //o hardware timed PWM on any of GPIO 0-31
 //o hardware timed servo pulses on any of GPIO 0-31
 //o callbacks when any of GPIO 0-31 change state
@@ -1174,7 +1167,14 @@
 
 //A 16-bit word value.
 //}}}
+//}}}
+//{{{  includes
+#include <stdint.h>
+#include <pthread.h>
+//}}}
 //{{{  defines
+#define PIGPIO_VERSION 77
+
 //{{{  gpio: 0-53
 #define PI_MIN_GPIO       0
 #define PI_MAX_GPIO      53
@@ -1947,13 +1947,12 @@ after this command is issued.
 #define PI_LOCKFILE "/var/run/pigpio.pid"
 #define PI_I2C_COMBINED "/sys/module/i2c_bcm2708/parameters/combined"
 //}}}
-
 //{{{
 #ifdef __cplusplus
   extern "C" {
 #endif
 //}}}
-
+//{{{  structs, typedefs
 //{{{  struct gpioHeader_t
 typedef struct
 {
@@ -2077,7 +2076,8 @@ typedef struct
    char txBuf[BSC_FIFO_SIZE]; /* Write */
 } bsc_xfer_t;
 //}}}
-//{{{
+
+// typedefs
 typedef void (*gpioAlertFunc_t) (int gpio, int level, uint32_t tick);
 typedef void (*gpioAlertFuncEx_t) (int gpio, int level, uint32_t tick, void* userdata);
 
@@ -2100,14 +2100,12 @@ typedef void *(gpioThreadFunc_t) (void*);
 //}}}
 
 //{{{
-/*F*/
 unsigned gpioVersion();
 /*D
 Returns the pigpio version.
 D*/
 //}}}
 //{{{
-/*F*/
 unsigned gpioHardwareRevision();
 /*D
 Returns the hardware revision.
@@ -2135,7 +2133,6 @@ for "Revision       : 000g" the function returns 0.
 D*/
 //}}}
 //{{{
-/*F*/
 int gpioInitialise();
 /*D
 Initialises the library.
@@ -2164,7 +2161,6 @@ else
 D*/
 //}}}
 //{{{
-/*F*/
 void gpioTerminate();
 /*D
 Terminates the library.
@@ -2184,7 +2180,6 @@ D*/
 
 // gpio
 //{{{
-/*F*/
 int gpioSetMode (unsigned gpio, unsigned mode);
 /*D
 Sets the GPIO mode, typically input or output.
@@ -2210,7 +2205,6 @@ See [[http://www.raspberrypi.org/documentation/hardware/raspberrypi/bcm2835/BCM2
 D*/
 //}}}
 //{{{
-/*F*/
 int gpioGetMode (unsigned gpio);
 /*D
 Gets the GPIO mode.
@@ -2230,70 +2224,6 @@ if (gpioGetMode(17) != PI_ALT0)
 D*/
 //}}}
 //{{{
-/*F*/
-int gpioSetPullUpDown (unsigned gpio, unsigned pud);
-/*D
-Sets or clears resistor pull ups or downs on the GPIO.
-
-. .
-gpio: 0-53
- pud: 0-2
-. .
-
-Returns 0 if OK, otherwise PI_BAD_GPIO or PI_BAD_PUD.
-
-...
-gpioSetPullUpDown(17, PI_PUD_UP);   // Sets a pull-up.
-
-gpioSetPullUpDown(18, PI_PUD_DOWN); // Sets a pull-down.
-
-gpioSetPullUpDown(23, PI_PUD_OFF);  // Clear any pull-ups/downs.
-...
-D*/
-//}}}
-//{{{
-/*F*/
-int gpioRead (unsigned gpio);
-/*D
-Reads the GPIO level, on or off.
-
-. .
-gpio: 0-53
-. .
-
-Returns the GPIO level if OK, otherwise PI_BAD_GPIO.
-
-Arduino style: digitalRead.
-
-...
-printf("GPIO24 is level %d", gpioRead(24));
-...
-D*/
-//}}}
-//{{{
-/*F*/
-int gpioWrite(unsigned gpio, unsigned level);
-/*D
-Sets the GPIO level, on or off.
-
-. .
- gpio: 0-53
-level: 0-1
-. .
-
-Returns 0 if OK, otherwise PI_BAD_GPIO or PI_BAD_LEVEL.
-
-If PWM or servo pulses are active on the GPIO they are switched off.
-
-Arduino style: digitalWrite
-
-...
-gpioWrite(24, 1); // Set GPIO24 high.
-...
-D*/
-//}}}
-//{{{
-/*F*/
 int gpioGetPad (unsigned pad);
 /*D
 This function returns the pad drive strength in mA.
@@ -2315,7 +2245,6 @@ strength = gpioGetPad(1); // get pad 1 strength
 D*/
 //}}}
 //{{{
-/*F*/
 int gpioSetPad (unsigned pad, unsigned padStrength);
 /*D
 This function sets the pad drive strength in mA.
@@ -2337,23 +2266,81 @@ gpioSetPad(0, 16); // set pad 0 strength to 16 mA
 ...
 D*/
 //}}}
+//{{{
+int gpioSetPullUpDown (unsigned gpio, unsigned pud);
+/*D
+Sets or clears resistor pull ups or downs on the GPIO.
+
+. .
+gpio: 0-53
+ pud: 0-2
+. .
+
+Returns 0 if OK, otherwise PI_BAD_GPIO or PI_BAD_PUD.
+
+...
+gpioSetPullUpDown(17, PI_PUD_UP);   // Sets a pull-up.
+
+gpioSetPullUpDown(18, PI_PUD_DOWN); // Sets a pull-down.
+
+gpioSetPullUpDown(23, PI_PUD_OFF);  // Clear any pull-ups/downs.
+...
+D*/
+//}}}
 
 //{{{
-/*F*/
+int gpioRead (unsigned gpio);
+/*D
+Reads the GPIO level, on or off.
+
+. .
+gpio: 0-53
+. .
+
+Returns the GPIO level if OK, otherwise PI_BAD_GPIO.
+
+Arduino style: digitalRead.
+
+...
+printf("GPIO24 is level %d", gpioRead(24));
+...
+D*/
+//}}}
+//{{{
 uint32_t gpioRead_Bits_0_31();
 /*D
 Returns the current level of GPIO 0-31.
 D*/
 //}}}
 //{{{
-/*F*/
 uint32_t gpioRead_Bits_32_53();
 /*D
 Returns the current level of GPIO 32-53.
 D*/
 //}}}
+
 //{{{
-/*F*/
+int gpioWrite (unsigned gpio, unsigned level);
+/*D
+Sets the GPIO level, on or off.
+
+. .
+ gpio: 0-53
+level: 0-1
+. .
+
+Returns 0 if OK, otherwise PI_BAD_GPIO or PI_BAD_LEVEL.
+
+If PWM or servo pulses are active on the GPIO they are switched off.
+
+Arduino style: digitalWrite
+
+...
+gpioWrite(24, 1); // Set GPIO24 high.
+...
+D*/
+//}}}
+//{{{
 int gpioWrite_Bits_0_31_Clear (uint32_t bits);
 /*D
 Clears GPIO 0-31 if the corresponding bit in bits is set.
@@ -2371,7 +2358,6 @@ gpioWrite_Bits_0_31_Clear( (1<<4) | (1<<7) | (1<<15) );
 D*/
 //}}}
 //{{{
-/*F*/
 int gpioWrite_Bits_32_53_Clear (uint32_t bits);
 /*D
 Clears GPIO 32-53 if the corresponding bit (0-21) in bits is set.
@@ -2384,7 +2370,6 @@ Returns 0 if OK.
 D*/
 //}}}
 //{{{
-/*F*/
 int gpioWrite_Bits_0_31_Set (uint32_t bits);
 /*D
 Sets GPIO 0-31 if the corresponding bit in bits is set.
@@ -2397,7 +2382,6 @@ Returns 0 if OK.
 D*/
 //}}}
 //{{{
-/*F*/
 int gpioWrite_Bits_32_53_Set (uint32_t bits);
 /*D
 Sets GPIO 32-53 if the corresponding bit (0-21) in bits is set.
@@ -2416,7 +2400,6 @@ D*/
 //}}}
 
 //{{{
-/*F*/
 int gpioPWM (unsigned user_gpio, unsigned dutycycle);
 /*D
 Starts PWM on the GPIO, dutycycle between 0 (off) and range (fully on).
@@ -2447,7 +2430,6 @@ gpioPWM(23, 0);   // Sets GPIO23 full off.
 D*/
 //}}}
 //{{{
-/*F*/
 int gpioGetPWMdutycycle (unsigned user_gpio);
 /*D
 Returns the PWM dutycycle setting for the GPIO.
@@ -2472,7 +2454,6 @@ Normal PWM range defaults to 255.
 D*/
 //}}}
 //{{{
-/*F*/
 int gpioSetPWMrange (unsigned user_gpio, unsigned range);
 /*D
 Selects the dutycycle range to be used for the GPIO.  Subsequent calls
@@ -2507,7 +2488,6 @@ gpioSetPWMrange(24, 2000); // Now 2000 is fully on
 D*/
 //}}}
 //{{{
-/*F*/
 int gpioGetPWMrange (unsigned user_gpio);
 /*D
 Returns the dutycycle range used for the GPIO if OK, otherwise
@@ -2526,7 +2506,6 @@ r = gpioGetPWMrange(23);
 D*/
 //}}}
 //{{{
-/*F*/
 int gpioGetPWMrealRange (unsigned user_gpio);
 /*D
 Returns the real range used for the GPIO if OK, otherwise
@@ -2548,7 +2527,6 @@ rr = gpioGetPWMrealRange(17);
 D*/
 //}}}
 //{{{
-/*F*/
 int gpioSetPWMfrequency (unsigned user_gpio, unsigned frequency);
 /*D
 Sets the frequency in hertz to be used for the GPIO.
@@ -2605,7 +2583,6 @@ gpioSetPWMfrequency(25, 100000); // Set GPIO25 to highest frequency.
 D*/
 //}}}
 //{{{
-/*F*/
 int gpioGetPWMfrequency (unsigned user_gpio);
 /*D
 Returns the frequency (in hertz) used for the GPIO if OK, otherwise
@@ -2629,8 +2606,8 @@ f = gpioGetPWMfrequency(23); // Get frequency used for GPIO23.
 ...
 D*/
 //}}}
+
 //{{{
-/*F*/
 int gpioServo (unsigned user_gpio, unsigned pulsewidth);
 /*D
 Starts servo pulses on the GPIO, 0 (off), 500 (most anti-clockwise) to
@@ -2689,7 +2666,6 @@ e.g. gpioPWM(25, 1500) will set a 1500 us pulse.
 D*/
 //}}}
 //{{{
-/*F*/
 int gpioGetServoPulsewidth (unsigned user_gpio);
 /*D
 Returns the servo pulsewidth setting for the GPIO.
@@ -2702,8 +2678,8 @@ Returns 0 (off), 500 (most anti-clockwise) to 2500 (most clockwise)
 if OK, otherwise PI_BAD_USER_GPIO or PI_NOT_SERVO_GPIO.
 D*/
 //}}}
+
 //{{{
-/*F*/
 int gpioSetAlertFunc (unsigned user_gpio, gpioAlertFunc_t f);
 /*D
 Registers a function to be called (a callback) when the specified
@@ -2784,7 +2760,6 @@ gpioSetAlertFunc(4, aFunction);
 D*/
 //}}}
 //{{{
-/*F*/
 int gpioSetAlertFuncEx (unsigned user_gpio, gpioAlertFuncEx_t f, void* userdata);
 /*D
 Registers a function to be called (a callback) when the specified
@@ -2825,8 +2800,8 @@ Only one of [*gpioSetAlertFunc*] or [*gpioSetAlertFuncEx*] can be
 registered per GPIO.
 D*/
 //}}}
+
 //{{{
-/*F*/
 int gpioSetISRFunc (unsigned gpio, unsigned edge, int timeout, gpioISRFunc_t f);
 /*D
 Registers a function to be called (a callback) whenever the specified
@@ -2890,7 +2865,6 @@ interrupts only a few microseconds apart).
 D*/
 //}}}
 //{{{
-/*F*/
 int gpioSetISRFuncEx (unsigned gpio, unsigned edge, int timeout, gpioISRFuncEx_t f, void* userdata);
 /*D
 Registers a function to be called (a callback) whenever the specified
@@ -2932,8 +2906,8 @@ registered per GPIO.
 See [*gpioSetISRFunc*] for further details.
 D*/
 //}}}
+
 //{{{
-/*F*/
 int gpioNotifyOpen();
 /*D
 This function requests a free notification handle.
@@ -2978,7 +2952,6 @@ else
 D*/
 //}}}
 //{{{
-/*F*/
 int gpioNotifyOpenWithSize (int bufSize);
 /*D
 This function requests a free notification handle.
@@ -2990,7 +2963,6 @@ See [*gpioNotifyOpen*] for further details.
 D*/
 //}}}
 //{{{
-/*F*/
 int gpioNotifyBegin (unsigned handle, uint32_t bits);
 /*D
 This function starts notifications on a previously opened handle.
@@ -3052,7 +3024,6 @@ gpioNotifyBegin(h, 1234);
 D*/
 //}}}
 //{{{
-/*F*/
 int gpioNotifyPause (unsigned handle);
 /*D
 This function pauses notifications on a previously opened handle.
@@ -3072,7 +3043,6 @@ gpioNotifyPause(h);
 D*/
 //}}}
 //{{{
-/*F*/
 int gpioNotifyClose (unsigned handle);
 /*D
 This function stops notifications on a previously opened handle
@@ -3090,9 +3060,8 @@ gpioNotifyClose(h);
 D*/
 //}}}
 
-// gpioWave
+//{{{  gpioWave
 //{{{
-/*F*/
 int gpioWaveClear();
 /*D
 This function clears all waveforms and any data added by calls to the
@@ -3105,8 +3074,8 @@ gpioWaveClear();
 ...
 D*/
 //}}}
+
 //{{{
-/*F*/
 int gpioWaveAddNew();
 /*D
 This function starts a new empty waveform.
@@ -3122,7 +3091,6 @@ gpioWaveAddNew();
 D*/
 //}}}
 //{{{
-/*F*/
 int gpioWaveAddGeneric (unsigned numPulses, gpioPulse_t* pulses);
 /*D
 This function adds a number of pulses to the current waveform.
@@ -3181,7 +3149,6 @@ else
 D*/
 //}}}
 //{{{
-/*F*/
 int gpioWaveAddSerial (unsigned user_gpio, unsigned baud, unsigned data_bits, unsigned stop_bits, unsigned offset,
                        unsigned numBytes, char     *str);
 /*D
@@ -3238,8 +3205,8 @@ gpioWaveAddSerial(4, 9600, 8, 2, 1000000, MSG_LEN, data);
 ...
 D*/
 //}}}
+
 //{{{
-/*F*/
 int gpioWaveCreate();
 /*D
 This function creates a waveform from the data provided by the prior
@@ -3294,7 +3261,6 @@ PI_NO_WAVEFORM_ID, PI_TOO_MANY_CBS, or PI_TOO_MANY_OOL.
 D*/
 //}}}
 //{{{
-/*F*/
 int gpioWaveCreatePad (int pctCB, int pctBOOL, int pctTOOL);
 /*D
 Similar to [*gpioWaveCreate*], this function creates a waveform but pads the consumed
@@ -3337,8 +3303,8 @@ This buffer structure allows the transmission of infinite wave sequences.
 
 D*/
 //}}}
+
 //{{{
-/*F*/
 int gpioWaveDelete (unsigned wave_id);
 /*D
 This function deletes the waveform with id wave_id.
@@ -3362,7 +3328,6 @@ Returns 0 if OK, otherwise PI_BAD_WAVE_ID.
 D*/
 //}}}
 //{{{
-/*F*/
 int gpioWaveTxSend (unsigned wave_id, unsigned wave_mode);
 /*D
 This function transmits the waveform with id wave_id.  The mode
@@ -3386,7 +3351,6 @@ otherwise PI_BAD_WAVE_ID, or PI_BAD_WAVE_MODE.
 D*/
 //}}}
 //{{{
-/*F*/
 int gpioWaveChain (char* buf, unsigned bufSize);
 /*D
 This function transmits a chain of waveforms.
@@ -3483,8 +3447,8 @@ int main(int argc, char *argv[])
 ...
 D*/
 //}}}
+
 //{{{
-/*F*/
 int gpioWaveTxAt();
 /*D
 This function returns the id of the waveform currently being
@@ -3497,7 +3461,6 @@ PI_NO_TX_WAVE (9999) - no wave being transmitted.
 D*/
 //}}}
 //{{{
-/*F*/
 int gpioWaveTxBusy();
 /*D
 This function checks to see if a waveform is currently being
@@ -3507,7 +3470,6 @@ Returns 1 if a waveform is currently being transmitted, otherwise 0.
 D*/
 //}}}
 //{{{
-/*F*/
 int gpioWaveTxStop();
 /*D
 This function aborts the transmission of the current waveform.
@@ -3517,8 +3479,8 @@ Returns 0 if OK.
 This function is intended to stop a waveform started in repeat mode.
 D*/
 //}}}
+
 //{{{
-/*F*/
 int gpioWaveGetMicros();
 /*D
 This function returns the length in microseconds of the current
@@ -3526,7 +3488,6 @@ waveform.
 D*/
 //}}}
 //{{{
-/*F*/
 int gpioWaveGetHighMicros();
 /*D
 This function returns the length in microseconds of the longest waveform
@@ -3534,7 +3495,6 @@ created since [*gpioInitialise*] was called.
 D*/
 //}}}
 //{{{
-/*F*/
 int gpioWaveGetMaxMicros();
 /*D
 This function returns the maximum possible size of a waveform in
@@ -3542,14 +3502,12 @@ microseconds.
 D*/
 //}}}
 //{{{
-/*F*/
 int gpioWaveGetPulses();
 /*D
 This function returns the length in pulses of the current waveform.
 D*/
 //}}}
 //{{{
-/*F*/
 int gpioWaveGetHighPulses();
 /*D
 This function returns the length in pulses of the longest waveform
@@ -3557,14 +3515,12 @@ created since [*gpioInitialise*] was called.
 D*/
 //}}}
 //{{{
-/*F*/
 int gpioWaveGetMaxPulses();
 /*D
 This function returns the maximum possible size of a waveform in pulses.
 D*/
 //}}}
 //{{{
-/*F*/
 int gpioWaveGetCbs();
 /*D
 This function returns the length in DMA control blocks of the current
@@ -3572,7 +3528,6 @@ waveform.
 D*/
 //}}}
 //{{{
-/*F*/
 int gpioWaveGetHighCbs();
 /*D
 This function returns the length in DMA control blocks of the longest
@@ -3580,99 +3535,15 @@ waveform created since [*gpioInitialise*] was called.
 D*/
 //}}}
 //{{{
-/*F*/
 int gpioWaveGetMaxCbs();
 /*D
 This function returns the maximum possible size of a waveform in DMA
 control blocks.
 D*/
 //}}}
-
-// serial
-//{{{
-/*F*/
-int gpioSerialReadOpen (unsigned user_gpio, unsigned baud, unsigned data_bits);
-/*D
-This function opens a GPIO for bit bang reading of serial data.
-
-. .
-user_gpio: 0-31
-     baud: 50-250000
-data_bits: 1-32
-. .
-
-Returns 0 if OK, otherwise PI_BAD_USER_GPIO, PI_BAD_WAVE_BAUD,
-PI_BAD_DATABITS, or PI_GPIO_IN_USE.
-
-The serial data is returned in a cyclic buffer and is read using
-[*gpioSerialRead*].
-
-It is the caller's responsibility to read data from the cyclic buffer
-in a timely fashion.
-D*/
 //}}}
+//{{{  i2c
 //{{{
-/*F*/
-int gpioSerialReadInvert (unsigned user_gpio, unsigned invert);
-/*D
-This function configures the level logic for bit bang serial reads.
-
-Use PI_BB_SER_INVERT to invert the serial logic and PI_BB_SER_NORMAL for
-normal logic.  Default is PI_BB_SER_NORMAL.
-
-. .
-user_gpio: 0-31
-   invert: 0-1
-. .
-
-Returns 0 if OK, otherwise PI_BAD_USER_GPIO, PI_GPIO_IN_USE,
-PI_NOT_SERIAL_GPIO, or PI_BAD_SER_INVERT.
-
-The GPIO must be opened for bit bang reading of serial data using
-[*gpioSerialReadOpen*] prior to calling this function.
-D*/
-//}}}
-//{{{
-/*F*/
-int gpioSerialRead (unsigned user_gpio, void *buf, size_t bufSize);
-/*D
-This function copies up to bufSize bytes of data read from the
-bit bang serial cyclic buffer to the buffer starting at buf.
-
-. .
-user_gpio: 0-31, previously opened with [*gpioSerialReadOpen*]
-      buf: an array to receive the read bytes
-  bufSize: >=0
-. .
-
-Returns the number of bytes copied if OK, otherwise PI_BAD_USER_GPIO
-or PI_NOT_SERIAL_GPIO.
-
-The bytes returned for each character depend upon the number of
-data bits [*data_bits*] specified in the [*gpioSerialReadOpen*] command.
-
-For [*data_bits*] 1-8 there will be one byte per character.
-For [*data_bits*] 9-16 there will be two bytes per character.
-For [*data_bits*] 17-32 there will be four bytes per character.
-D*/
-//}}}
-//{{{
-/*F*/
-int gpioSerialReadClose (unsigned user_gpio);
-/*D
-This function closes a GPIO for bit bang reading of serial data.
-
-. .
-user_gpio: 0-31, previously opened with [*gpioSerialReadOpen*]
-. .
-
-Returns 0 if OK, otherwise PI_BAD_USER_GPIO, or PI_NOT_SERIAL_GPIO.
-D*/
-//}}}
-
-// i2c
-//{{{
-/*F*/
 int i2cOpen (unsigned i2cBus, unsigned i2cAddr, unsigned i2cFlags);
 /*D
 This returns a handle for the device at the address on the I2C bus.
@@ -3715,7 +3586,6 @@ Count  (8 bits): A byte defining the length of a block operation.
 D*/
 //}}}
 //{{{
-/*F*/
 int i2cClose (unsigned handle);
 /*D
 This closes the I2C device associated with the handle.
@@ -3727,8 +3597,8 @@ handle: >=0, as returned by a call to [*i2cOpen*]
 Returns 0 if OK, otherwise PI_BAD_HANDLE.
 D*/
 //}}}
+
 //{{{
-/*F*/
 int i2cWriteQuick (unsigned handle, unsigned bit);
 /*D
 This sends a single bit (in the Rd/Wr bit) to the device associated
@@ -3749,7 +3619,6 @@ S Addr bit [A] P
 D*/
 //}}}
 //{{{
-/*F*/
 int i2cWriteByte (unsigned handle, unsigned bVal);
 /*D
 This sends a single byte to the device associated with handle.
@@ -3769,28 +3638,6 @@ S Addr Wr [A] bVal [A] P
 D*/
 //}}}
 //{{{
-
-/*F*/
-int i2cReadByte (unsigned handle);
-/*D
-This reads a single byte from the device associated with handle.
-
-. .
-handle: >=0, as returned by a call to [*i2cOpen*]
-. .
-
-Returns the byte read (>=0) if OK, otherwise PI_BAD_HANDLE,
-or PI_I2C_READ_FAILED.
-
-Receive byte. SMBus 2.0 5.5.3
-. .
-S Addr Rd [A] [Data] NA P
-. .
-D*/
-
-//}}}
-//{{{
-/*F*/
 int i2cWriteByteData (unsigned handle, unsigned i2cReg, unsigned bVal);
 /*D
 This writes a single byte to the specified register of the device
@@ -3812,7 +3659,6 @@ S Addr Wr [A] i2cReg [A] bVal [A] P
 D*/
 //}}}
 //{{{
-/*F*/
 int i2cWriteWordData (unsigned handle, unsigned i2cReg, unsigned wVal);
 /*D
 This writes a single 16 bit word to the specified register of the device
@@ -3834,72 +3680,6 @@ S Addr Wr [A] i2cReg [A] wValLow [A] wValHigh [A] P
 D*/
 //}}}
 //{{{
-/*F*/
-int i2cReadByteData (unsigned handle, unsigned i2cReg);
-/*D
-This reads a single byte from the specified register of the device
-associated with handle.
-
-. .
-handle: >=0, as returned by a call to [*i2cOpen*]
-i2cReg: 0-255, the register to read
-. .
-
-Returns the byte read (>=0) if OK, otherwise PI_BAD_HANDLE,
-PI_BAD_PARAM, or PI_I2C_READ_FAILED.
-
-Read byte. SMBus 2.0 5.5.5
-. .
-S Addr Wr [A] i2cReg [A] S Addr Rd [A] [Data] NA P
-. .
-D*/
-//}}}
-//{{{
-/*F*/
-int i2cReadWordData (unsigned handle, unsigned i2cReg);
-/*D
-This reads a single 16 bit word from the specified register of the device
-associated with handle.
-
-. .
-handle: >=0, as returned by a call to [*i2cOpen*]
-i2cReg: 0-255, the register to read
-. .
-
-Returns the word read (>=0) if OK, otherwise PI_BAD_HANDLE,
-PI_BAD_PARAM, or PI_I2C_READ_FAILED.
-
-Read word. SMBus 2.0 5.5.5
-. .
-S Addr Wr [A] i2cReg [A] S Addr Rd [A] [DataLow] A [DataHigh] NA P
-. .
-D*/
-//}}}
-//{{{
-/*F*/
-int i2cProcessCall (unsigned handle, unsigned i2cReg, unsigned wVal);
-/*D
-This writes 16 bits of data to the specified register of the device
-associated with handle and reads 16 bits of data in return.
-
-. .
-handle: >=0, as returned by a call to [*i2cOpen*]
-i2cReg: 0-255, the register to write/read
-  wVal: 0-0xFFFF, the value to write
-. .
-
-Returns the word read (>=0) if OK, otherwise PI_BAD_HANDLE,
-PI_BAD_PARAM, or PI_I2C_READ_FAILED.
-
-Process call. SMBus 2.0 5.5.6
-. .
-S Addr Wr [A] i2cReg [A] wValLow [A] wValHigh [A]
-   S Addr Rd [A] [DataLow] A [DataHigh] NA P
-. .
-D*/
-//}}}
-//{{{
-/*F*/
 int i2cWriteBlockData (unsigned handle, unsigned i2cReg, char* buf, unsigned count);
 /*D
 This writes up to 32 bytes to the specified register of the device
@@ -3923,7 +3703,88 @@ S Addr Wr [A] i2cReg [A] count [A]
 D*/
 //}}}
 //{{{
-/*F*/
+int i2cWriteI2CBlockData (unsigned handle, unsigned i2cReg, char* buf, unsigned count);
+/*D
+This writes 1 to 32 bytes to the specified register of the device
+associated with handle.
+
+. .
+handle: >=0, as returned by a call to [*i2cOpen*]
+i2cReg: 0-255, the register to write
+   buf: the data to write
+ count: 1-32, the number of bytes to write
+. .
+
+Returns 0 if OK, otherwise PI_BAD_HANDLE, PI_BAD_PARAM, or
+PI_I2C_WRITE_FAILED.
+
+. .
+S Addr Wr [A] i2cReg [A] buf0 [A] buf1 [A] ... [A] bufn [A] P
+. .
+D*/
+//}}}
+
+//{{{
+
+int i2cReadByte (unsigned handle);
+/*D
+This reads a single byte from the device associated with handle.
+
+. .
+handle: >=0, as returned by a call to [*i2cOpen*]
+. .
+
+Returns the byte read (>=0) if OK, otherwise PI_BAD_HANDLE,
+or PI_I2C_READ_FAILED.
+
+Receive byte. SMBus 2.0 5.5.3
+. .
+S Addr Rd [A] [Data] NA P
+. .
+D*/
+
+//}}}
+//{{{
+int i2cReadByteData (unsigned handle, unsigned i2cReg);
+/*D
+This reads a single byte from the specified register of the device
+associated with handle.
+
+. .
+handle: >=0, as returned by a call to [*i2cOpen*]
+i2cReg: 0-255, the register to read
+. .
+
+Returns the byte read (>=0) if OK, otherwise PI_BAD_HANDLE,
+PI_BAD_PARAM, or PI_I2C_READ_FAILED.
+
+Read byte. SMBus 2.0 5.5.5
+. .
+S Addr Wr [A] i2cReg [A] S Addr Rd [A] [Data] NA P
+. .
+D*/
+//}}}
+//{{{
+int i2cReadWordData (unsigned handle, unsigned i2cReg);
+/*D
+This reads a single 16 bit word from the specified register of the device
+associated with handle.
+
+. .
+handle: >=0, as returned by a call to [*i2cOpen*]
+i2cReg: 0-255, the register to read
+. .
+
+Returns the word read (>=0) if OK, otherwise PI_BAD_HANDLE,
+PI_BAD_PARAM, or PI_I2C_READ_FAILED.
+
+Read word. SMBus 2.0 5.5.5
+. .
+S Addr Wr [A] i2cReg [A] S Addr Rd [A] [DataLow] A [DataHigh] NA P
+. .
+D*/
+//}}}
+//{{{
 int i2cReadBlockData (unsigned handle, unsigned i2cReg, char* buf);
 /*D
 This reads a block of up to 32 bytes from the specified register of
@@ -3948,7 +3809,51 @@ S Addr Wr [A] i2cReg [A]
 D*/
 //}}}
 //{{{
-/*F*/
+int i2cReadI2CBlockData (unsigned handle, unsigned i2cReg, char* buf, unsigned count);
+/*D
+This reads count bytes from the specified register of the device
+associated with handle .  The count may be 1-32.
+
+. .
+handle: >=0, as returned by a call to [*i2cOpen*]
+i2cReg: 0-255, the register to read
+   buf: an array to receive the read data
+ count: 1-32, the number of bytes to read
+. .
+
+Returns the number of bytes read (>0) if OK, otherwise PI_BAD_HANDLE,
+PI_BAD_PARAM, or PI_I2C_READ_FAILED.
+
+. .
+S Addr Wr [A] i2cReg [A]
+   S Addr Rd [A] [buf0] A [buf1] A ... A [bufn] NA P
+. .
+D*/
+//}}}
+
+//{{{
+int i2cProcessCall (unsigned handle, unsigned i2cReg, unsigned wVal);
+/*D
+This writes 16 bits of data to the specified register of the device
+associated with handle and reads 16 bits of data in return.
+
+. .
+handle: >=0, as returned by a call to [*i2cOpen*]
+i2cReg: 0-255, the register to write/read
+  wVal: 0-0xFFFF, the value to write
+. .
+
+Returns the word read (>=0) if OK, otherwise PI_BAD_HANDLE,
+PI_BAD_PARAM, or PI_I2C_READ_FAILED.
+
+Process call. SMBus 2.0 5.5.6
+. .
+S Addr Wr [A] i2cReg [A] wValLow [A] wValHigh [A]
+   S Addr Rd [A] [DataLow] A [DataHigh] NA P
+. .
+D*/
+//}}}
+//{{{
 int i2cBlockProcessCall (unsigned handle, unsigned i2cReg, char* buf, unsigned count);
 /*D
 This writes data bytes to the specified register of the device
@@ -3976,53 +3881,8 @@ S Addr Wr [A] i2cReg [A] count [A] buf0 [A] ... bufn [A]
 . .
 D*/
 //}}}
+
 //{{{
-/*F*/
-int i2cReadI2CBlockData (unsigned handle, unsigned i2cReg, char* buf, unsigned count);
-/*D
-This reads count bytes from the specified register of the device
-associated with handle .  The count may be 1-32.
-
-. .
-handle: >=0, as returned by a call to [*i2cOpen*]
-i2cReg: 0-255, the register to read
-   buf: an array to receive the read data
- count: 1-32, the number of bytes to read
-. .
-
-Returns the number of bytes read (>0) if OK, otherwise PI_BAD_HANDLE,
-PI_BAD_PARAM, or PI_I2C_READ_FAILED.
-
-. .
-S Addr Wr [A] i2cReg [A]
-   S Addr Rd [A] [buf0] A [buf1] A ... A [bufn] NA P
-. .
-D*/
-//}}}
-//{{{
-/*F*/
-int i2cWriteI2CBlockData (unsigned handle, unsigned i2cReg, char* buf, unsigned count);
-/*D
-This writes 1 to 32 bytes to the specified register of the device
-associated with handle.
-
-. .
-handle: >=0, as returned by a call to [*i2cOpen*]
-i2cReg: 0-255, the register to write
-   buf: the data to write
- count: 1-32, the number of bytes to write
-. .
-
-Returns 0 if OK, otherwise PI_BAD_HANDLE, PI_BAD_PARAM, or
-PI_I2C_WRITE_FAILED.
-
-. .
-S Addr Wr [A] i2cReg [A] buf0 [A] buf1 [A] ... [A] bufn [A] P
-. .
-D*/
-//}}}
-//{{{
-/*F*/
 int i2cReadDevice (unsigned handle, char* buf, unsigned count);
 /*D
 This reads count bytes from the raw device into buf.
@@ -4042,7 +3902,6 @@ S Addr Rd [A] [buf0] A [buf1] A ... A [bufn] NA P
 D*/
 //}}}
 //{{{
-/*F*/
 int i2cWriteDevice (unsigned handle, char* buf, unsigned count);
 /*D
 This writes count bytes from buf to the raw device.
@@ -4061,8 +3920,8 @@ S Addr Wr [A] buf0 [A] buf1 [A] ... [A] bufn [A] P
 . .
 D*/
 //}}}
+
 //{{{
-/*F*/
 void i2cSwitchCombined (int setting);
 /*D
 This sets the I2C (i2c-bcm2708) module "use combined transactions"
@@ -4078,7 +3937,6 @@ slave address will use a repeated start (rather than a stop/start).
 D*/
 //}}}
 //{{{
-/*F*/
 int i2cSegments(unsigned handle, pi_i2c_msg_t* segs, unsigned numSegs);
 /*D
 This function executes multiple I2C segments in one transaction by
@@ -4094,7 +3952,6 @@ Returns the number of segments if OK, otherwise PI_BAD_I2C_SEG.
 D*/
 //}}}
 //{{{
-/*F*/
 int i2cZip (unsigned handle, char* inBuf, unsigned inLen, char* outBuf, unsigned outLen);
 /*D
 This function executes a sequence of I2C operations.  The
@@ -4151,7 +4008,6 @@ D*/
 //}}}
 
 //{{{
-/*F*/
 int bbI2COpen (unsigned SDA, unsigned SCL, unsigned baud);
 /*D
 This function selects a pair of GPIO for bit banging I2C at a
@@ -4181,7 +4037,6 @@ a guide the hardware pull-ups on pins 3 and 5 are 1k8 in value.
 D*/
 //}}}
 //{{{
-/*F*/
 int bbI2CClose (unsigned SDA);
 /*D
 This function stops bit banging I2C on a pair of GPIO previously
@@ -4195,7 +4050,6 @@ Returns 0 if OK, otherwise PI_BAD_USER_GPIO, or PI_NOT_I2C_GPIO.
 D*/
 //}}}
 //{{{
-/*F*/
 int bbI2CZip (unsigned SDA, char* inBuf, unsigned inLen, char* outBuf, unsigned outLen);
 /*D
 This function executes a sequence of bit banged I2C operations.  The
@@ -4261,10 +4115,9 @@ End
 ...
 D*/
 //}}}
-
-// spi
+//}}}
+//{{{  spi
 //{{{
-/*F*/
 int spiOpen (unsigned spiChan, unsigned baud, unsigned spiFlags);
 /*D
 This function returns a handle for the SPI device on the channel.
@@ -4272,72 +4125,62 @@ Data will be transferred at baud bits per second.  The flags may
 be used to modify the default behaviour of 4-wire operation, mode 0, active low chip select.
 
 The Pi has two SPI peripherals: main and auxiliary.
-
 The main SPI has two chip selects (channels), the auxiliary has three.
-
 The auxiliary SPI is available on all models but the A and B.
 
-The GPIO used are given in the following table.
-
-         @ MISO @ MOSI @ SCLK @ CE0 @ CE1 @ CE2
-Main SPI @    9 @   10 @   11 @   8 @   7 @   -
-Aux SPI  @   19 @   20 @   21 @  18 @  17 @  16
+          MISO  MOSI  SCLK  CE0  CE1  CE2
+Main SPI    9    10    11    8    7    -
+ Aux SPI   19    20    21   18   17   16
 
  spiChan: 0-1 (0-2 for the auxiliary SPI)
     baud: 32K-125M (values above 30M are unlikely to work)
+    Returns a handle (>=0) if OK, otherwise PI_BAD_SPI_CHANNEL,
+    PI_BAD_SPI_SPEED, PI_BAD_FLAGS, PI_NO_AUX_SPI, or PI_SPI_OPEN_FAILED.
 
-  spiFlags: see below
+  spiFlags consists of the least significant 22 bits.
+    21 20 19 18 17 16 15 14 13 12 11 10  9  8  7  6  5  4  3  2  1  0
+     b  b  b  b  b  b  R  T  n  n  n  n  W  A u2 u1 u0 p2 p1 p0  m  m
 
-Returns a handle (>=0) if OK, otherwise PI_BAD_SPI_CHANNEL,
-PI_BAD_SPI_SPEED, PI_BAD_FLAGS, PI_NO_AUX_SPI, or PI_SPI_OPEN_FAILED.
+      mm defines the SPI mode, modes 1,3 do not appear to work on the auxiliary SPI.
+        Mode POL PHA
+         0    0   0
+         1    0   1
+         2    1   0
+         3    1   1
 
-spiFlags consists of the least significant 22 bits.
-  21 20 19 18 17 16 15 14 13 12 11 10  9  8  7  6  5  4  3  2  1  0
-   b  b  b  b  b  b  R  T  n  n  n  n  W  A u2 u1 u0 p2 p1 p0  m  m
+      px = 0 if CEx is active low (default), 1 = active high.
 
-  mm defines the SPI mode.
-    Warning: modes 1 and 3 do not appear to work on the auxiliary SPI.
-    Mode POL PHA
-     0    0   0
-     1    0   1
-     2    1   0
-     3    1   1
+      ux = 0 CEx GPIO is reserved for SPI (default), 1 otherwise.
 
-  px is 0 if CEx is active low (default) and 1 for active high.
+      A = 0 main SPI, 1 for the auxiliary SPI.
 
-  ux is 0 if the CEx GPIO is reserved for SPI (default) and 1 otherwise.
+      W = 0 if the device is not 3-wire, 1 if the device is 3-wire. Main SPI only.
+        nnnn = number of bytes (0-15) to write before switching MOSI line to MISO to read data.  
+               This field is ignored if W is not set.  Main SPI only.
 
-  A is 0 for the main SPI, 1 for the auxiliary SPI.
+      T = 1 if the least significant bit is transmitted on MOSI first
+            default (0) shifts the most significant bit out first.  Auxiliary SPI only.
 
-  W is 0 if the device is not 3-wire, 1 if the device is 3-wire. Main SPI only.
+      R = 1 if the least significant bit is received on MISO first
+            default (0) receives the most significant bit first.  Auxiliary SPI only.
 
-  nnnn defines the number of bytes (0-15) to write before switching
-  the MOSI line to MISO to read data.  This field is ignored if W is not set.  Main SPI only.
+      bbbbbb = word size in bits (0-32).  The default (0) sets 8 bits per word.  Auxiliary SPI only.
 
-  T is 1 if the least significant bit is transmitted on MOSI first, the
-  default (0) shifts the most significant bit out first.  Auxiliary SPI only.
+        The [*spiRead*], [*spiWrite*], and [*spiXfer*] functions
+        transfer data packed into 1, 2, or 4 bytes according to the word size in bits.
 
-  R is 1 if the least significant bit is received on MISO first, the
-  default (0) receives the most significant bit first.  Auxiliary SPI only.
+        For bits 1-8 there will be one byte per word.
+        For bits 9-16 there will be two bytes per word.
+        For bits 17-32 there will be four bytes per word.
 
-  bbbbbb defines the word size in bits (0-32).  The default (0) sets 8 bits per word.  Auxiliary SPI only.
+        Multi-byte transfers are made in least significant byte first order.
+        E.g. to transfer 32 11-bit words buf should contain 64 bytes and count should be 64.
+        E.g. to transfer the 14 bit value 0x1ABC send the bytes 0xBC followed by 0x1A.
 
-    The [*spiRead*], [*spiWrite*], and [*spiXfer*] functions
-    transfer data packed into 1, 2, or 4 bytes according to the word size in bits.
-
-    For bits 1-8 there will be one byte per word.
-    For bits 9-16 there will be two bytes per word.
-    For bits 17-32 there will be four bytes per word.
-
-    Multi-byte transfers are made in least significant byte first order.
-    E.g. to transfer 32 11-bit words buf should contain 64 bytes and count should be 64.
-    E.g. to transfer the 14 bit value 0x1ABC send the bytes 0xBC followed by 0x1A.
-
-  other bits in flags should be set to zero.
+      other bits in flags should be set to zero.
 D*/
 //}}}
 //{{{
-/*F*/
 int spiClose (unsigned handle);
 /*D
 This functions closes the SPI device identified by the handle.
@@ -4349,8 +4192,8 @@ handle: >=0, as returned by a call to [*spiOpen*]
 Returns 0 if OK, otherwise PI_BAD_HANDLE.
 D*/
 //}}}
+
 //{{{
-/*F*/
 int spiRead (unsigned handle, char* buf, unsigned count);
 /*D
 This function reads count bytes of data from the SPI
@@ -4367,7 +4210,6 @@ PI_BAD_HANDLE, PI_BAD_SPI_COUNT, or PI_SPI_XFER_FAILED.
 D*/
 //}}}
 //{{{
-/*F*/
 int spiWrite (unsigned handle, char* buf, unsigned count);
 /*D
 This function writes count bytes of data from buf to the SPI
@@ -4384,7 +4226,6 @@ PI_BAD_HANDLE, PI_BAD_SPI_COUNT, or PI_SPI_XFER_FAILED.
 D*/
 //}}}
 //{{{
-/*F*/
 int spiXfer (unsigned handle, char* txBuf, char* rxBuf, unsigned count);
 /*D
 This function transfers count bytes of data from txBuf to the SPI
@@ -4404,7 +4245,6 @@ D*/
 //}}}
 
 //{{{
-/*F*/
 int bscXfer (bsc_xfer_t* bsc_xfer);
 /*D
 This function provides a low-level interface to the SPI/I2C Slave
@@ -4544,7 +4384,6 @@ if (status >= 0)
 D*/
 //}}}
 //{{{
-/*F*/
 int bbSPIOpen (unsigned CS, unsigned MISO, unsigned MOSI, unsigned SCLK, unsigned baud, unsigned spiFlags);
 /*D
 This function selects a set of GPIO for bit banging SPI with
@@ -4599,7 +4438,6 @@ bbSPIOpen(11, MISO, MOSI, SCLK, 20000, 3); // device 2
 D*/
 //}}}
 //{{{
-/*F*/
 int bbSPIClose (unsigned CS);
 /*D
 This function stops bit banging SPI on a set of GPIO
@@ -4613,7 +4451,6 @@ Returns 0 if OK, otherwise PI_BAD_USER_GPIO, or PI_NOT_SPI_GPIO.
 D*/
 //}}}
 //{{{
-/*F*/
 int bbSPIXfer (unsigned CS, char* inBuf, char* outBuf, unsigned count);
 /*D
 This function executes a bit banged SPI transfer.
@@ -4695,10 +4532,87 @@ int main(int argc, char *argv[])
 ...
 D*/
 //}}}
-
-// serial
+//}}}
+//{{{  serial
 //{{{
-/*F*/
+int gpioSerialReadOpen (unsigned user_gpio, unsigned baud, unsigned data_bits);
+/*D
+This function opens a GPIO for bit bang reading of serial data.
+
+. .
+user_gpio: 0-31
+     baud: 50-250000
+data_bits: 1-32
+. .
+
+Returns 0 if OK, otherwise PI_BAD_USER_GPIO, PI_BAD_WAVE_BAUD,
+PI_BAD_DATABITS, or PI_GPIO_IN_USE.
+
+The serial data is returned in a cyclic buffer and is read using
+[*gpioSerialRead*].
+
+It is the caller's responsibility to read data from the cyclic buffer
+in a timely fashion.
+D*/
+//}}}
+//{{{
+int gpioSerialReadInvert (unsigned user_gpio, unsigned invert);
+/*D
+This function configures the level logic for bit bang serial reads.
+
+Use PI_BB_SER_INVERT to invert the serial logic and PI_BB_SER_NORMAL for
+normal logic.  Default is PI_BB_SER_NORMAL.
+
+. .
+user_gpio: 0-31
+   invert: 0-1
+. .
+
+Returns 0 if OK, otherwise PI_BAD_USER_GPIO, PI_GPIO_IN_USE,
+PI_NOT_SERIAL_GPIO, or PI_BAD_SER_INVERT.
+
+The GPIO must be opened for bit bang reading of serial data using
+[*gpioSerialReadOpen*] prior to calling this function.
+D*/
+//}}}
+//{{{
+int gpioSerialRead (unsigned user_gpio, void *buf, size_t bufSize);
+/*D
+This function copies up to bufSize bytes of data read from the
+bit bang serial cyclic buffer to the buffer starting at buf.
+
+. .
+user_gpio: 0-31, previously opened with [*gpioSerialReadOpen*]
+      buf: an array to receive the read bytes
+  bufSize: >=0
+. .
+
+Returns the number of bytes copied if OK, otherwise PI_BAD_USER_GPIO
+or PI_NOT_SERIAL_GPIO.
+
+The bytes returned for each character depend upon the number of
+data bits [*data_bits*] specified in the [*gpioSerialReadOpen*] command.
+
+For [*data_bits*] 1-8 there will be one byte per character.
+For [*data_bits*] 9-16 there will be two bytes per character.
+For [*data_bits*] 17-32 there will be four bytes per character.
+D*/
+//}}}
+//{{{
+int gpioSerialReadClose (unsigned user_gpio);
+/*D
+This function closes a GPIO for bit bang reading of serial data.
+
+. .
+user_gpio: 0-31, previously opened with [*gpioSerialReadOpen*]
+. .
+
+Returns 0 if OK, otherwise PI_BAD_USER_GPIO, or PI_NOT_SERIAL_GPIO.
+D*/
+//}}}
+
+// more serial
+//{{{
 int serOpen (char* sertty, unsigned baud, unsigned serFlags);
 /*D
 This function opens a serial device at a specified baud rate
@@ -4722,7 +4636,6 @@ No flags are currently defined.  This parameter should be set to zero.
 D*/
 //}}}
 //{{{
-/*F*/
 int serClose (unsigned handle);
 /*D
 This function closes the serial device associated with handle.
@@ -4734,8 +4647,8 @@ handle: >=0, as returned by a call to [*serOpen*]
 Returns 0 if OK, otherwise PI_BAD_HANDLE.
 D*/
 //}}}
+
 //{{{
-/*F*/
 int serWriteByte (unsigned handle, unsigned bVal);
 /*D
 This function writes bVal to the serial port associated with handle.
@@ -4749,7 +4662,6 @@ PI_SER_WRITE_FAILED.
 D*/
 //}}}
 //{{{
-/*F*/
 int serReadByte (unsigned handle);
 /*D
 This function reads a byte from the serial port associated with handle.
@@ -4765,7 +4677,6 @@ If no data is ready PI_SER_READ_NO_DATA is returned.
 D*/
 //}}}
 //{{{
-/*F*/
 int serWrite (unsigned handle, char *buf, unsigned count);
 /*D
 This function writes count bytes from buf to the the serial port
@@ -4782,7 +4693,6 @@ PI_SER_WRITE_FAILED.
 D*/
 //}}}
 //{{{
-/*F*/
 int serRead (unsigned handle, char *buf, unsigned count);
 /*D
 This function reads up count bytes from the the serial port
@@ -4801,7 +4711,6 @@ If no data is ready zero is returned.
 D*/
 //}}}
 //{{{
-/*F*/
 int serDataAvailable (unsigned handle);
 /*D
 This function returns the number of bytes available
@@ -4815,10 +4724,9 @@ Returns the number of bytes of data available (>=0) if OK,
 otherwise PI_BAD_HANDLE.
 D*/
 //}}}
-
-// utils
+//}}}
+//{{{  utils
 //{{{
-/*F*/
 int gpioTrigger (unsigned user_gpio, unsigned pulseLen, unsigned level);
 /*D
 This function sends a trigger pulse to a GPIO.  The GPIO is set to
@@ -4835,8 +4743,8 @@ or PI_BAD_PULSELEN.
 D*/
 
 //}}}
+
 //{{{
-/*F*/
 int gpioSetWatchdog (unsigned user_gpio, unsigned timeout);
 /*D
 Sets a watchdog for a GPIO.
@@ -4879,8 +4787,8 @@ gpioSetWatchdog(4, 5);
 ...
 D*/
 //}}}
+
 //{{{
-/*F*/
 int gpioNoiseFilter (unsigned user_gpio, unsigned steady, unsigned active);
 /*D
 Sets a noise filter on a GPIO.
@@ -4912,7 +4820,6 @@ such reports.
 D*/
 //}}}
 //{{{
-/*F*/
 int gpioGlitchFilter (unsigned user_gpio, unsigned steady);
 /*D
 Sets a glitch filter on a GPIO.
@@ -4941,8 +4848,8 @@ Each (stable) edge will be timestamped [*steady*] microseconds
 after it was first detected.
 D*/
 //}}}
+
 //{{{
-/*F*/
 int gpioSetGetSamplesFunc (gpioGetSamplesFunc_t f, uint32_t bits);
 /*D
 Registers a function to be called (a callback) every millisecond
@@ -4971,7 +4878,6 @@ e.g.  if there are alerts for GPIO 7, 8, and 9, notifications for GPIO
 D*/
 //}}}
 //{{{
-/*F*/
 int gpioSetGetSamplesFuncEx (gpioGetSamplesFuncEx_t f, uint32_t bits, void* userdata);
 /*D
 Registers a function to be called (a callback) every millisecond
@@ -4994,8 +4900,8 @@ registered.
 See [*gpioSetGetSamplesFunc*] for further details.
 D*/
 //}}}
+
 //{{{
-/*F*/
 int gpioSetTimerFunc (unsigned timer, unsigned millis, gpioTimerFunc_t f);
 /*D
 Registers a function to be called (a callback) every millis milliseconds.
@@ -5026,7 +4932,6 @@ gpioSetTimerFunc(0, 2000, bFunction);
 D*/
 //}}}
 //{{{
-/*F*/
 int gpioSetTimerFuncEx (unsigned timer, unsigned millis, gpioTimerFuncEx_t f, void* userdata);
 /*D
 Registers a function to be called (a callback) every millis milliseconds.
@@ -5048,8 +4953,8 @@ registered per timer.
 See [*gpioSetTimerFunc*] for further details.
 D*/
 //}}}
+
 //{{{
-/*F*/
 pthread_t* gpioStartThread (gpioThreadFunc_t f, void* userdata);
 /*D
 Starts a new thread of execution with f as the main routine.
@@ -5103,7 +5008,6 @@ int main(int argc, char *argv[])
 D*/
 //}}}
 //{{{
-/*F*/
 void gpioStopThread (pthread_t *pth);
 /*D
 Cancels the thread pointed at by pth.
@@ -5117,10 +5021,9 @@ No value is returned.
 The thread to be stopped should have been started with [*gpioStartThread*].
 D*/
 //}}}
-
-// script
+//}}}
+//{{{  script
 //{{{
-/*F*/
 int gpioStoreScript (char* script);
 /*D
 This function stores a null terminated script for later execution.
@@ -5135,8 +5038,8 @@ The function returns a script id if the script is valid,
 otherwise PI_BAD_SCRIPT.
 D*/
 //}}}
+
 //{{{
-/*F*/
 int gpioRunScript (unsigned script_id, unsigned numPar, uint32_t* param);
 /*D
 This function runs a stored script.
@@ -5155,7 +5058,6 @@ the script as p0 to p9.
 D*/
 //}}}
 //{{{
-/*F*/
 int gpioRunScript (unsigned script_id, unsigned numPar, uint32_t* param);
 /*D
 This function runs a stored script.
@@ -5174,7 +5076,6 @@ the script as p0 to p9.
 D*/
 //}}}
 //{{{
-/*F*/
 int gpioUpdateScript (unsigned script_id, unsigned numPar, uint32_t* param);
 /*D
 This function sets the parameters of a script.  The script may or
@@ -5195,7 +5096,6 @@ the script as p0 to p9.
 D*/
 //}}}
 //{{{
-/*F*/
 int gpioScriptStatus (unsigned script_id, uint32_t* param);
 /*D
 This function returns the run status of a stored script as well as
@@ -5223,7 +5123,6 @@ The current value of script parameters 0 to 9 are returned in param.
 D*/
 //}}}
 //{{{
-/*F*/
 int gpioStopScript (unsigned script_id);
 /*D
 This function stops a running script.
@@ -5236,7 +5135,6 @@ The function returns 0 if OK, otherwise PI_BAD_SCRIPT_ID.
 D*/
 //}}}
 //{{{
-/*F*/
 int gpioDeleteScript (unsigned script_id);
 /*D
 This function deletes a stored script.
@@ -5250,7 +5148,6 @@ D*/
 //}}}
 
 //{{{
-/*F*/
 int gpioSetSignalFunc (unsigned signum, gpioSignalFunc_t f);
 /*D
 Registers a function to be called (a callback) when a signal occurs.
@@ -5273,7 +5170,6 @@ to call gpioTerminate and then exit.
 D*/
 //}}}
 //{{{
-/*F*/
 int gpioSetSignalFuncEx (unsigned signum, gpioSignalFuncEx_t f, void* userdata);
 /*D
 Registers a function to be called (a callback) when a signal occurs.
@@ -5296,7 +5192,6 @@ D*/
 //}}}
 
 //{{{
-/*F*/
 int gpioHardwareClock (unsigned gpio, unsigned clkfreq);
 /*D
 Starts a hardware clock on a GPIO at the specified frequency.
@@ -5335,7 +5230,6 @@ GPIO number.
 D*/
 //}}}
 //{{{
-/*F*/
 int gpioHardwarePWM (unsigned gpio, unsigned PWMfreq, unsigned PWMduty);
 /*D
 Starts hardware PWM on a GPIO at the specified frequency and dutycycle.
@@ -5387,10 +5281,9 @@ frequencies will have fewer steps.  PWMduty is
 automatically scaled to take this into account.
 D*/
 //}}}
-
-// time
+//}}}
+//{{{  time
 //{{{
-/*F*/
 int gpioTime (unsigned timetype, int* seconds, int* micros);
 /*D
 Updates the seconds and micros variables with the current time.
@@ -5419,7 +5312,6 @@ printf("library started %d.%03d seconds ago", secs, mics/1000);
 D*/
 //}}}
 //{{{
-/*F*/
 int gpioSleep (unsigned timetype, int seconds, int micros);
 /*D
 Sleeps for the number of seconds and microseconds specified by seconds
@@ -5453,8 +5345,8 @@ gpioSleep(PI_TIME_RELATIVE, 60, 0);     // sleep for one minute
 ...
 D*/
 //}}}
+
 //{{{
-/*F*/
 uint32_t gpioDelay (uint32_t micros);
 /*D
 Delays for at least the number of microseconds specified by micros.
@@ -5469,7 +5361,6 @@ Delays of 100 microseconds or less use busy waits.
 D*/
 //}}}
 //{{{
-/*F*/
 uint32_t gpioTick();
 /*D
 Returns the current system tick.
@@ -5499,15 +5390,14 @@ printf("some processing took %d microseconds", diffTick);
 ...
 D*/
 //}}}
+
 //{{{
-/*F*/
 double time_time();
 /*D
 Return the current time in seconds since the Epoch.
 D*/
 //}}}
 //{{{
-/*F*/
 void time_sleep (double seconds);
 /*D
 Delay execution for a given number of seconds
@@ -5517,10 +5407,9 @@ seconds: the number of seconds to sleep
 . .
 D*/
 //}}}
-
-// event
+//}}}
+//{{{  event
 //{{{
-/*F*/
 int eventMonitor (unsigned handle, uint32_t bits);
 /*D
 This function selects the events to be reported on a previously
@@ -5549,8 +5438,8 @@ eventMonitor(h, 0xC8);
 
 D*/
 //}}}
+
 //{{{
-/*F*/
 int eventSetFunc (unsigned event, eventFunc_t f);
 /*D
 Registers a function to be called (a callback) when the specified
@@ -5571,7 +5460,6 @@ The callback may be cancelled by passing NULL as the function.
 D*/
 //}}}
 //{{{
-/*F*/
 int eventSetFuncEx (unsigned event, eventFuncEx_t f, void* userdata);
 /*D
 Registers a function to be called (a callback) when the specified
@@ -5595,8 +5483,8 @@ Only one of [*eventSetFunc*] or [*eventSetFuncEx*] can be
 registered per event.
 D*/
 //}}}
+
 //{{{
-/*F*/
 int eventTrigger (unsigned event);
 /*D
 This function signals the occurrence of an event.
@@ -5621,10 +5509,9 @@ Note that other than its id and its tick there is no data associated
 with an event.
 D*/
 //}}}
-
-// shell
+//}}}
+//{{{  shell
 //{{{
-/*F*/
 int shell (char* scriptName, char* scriptString);
 /*D
 This function uses the system call to execute a shell script
@@ -5666,8 +5553,8 @@ status = shell("scr1", "\"hello string with spaces world\"");
 ...
 D*/
 //}}}
-
-// file
+//}}}
+//{{{  file
 //{{{
 int fileOpen (char* file, unsigned mode);
 //This function returns a handle to a file opened in a specified mode.
@@ -5772,7 +5659,6 @@ int fileOpen (char* file, unsigned mode);
 //...
 //}}}
 //{{{
-/*F*/
 int fileClose (unsigned handle);
 /*D
 This function closes the file associated with handle.
@@ -5788,8 +5674,8 @@ fileClose(h);
 ...
 D*/
 //}}}
+
 //{{{
-/*F*/
 int fileWrite (unsigned handle, char* buf, unsigned count);
 /*D
 This function writes count bytes from buf to the the file
@@ -5818,7 +5704,6 @@ else
 D*/
 //}}}
 //{{{
-/*F*/
 int fileRead (unsigned handle, char* buf, unsigned count);
 /*D
 This function reads up to count bytes from the the file
@@ -5841,7 +5726,6 @@ if (fileRead(h, buf, sizeof(buf)) > 0)
 D*/
 //}}}
 //{{{
-/*F*/
 int fileSeek (unsigned handle, int32_t seekOffset, int seekFrom);
 /*D
 This function seeks to a position within the file associated
@@ -5866,6 +5750,7 @@ pos = fileSeek(0, 0, PI_FROM_CURRENT); // Return current position
 ...
 D*/
 //}}}
+
 //{{{
 int fileList (char* fpat, char* buf, unsigned count);
 //This function returns a list of files which match a pattern.  The
@@ -5915,10 +5800,9 @@ int fileList (char* fpat, char* buf, unsigned count);
    //gpioTerminate();
 //}
 //}}}
-
-// config
+//}}}
+//{{{  config
 //{{{
-/*F*/
 int gpioCfgBufferSize (unsigned cfgMillis);
 /*D
 Configures pigpio to buffer cfgMillis milliseconds of GPIO samples.
@@ -5952,8 +5836,8 @@ sample   4       8  12  18   31   55  107  ---
 . .
 D*/
 //}}}
+
 //{{{
-/*F*/
 int gpioCfgClock (unsigned cfgMicros, unsigned cfgPeripheral, unsigned cfgSource);
 /*D
 Configures pigpio to use a particular sample rate timed by a specified
@@ -5988,8 +5872,8 @@ sample  cpu
 A sample rate of 5 microseconds seeems to be the sweet spot.
 D*/
 //}}}
+
 //{{{
-/*F*/
 int gpioCfgDMAchannel (unsigned DMAchannel); /* DEPRECATED */
 /*D
 Configures pigpio to use the specified DMA channel.
@@ -6004,7 +5888,6 @@ The default setting is to use channel 14.
 D*/
 //}}}
 //{{{
-/*F*/
 int gpioCfgDMAchannels (unsigned primaryChannel, unsigned secondaryChannel);
 /*D
 Configures pigpio to use the specified DMA channels.
@@ -6037,8 +5920,8 @@ a 10 second pulse delay requires one control block on a full channel
 and 611 control blocks on a lite channel.
 D*/
 //}}}
+
 //{{{
-/*F*/
 int gpioCfgPermissions (uint64_t updateMask);
 /*D
 Configures pigpio to restrict GPIO updates via the socket or pipe
@@ -6065,7 +5948,6 @@ Type 3 board  @ PI_DEFAULT_UPDATE_MASK_R3 @ 0x0FFFFFFC
 D*/
 //}}}
 //{{{
-/*F*/
 int gpioCfgSocketPort (unsigned port);
 /*D
 Configures pigpio to use the specified socket port.
@@ -6080,7 +5962,6 @@ The default setting is to use port 8888.
 D*/
 //}}}
 //{{{
-/*F*/
 int gpioCfgInterfaces (unsigned ifFlags);
 /*D
 Configures pigpio support of the fifo and socket interfaces.
@@ -6103,7 +5984,6 @@ usable from the local Pi).
 D*/
 //}}}
 //{{{
-/*F*/
 int gpioCfgMemAlloc (unsigned memAllocMode);
 /*D
 Selects the method of DMA memory allocation.
@@ -6123,7 +6003,6 @@ size is requested with [*gpioCfgBufferSize*].
 D*/
 //}}}
 //{{{
-/*F*/
 int gpioCfgNetAddr (int numSockAddr, uint32_t *sockAddr);
 /*D
 Sets the network addresses which are allowed to talk over the
@@ -6137,15 +6016,14 @@ numSockAddr: 0-256 (0 means all addresses allowed)
 . .
 D*/
 //}}}
+
 //{{{
-/*F*/
 uint32_t gpioCfgGetInternals();
 /*D
 This function returns the current library internal configuration
 settings.
 D*/
 
-/*F*/
 int gpioCfgSetInternals(uint32_t cfgVal);
 /*D
 This function sets the current library internal configuration
@@ -6157,10 +6035,9 @@ cfgVal: see source code
 
 D*/
 //}}}
-
-// custom
+//}}}
+//{{{  custom
 //{{{
-/*F*/
 int gpioCustom1 (unsigned arg1, unsigned arg2, char* argx, unsigned argc);
 /*D
 This function is available for user customisation.
@@ -6178,7 +6055,6 @@ Returns >= 0 if OK, less than 0 indicates a user defined error.
 D*/
 //}}}
 //{{{
-/*F*/
 int gpioCustom2 (unsigned arg1, char* argx, unsigned argc,
                 char *retBuf, unsigned retMax);
 /*D
@@ -6201,10 +6077,9 @@ Returns >= 0 if OK, less than 0 indicates a user defined error.
 The number of returned bytes must be retMax or less.
 D*/
 //}}}
-
-// raw
+//}}}
+//{{{  raw
 //{{{
-/*F*/
 int rawWaveAddSPI (rawSPI_t* spi, unsigned offset, unsigned spiSS, char* buf, unsigned spiTxBits,
                    unsigned spiBitFirst, unsigned spiBitLast, unsigned spiBits);
 /*D
@@ -6229,7 +6104,6 @@ Not intended for general use.
 D*/
 //}}}
 //{{{
-/*F*/
 int rawWaveAddGeneric (unsigned numPulses, rawWave_t* pulses);
 /*D
 This function adds a number of pulses to the current waveform.
@@ -6257,8 +6131,8 @@ waveform then the first pulse should consist of a delay.
 Not intended for general use.
 D*/
 //}}}
+
 //{{{
-/*F*/
 unsigned rawWaveCB();
 /*D
 Returns the number of the cb being currently output.
@@ -6267,7 +6141,6 @@ Not intended for general use.
 D*/
 //}}}
 //{{{
-/*F*/
 rawCbs_t* rawWaveCBAdr (int cbNum);
 /*D
 Return the (Linux) address of contol block cbNum.
@@ -6279,8 +6152,8 @@ cbNum: the cb of interest
 Not intended for general use.
 D*/
 //}}}
+
 //{{{
-/*F*/
 uint32_t rawWaveGetOOL (int pos);
 /*D
 Gets the OOL parameter stored at pos.
@@ -6293,7 +6166,6 @@ Not intended for general use.
 D*/
 //}}}
 //{{{
-/*F*/
 void rawWaveSetOOL (int pos, uint32_t lVal);
 /*D
 Sets the OOL parameter stored at pos to value.
@@ -6306,8 +6178,8 @@ lVal: the value to write
 Not intended for general use.
 D*/
 //}}}
+
 //{{{
-/*F*/
 uint32_t rawWaveGetOut (int pos);
 /*D
 Gets the wave output parameter stored at pos.
@@ -6322,7 +6194,6 @@ Not intended for general use.
 D*/
 //}}}
 //{{{
-/*F*/
 void rawWaveSetOut (int pos, uint32_t lVal);
 /*D
 Sets the wave output parameter stored at pos to value.
@@ -6337,8 +6208,8 @@ lVal: the value to write
 Not intended for general use.
 D*/
 //}}}
+
 //{{{
-/*F*/
 uint32_t rawWaveGetIn (int pos);
 /*D
 Gets the wave input value parameter stored at pos.
@@ -6353,7 +6224,6 @@ Not intended for general use.
 D*/
 //}}}
 //{{{
-/*F*/
 void rawWaveSetIn (int pos, uint32_t lVal);
 /*D
 Sets the wave input value stored at pos to value.
@@ -6368,8 +6238,8 @@ lVal: the value to write
 Not intended for general use.
 D*/
 //}}}
+
 //{{{
-/*F*/
 rawWaveInfo_t rawWaveInfo (int wave_id);
 /*D
 Gets details about the wave with id wave_id.
@@ -6383,7 +6253,6 @@ D*/
 //}}}
 
 //{{{
-/*F*/
 int getBitInBytes (int bitPos, char* buf, int numBits);
 /*D
 Returns the value of the bit bitPos bits from the start of buf.  Returns
@@ -6398,7 +6267,6 @@ numBits: number of valid bits in buf
 D*/
 //}}}
 //{{{
-/*F*/
 void putBitInBytes (int bitPos, char* buf, int bit);
 /*D
 Sets the bit bitPos bits from the start of buf to bit.
@@ -6413,7 +6281,6 @@ D*/
 //}}}
 
 //{{{
-/*F*/
 void rawDumpWave();
 /*D
 Used to print a readable version of the current waveform to stderr.
@@ -6422,9 +6289,8 @@ Not intended for general use.
 D*/
 //}}}
 //{{{
-/*F*/
 void rawDumpScript (unsigned script_id);
-/*D
+/*
 Used to print a readable version of a script to stderr.
 
 . .
@@ -6433,6 +6299,7 @@ script_id: >=0, a script_id returned by [*gpioStoreScript*]
 
 Not intended for general use.
 D*/
+//}}}
 //}}}
 
 //{{{

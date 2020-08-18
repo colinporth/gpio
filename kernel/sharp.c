@@ -45,14 +45,13 @@ unsigned char lineBuffer[LCDWIDTH/8];
 
 //{{{
 struct sharp {
-    struct spi_device *spi;
-  int     id;
-    char      name[sizeof("sharp-3")];
-
-    struct mutex    mutex;
-  struct work_struct  work;
-  spinlock_t    lock;
-};
+  struct spi_device* spi;
+  int id;
+  char name[sizeof("sharp-3")];
+  struct mutex mutex;
+  struct work_struct work;
+  spinlock_t lock;
+  };
 //}}}
 struct sharp* screen;
 struct fb_info* info;
@@ -129,7 +128,7 @@ static int vfb_mmap (struct fb_info* info, struct vm_area_struct* vma) {
   unsigned long size = vma->vm_end - vma->vm_start;
   unsigned long offset = vma->vm_pgoff << PAGE_SHIFT;
   unsigned long page, pos;
-  printk(KERN_CRIT "start %ld size %ld offset %ld", start, size, offset);
+  printk (KERN_CRIT "start %ld size %ld offset %ld", start, size, offset);
 
   if (vma->vm_pgoff > (~0UL >> PAGE_SHIFT))
     return -EINVAL;
@@ -141,8 +140,8 @@ static int vfb_mmap (struct fb_info* info, struct vm_area_struct* vma) {
   pos = (unsigned long)info->fix.smem_start + offset;
 
   while (size > 0) {
-    page = vmalloc_to_pfn((void *)pos);
-    if (remap_pfn_range(vma, start, page, PAGE_SIZE, PAGE_SHARED)) {
+    page = vmalloc_to_pfn ((void *)pos);
+    if (remap_pfn_range (vma, start, page, PAGE_SIZE, PAGE_SHARED)) {
       return -EAGAIN;
       }
     start += PAGE_SIZE;
@@ -194,7 +193,7 @@ static void rvfree (void* mem, unsigned long size) {
 
   adr = (unsigned long)mem;
   while ((long) size > 0) {
-    ClearPageReserved (vmalloc_to_page((void *)adr));
+    ClearPageReserved (vmalloc_to_page ((void*)adr));
     adr += PAGE_SIZE;
     size -= PAGE_SIZE;
     }
@@ -206,7 +205,7 @@ static void rvfree (void* mem, unsigned long size) {
 //{{{
 void clearDisplay(void) {
 
-  char buffer[2] = { clearByte, paddingByte} ;
+  char buffer[2] = { clearByte, paddingByte } ;
   gpio_set_value (SCS, 1);
 
   spi_write (screen->spi, (const u8 *)buffer, 2);
@@ -227,8 +226,8 @@ char reverseByte (char b) {
 int vcomToggleFunction (void* v) {
 
   while (!kthread_should_stop()) {
-    msleep(50);
-    vcomState = vcomState ? 0:1;
+    msleep (50);
+    vcomState = vcomState ? 0 : 1;
     gpio_set_value (VCOM, vcomState);
     }
 
