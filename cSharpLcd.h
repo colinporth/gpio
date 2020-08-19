@@ -30,8 +30,8 @@ public:
   void writePixelToFrame (uint16_t pixel, uint8_t lineNumber, bool on);
 
 private:
-  static const int kWidth = 400;
-  static const int kHeight = 240;
+  static const int kWidth = 96;
+  static const int kHeight = 96;
   static const int kRowHeader = 2;
   static const int kRowDataBytes = kWidth/8;
   static const int kRowBytes = kRowHeader + kRowDataBytes;
