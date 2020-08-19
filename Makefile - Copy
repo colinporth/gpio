@@ -1,5 +1,6 @@
 TARGET    = lcd
-SRCS      = st7735.cpp \
+SRCS      = lcd.cpp \
+	    cSharpLcd.cpp \
 	    pigpio/pigpio.c \
 	    pigpio/command.c
 

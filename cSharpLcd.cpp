@@ -26,7 +26,7 @@ cSharpLcd::cSharpLcd() {
 
   unsigned hardwareRevision = gpioHardwareRevision();
   unsigned version = gpioVersion();
-  printf ("pigpio hwRev:%d version:%d\n", hardwareRevision, version);
+  printf ("pigpio hwRev:%x version:%d\n", hardwareRevision, version);
 
   if (gpioInitialise() >= 0) {
     gpioSetMode (SCS, PI_OUTPUT);
