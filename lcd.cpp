@@ -23,7 +23,7 @@ int main() {
     float increment = 6.2831f / lcdWidth;
 
     for (float theta = 0; theta < 10.f; theta += 0.1256f) {
-      for (int y = 1; y <= lcdHeight; y++) {
+      for (int y = 0; y < lcdHeight; y++) {
         sharpLcd.clearLine();
         for (int x = 1; x <= lcdWidth; x++) {
           int sinValue = (sin(theta + (x * increment)) * lcdHeight/2) + lcdHeight/2;
@@ -137,8 +137,8 @@ int main() {
     for (int i = 0; i < numRepetitions; i++) {
       sharpLcd.clearDisplay();
 
-      for (int y = 1; y <= lcdHeight; y++) {
-        for (int x = 1; x <= lcdWidth/8; x++) {
+      for (int y = 0; y < lcdHeight; y++) {
+        for (int x = 0; x < lcdWidth/8; x++) {
           sharpLcd.writeByteToLine (x, toggle ? 0xFF : 0x00);
           toggle = !toggle;
           }

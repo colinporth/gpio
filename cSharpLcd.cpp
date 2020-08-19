@@ -12,12 +12,11 @@ using namespace std;
 //}}}
 static const int kSpiClock = 8000000;
 
-static const uint8_t CE1      =  7; // J8 - pin26
-static const uint8_t CE0      =  8; // J8 - pin24
-static const uint8_t MISO     =  9; // J8 - pin21
-static const uint8_t MOSI     = 10; // J8 - pin19 - used
-static const uint8_t CLK      = 11; // J8 - pin23 - used
-
+//static const uint8_t CE1      =  7; // J8 - pin26
+//static const uint8_t CE0      =  8; // J8 - pin24
+//static const uint8_t MISO     =  9; // J8 - pin21
+//static const uint8_t MOSI     = 10; // J8 - pin19 - used
+//static const uint8_t CLK      = 11; // J8 - pin23 - used
 static const uint8_t SCS      = 23; // J8 - pin16 - used
 static const uint8_t DISP     = 24; // J8 - pin18 - used
 static const uint8_t EXTCOMIN = 25; // J8 - pin22 - used
