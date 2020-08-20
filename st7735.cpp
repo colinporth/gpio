@@ -81,13 +81,6 @@ private:
   //{{{  static const commands
   static const uint8_t ST7735_NOP = 0x0 ;
   static const uint8_t ST7735_SWRESET = 0x01;
-  //static const uint8_t ST7735_RDDID = 0x04;
-  //static const uint8_t ST7735_RDDST = 0x09;
-  //static const uint8_t ST7735_RDDPM = 0x0A;
-  //static const uint8_t ST7735_RDDMADCTL = 0x0B;
-  //static const uint8_t ST7735_RDDCOLMOD = 0x0C;
-  //static const uint8_t ST7735_RDDIM = 0x0D;
-  //static const uint8_t ST7735_RDDSM = 0x0E;
 
   static const uint8_t ST7735_SLPIN   = 0x10;
   static const uint8_t ST7735_SLPOUT  = 0x11;
@@ -117,10 +110,14 @@ private:
   static const uint8_t ST7735_FRMCTR1 = 0xB1;
   static const uint8_t ST7735_FRMCTR2 = 0xB2;
   static const uint8_t ST7735_FRMCTR3 = 0xB3;
+  constexpr static uint8_t kFRMCTRData[6] =  { 0x01, 0x2c, 0x2d, 0x01, 0x2c, 0x2d };
+
   static const uint8_t ST7735_INVCTR  = 0xB4;
   static const uint8_t ST7735_DISSET5 = 0xB6;
 
   static const uint8_t ST7735_PWCTR1  = 0xC0;
+  constexpr static  uint8_t kPowerControlData1[3] =  { 0xA2, 0x02 /* -4.6V */, 0x84 /* AUTO mode */ };
+
   static const uint8_t ST7735_PWCTR2  = 0xC1;
   static const uint8_t ST7735_PWCTR3  = 0xC2;
   static const uint8_t ST7735_PWCTR4  = 0xC3;
@@ -135,7 +132,12 @@ private:
   static const uint8_t ST7735_NVCTR3  = 0xDF;
 
   static const uint8_t ST7735_GMCTRP1 = 0xE0;
+  constexpr static  uint8_t kGMCTRP1Data[16] = { 0x02, 0x1c, 0x07, 0x12, 0x37, 0x32, 0x29, 0x2d,
+                                            0x29, 0x25, 0x2B, 0x39, 0x00, 0x01, 0x03, 0x10 } ;
+
   static const uint8_t ST7735_GMCTRN1 = 0xE1;
+  constexpr static  uint8_t kGMCTRN1Data[16] = { 0x03, 0x1d, 0x07, 0x06, 0x2E, 0x2C, 0x29, 0x2D,
+                                            0x2E, 0x2E, 0x37, 0x3F, 0x00, 0x00, 0x02, 0x10 } ;
   //}}}
 
   // 3.3v                                  J8 pin17
@@ -145,7 +147,7 @@ private:
   // SPI0 - SCLK                           J8 pin21
   static const uint8_t kResetPin = 25;  // J8 pin22
   // SPI0 - CE0                            J8 pin24
-  static const int kSpiClock = 24000000; // 24Mhz
+  static const int kSpiClock = 24000000;   // spi clock 24Mhz
 
   //{{{
   void writeCommand (uint8_t command) {
@@ -196,102 +198,64 @@ private:
       // setup spi0, CE0 active lo
       mHandle = spiOpen (0, kSpiClock, 0);
 
+      //{{{  init st7735 registers
       writeCommand (ST7735_SLPOUT);
       gpioDelay (120);
 
-      //{{{  frameRate normal mode
+      // frameRate normal mode
       writeCommand (ST7735_FRMCTR1);
-      writeData (0x01);
-      writeData (0x2C);
-      writeData (0x2D);
-      //}}}
-      //{{{  frameRate idle mode
+      spiWrite (mHandle, (char*)kFRMCTRData, 3);
+
+      // frameRate idle mode
       writeCommand (ST7735_FRMCTR2);
-      writeData (0x01);
-      writeData (0x2C);
-      writeData (0x2D);
-      //}}}
-      //{{{  frameRate partial mode
+      spiWrite (mHandle, (char*)kFRMCTRData, 3);
+
+      // frameRate partial mode
       writeCommand (ST7735_FRMCTR3);
-      writeData (0x01);
-      writeData (0x2C);
-      writeData (0x2D);
-      writeData (0x01);   // inversion mode settings
-      writeData (0x2C);
-      writeData (0x2D);
-      //}}}
+      spiWrite (mHandle, (char*)kFRMCTRData, 6);
 
-      writeCommandData (ST7735_INVCTR, 0x07); // Inverted mode off
+      // Inverted mode off
+      writeCommandData (ST7735_INVCTR, 0x07); 
 
-      //{{{  POWER CONTROL 1
-      const uint8_t kPowerControlData1[3] =  { 0xA2, 0x02 /* -4.6V */, 0x84 /* AUTO mode */ };
+      // POWER CONTROL 1
       writeCommand (ST7735_PWCTR1);
-      spiWrite (mHandle, (char*)kPowerControlData1, 3);
-      //}}}
-      //{{{  POWER CONTROL 2 - VGH25 = 2.4C VGSEL =-10 VGH = 3*AVDD
+      spiWrite (mHandle, (char*)kPowerControlData1, sizeof(kPowerControlData1));
+
+      // POWER CONTROL 2 - VGH25 = 2.4C VGSEL =-10 VGH = 3*AVDD
       writeCommandData (ST7735_PWCTR2, 0xC5);
-      //}}}
-      //{{{  POWER CONTROL 3
+
+      // POWER CONTROL 3
       writeCommand (ST7735_PWCTR3);
       writeData (0x0A);             // Opamp current small
       writeData (0x00);             // Boost freq
-      //}}}
-      //{{{  POWER CONTROL 4
+
+      // POWER CONTROL 4
       writeCommand (ST7735_PWCTR4);
       writeData (0x8A);             // BCLK/2, Opamp current small / medium low
       writeData (0x2A);
-      //}}}
-      //{{{  POWER CONTROL 5
+
+      // POWER CONTROL 5
       writeCommand (ST7735_PWCTR5);
       writeData (0x8A);             // BCLK/2, Opamp current small / medium low
       writeData (0xEE);
-      //}}}
-      //{{{  POWER CONTROL 6
+
+      // POWER CONTROL 6
       writeCommandData (ST7735_VMCTR1, 0x0E);
-      //}}}
 
-      writeCommandData (ST7735_MADCTL, 0xC0); // ORIENTATION
-      writeCommandData (ST7735_COLMOD, 0x05); // COLOR MODE - 16bit per pixel
+      // ORIENTATION
+      writeCommandData (ST7735_MADCTL, 0xC0); 
 
-      //{{{  gamma GMCTRP1
+      // COLOR MODE - 16bit per pixel
+      writeCommandData (ST7735_COLMOD, 0x05); 
+
+      //  gamma GMCTRP1
       writeCommand (ST7735_GMCTRP1);
-      writeData (0x02);
-      writeData (0x1c);
-      writeData (0x07);
-      writeData (0x12);
-      writeData (0x37);
-      writeData (0x32);
-      writeData (0x29);
-      writeData (0x2d);
-      writeData (0x29);
-      writeData (0x25);
-      writeData (0x2B);
-      writeData (0x39);
-      writeData (0x00);
-      writeData (0x01);
-      writeData (0x03);
-      writeData (0x10);
-      //}}}
-      //{{{  Gamma GMCTRN1
-      writeCommand (ST7735_GMCTRN1);
-      writeData (0x03);
-      writeData (0x1d);
-      writeData (0x07);
-      writeData (0x06);
-      writeData (0x2E);
-      writeData (0x2C);
-      writeData (0x29);
-      writeData (0x2D);
-      writeData (0x2E);
-      writeData (0x2E);
-      writeData (0x37);
-      writeData (0x3F);
-      writeData (0x00);
-      writeData (0x00);
-      writeData (0x02);
-      writeData (0x10);
-      //}}}
+      spiWrite (mHandle, (char*)kGMCTRP1Data, sizeof(kGMCTRP1Data));
 
+      // Gamma GMCTRN1
+      writeCommand (ST7735_GMCTRN1);
+      spiWrite (mHandle, (char*)kGMCTRN1Data, sizeof(kGMCTRN1Data));
+      //}}}
       writeCommand (ST7735_DISPON); // display ON
 
       thread ([=]() {
