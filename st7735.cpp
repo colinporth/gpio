@@ -34,11 +34,7 @@ static const uint16_t GreenYellow =  0xAFE5;  // 173, 255,  47
 class cLcd {
 // ST7735 tft lcd
 public:
-  //{{{
-  cLcd() {
-    init();
-    }
-  //}}}
+  cLcd() {}
   //{{{
   ~cLcd() {
     //turnOff();
@@ -47,6 +43,93 @@ public:
     }
   //}}}
 
+  //{{{
+  void initialise() {
+
+    unsigned hardwareRevision = gpioHardwareRevision();
+    unsigned version = gpioVersion();
+    cLog::log (LOGINFO, "pigpio hwRev:%x version:%d", hardwareRevision, version);
+
+    if (gpioInitialise() >= 0) {
+      // setup data/command pin to data (hi)
+      gpioSetMode (kDcPin, PI_OUTPUT);
+      gpioWrite (kDcPin, 1);
+
+      //{{{  setup and pulse reset pin
+      gpioSetMode (kResetPin, PI_OUTPUT);
+
+      gpioWrite (kResetPin, 0);
+      gpioDelay (10000);
+
+      gpioWrite (kResetPin, 1);
+      gpioDelay (120000);
+      //}}}
+
+      // setup spi0, CE0 active lo
+      mHandle = spiOpen (0, kSpiClock, 0);
+
+      writeCommand (ST7735_SLPOUT);
+      gpioDelay (120);
+      //{{{  init st7735 registers
+      // frameRate normal mode
+      writeCommandData (ST7735_FRMCTR1, kFRMCTRData, 3);
+
+      // frameRate idle mode
+      writeCommandData (ST7735_FRMCTR2, kFRMCTRData, 3);
+
+      // frameRate partial mode
+      writeCommandData (ST7735_FRMCTR3, kFRMCTRData, 6);
+
+      // Inverted mode off
+      writeCommandData (ST7735_INVCTR, kINVCTRData, sizeof(kINVCTRData));
+
+      // POWER CONTROL 1
+      writeCommandData (ST7735_PWCTR1, kPowerControlData1, sizeof(kPowerControlData1));
+
+      // POWER CONTROL 2 - VGH25 = 2.4C VGSEL =-10 VGH = 3*AVDD
+      writeCommandData (ST7735_PWCTR2, kPowerControlData2, sizeof(kPowerControlData2));
+
+      // POWER CONTROL 3
+      writeCommandData (ST7735_PWCTR3, kPowerControlData3, sizeof(kPowerControlData3));
+
+      // POWER CONTROL 4
+      writeCommandData (ST7735_PWCTR4, kPowerControlData4, sizeof(kPowerControlData4));
+
+      // POWER CONTROL 5
+      writeCommandData (ST7735_PWCTR5, kPowerControlData5, sizeof(kPowerControlData5));
+
+      // POWER CONTROL 6
+      writeCommandData (ST7735_VMCTR1, kVMCTR1Data, sizeof(kVMCTR1Data));
+
+      // ORIENTATION
+      writeCommandData (ST7735_MADCTL, kMADCTData, sizeof(kMADCTData));
+
+      // COLOR MODE - 16bit per pixel
+      writeCommandData (ST7735_COLMOD, kCOLMODData, sizeof(kCOLMODData));
+
+      //  gamma GMCTRP1
+      writeCommandData (ST7735_GMCTRP1, kGMCTRP1Data, sizeof(kGMCTRP1Data));
+
+      // Gamma GMCTRN1
+      writeCommandData (ST7735_GMCTRN1, kGMCTRN1Data, sizeof(kGMCTRN1Data));
+      //}}}
+      writeCommand (ST7735_DISPON); // display ON
+
+      thread ([=]() {
+        while (true) {
+          if (mChanged) {
+            mChanged = false;
+            writeCommandData (ST7735_CASET, caSetData, sizeof(caSetData));
+            writeCommandData (ST7735_RASET, raSetData, sizeof(raSetData));
+            writeCommandData (ST7735_RAMWR, (const uint8_t*)mFrameBuf, kWidth * kHeight * 2);
+            }
+
+          gpioDelay (20000);
+          }
+        } ).detach();
+      }
+    }
+  //}}}
   uint8_t getWidth() { return kWidth; }
   uint8_t getHeight() { return kHeight; }
 
@@ -104,9 +187,11 @@ private:
   static const uint8_t ST7735_TEOFF   = 0x34;
   static const uint8_t ST7735_TEON    = 0x35;
   static const uint8_t ST7735_MADCTL  = 0x36;
+  constexpr static uint8_t kMADCTData[1] = { 0xc0 } ;
   static const uint8_t ST7735_IDMOFF  = 0x38;
   static const uint8_t ST7735_IDMON   = 0x39;
   static const uint8_t ST7735_COLMOD  = 0x3A;
+  constexpr static uint8_t kCOLMODData[1] = { 0x05 } ;
 
   static const uint8_t ST7735_FRMCTR1 = 0xB1;
   static const uint8_t ST7735_FRMCTR2 = 0xB2;
@@ -114,11 +199,13 @@ private:
   constexpr static uint8_t kFRMCTRData[6] =  { 0x01, 0x2c, 0x2d, 0x01, 0x2c, 0x2d };
 
   static const uint8_t ST7735_INVCTR  = 0xB4;
+  constexpr static uint8_t kINVCTRData[1] = { 0x07 } ;
   static const uint8_t ST7735_DISSET5 = 0xB6;
 
   static const uint8_t ST7735_PWCTR1  = 0xC0;
   constexpr static  uint8_t kPowerControlData1[3] =  { 0xA2, 0x02 /* -4.6V */, 0x84 /* AUTO mode */ };
   static const uint8_t ST7735_PWCTR2  = 0xC1;
+  constexpr static uint8_t kPowerControlData2[1] = { 0xc5 } ;
   static const uint8_t ST7735_PWCTR3  = 0xC2;
   constexpr static uint8_t kPowerControlData3[2] = { 0x0A /* Opamp current small */, 0x00 /* Boost freq */ };
   static const uint8_t ST7735_PWCTR4  = 0xC3;
@@ -127,6 +214,7 @@ private:
   constexpr static uint8_t kPowerControlData5[2] =  { 0x8A /* BCLK/2, Opamp current small / medium low */, 0xEE };
 
   static const uint8_t ST7735_VMCTR1  = 0xC5;
+  constexpr static uint8_t kVMCTR1Data[1] = { 0x0E } ;
   static const uint8_t ST7735_VMOFCTR = 0xC7;
 
   static const uint8_t ST7735_WRID2   = 0xD1;
@@ -162,112 +250,13 @@ private:
     }
   //}}}
   //{{{
-  void writeCommandData (uint8_t command, uint8_t data) {
-
-    gpioWrite (kDcPin, 0);
-    spiWrite (mHandle, (char*)(&command), 1);
-    gpioWrite (kDcPin, 1);
-
-    spiWrite (mHandle, (char*)(&data), 1);
-    }
-  //}}}
-  //{{{
-  void writeCommandDataMultiple (uint8_t command, const uint8_t* data, int len) {
+  void writeCommandData (uint8_t command, const uint8_t* data, int len) {
 
     gpioWrite (kDcPin, 0);
     spiWrite (mHandle, (char*)(&command), 1);
     gpioWrite (kDcPin, 1);
 
     spiWrite (mHandle, (char*)data, len);
-    }
-  //}}}
-
-  //{{{
-  void init() {
-
-    unsigned hardwareRevision = gpioHardwareRevision();
-    unsigned version = gpioVersion();
-    cLog::log (LOGINFO, "pigpio hwRev:%x version:%d", hardwareRevision, version);
-
-    if (gpioInitialise() >= 0) {
-      // setup data/command pin to data (hi)
-      gpioSetMode (kDcPin, PI_OUTPUT);
-      gpioWrite (kDcPin, 1);
-
-      //{{{  setup and pulse reset pin
-      gpioSetMode (kResetPin, PI_OUTPUT);
-
-      gpioWrite (kResetPin, 0);
-      gpioDelay (10000);
-
-      gpioWrite (kResetPin, 1);
-      gpioDelay (120000);
-      //}}}
-
-      // setup spi0, CE0 active lo
-      mHandle = spiOpen (0, kSpiClock, 0);
-
-      //{{{  init st7735 registers
-      writeCommand (ST7735_SLPOUT);
-      gpioDelay (120);
-
-      // frameRate normal mode
-      writeCommandDataMultiple (ST7735_FRMCTR1, kFRMCTRData, 3);
-
-      // frameRate idle mode
-      writeCommandDataMultiple (ST7735_FRMCTR2, kFRMCTRData, 3);
-
-      // frameRate partial mode
-      writeCommandDataMultiple (ST7735_FRMCTR3, kFRMCTRData, 6);
-
-      // Inverted mode off
-      writeCommandData (ST7735_INVCTR, 0x07);
-
-      // POWER CONTROL 1
-      writeCommandDataMultiple (ST7735_PWCTR1, kPowerControlData1, sizeof(kPowerControlData1));
-
-      // POWER CONTROL 2 - VGH25 = 2.4C VGSEL =-10 VGH = 3*AVDD
-      writeCommandData (ST7735_PWCTR2, 0xC5);
-
-      // POWER CONTROL 3
-      writeCommandDataMultiple (ST7735_PWCTR3, kPowerControlData3, sizeof(kPowerControlData3));
-
-      // POWER CONTROL 4
-      writeCommandDataMultiple (ST7735_PWCTR4, kPowerControlData4, sizeof(kPowerControlData4));
-
-      // POWER CONTROL 5
-      writeCommandDataMultiple (ST7735_PWCTR5, kPowerControlData5, sizeof(kPowerControlData5));
-
-      // POWER CONTROL 6
-      writeCommandData (ST7735_VMCTR1, 0x0E);
-
-      // ORIENTATION
-      writeCommandData (ST7735_MADCTL, 0xC0);
-
-      // COLOR MODE - 16bit per pixel
-      writeCommandData (ST7735_COLMOD, 0x05);
-
-      //  gamma GMCTRP1
-      writeCommandDataMultiple (ST7735_GMCTRP1, kGMCTRP1Data, sizeof(kGMCTRP1Data));
-
-      // Gamma GMCTRN1
-      writeCommandDataMultiple (ST7735_GMCTRN1, kGMCTRN1Data, sizeof(kGMCTRN1Data));
-      //}}}
-      writeCommand (ST7735_DISPON); // display ON
-
-      thread ([=]() {
-        while (true) {
-          if (mChanged) {
-            mChanged = false;
-            writeCommandDataMultiple (ST7735_CASET, caSetData, sizeof(caSetData));
-            writeCommandDataMultiple (ST7735_RASET, raSetData, sizeof(raSetData));
-            writeCommandDataMultiple (ST7735_RAMWR, (const uint8_t*)mFrameBuf, kWidth * kHeight * 2);
-            }
-
-          gpioDelay (20000);
-          }
-        } ).detach();
-      }
     }
   //}}}
 
@@ -280,7 +269,9 @@ private:
 int main() {
 
   cLog::init (LOGINFO, false, "", "gpio");
+
   cLcd lcd;
+  lcd.initialise();
 
   while (true) {
     lcd.clear (Red);
