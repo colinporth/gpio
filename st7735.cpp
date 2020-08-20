@@ -293,21 +293,18 @@ private:
       writeCommand (ST7735_DISPON); // display ON
 
       thread ([=]() {
-        uint16_t xend = kWidth - 1;
-        char caSetData[4] = { 0, 0, 0, (char)xend };
-
-        uint16_t yend = kHeight - 1;
-        char raSetData[4] = { 0, 0, 0, (char)yend };
+        const char caSetData[4] = { 0, 0, 0, (char)(kWidth - 1) };
+        const char raSetData[4] = { 0, 0, 0, (char)(kHeight - 1) };
 
         while (true) {
           if (mChanged) {
             mChanged = false;
 
             writeCommand (ST7735_CASET);  // column addr set
-            spiWrite (mHandle, caSetData, 1);
+            spiWrite (mHandle, (char*)caSetData, 1);
 
             writeCommand (ST7735_RASET);  // row addr set
-            spiWrite (mHandle, raSetData, 1);
+            spiWrite (mHandle, (char*)raSetData, 1);
 
             writeCommand (ST7735_RAMWR);
             spiWrite (mHandle, (char*)mFrameBuf, kWidth * kHeight * 2);
