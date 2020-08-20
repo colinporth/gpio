@@ -89,14 +89,15 @@ public:
       setRegister (ST7735_GMCTRP1, kGMCTRP1Data, sizeof(kGMCTRP1Data)); // gamma GMCTRP1
       setRegister (ST7735_GMCTRN1, kGMCTRN1Data, sizeof(kGMCTRN1Data)); // Gamma GMCTRN1
 
+      setRegister (ST7735_CASET, caSetData, sizeof(caSetData));
+      setRegister (ST7735_RASET, raSetData, sizeof(raSetData));
+
       setRegister (ST7735_DISPON, nullptr, 0); // display ON
 
       thread ([=]() {
         while (true) {
           if (mChanged) {
             mChanged = false;
-            setRegister (ST7735_CASET, caSetData, sizeof(caSetData));
-            setRegister (ST7735_RASET, raSetData, sizeof(raSetData));
             setRegister (ST7735_RAMWR, (const uint8_t*)mFrameBuf, kWidth * kHeight * 2);
             }
 
@@ -137,86 +138,66 @@ public:
 private:
   static const uint8_t kWidth = 128;
   static const uint8_t kHeight = 160;
-  //{{{  static const commands
-  static const uint8_t ST7735_NOP = 0x0 ;
-  static const uint8_t ST7735_SWRESET = 0x01;
 
-  static const uint8_t ST7735_SLPIN   = 0x10;
-  static const uint8_t ST7735_SLPOUT  = 0x11;
-  static const uint8_t ST7735_PTLON   = 0x12;
-  static const uint8_t ST7735_NORON   = 0x13;
-
-  static const uint8_t ST7735_INVOFF  = 0x20;
-  static const uint8_t ST7735_INVON   = 0x21;
-  static const uint8_t ST7735_GAMSET  = 0x26;
-
-  static const uint8_t ST7735_DISPOFF = 0x28;
-  static const uint8_t ST7735_DISPON  = 0x29;
-  static const uint8_t ST7735_CASET   = 0x2A;
-  constexpr static uint8_t caSetData[4] = { 0, 0, 0, kWidth - 1 };
-  static const uint8_t ST7735_RASET   = 0x2B;
-  constexpr static uint8_t raSetData[4] = { 0, 0, 0, kHeight - 1 };
-  static const uint8_t ST7735_RAMWR   = 0x2C;
-  static const uint8_t ST7735_RGBSET  = 0x2D;
-
-  static const uint8_t ST7735_PTLAR   = 0x30;
-  static const uint8_t ST7735_TEOFF   = 0x34;
-  static const uint8_t ST7735_TEON    = 0x35;
-  static const uint8_t ST7735_MADCTL  = 0x36;
-  constexpr static uint8_t kMADCTData[1] = { 0xc0 };
-  static const uint8_t ST7735_IDMOFF  = 0x38;
-  static const uint8_t ST7735_IDMON   = 0x39;
-  static const uint8_t ST7735_COLMOD  = 0x3A;
-  constexpr static uint8_t kCOLMODData[1] = { 0x05 };
-
-  static const uint8_t ST7735_FRMCTR1 = 0xB1;
-  static const uint8_t ST7735_FRMCTR2 = 0xB2;
-  static const uint8_t ST7735_FRMCTR3 = 0xB3;
-  constexpr static uint8_t kFRMCTRData[6] =  { 0x01, 0x2c, 0x2d, 0x01, 0x2c, 0x2d };
-
-  static const uint8_t ST7735_INVCTR  = 0xB4;
-  constexpr static uint8_t kINVCTRData[1] = { 0x07 };
-
-  static const uint8_t ST7735_DISSET5 = 0xB6;
-  static const uint8_t ST7735_PWCTR1  = 0xC0;
-  constexpr static  uint8_t kPowerControlData1[3] =  { 0xA2, 0x02 /* -4.6V */, 0x84 /* AUTO mode */ };
-  static const uint8_t ST7735_PWCTR2  = 0xC1;
-  constexpr static uint8_t kPowerControlData2[1] = { 0xc5 }; // VGH25 = 2.4C VGSEL =-10 VGH = 3*AVDD
-  static const uint8_t ST7735_PWCTR3  = 0xC2;
-  constexpr static uint8_t kPowerControlData3[2] = { 0x0A /* Opamp current small */, 0x00 /* Boost freq */ };
-  static const uint8_t ST7735_PWCTR4  = 0xC3;
-  constexpr static uint8_t kPowerControlData4[2] = { 0x8A /* BCLK/2, Opamp current small / medium low */, 0x2A };
-  static const uint8_t ST7735_PWCTR5  = 0xC4;
-  constexpr static uint8_t kPowerControlData5[2] =  { 0x8A /* BCLK/2, Opamp current small / medium low */, 0xEE };
-
-  static const uint8_t ST7735_VMCTR1  = 0xC5;
-  constexpr static uint8_t kVMCTR1Data[1] = { 0x0E };
-  static const uint8_t ST7735_VMOFCTR = 0xC7;
-
-  static const uint8_t ST7735_WRID2   = 0xD1;
-  static const uint8_t ST7735_WRID3   = 0xD2;
-  static const uint8_t ST7735_NVCTR1  = 0xD9;
-  static const uint8_t ST7735_NVCTR2  = 0xDE;
-  static const uint8_t ST7735_NVCTR3  = 0xDF;
-
-  static const uint8_t ST7735_GMCTRP1 = 0xE0;
-  constexpr static  uint8_t kGMCTRP1Data[16] = { 0x02, 0x1c, 0x07, 0x12, 0x37, 0x32, 0x29, 0x2d,
-                                                 0x29, 0x25, 0x2B, 0x39, 0x00, 0x01, 0x03, 0x10 } ;
-
-  static const uint8_t ST7735_GMCTRN1 = 0xE1;
-  constexpr static  uint8_t kGMCTRN1Data[16] = { 0x03, 0x1d, 0x07, 0x06, 0x2E, 0x2C, 0x29, 0x2D,
-                                                 0x2E, 0x2E, 0x37, 0x3F, 0x00, 0x00, 0x02, 0x10 } ;
-  //}}}
-
-  // 3.3v                                  J8 pin17
-  static const uint8_t kDcPin  = 24;    // J8 pin18
-  // SPI0 - MOSI                           J8 pin19
-  // 0v                                    J8 pin20
-  // SPI0 - SCLK                           J8 pin21
-  static const uint8_t kResetPin = 25;  // J8 pin22
-  // SPI0 - CE0                            J8 pin24
+  // J8 header pins
+  // - 3.3v                               J8 pin17
+  static const uint8_t kDcPin  = 24;   // J8 pin18
+  // - SPI0 - MOSI                        J8 pin19
+  // - 0v                                 J8 pin20
+  // - SPI0 - SCLK                        J8 pin21
+  static const uint8_t kResetPin = 25; // J8 pin22
+  // - SPI0 - CE0                         J8 pin24
   static const int kSpiClock = 24000000;   // spi clock 24Mhz
 
+  //{{{  register const
+  constexpr static uint8_t ST7735_SLPOUT  = 0x11; // no data
+  constexpr static uint8_t ST7735_DISPOFF = 0x28; // no data
+  constexpr static uint8_t ST7735_DISPON  = 0x29; // no data
+
+  constexpr static uint8_t ST7735_CASET = 0x2A;
+  constexpr static uint8_t caSetData[4] = { 0, 0, 0, kWidth - 1 };
+
+  constexpr static uint8_t ST7735_RASET = 0x2B;
+  constexpr static uint8_t raSetData[4] = { 0, 0, 0, kHeight - 1 };
+
+  constexpr static uint8_t ST7735_RAMWR = 0x2C; // followed by frameBuffer data
+
+  constexpr static uint8_t ST7735_MADCTL = 0x36;
+  constexpr static uint8_t kMADCTData[1] = { 0xc0 };
+
+  constexpr static uint8_t ST7735_COLMOD  = 0x3A;
+  constexpr static uint8_t kCOLMODData[1] = { 0x05 };
+
+  constexpr static uint8_t ST7735_FRMCTR1 = 0xB1;
+  constexpr static uint8_t ST7735_FRMCTR2 = 0xB2;
+  constexpr static uint8_t ST7735_FRMCTR3 = 0xB3;
+  constexpr static uint8_t kFRMCTRData[6] = { 0x01, 0x2c, 0x2d, 0x01, 0x2c, 0x2d };
+
+  constexpr static uint8_t ST7735_INVCTR  = 0xB4;
+  constexpr static uint8_t kINVCTRData[1] = { 0x07 };
+
+  constexpr static uint8_t ST7735_PWCTR1  = 0xC0;
+  constexpr static uint8_t kPowerControlData1[3] = { 0xA2, 0x02 /* -4.6V */, 0x84 /* AUTO mode */ };
+  constexpr static uint8_t ST7735_PWCTR2  = 0xC1;
+  constexpr static uint8_t kPowerControlData2[1] = { 0xc5 }; // VGH25 = 2.4C VGSEL =-10 VGH = 3*AVDD
+  constexpr static uint8_t ST7735_PWCTR3  = 0xC2;
+  constexpr static uint8_t kPowerControlData3[2] = { 0x0A /* Opamp current small */, 0x00 /* Boost freq */ };
+  constexpr static uint8_t ST7735_PWCTR4  = 0xC3;
+  constexpr static uint8_t kPowerControlData4[2] = { 0x8A /* BCLK/2, Opamp current small/medium low */, 0x2A };
+  constexpr static uint8_t ST7735_PWCTR5  = 0xC4;
+  constexpr static uint8_t kPowerControlData5[2] = { 0x8A /* BCLK/2, Opamp current small/medium low */, 0xEE };
+
+  constexpr static uint8_t ST7735_VMCTR1  = 0xC5;
+  constexpr static uint8_t kVMCTR1Data[1] = { 0x0E };
+
+  constexpr static uint8_t ST7735_GMCTRP1 = 0xE0;
+  constexpr static uint8_t kGMCTRP1Data[16] = { 0x02, 0x1c, 0x07, 0x12, 0x37, 0x32, 0x29, 0x2d,
+                                                0x29, 0x25, 0x2B, 0x39, 0x00, 0x01, 0x03, 0x10 } ;
+
+  constexpr static uint8_t ST7735_GMCTRN1 = 0xE1;
+  constexpr static uint8_t kGMCTRN1Data[16] = { 0x03, 0x1d, 0x07, 0x06, 0x2E, 0x2C, 0x29, 0x2D,
+                                                0x2E, 0x2E, 0x37, 0x3F, 0x00, 0x00, 0x02, 0x10 } ;
+  //}}}
   //{{{
   void setRegister (uint8_t command, const uint8_t* data, int len) {
 
