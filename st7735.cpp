@@ -47,8 +47,8 @@ public:
     }
   //}}}
 
-  int getWidth() { return kWidth; }
-  int getHeight() { return kHeight; }
+  uint8_t getWidth() { return kWidth; }
+  uint8_t getHeight() { return kHeight; }
 
   //{{{
   void clear (uint16_t colour) {
@@ -76,18 +76,9 @@ public:
   //}}}
 
 private:
-  // 3.3v                                  J8 pin17
-  static const uint8_t kDcPin  = 24;    // J8 pin18
-  // SPI0 - MOSI                           J8 pin19
-  // 0v                                    J8 pin20
-  // SPI0 - SCLK                           J8 pin21
-  static const uint8_t kResetPin = 25;  // J8 pin22
-  // SPI0 - CE0                            J8 pin24
-  static const int kSpiClock = 24000000; // 24Mhz
+  static const uint8_t kWidth = 128;
+  static const uint8_t kHeight = 160;
   //{{{  static const commands
-  static const int kWidth = 128;
-  static const int kHeight = 160;
-
   static const uint8_t ST7735_NOP = 0x0 ;
   static const uint8_t ST7735_SWRESET = 0x01;
   //static const uint8_t ST7735_RDDID = 0x04;
@@ -147,24 +138,36 @@ private:
   static const uint8_t ST7735_GMCTRN1 = 0xE1;
   //}}}
 
+  // 3.3v                                  J8 pin17
+  static const uint8_t kDcPin  = 24;    // J8 pin18
+  // SPI0 - MOSI                           J8 pin19
+  // 0v                                    J8 pin20
+  // SPI0 - SCLK                           J8 pin21
+  static const uint8_t kResetPin = 25;  // J8 pin22
+  // SPI0 - CE0                            J8 pin24
+  static const int kSpiClock = 24000000; // 24Mhz
+
   //{{{
-  void writeCommand (char command) {
+  void writeCommand (uint8_t command) {
 
     gpioWrite (kDcPin, 0);
-    spiWrite (mHandle, &command, 1);
+    spiWrite (mHandle, (char*)(&command), 1);
     gpioWrite (kDcPin, 1);
     }
   //}}}
   //{{{
-  void writeData (char data) {
-    spiWrite (mHandle, &data, 1);
+  void writeData (uint8_t data) {
+    spiWrite (mHandle, (char*)(&data), 1);
     }
   //}}}
   //{{{
-  void writeCommandData (char command, char data) {
+  void writeCommandData (uint8_t command, uint8_t data) {
 
-    writeCommand (command);
-    writeData (data);
+    gpioWrite (kDcPin, 0);
+    spiWrite (mHandle, (char*)(&command), 1);
+    gpioWrite (kDcPin, 1);
+
+    spiWrite (mHandle, (char*)(&data), 1);
     }
   //}}}
 
@@ -196,19 +199,19 @@ private:
       writeCommand (ST7735_SLPOUT);
       gpioDelay (120);
 
-      //{{{  Frame rate in normal mode
+      //{{{  frameRate normal mode
       writeCommand (ST7735_FRMCTR1);
       writeData (0x01);
       writeData (0x2C);
       writeData (0x2D);
       //}}}
-      //{{{  Frame rate in idle mode
+      //{{{  frameRate idle mode
       writeCommand (ST7735_FRMCTR2);
       writeData (0x01);
       writeData (0x2C);
       writeData (0x2D);
       //}}}
-      //{{{  Frame rate in partial mode
+      //{{{  frameRate partial mode
       writeCommand (ST7735_FRMCTR3);
       writeData (0x01);
       writeData (0x2C);
@@ -221,10 +224,9 @@ private:
       writeCommandData (ST7735_INVCTR, 0x07); // Inverted mode off
 
       //{{{  POWER CONTROL 1
+      const uint8_t kPowerControlData1[3] =  { 0xA2, 0x02 /* -4.6V */, 0x84 /* AUTO mode */ };
       writeCommand (ST7735_PWCTR1);
-      writeData (0xA2);
-      writeData (0x02);             // -4.6V
-      writeData (0x84);             // AUTO mode
+      spiWrite (mHandle, (char*)kPowerControlData1, 3);
       //}}}
       //{{{  POWER CONTROL 2 - VGH25 = 2.4C VGSEL =-10 VGH = 3*AVDD
       writeCommandData (ST7735_PWCTR2, 0xC5);
@@ -293,18 +295,18 @@ private:
       writeCommand (ST7735_DISPON); // display ON
 
       thread ([=]() {
-        const char caSetData[4] = { 0, 0, 0, (char)(kWidth - 1) };
-        const char raSetData[4] = { 0, 0, 0, (char)(kHeight - 1) };
+        const uint8_t caSetData[4] = { 0, 0, 0, kWidth - 1 };
+        const uint8_t raSetData[4] = { 0, 0, 0, kHeight - 1 };
 
         while (true) {
           if (mChanged) {
             mChanged = false;
 
             writeCommand (ST7735_CASET);  // column addr set
-            spiWrite (mHandle, (char*)caSetData, 1);
+            spiWrite (mHandle, (char*)caSetData, 4);
 
             writeCommand (ST7735_RASET);  // row addr set
-            spiWrite (mHandle, (char*)raSetData, 1);
+            spiWrite (mHandle, (char*)raSetData, 4);
 
             writeCommand (ST7735_RAMWR);
             spiWrite (mHandle, (char*)mFrameBuf, kWidth * kHeight * 2);
