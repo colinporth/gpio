@@ -95,13 +95,13 @@ public:
       setRegister (ST7735_DISPON, nullptr, 0); // display ON
 
       thread ([=]() {
+        // write frameBuffer to lcd ram thread if changed
         while (true) {
           if (mChanged) {
             mChanged = false;
             setRegister (ST7735_RAMWR, (const uint8_t*)mFrameBuf, kWidth * kHeight * 2);
             }
-
-          gpioDelay (20000);
+          gpioDelay (10000);
           }
         } ).detach();
       }
