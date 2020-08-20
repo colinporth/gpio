@@ -1,6 +1,6 @@
 // st7735.cpp
 #include <cstdint>
-#include <pthread.h>
+#include <thread>
 
 #include "../shared/utils/cLog.h"
 #include "pigpio/pigpio.h"
@@ -149,7 +149,7 @@ private:
   //}}}
 
   //{{{
-  static void writeCommand (char command) {
+  void writeCommand (char command) {
 
     gpioWrite (kDcPin, 0);
     spiWrite (mHandle, &command, 1);
@@ -157,12 +157,12 @@ private:
     }
   //}}}
   //{{{
-  static void writeData (char data) {
+  void writeData (char data) {
     spiWrite (mHandle, &data, 1);
     }
   //}}}
   //{{{
-  static void writeCommandData (char command, char data) {
+  void writeCommandData (char command, char data) {
 
     writeCommand (command);
     writeData (data);
@@ -170,7 +170,7 @@ private:
   //}}}
 
   //{{{
-  static void init() {
+  void init() {
 
     unsigned hardwareRevision = gpioHardwareRevision();
     unsigned version = gpioVersion();
@@ -293,50 +293,40 @@ private:
 
       writeCommand (ST7735_DISPON); // display ON
 
-      pthread_t threadId;
-      if (pthread_create (&threadId, NULL, &updateThread, 0))
-        cLog::log (LOGERROR, "creating updateThread");
-      else
-        cLog::log (LOGINFO, "updateThread started");
+      thread ([=]() { 
+        uint16_t xend = kWidth - 1;
+        uint16_t yend = kHeight - 1;
+
+        while (true) {
+          if (mChanged) {
+            mChanged = false;
+
+            writeCommand (ST7735_CASET);  // column addr set
+            writeData (0);
+            writeData (0);    // XSTART
+            writeData (0);
+            writeData (xend); // XEND
+
+            writeCommand (ST7735_RASET);  // row addr set
+            writeData (0);
+            writeData (0);    // YSTART
+            writeData (0);
+            writeData (yend); // YEND
+
+            writeCommand (ST7735_RAMWR);
+            spiWrite (mHandle, (char*)mFrameBuf, kWidth * kHeight * 2);
+            }
+
+          gpioDelay (20000);
+          }
+        } ).detach();
       }
     }
   //}}}
-  //{{{
-  static void* updateThread (void* arg) {
 
-    uint16_t xend = kWidth - 1;
-    uint16_t yend = kHeight - 1;
-
-    while (true) {
-      if (mChanged) {
-        mChanged = false;
-
-        writeCommand (ST7735_CASET);  // column addr set
-        writeData (0);
-        writeData (0);    // XSTART
-        writeData (0);
-        writeData (xend); // XEND
-
-        writeCommand (ST7735_RASET);  // row addr set
-        writeData (0);
-        writeData (0);    // YSTART
-        writeData (0);
-        writeData (yend); // YEND
-
-        writeCommand (ST7735_RAMWR);
-        spiWrite (mHandle, (char*)mFrameBuf, kWidth * kHeight * 2);
-        }
-
-      gpioDelay (20000);
-      }
-
-    pthread_exit (NULL);
-    }
-  //}}}
-
-  static inline int mHandle = 0;
-  static inline bool mChanged = true;
-  static inline uint16_t mFrameBuf [kWidth * kHeight * 2];
+  int mHandle = 0;
+  bool mChanged = true;
+  uint16_t mFrameBuf [kWidth * kHeight * 2];
   };
 //}}}
 
