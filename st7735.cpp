@@ -224,9 +224,10 @@ private:
 //}}}
 
 //{{{
-void type (cLcd& lcd, char ch) {
+void type (cLcd& lcd, char ch, int size) {
 
-  FT_Load_Char (face, 'A', FT_LOAD_RENDER);
+  FT_Set_Pixel_Sizes (face, 0, size);
+  FT_Load_Char (face, ch, FT_LOAD_RENDER);
   if (slot->bitmap.buffer) {
      for (unsigned y = 0; y < slot->bitmap.rows; y++) {
       for (int x = 0; x < slot->bitmap.pitch; x++) {
@@ -254,8 +255,7 @@ int main() {
   FT_New_Memory_Face (library, (FT_Byte*)freeSansBold, freeSansBold_len, 0, &face);
   slot = face->glyph;
 
-  FT_Set_Pixel_Sizes (face, 0, 20);
-  type (lcd, 'A');
+  type (lcd, 'A', 20);
   //  setTTPixels (colour, slot->bitmap.buffer,
   //               xorg + slot->bitmap_left, yorg + height - slot->bitmap_top,
   //               slot->bitmap.pitch, slot->bitmap.rows);
@@ -263,30 +263,30 @@ int main() {
 
   while (true) {
     lcd.clear (Red);
-    type (lcd, 'B');
+    type (lcd, 'B', 30);
     gpioDelay (200000);
 
     lcd.clear (Yellow);
-    type (lcd, 'C');
+    type (lcd, 'C', 40);
     gpioDelay (200000);
 
     lcd.clear (Green);
-    type (lcd, 'D');
+    type (lcd, 'D', 50);
     gpioDelay (200000);
 
     for (int i = 0; i < lcd.getWidth(); i++)
       lcd.rect (Blue, 0, i, i, 1);
-    type (lcd, 'E');
+    type (lcd, 'E', 60);
     gpioDelay (200000);
 
     for (int i = 0; i < lcd.getWidth(); i++)
       lcd.rect (Cyan, 0, i, i, 1);
-    type (lcd, 'F');
+    type (lcd, 'F', 70);
     gpioDelay (200000);
 
     for (int i = 0; i < lcd.getWidth(); i++)
       lcd.rect (White, 0, i, i, 1);
-    type (lcd, 'G');
+    type (lcd, 'G', 80);
     gpioDelay (200000);
     }
 
