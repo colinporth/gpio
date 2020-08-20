@@ -1,9 +1,16 @@
 // st7735.cpp
 #include <cstdint>
 #include <thread>
-
 #include "../shared/utils/cLog.h"
 #include "pigpio/pigpio.h"
+
+#include "FreeSansBold.c"
+#include <ft2build.h>
+#include FT_FREETYPE_H
+
+static FT_Library library;
+static FT_Face face;
+static FT_GlyphSlot slot;
 
 using namespace std;
 
@@ -147,7 +154,7 @@ private:
   // - SPI0 - SCLK                        J8 pin21
   static const uint8_t kResetPin = 25; // J8 pin22
   // - SPI0 - CE0                         J8 pin24
-  static const int kSpiClock = 24000000;   // spi clock 24Mhz
+  static const int kSpiClock = 24000000;
 
   //{{{  register const
   constexpr static uint8_t ST7735_SLPOUT  = 0x11; // no data
@@ -222,6 +229,30 @@ int main() {
 
   cLcd lcd;
   lcd.initialise();
+
+  FT_Init_FreeType (&library);
+  FT_New_Memory_Face (library, (FT_Byte*)freeSansBold, freeSansBold_len, 0, &face);
+  slot = face->glyph;
+
+  FT_Set_Pixel_Sizes (face, 0, 20);
+  FT_Load_Char (face, 'A', FT_LOAD_RENDER);
+  if (slot->bitmap.buffer) {
+     for (unsigned y = 0; y < slot->bitmap.rows; y++) {
+      for (int x = 0; x < slot->bitmap.pitch; x++) {
+        uint8_t grey = slot->bitmap.buffer[(y * slot->bitmap.pitch) + x];
+        uint16_t rgb = ((grey << 8) & 0xF800) | // b 15:11
+                       ((grey << 3) & 0x07E0) | // g 10:5
+                       ((grey >> 3) & 0x001F);  // r 4:0
+        lcd.pixel (rgb, x, y);
+        //printf ("%2x ", slot->bitmap.buffer[(y * slot->bitmap.pitch) + x]);
+        }
+      printf ("\n");
+      }
+    }
+  //  setTTPixels (colour, slot->bitmap.buffer,
+  //               xorg + slot->bitmap_left, yorg + height - slot->bitmap_top,
+  //               slot->bitmap.pitch, slot->bitmap.rows);
+  //xorg += slot->advance.x/64;
 
   while (true) {
     lcd.clear (Red);
