@@ -33,7 +33,6 @@ static const uint16_t GreenYellow =  0xAFE5;  // 173, 255,  47
 //{{{
 class cLcd {
 // ST7735 tft lcd
-// make a better job of singleton
 public:
   //{{{
   cLcd() {
@@ -293,25 +292,22 @@ private:
 
       writeCommand (ST7735_DISPON); // display ON
 
-      thread ([=]() { 
+      thread ([=]() {
         uint16_t xend = kWidth - 1;
+        char caSetData[4] = { 0, 0, 0, (char)xend };
+
         uint16_t yend = kHeight - 1;
+        char raSetData[4] = { 0, 0, 0, (char)yend };
 
         while (true) {
           if (mChanged) {
             mChanged = false;
 
             writeCommand (ST7735_CASET);  // column addr set
-            writeData (0);
-            writeData (0);    // XSTART
-            writeData (0);
-            writeData (xend); // XEND
+            spiWrite (mHandle, caSetData, 1);
 
             writeCommand (ST7735_RASET);  // row addr set
-            writeData (0);
-            writeData (0);    // YSTART
-            writeData (0);
-            writeData (yend); // YEND
+            spiWrite (mHandle, raSetData, 1);
 
             writeCommand (ST7735_RAMWR);
             spiWrite (mHandle, (char*)mFrameBuf, kWidth * kHeight * 2);
