@@ -1,12 +1,12 @@
 TARGET    = lcd
 SRCS      = st7735.cpp \
 	    pigpio/pigpio.c \
-	    pigpio/command.c
-
+	    pigpio/command.c \
+	    ../shared/utils/cLog.cpp
 
 BUILD_DIR = ./build
 CLEAN_DIRS = $(BUILD_DIR)
-LIBS      = -lpthread -lrt
+LIBS      = -lpthread -lrt -lbfd
 #
 #
 OBJS      = $(SRCS:%=$(BUILD_DIR)/%.o)
@@ -16,6 +16,11 @@ CFLAGS = -Wall \
 	 -g \
 	 -MMD -MP \
 	 -O2
+
+LD_VERSION = $(shell ld -v 2>&1 | sed -ne 's/.*\([0-9]\+\.[0-9]\+\).*/\1/p')
+ifeq "$(LD_VERSION)" "2.34"
+	CFLAGS += -D HAS_BINUTILS_234
+endif
 
 $(BUILD_DIR)/%.c.o: %.c
 	mkdir -p $(dir $@)

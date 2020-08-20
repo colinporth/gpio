@@ -1,20 +1,9 @@
 // st7735.cpp
-#include <stdio.h>
-#include <stdint.h>
-#include <stdbool.h>
+#include <cstdint>
 #include <pthread.h>
-#include "pigpio/pigpio.h"
 
-static const int kSpiClock = 24000000; // 24Mhz
-//{{{  gpio pins
-// 3.3v                                  J8 pin17
-static const uint8_t kResetPin = 24;  // J8 pin18
-// SPI0 - MOSI                           J8 pin19
-// 0v                                    J8 pin20
-// SPI0 - SCLK                           J8 pin21
-static const uint8_t kDcPin  = 25;    // J8 pin22
-// SPI0 - CE0                            J8 pin24
-//}}}
+#include "../shared/utils/cLog.h"
+#include "pigpio/pigpio.h"
 
 using namespace std;
 
@@ -88,6 +77,14 @@ public:
   //}}}
 
 private:
+  // 3.3v                                  J8 pin17
+  static const uint8_t kDcPin  = 24;    // J8 pin18
+  // SPI0 - MOSI                           J8 pin19
+  // 0v                                    J8 pin20
+  // SPI0 - SCLK                           J8 pin21
+  static const uint8_t kResetPin = 25;  // J8 pin22
+  // SPI0 - CE0                            J8 pin24
+  static const int kSpiClock = 24000000; // 24Mhz
   //{{{  static const commands
   static const int kWidth = 128;
   static const int kHeight = 160;
@@ -177,7 +174,7 @@ private:
 
     unsigned hardwareRevision = gpioHardwareRevision();
     unsigned version = gpioVersion();
-    printf ("pigpio hwRev:%x version:%d\n", hardwareRevision, version);
+    cLog::log (LOGINFO, "pigpio hwRev:%x version:%d", hardwareRevision, version);
 
     if (gpioInitialise() >= 0) {
       // setup data/command pin to data (hi)
@@ -298,9 +295,9 @@ private:
 
       pthread_t threadId;
       if (pthread_create (&threadId, NULL, &updateThread, 0))
-        printf ("error creating updateThread\n");
+        cLog::log (LOGERROR, "creating updateThread");
       else
-        printf ("updateThread started\n");
+        cLog::log (LOGINFO, "updateThread started");
       }
     }
   //}}}
@@ -345,6 +342,7 @@ private:
 
 int main() {
 
+  cLog::init (LOGINFO, false, "", "gpio");
   cLcd lcd;
 
   while (true) {
