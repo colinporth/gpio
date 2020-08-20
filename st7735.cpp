@@ -68,60 +68,36 @@ public:
       // setup spi0, CE0 active lo
       mHandle = spiOpen (0, kSpiClock, 0);
 
-      writeCommand (ST7735_SLPOUT);
+      setRegister (ST7735_SLPOUT, nullptr, 0);
       gpioDelay (120);
-      //{{{  init st7735 registers
-      // frameRate normal mode
-      writeCommandData (ST7735_FRMCTR1, kFRMCTRData, 3);
 
-      // frameRate idle mode
-      writeCommandData (ST7735_FRMCTR2, kFRMCTRData, 3);
+      setRegister (ST7735_FRMCTR1, kFRMCTRData, 3); // frameRate normal mode
+      setRegister (ST7735_FRMCTR2, kFRMCTRData, 3); // frameRate idle mode
+      setRegister (ST7735_FRMCTR3, kFRMCTRData, 6); // frameRate partial mode
+      setRegister (ST7735_INVCTR, kINVCTRData, sizeof(kINVCTRData)); // Inverted mode off
 
-      // frameRate partial mode
-      writeCommandData (ST7735_FRMCTR3, kFRMCTRData, 6);
+      setRegister (ST7735_PWCTR1, kPowerControlData1, sizeof(kPowerControlData1)); // POWER CONTROL 1
+      setRegister (ST7735_PWCTR2, kPowerControlData2, sizeof(kPowerControlData2)); // POWER CONTROL 2
+      setRegister (ST7735_PWCTR3, kPowerControlData3, sizeof(kPowerControlData3)); // POWER CONTROL 3
+      setRegister (ST7735_PWCTR4, kPowerControlData4, sizeof(kPowerControlData4)); // POWER CONTROL 4
+      setRegister (ST7735_PWCTR5, kPowerControlData5, sizeof(kPowerControlData5)); // POWER CONTROL 5
 
-      // Inverted mode off
-      writeCommandData (ST7735_INVCTR, kINVCTRData, sizeof(kINVCTRData));
+      setRegister (ST7735_VMCTR1, kVMCTR1Data, sizeof(kVMCTR1Data)); // POWER CONTROL 6
+      setRegister (ST7735_MADCTL, kMADCTData, sizeof(kMADCTData)); // ORIENTATION
+      setRegister (ST7735_COLMOD, kCOLMODData, sizeof(kCOLMODData)); // COLOR MODE - 16bit per pixel
 
-      // POWER CONTROL 1
-      writeCommandData (ST7735_PWCTR1, kPowerControlData1, sizeof(kPowerControlData1));
+      setRegister (ST7735_GMCTRP1, kGMCTRP1Data, sizeof(kGMCTRP1Data)); // gamma GMCTRP1
+      setRegister (ST7735_GMCTRN1, kGMCTRN1Data, sizeof(kGMCTRN1Data)); // Gamma GMCTRN1
 
-      // POWER CONTROL 2 - VGH25 = 2.4C VGSEL =-10 VGH = 3*AVDD
-      writeCommandData (ST7735_PWCTR2, kPowerControlData2, sizeof(kPowerControlData2));
-
-      // POWER CONTROL 3
-      writeCommandData (ST7735_PWCTR3, kPowerControlData3, sizeof(kPowerControlData3));
-
-      // POWER CONTROL 4
-      writeCommandData (ST7735_PWCTR4, kPowerControlData4, sizeof(kPowerControlData4));
-
-      // POWER CONTROL 5
-      writeCommandData (ST7735_PWCTR5, kPowerControlData5, sizeof(kPowerControlData5));
-
-      // POWER CONTROL 6
-      writeCommandData (ST7735_VMCTR1, kVMCTR1Data, sizeof(kVMCTR1Data));
-
-      // ORIENTATION
-      writeCommandData (ST7735_MADCTL, kMADCTData, sizeof(kMADCTData));
-
-      // COLOR MODE - 16bit per pixel
-      writeCommandData (ST7735_COLMOD, kCOLMODData, sizeof(kCOLMODData));
-
-      //  gamma GMCTRP1
-      writeCommandData (ST7735_GMCTRP1, kGMCTRP1Data, sizeof(kGMCTRP1Data));
-
-      // Gamma GMCTRN1
-      writeCommandData (ST7735_GMCTRN1, kGMCTRN1Data, sizeof(kGMCTRN1Data));
-      //}}}
-      writeCommand (ST7735_DISPON); // display ON
+      setRegister (ST7735_DISPON, nullptr, 0); // display ON
 
       thread ([=]() {
         while (true) {
           if (mChanged) {
             mChanged = false;
-            writeCommandData (ST7735_CASET, caSetData, sizeof(caSetData));
-            writeCommandData (ST7735_RASET, raSetData, sizeof(raSetData));
-            writeCommandData (ST7735_RAMWR, (const uint8_t*)mFrameBuf, kWidth * kHeight * 2);
+            setRegister (ST7735_CASET, caSetData, sizeof(caSetData));
+            setRegister (ST7735_RASET, raSetData, sizeof(raSetData));
+            setRegister (ST7735_RAMWR, (const uint8_t*)mFrameBuf, kWidth * kHeight * 2);
             }
 
           gpioDelay (20000);
@@ -187,11 +163,11 @@ private:
   static const uint8_t ST7735_TEOFF   = 0x34;
   static const uint8_t ST7735_TEON    = 0x35;
   static const uint8_t ST7735_MADCTL  = 0x36;
-  constexpr static uint8_t kMADCTData[1] = { 0xc0 } ;
+  constexpr static uint8_t kMADCTData[1] = { 0xc0 };
   static const uint8_t ST7735_IDMOFF  = 0x38;
   static const uint8_t ST7735_IDMON   = 0x39;
   static const uint8_t ST7735_COLMOD  = 0x3A;
-  constexpr static uint8_t kCOLMODData[1] = { 0x05 } ;
+  constexpr static uint8_t kCOLMODData[1] = { 0x05 };
 
   static const uint8_t ST7735_FRMCTR1 = 0xB1;
   static const uint8_t ST7735_FRMCTR2 = 0xB2;
@@ -199,13 +175,13 @@ private:
   constexpr static uint8_t kFRMCTRData[6] =  { 0x01, 0x2c, 0x2d, 0x01, 0x2c, 0x2d };
 
   static const uint8_t ST7735_INVCTR  = 0xB4;
-  constexpr static uint8_t kINVCTRData[1] = { 0x07 } ;
-  static const uint8_t ST7735_DISSET5 = 0xB6;
+  constexpr static uint8_t kINVCTRData[1] = { 0x07 };
 
+  static const uint8_t ST7735_DISSET5 = 0xB6;
   static const uint8_t ST7735_PWCTR1  = 0xC0;
   constexpr static  uint8_t kPowerControlData1[3] =  { 0xA2, 0x02 /* -4.6V */, 0x84 /* AUTO mode */ };
   static const uint8_t ST7735_PWCTR2  = 0xC1;
-  constexpr static uint8_t kPowerControlData2[1] = { 0xc5 } ;
+  constexpr static uint8_t kPowerControlData2[1] = { 0xc5 }; // VGH25 = 2.4C VGSEL =-10 VGH = 3*AVDD
   static const uint8_t ST7735_PWCTR3  = 0xC2;
   constexpr static uint8_t kPowerControlData3[2] = { 0x0A /* Opamp current small */, 0x00 /* Boost freq */ };
   static const uint8_t ST7735_PWCTR4  = 0xC3;
@@ -214,7 +190,7 @@ private:
   constexpr static uint8_t kPowerControlData5[2] =  { 0x8A /* BCLK/2, Opamp current small / medium low */, 0xEE };
 
   static const uint8_t ST7735_VMCTR1  = 0xC5;
-  constexpr static uint8_t kVMCTR1Data[1] = { 0x0E } ;
+  constexpr static uint8_t kVMCTR1Data[1] = { 0x0E };
   static const uint8_t ST7735_VMOFCTR = 0xC7;
 
   static const uint8_t ST7735_WRID2   = 0xD1;
@@ -242,21 +218,14 @@ private:
   static const int kSpiClock = 24000000;   // spi clock 24Mhz
 
   //{{{
-  void writeCommand (uint8_t command) {
-
-    gpioWrite (kDcPin, 0);
-    spiWrite (mHandle, (char*)(&command), 1);
-    gpioWrite (kDcPin, 1);
-    }
-  //}}}
-  //{{{
-  void writeCommandData (uint8_t command, const uint8_t* data, int len) {
+  void setRegister (uint8_t command, const uint8_t* data, int len) {
 
     gpioWrite (kDcPin, 0);
     spiWrite (mHandle, (char*)(&command), 1);
     gpioWrite (kDcPin, 1);
 
-    spiWrite (mHandle, (char*)data, len);
+    if (data)
+      spiWrite (mHandle, (char*)data, len);
     }
   //}}}
 
