@@ -223,18 +223,9 @@ private:
   };
 //}}}
 
-int main() {
+//{{{
+void type (cLcd& lcd, char ch) {
 
-  cLog::init (LOGINFO, false, "", "gpio");
-
-  cLcd lcd;
-  lcd.initialise();
-
-  FT_Init_FreeType (&library);
-  FT_New_Memory_Face (library, (FT_Byte*)freeSansBold, freeSansBold_len, 0, &face);
-  slot = face->glyph;
-
-  FT_Set_Pixel_Sizes (face, 0, 20);
   FT_Load_Char (face, 'A', FT_LOAD_RENDER);
   if (slot->bitmap.buffer) {
      for (unsigned y = 0; y < slot->bitmap.rows; y++) {
@@ -249,6 +240,22 @@ int main() {
       printf ("\n");
       }
     }
+  }
+//}}}
+
+int main() {
+
+  cLog::init (LOGINFO, false, "", "gpio");
+
+  cLcd lcd;
+  lcd.initialise();
+
+  FT_Init_FreeType (&library);
+  FT_New_Memory_Face (library, (FT_Byte*)freeSansBold, freeSansBold_len, 0, &face);
+  slot = face->glyph;
+
+  FT_Set_Pixel_Sizes (face, 0, 20);
+  type (lcd, 'A');
   //  setTTPixels (colour, slot->bitmap.buffer,
   //               xorg + slot->bitmap_left, yorg + height - slot->bitmap_top,
   //               slot->bitmap.pitch, slot->bitmap.rows);
@@ -256,24 +263,30 @@ int main() {
 
   while (true) {
     lcd.clear (Red);
+    type (lcd, 'B');
     gpioDelay (200000);
 
     lcd.clear (Yellow);
+    type (lcd, 'C');
     gpioDelay (200000);
 
     lcd.clear (Green);
+    type (lcd, 'D');
     gpioDelay (200000);
 
     for (int i = 0; i < lcd.getWidth(); i++)
       lcd.rect (Blue, 0, i, i, 1);
+    type (lcd, 'E');
     gpioDelay (200000);
 
     for (int i = 0; i < lcd.getWidth(); i++)
       lcd.rect (Cyan, 0, i, i, 1);
+    type (lcd, 'F');
     gpioDelay (200000);
 
     for (int i = 0; i < lcd.getWidth(); i++)
       lcd.rect (White, 0, i, i, 1);
+    type (lcd, 'G');
     gpioDelay (200000);
     }
 
