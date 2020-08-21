@@ -2,7 +2,6 @@
 #include <cstdint>
 #include "lcd.h"
 
-#include "FreeSansBold.h"
 #include "../shared/utils/utils.h"
 
 using namespace std;
@@ -13,7 +12,6 @@ int main() {
 
   cLcd* lcd = new cLcd9225b();
   lcd->initialise();
-  lcd->setFont (getFreeSansBold(), getFreeSansBoldSize());
 
   while (true) {
     for (int i = 0; i < 1000; i += 3) {

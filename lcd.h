@@ -9,6 +9,7 @@
 #include FT_FREETYPE_H
 
 #include "../shared/utils/cLog.h"
+#include "FreeSansBold.h"
 
 //{{{  colours
 static const uint16_t Black       =  0x0000;  //   0,   0,   0
@@ -53,6 +54,8 @@ public:
     cLog::log (LOGINFO, "pigpio hwRev:%x version:%d", hardwareRevision, version);
 
     if (gpioInitialise() >= 0) {
+      setFont (getFreeSansBold(), getFreeSansBoldSize());
+
       mFrameBuf = (uint16_t*)malloc (getWidth() * getHeight() * 2);
       return true;
       }
