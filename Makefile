@@ -1,6 +1,7 @@
 TARGET    = lcd
 SRCS      = st7735.cpp \
-	    ../shared/utils/cLog.cpp
+	    ../shared/utils/cLog.cpp \
+	    FreeSansBold.cpp \
 #            pigpio/pigpio.c \
 #            pigpio/command.c \
 

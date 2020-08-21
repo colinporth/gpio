@@ -1,21 +1,17 @@
 // st7735.cpp
 #include <cstdint>
 #include <thread>
-#include "../shared/utils/cLog.h"
-//#include "pigpio/pigpio.h"
 #include <pigpio.h>
 #include <ft2build.h>
-
 #include FT_FREETYPE_H
-#include "FreeSansBold.c"
 
-static FT_Library library;
-static FT_Face face;
-static FT_GlyphSlot slot;
+#include "FreeSansBold.h"
+#include "../shared/utils/utils.h"
+#include "../shared/utils/cLog.h"
 
 using namespace std;
 
-//{{{  static const uint16_t colours
+//{{{  colours
 static const uint16_t Black       =  0x0000;  //   0,   0,   0
 static const uint16_t Blue        =  0x001F;  //   0,   0, 255
 static const uint16_t Green       =  0x07E0;  //   0, 255,   0
@@ -105,11 +101,12 @@ public:
       thread ([=]() {
         // write frameBuffer to lcd ram thread if changed
         while (true) {
-          if (mChanged) {
+          if (mUpdate || (mAutoUpdate && mChanged)) {
             mChanged = false;
+            mUpdate = false;
             command (ST7735_RAMWR, (const uint8_t*)mFrameBuf, kWidth * kHeight * 2);
             }
-          gpioDelay (10000);
+          gpioDelay (16000);
           }
         } ).detach();
       }
@@ -119,12 +116,7 @@ public:
   uint8_t getHeight() { return kHeight; }
 
   //{{{
-  void clear (uint16_t colour) {
-    rect (colour, 0,0, kWidth, kHeight);
-    }
-  //}}}
-  //{{{
-  void rect (uint16_t colour, int16_t xorg, int16_t yorg, uint16_t xlen, uint16_t ylen) {
+  void rect (uint16_t colour, int xorg, int yorg, int xlen, int ylen) {
 
     uint16_t colourReversed = (colour >> 8) | (colour << 8);
 
@@ -136,42 +128,84 @@ public:
     }
   //}}}
   //{{{
-  void pixel (uint16_t colour, int16_t x, int16_t y) {
+  void clear (uint16_t colour) {
+    rect (colour, 0,0, kWidth, kHeight);
+    }
+  //}}}
+
+  //{{{
+  void pixel (uint16_t colour, int x, int y) {
 
     mFrameBuf[(y*kWidth) + x] = (colour >> 8) | (colour << 8);
     mChanged = true;
     }
   //}}}
   //{{{
-  void blendPixel (uint16_t colour, uint8_t alpha, int16_t x, int16_t y) {
+  void blendPixel (uint16_t colour, uint8_t alpha, int x, int y) {
   // magical rgb565 alpha composite
+  // - linear interp bg * (1.0 - alpha) + fg * alpha
+  //   - factorized into: result = bg + (fg - bg) * alpha
+  //   - alpha is in Q1.5 format, so 0.0 is represented by 0, and 1.0 is represented by 32
+  // - Converts  0000000000000000rrrrrggggggbbbbb
+  // -     into  00000gggggg00000rrrrr000000bbbbb
 
-    if (alpha == 0) {
+    if (alpha >= 0) {
+      if ((x >= 0) && (y > 0) && (x < kWidth) && (y < kHeight)) {
+        if (alpha == 0xFF) {
+          mFrameBuf[(y*kWidth) + x] = (colour >> 8) | (colour << 8);
+          }
+        else {
+          uint16_t value = mFrameBuf[(y*kWidth) + x];
+          uint32_t bg = (value >> 8) | (value << 8);
+
+          uint32_t fg = colour;
+          fg = (fg | fg << 16) & 0x07e0f81f;
+          bg = (bg | bg << 16) & 0x07e0f81f;
+          bg += (((fg - bg) * ((alpha + 4) >> 3)) >> 5) & 0x07e0f81f;
+          bg |= bg >> 16;
+
+          mFrameBuf[(y*kWidth) + x] = (bg >> 8) | (bg << 8);
+          }
+        mChanged = true;
+        }
       }
-    else if (alpha == 0xFF)
-      mFrameBuf[(y*kWidth) + x] = (colour >> 8) | (colour << 8);
-    else {
-      // Converts  0000000000000000rrrrrggggggbbbbb
-      //     into  00000gggggg00000rrrrr000000bbbbb
-      uint32_t fg = colour;
-      fg = (fg | fg << 16) & 0x07e0f81f;
+    }
+  //}}}
+  //{{{
+  int text (uint16_t colour, int strX, int strY, FT_Face& face, int height, string str) {
 
-      uint16_t value = mFrameBuf[(y*kWidth) + x];
-      uint32_t bg = (value >> 8) | (value << 8);
-      bg = (bg | bg << 16) & 0x07e0f81f;
+    FT_Set_Pixel_Sizes (face, 0, height);
 
-      // This implements the linear interpolation formula: result = bg * (1.0 - alpha) + fg * alpha
-      // This can be factorized into: result = bg + (fg - bg) * alpha
-      // alpha is in Q1.5 format, so 0.0 is represented by 0, and 1.0 is represented by 32
-      uint32_t alpha1 = (alpha + 4) >> 3;
-      bg += (fg - bg) * alpha1 >> 5;
-      bg &= 0x07e0f81f;
-      bg = bg | (bg >> 16);
+    for (unsigned i = 0; i < str.size(); i++) {
+      FT_Load_Char (face, str[i], FT_LOAD_RENDER);
+      FT_GlyphSlot slot = face->glyph;
 
-      mFrameBuf[(y*kWidth) + x] = (bg >> 8) | (bg << 8);
+      int x = strX + slot->bitmap_left;
+      int y = strY + height - slot->bitmap_top;
+
+      if (slot->bitmap.buffer) {
+        for (unsigned bitmapY = 0; bitmapY < slot->bitmap.rows; bitmapY++) {
+          auto bitmapPtr = slot->bitmap.buffer + (bitmapY * slot->bitmap.pitch);
+          for (unsigned bitmapX = 0; bitmapX < slot->bitmap.width; bitmapX++)
+            blendPixel (colour, *bitmapPtr++, x + bitmapX, y + bitmapY);
+          }
+
+        }
+      strX += slot->advance.x / 64;
       }
 
-    mChanged = true;
+    return strX;
+    }
+  //}}}
+
+  //{{{
+  void update() {
+    mUpdate = true;
+    }
+  //}}}
+  //{{{
+  void setAutoUpdate() {
+    mAutoUpdate = true;
     }
   //}}}
 
@@ -252,28 +286,10 @@ private:
 
   int mHandle = 0;
   bool mChanged = true;
-  uint16_t mFrameBuf [kWidth * kHeight * 2];
+  bool mUpdate = false;
+  bool mAutoUpdate = false;
+  uint16_t mFrameBuf [kWidth * kHeight * 2]; // RGB565
   };
-//}}}
-
-//{{{
-int textChar (cLcd& lcd, uint16_t colour, char ch, int height, int dx, int dy) {
-
-  FT_Set_Pixel_Sizes (face, 0, height);
-  FT_Load_Char (face, ch, FT_LOAD_RENDER);
-
-  dx += slot->bitmap_left;
-  dy += height - slot->bitmap_top;
-
-  if (slot->bitmap.buffer) {
-    for (unsigned y = 0; y < slot->bitmap.rows; y++)
-      for (unsigned x = 0; x < slot->bitmap.width; x++)
-        lcd.blendPixel (colour, slot->bitmap.buffer[(y * slot->bitmap.pitch) + x], dx+x, dy+y);
-    return slot->advance.x / 64;
-    }
-
-  return 0;
-  }
 //}}}
 
 int main() {
@@ -283,46 +299,39 @@ int main() {
   cLcd lcd;
   lcd.initialise();
 
+  FT_Library library;
   FT_Init_FreeType (&library);
-  FT_New_Memory_Face (library, (FT_Byte*)freeSansBold, freeSansBold_len, 0, &face);
-  slot = face->glyph;
+
+  FT_Face face;
+  FT_New_Memory_Face (library, (FT_Byte*)getFreeSansBold(), getFreeSansBoldSize(), 0, &face);
 
   while (true) {
-    int height = 5;
-    while (height++ < 130) {
+    for (int i = 0; i < 100; i++) {
+      lcd.clear (Black);
+      lcd.text (White, 0,0, face, 110, dec(i,2));
+      lcd.update();
+      gpioDelay (100000);
+      }
+
+    int height = 8;
+    while (height++ < lcd.getHeight()) {
       int x = 0;
       int y = 0;
-      lcd.clear (DarkCyan);
+      lcd.clear (Magenta);
       for (char ch = 'A'; ch < 0x7f; ch++) {
-        x += textChar (lcd, White, ch, height, x, y);
+        x = lcd.text (White, x, y, face, height, string(1,ch));
         if (x > lcd.getWidth()) {
           x = 0;
           y += height;
-          if (y > 160)
+          if (y > lcd.getHeight())
             break;
           }
         }
+      lcd.text (Yellow, 0,0, face, 20, "Hello Colin");
+      lcd.update();
       gpioDelay (40000);
       }
     }
-
-  lcd.clear (Yellow);
-  gpioDelay (200000);
-
-  lcd.clear (Green);
-  gpioDelay (200000);
-
-  for (int i = 0; i < lcd.getWidth(); i++)
-    lcd.rect (Blue, 0, i, i, 1);
-  gpioDelay (200000);
-
-  for (int i = 0; i < lcd.getWidth(); i++)
-    lcd.rect (Cyan, 0, i, i, 1);
-  gpioDelay (200000);
-
-  for (int i = 0; i < lcd.getWidth(); i++)
-    lcd.rect (White, 0, i, i, 1);
-  gpioDelay (200000);
 
   return 0;
   }
