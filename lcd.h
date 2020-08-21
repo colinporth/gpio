@@ -206,6 +206,7 @@ private:
   const uint8_t mHeight;
   };
 //}}}
+
 //{{{
 class cLcd7735 : public cLcd {
 public:
@@ -340,7 +341,7 @@ private:
   //}}}
   };
 //}}}
-//{{{
+
 class cLcd9225b : public cLcd {
 public:
   cLcd9225b() : cLcd(kWidth, kHeight) {}
@@ -463,4 +464,3 @@ private:
     }
   //}}}
   };
-//}}}
