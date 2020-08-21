@@ -34,11 +34,11 @@ static const uint16_t DarkGrey    =  0x7BEF;  // 128, 128, 128
 static const uint16_t Orange      =  0xFD20;  // 255, 165,   0
 static const uint16_t GreenYellow =  0xAFE5;  // 173, 255,  47
 //}}}
-
 //{{{
 class cLcd {
 public:
-  cLcd (const uint8_t width, const uint8_t height) : mWidth(width), mHeight(height) {}
+  cLcd (const uint8_t width, const uint8_t height, const uint8_t dcPin) :
+    mWidth(width), mHeight(height), mDcPin(dcPin) {}
   //{{{
   virtual ~cLcd() {
     spiClose (mHandle);
@@ -46,23 +46,7 @@ public:
     }
   //}}}
 
-  //{{{
-  virtual bool initialise() {
-
-    unsigned hardwareRevision = gpioHardwareRevision();
-    unsigned version = gpioVersion();
-    cLog::log (LOGINFO, "pigpio hwRev:%x version:%d", hardwareRevision, version);
-
-    if (gpioInitialise() >= 0) {
-      setFont (getFreeSansBold(), getFreeSansBoldSize());
-
-      mFrameBuf = (uint16_t*)malloc (getWidth() * getHeight() * 2);
-      return true;
-      }
-
-    return false;
-    }
-  //}}}
+  virtual bool initialise() = 0;
   //{{{
   void setFont (const uint8_t* font, int fontSize)  {
 
@@ -71,8 +55,8 @@ public:
     }
   //}}}
 
-  const uint8_t getWidth() { return mWidth; }
-  const uint8_t getHeight() { return mHeight; }
+  constexpr uint8_t getWidth() { return mWidth; }
+  constexpr uint8_t getHeight() { return mHeight; }
 
   //{{{
   void rect (uint16_t colour, int xorg, int yorg, int xlen, int ylen) {
@@ -167,12 +151,28 @@ public:
     }
   //}}}
 
-  int mHandle = 0;
   bool mChanged = false;
   bool mUpdate = false;
   bool mAutoUpdate = false;
 
 protected:
+  //{{{
+  bool initResources() {
+
+    unsigned hardwareRevision = gpioHardwareRevision();
+    unsigned version = gpioVersion();
+    cLog::log (LOGINFO, "pigpio hwRev:%x version:%d", hardwareRevision, version);
+
+    if (gpioInitialise() >= 0) {
+      setFont (getFreeSansBold(), getFreeSansBoldSize());
+
+      mFrameBuf = (uint16_t*)malloc (getWidth() * getHeight() * 2);
+      return true;
+      }
+
+    return false;
+    }
+  //}}}
   //{{{
   void reset (const uint8_t pin) {
     // setup and pulse reset pin
@@ -196,7 +196,44 @@ protected:
   void initSpi (const int clockSpeed) {
     // setup spi0, use CE0 active lo as CS
     mHandle = spiOpen (0, clockSpeed, 0);
-   }
+    }
+  //}}}
+
+  //{{{
+  void command (uint8_t command) {
+
+    gpioWrite (mDcPin, 0);
+    spiWrite (mHandle, (char*)(&command), 1);
+    gpioWrite (mDcPin, 1);
+    }
+  //}}}
+  //{{{
+  void commandData (uint8_t command, const uint16_t data) {
+
+    gpioWrite (mDcPin, 0);
+    spiWrite (mHandle, (char*)(&command), 1);
+    gpioWrite (mDcPin, 1);
+
+    char dataBytes[2] = { (char)(data >> 8), (char)(data & 0xff) };
+    spiWrite (mHandle, (char*)dataBytes, 2);
+    }
+  //}}}
+  //{{{
+  void commandData (uint8_t command, const uint8_t* data, int len) {
+
+    gpioWrite (mDcPin, 0);
+    spiWrite (mHandle, (char*)(&command), 1);
+    gpioWrite (mDcPin, 1);
+
+    if (data) {
+      if (len > 0x10000) {
+        spiWrite (mHandle, (char*)data, len/2);
+        spiWrite (mHandle, (char*)data + (len/2), len/2);
+        }
+      else
+        spiWrite (mHandle, (char*)data, len);
+      }
+    }
   //}}}
 
   uint16_t* mFrameBuf = nullptr;
@@ -207,24 +244,26 @@ private:
 
   const uint8_t mWidth;
   const uint8_t mHeight;
+
+  const uint8_t mDcPin;
+  int mHandle = 0;
   };
 //}}}
-
 //{{{
 class cLcd7735 : public cLcd {
 public:
-  cLcd7735() : cLcd (kWidth, kHeight) {}
+  cLcd7735() : cLcd (kWidth, kHeight,kDcPin) {}
   virtual ~cLcd7735() {}
 
   //{{{
   virtual bool initialise() {
 
-    if (cLcd::initialise()) {
+    if (initResources()) {
       reset (kResetPin);
       initDcPin (kDcPin);
       initSpi (kSpiClock);
 
-      commandData (ST7735_SLPOUT);
+      command (ST7735_SLPOUT);
       gpioDelay (120);
 
       commandData (ST7735_FRMCTR1, kFRMCTRData, 3); // frameRate normal mode
@@ -248,7 +287,7 @@ public:
       commandData (ST7735_CASET, caSetData, sizeof(caSetData));
       commandData (ST7735_RASET, raSetData, sizeof(raSetData));
 
-      commandData (ST7735_DISPON); // display ON
+      command (ST7735_DISPON); // display ON
 
       std::thread ([=]() {
         // write frameBuffer to lcd ram thread if changed
@@ -331,29 +370,18 @@ private:
   constexpr static uint8_t kGMCTRN1Data[16] = { 0x03, 0x1d, 0x07, 0x06, 0x2E, 0x2C, 0x29, 0x2D,
                                                 0x2E, 0x2E, 0x37, 0x3F, 0x00, 0x00, 0x02, 0x10 } ;
   //}}}
-  //{{{
-  void commandData (uint8_t command, const uint8_t* data = nullptr, int len = 0) {
-
-    gpioWrite (kDcPin, 0);
-    spiWrite (mHandle, (char*)(&command), 1);
-    gpioWrite (kDcPin, 1);
-
-    if (data)
-      spiWrite (mHandle, (char*)data, len);
-    }
-  //}}}
   };
 //}}}
 
 class cLcd9225b : public cLcd {
 public:
-  cLcd9225b() : cLcd(kWidth, kHeight) {}
+  cLcd9225b() : cLcd(kWidth, kHeight, kDcPin) {}
   virtual ~cLcd9225b() {}
 
   //{{{
   virtual bool initialise() {
 
-    if (cLcd::initialise()) {
+    if (initResources()) {
       reset (kResetPin);
       initDcPin (kDcPin);
       initSpi (kSpiClock);
@@ -418,18 +446,11 @@ public:
 
       std::thread ([=]() {
         // thread lambda - write frameBuffer to lcd ram if updated
-        char command = 0x22;
         while (true) {
           if (mUpdate || (mAutoUpdate && mChanged)) {
             mUpdate = false;
             mChanged = false;
-
-            gpioWrite (kDcPin, 0);
-            spiWrite (mHandle, &command, 1);
-            gpioWrite (kDcPin, 1);
-
-            spiWrite (mHandle, (char*)mFrameBuf, getWidth() * getHeight());
-            spiWrite (mHandle, (char*)(mFrameBuf) + (getWidth() * getHeight()), getWidth() * getHeight());
+            commandData (0x22, (const uint8_t*)mFrameBuf, getWidth() * getHeight() * 2);
             }
           gpioDelay (16000);
           }
@@ -454,16 +475,4 @@ private:
   // - SPI0 - SCLK                                  J8 pin21
   constexpr static const uint8_t kResetPin = 25; // J8 pin22
   // - SPI0 - CE0                                   J8 pin24
-
-  //{{{
-  void commandData (uint8_t command, const uint16_t data) {
-
-    gpioWrite (kDcPin, 0);
-    spiWrite (mHandle, (char*)(&command), 1);
-    gpioWrite (kDcPin, 1);
-
-    char dataBytes[2] = { (char)(data >> 8), (char)(data & 0xff) };
-    spiWrite (mHandle, (char*)dataBytes, 2);
-    }
-  //}}}
   };
