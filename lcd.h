@@ -236,6 +236,20 @@ protected:
     }
   //}}}
 
+  void launchUpdateThread (uint8_t command) {
+
+    std::thread ([=]() {
+      // write frameBuffer to lcd ram thread if changed
+      while (true) {
+        if (mUpdate || (mAutoUpdate && mChanged)) {
+          mChanged = false;
+          mUpdate = false;
+          commandData (command, (const uint8_t*)mFrameBuf, getWidth() * getHeight() * 2);
+          }
+        gpioDelay (16000);
+        }
+      } ).detach();
+    }
   uint16_t* mFrameBuf = nullptr;
 
 private:
@@ -289,17 +303,7 @@ public:
 
       command (ST7735_DISPON); // display ON
 
-      std::thread ([=]() {
-        // write frameBuffer to lcd ram thread if changed
-        while (true) {
-          if (mUpdate || (mAutoUpdate && mChanged)) {
-            mChanged = false;
-            mUpdate = false;
-            commandData (ST7735_RAMWR, (const uint8_t*)mFrameBuf, getWidth() * getHeight() * 2);
-            }
-          gpioDelay (16000);
-          }
-        } ).detach();
+      launchUpdateThread (ST7735_RAMWR);
       return true;
       }
 
@@ -444,17 +448,7 @@ public:
       commandData (0x21, 0);
       //}}}
 
-      std::thread ([=]() {
-        // thread lambda - write frameBuffer to lcd ram if updated
-        while (true) {
-          if (mUpdate || (mAutoUpdate && mChanged)) {
-            mUpdate = false;
-            mChanged = false;
-            commandData (0x22, (const uint8_t*)mFrameBuf, getWidth() * getHeight() * 2);
-            }
-          gpioDelay (16000);
-          }
-        } ).detach();
+      launchUpdateThread (0x22);
       return true;
       }
 
