@@ -2,11 +2,12 @@
 #include <cstdint>
 #include <thread>
 #include "../shared/utils/cLog.h"
-#include "pigpio/pigpio.h"
-
-#include "FreeSansBold.c"
+//#include "pigpio/pigpio.h"
+#include <pigpio.h>
 #include <ft2build.h>
+
 #include FT_FREETYPE_H
+#include "FreeSansBold.c"
 
 static FT_Library library;
 static FT_Face face;
@@ -72,41 +73,41 @@ public:
       gpioDelay (120000);
       //}}}
 
-      // setup spi0, CE0 active lo
+      // setup spi0, use CE0 active lo as CS
       mHandle = spiOpen (0, kSpiClock, 0);
 
-      setRegister (ST7735_SLPOUT, nullptr, 0);
+      command (ST7735_SLPOUT);
       gpioDelay (120);
 
-      setRegister (ST7735_FRMCTR1, kFRMCTRData, 3); // frameRate normal mode
-      setRegister (ST7735_FRMCTR2, kFRMCTRData, 3); // frameRate idle mode
-      setRegister (ST7735_FRMCTR3, kFRMCTRData, 6); // frameRate partial mode
-      setRegister (ST7735_INVCTR, kINVCTRData, sizeof(kINVCTRData)); // Inverted mode off
+      command (ST7735_FRMCTR1, kFRMCTRData, 3); // frameRate normal mode
+      command (ST7735_FRMCTR2, kFRMCTRData, 3); // frameRate idle mode
+      command (ST7735_FRMCTR3, kFRMCTRData, 6); // frameRate partial mode
+      command (ST7735_INVCTR, kINVCTRData, sizeof(kINVCTRData)); // Inverted mode off
 
-      setRegister (ST7735_PWCTR1, kPowerControlData1, sizeof(kPowerControlData1)); // POWER CONTROL 1
-      setRegister (ST7735_PWCTR2, kPowerControlData2, sizeof(kPowerControlData2)); // POWER CONTROL 2
-      setRegister (ST7735_PWCTR3, kPowerControlData3, sizeof(kPowerControlData3)); // POWER CONTROL 3
-      setRegister (ST7735_PWCTR4, kPowerControlData4, sizeof(kPowerControlData4)); // POWER CONTROL 4
-      setRegister (ST7735_PWCTR5, kPowerControlData5, sizeof(kPowerControlData5)); // POWER CONTROL 5
+      command (ST7735_PWCTR1, kPowerControlData1, sizeof(kPowerControlData1)); // POWER CONTROL 1
+      command (ST7735_PWCTR2, kPowerControlData2, sizeof(kPowerControlData2)); // POWER CONTROL 2
+      command (ST7735_PWCTR3, kPowerControlData3, sizeof(kPowerControlData3)); // POWER CONTROL 3
+      command (ST7735_PWCTR4, kPowerControlData4, sizeof(kPowerControlData4)); // POWER CONTROL 4
+      command (ST7735_PWCTR5, kPowerControlData5, sizeof(kPowerControlData5)); // POWER CONTROL 5
 
-      setRegister (ST7735_VMCTR1, kVMCTR1Data, sizeof(kVMCTR1Data)); // POWER CONTROL 6
-      setRegister (ST7735_MADCTL, kMADCTData, sizeof(kMADCTData)); // ORIENTATION
-      setRegister (ST7735_COLMOD, kCOLMODData, sizeof(kCOLMODData)); // COLOR MODE - 16bit per pixel
+      command (ST7735_VMCTR1, kVMCTR1Data, sizeof(kVMCTR1Data)); // POWER CONTROL 6
+      command (ST7735_MADCTL, kMADCTData, sizeof(kMADCTData)); // ORIENTATION
+      command (ST7735_COLMOD, kCOLMODData, sizeof(kCOLMODData)); // COLOR MODE - 16bit per pixel
 
-      setRegister (ST7735_GMCTRP1, kGMCTRP1Data, sizeof(kGMCTRP1Data)); // gamma GMCTRP1
-      setRegister (ST7735_GMCTRN1, kGMCTRN1Data, sizeof(kGMCTRN1Data)); // Gamma GMCTRN1
+      command (ST7735_GMCTRP1, kGMCTRP1Data, sizeof(kGMCTRP1Data)); // gamma GMCTRP1
+      command (ST7735_GMCTRN1, kGMCTRN1Data, sizeof(kGMCTRN1Data)); // Gamma GMCTRN1
 
-      setRegister (ST7735_CASET, caSetData, sizeof(caSetData));
-      setRegister (ST7735_RASET, raSetData, sizeof(raSetData));
+      command (ST7735_CASET, caSetData, sizeof(caSetData));
+      command (ST7735_RASET, raSetData, sizeof(raSetData));
 
-      setRegister (ST7735_DISPON, nullptr, 0); // display ON
+      command (ST7735_DISPON); // display ON
 
       thread ([=]() {
         // write frameBuffer to lcd ram thread if changed
         while (true) {
           if (mChanged) {
             mChanged = false;
-            setRegister (ST7735_RAMWR, (const uint8_t*)mFrameBuf, kWidth * kHeight * 2);
+            command (ST7735_RAMWR, (const uint8_t*)mFrameBuf, kWidth * kHeight * 2);
             }
           gpioDelay (10000);
           }
@@ -141,6 +142,38 @@ public:
     mChanged = true;
     }
   //}}}
+  //{{{
+  void blendPixel (uint16_t colour, uint8_t alpha, int16_t x, int16_t y) {
+  // magical rgb565 alpha composite
+
+    if (alpha == 0) {
+      }
+    else if (alpha == 0xFF)
+      mFrameBuf[(y*kWidth) + x] = (colour >> 8) | (colour << 8);
+    else {
+      // Converts  0000000000000000rrrrrggggggbbbbb
+      //     into  00000gggggg00000rrrrr000000bbbbb
+      uint32_t fg = colour;
+      fg = (fg | fg << 16) & 0x07e0f81f;
+
+      uint16_t value = mFrameBuf[(y*kWidth) + x];
+      uint32_t bg = (value >> 8) | (value << 8);
+      bg = (bg | bg << 16) & 0x07e0f81f;
+
+      // This implements the linear interpolation formula: result = bg * (1.0 - alpha) + fg * alpha
+      // This can be factorized into: result = bg + (fg - bg) * alpha
+      // alpha is in Q1.5 format, so 0.0 is represented by 0, and 1.0 is represented by 32
+      uint32_t alpha1 = (alpha + 4) >> 3;
+      bg += (fg - bg) * alpha1 >> 5;
+      bg &= 0x07e0f81f;
+      bg = bg | (bg >> 16);
+
+      mFrameBuf[(y*kWidth) + x] = (bg >> 8) | (bg << 8);
+      }
+
+    mChanged = true;
+    }
+  //}}}
 
 private:
   static const uint8_t kWidth = 128;
@@ -156,7 +189,7 @@ private:
   // - SPI0 - CE0                         J8 pin24
   static const int kSpiClock = 24000000;
 
-  //{{{  register const
+  //{{{  command const
   constexpr static uint8_t ST7735_SLPOUT  = 0x11; // no data
   constexpr static uint8_t ST7735_DISPOFF = 0x28; // no data
   constexpr static uint8_t ST7735_DISPON  = 0x29; // no data
@@ -206,7 +239,7 @@ private:
                                                 0x2E, 0x2E, 0x37, 0x3F, 0x00, 0x00, 0x02, 0x10 } ;
   //}}}
   //{{{
-  void setRegister (uint8_t command, const uint8_t* data, int len) {
+  void command (uint8_t command, const uint8_t* data = nullptr, int len = 0) {
 
     gpioWrite (kDcPin, 0);
     spiWrite (mHandle, (char*)(&command), 1);
@@ -224,23 +257,22 @@ private:
 //}}}
 
 //{{{
-void type (cLcd& lcd, char ch, int size) {
+int textChar (cLcd& lcd, uint16_t colour, char ch, int height, int dx, int dy) {
 
-  FT_Set_Pixel_Sizes (face, 0, size);
+  FT_Set_Pixel_Sizes (face, 0, height);
   FT_Load_Char (face, ch, FT_LOAD_RENDER);
+
+  dx += slot->bitmap_left;
+  dy += height - slot->bitmap_top;
+
   if (slot->bitmap.buffer) {
-     for (unsigned y = 0; y < slot->bitmap.rows; y++) {
-      for (int x = 0; x < slot->bitmap.pitch; x++) {
-        uint8_t grey = slot->bitmap.buffer[(y * slot->bitmap.pitch) + x];
-        uint16_t rgb = ((grey << 8) & 0xF800) | // b 15:11
-                       ((grey << 3) & 0x07E0) | // g 10:5
-                       ((grey >> 3) & 0x001F);  // r 4:0
-        lcd.pixel (rgb, x, y);
-        //printf ("%2x ", slot->bitmap.buffer[(y * slot->bitmap.pitch) + x]);
-        }
-      printf ("\n");
-      }
+    for (unsigned y = 0; y < slot->bitmap.rows; y++)
+      for (unsigned x = 0; x < slot->bitmap.width; x++)
+        lcd.blendPixel (colour, slot->bitmap.buffer[(y * slot->bitmap.pitch) + x], dx+x, dy+y);
+    return slot->advance.x / 64;
     }
+
+  return 0;
   }
 //}}}
 
@@ -255,40 +287,42 @@ int main() {
   FT_New_Memory_Face (library, (FT_Byte*)freeSansBold, freeSansBold_len, 0, &face);
   slot = face->glyph;
 
-  type (lcd, 'A', 20);
-  //  setTTPixels (colour, slot->bitmap.buffer,
-  //               xorg + slot->bitmap_left, yorg + height - slot->bitmap_top,
-  //               slot->bitmap.pitch, slot->bitmap.rows);
-  //xorg += slot->advance.x/64;
-
   while (true) {
-    lcd.clear (Red);
-    type (lcd, 'B', 30);
-    gpioDelay (200000);
-
-    lcd.clear (Yellow);
-    type (lcd, 'C', 40);
-    gpioDelay (200000);
-
-    lcd.clear (Green);
-    type (lcd, 'D', 50);
-    gpioDelay (200000);
-
-    for (int i = 0; i < lcd.getWidth(); i++)
-      lcd.rect (Blue, 0, i, i, 1);
-    type (lcd, 'E', 60);
-    gpioDelay (200000);
-
-    for (int i = 0; i < lcd.getWidth(); i++)
-      lcd.rect (Cyan, 0, i, i, 1);
-    type (lcd, 'F', 70);
-    gpioDelay (200000);
-
-    for (int i = 0; i < lcd.getWidth(); i++)
-      lcd.rect (White, 0, i, i, 1);
-    type (lcd, 'G', 80);
-    gpioDelay (200000);
+    int height = 5;
+    while (height++ < 130) {
+      int x = 0;
+      int y = 0;
+      lcd.clear (DarkCyan);
+      for (char ch = 'A'; ch < 0x7f; ch++) {
+        x += textChar (lcd, White, ch, height, x, y);
+        if (x > lcd.getWidth()) {
+          x = 0;
+          y += height;
+          if (y > 160)
+            break;
+          }
+        }
+      gpioDelay (40000);
+      }
     }
+
+  lcd.clear (Yellow);
+  gpioDelay (200000);
+
+  lcd.clear (Green);
+  gpioDelay (200000);
+
+  for (int i = 0; i < lcd.getWidth(); i++)
+    lcd.rect (Blue, 0, i, i, 1);
+  gpioDelay (200000);
+
+  for (int i = 0; i < lcd.getWidth(); i++)
+    lcd.rect (Cyan, 0, i, i, 1);
+  gpioDelay (200000);
+
+  for (int i = 0; i < lcd.getWidth(); i++)
+    lcd.rect (White, 0, i, i, 1);
+  gpioDelay (200000);
 
   return 0;
   }
