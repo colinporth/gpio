@@ -12,6 +12,8 @@
 #include "../shared/utils/utils.h"
 #include "../shared/utils/cLog.h"
 #include "fonts/FreeSansBold.h"
+
+using namespace std;
 //}}}
 //{{{  freetype library static include
 // !!! singleton assumed !|! saves exporting FREETYPE outside
@@ -98,7 +100,7 @@ void cLcd::blendPixel (const uint16_t colour, const uint8_t alpha, const int x, 
   }
 //}}}
 //{{{
-int cLcd::text (const uint16_t colour, const int strX, const int strY, const int height, const std::string& str) {
+int cLcd::text (const uint16_t colour, const int strX, const int strY, const int height, const string& str) {
 
   FT_Set_Pixel_Sizes (mFace, 0, height);
 
@@ -215,7 +217,7 @@ void cLcd::commandData (const uint8_t command, const uint8_t* data, const int le
 //{{{
 void cLcd::launchUpdateThread (const uint8_t command) {
 
-  std::thread ([=]() {
+  thread ([=]() {
     // write frameBuffer to lcd ram thread if changed
     while (true) {
       if (mUpdate || (mAutoUpdate && mChanged)) {
