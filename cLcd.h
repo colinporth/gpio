@@ -56,7 +56,7 @@ protected:
   bool initResources();
   void reset (const uint8_t gpio);
   void setDataCommandGpio (const uint8_t gpio);
-  void initSpi (const int clockSpeed, const bool mode0, const bool enableAutoCE0);
+  void initSpi (const int clockSpeed, const bool mode0);
 
   void writeCommand (const uint8_t command);
   void writeCommandData (const uint8_t command, const uint16_t data);
@@ -80,23 +80,27 @@ private:
   };
 //}}}
 
+//{{{
 class cLcd7735 : public cLcd {
 public:
   cLcd7735();
   virtual ~cLcd7735() {}
   virtual bool initialise();
   };
-
+//}}}
+//{{{
 class cLcd9225b : public cLcd {
 public:
   cLcd9225b();
   virtual ~cLcd9225b() {}
   virtual bool initialise();
   };
-
+//}}}
+//{{{
 class cLcd9320 : public cLcd {
 public:
   cLcd9320();
   virtual ~cLcd9320() {}
   virtual bool initialise();
   };
+//}}}
