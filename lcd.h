@@ -27,7 +27,7 @@ constexpr uint16_t kWhite       =  0xFFFF;  // 255, 255, 255
 //{{{
 class cLcd {
 public:
-  cLcd (const uint8_t width, const uint8_t height, const uint8_t dcPin)
+  cLcd (const uint16_t width, const uint16_t height, const uint8_t dcPin)
     : mWidth(width), mHeight(height), mDcPin(dcPin) {}
   virtual ~cLcd();
 
@@ -35,8 +35,8 @@ public:
 
   void setFont (const uint8_t* font, const int fontSize);
 
-  constexpr uint8_t getWidth() { return mWidth; }
-  constexpr uint8_t getHeight() { return mHeight; }
+  constexpr uint16_t getWidth() { return mWidth; }
+  constexpr uint16_t getHeight() { return mHeight; }
 
   void rect (const uint16_t colour, const int xorg, const int yorg, const int xlen, const int ylen);
   void pixel (const uint16_t colour, const int x, const int y);
@@ -63,8 +63,8 @@ protected:
   void launchUpdateThread (const uint8_t command);
 
 private:
-  const uint8_t mWidth;
-  const uint8_t mHeight;
+  const uint16_t mWidth;
+  const uint16_t mHeight;
 
   bool mUpdate = false;
   bool mChanged = false;
@@ -87,5 +87,12 @@ class cLcd9225b : public cLcd {
 public:
   cLcd9225b();
   virtual ~cLcd9225b() {}
+  virtual bool initialise();
+  };
+
+class cLcd9320 : public cLcd {
+public:
+  cLcd9320();
+  virtual ~cLcd9320() {}
   virtual bool initialise();
   };

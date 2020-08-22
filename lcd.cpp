@@ -204,9 +204,15 @@ void cLcd::commandData (const uint8_t command, const uint8_t* data, const int le
   gpioWrite (mDcPin, 1);
 
   if (data) {
-    if (len > 0x10000) {
-      spiWrite (mHandle, (char*)data, len/2);
-      spiWrite (mHandle, (char*)data + (len/2), len/2);
+    if (len >= 0x10000) {
+      int bytesSent = 0;
+      int bytesLeft = len;
+      while (bytesSent < len) {
+        int sendBytes = (bytesLeft > 0x10000) ? 0x10000 : bytesLeft;
+        spiWrite (mHandle, (char*)data+bytesSent, sendBytes);
+        bytesSent += sendBytes;
+        bytesLeft -= sendBytes;
+        }
       }
     else
       spiWrite (mHandle, (char*)data, len);
@@ -232,8 +238,8 @@ void cLcd::launchUpdateThread (const uint8_t command) {
 //}}}
 
 // cLcd7735 - public
-constexpr uint8_t kWidth7735 = 128;
-constexpr uint8_t kHeight7735 = 160;
+constexpr uint16_t kWidth7735 = 128;
+constexpr uint16_t kHeight7735 = 160;
 constexpr static const int kSpiClock7735 = 24000000;
 //{{{  command constexpr
 constexpr uint8_t k7335_SLPOUT  = 0x11; // no data
@@ -329,8 +335,8 @@ bool cLcd7735::initialise() {
 //}}}
 
 // cLcd9225b - public
-constexpr uint8_t kWidth9225b = 176;
-constexpr uint8_t kHeight9225b = 220;
+constexpr uint16_t kWidth9225b = 176;
+constexpr uint16_t kHeight9225b = 220;
 constexpr int kSpiClock9225b = 16000000;
 
 cLcd9225b::cLcd9225b() : cLcd(kWidth9225b, kHeight9225b, kDcPin) {}
@@ -399,6 +405,27 @@ bool cLcd9225b::initialise() {
     commandData (0x20, 0);
     commandData (0x21, 0);
     //}}}
+
+    launchUpdateThread (0x22);
+    return true;
+    }
+
+  return false;
+  }
+//}}}
+
+// cLcd9320 - public
+constexpr uint16_t kWidth9320 = 240;
+constexpr uint16_t kHeight9320 = 320;
+constexpr int kSpiClock9320 = 2000000;
+
+cLcd9320::cLcd9320() : cLcd(kWidth9320, kHeight9320, kDcPin) {}
+//{{{
+bool cLcd9320::initialise() {
+
+  if (initResources()) {
+    reset (kResetPin);
+    initSpi (kSpiClock9320);
 
     launchUpdateThread (0x22);
     return true;
