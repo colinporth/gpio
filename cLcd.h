@@ -94,18 +94,18 @@ public:
   };
 //}}}
 //{{{
-class cLcd9225b : public cLcd {
-public:
-  cLcd9225b();
-  virtual ~cLcd9225b() {}
-  virtual bool initialise();
-  };
-//}}}
-//{{{
 class cLcd9320 : public cLcd {
 public:
   cLcd9320();
   virtual ~cLcd9320() {}
+  virtual bool initialise();
+  };
+//}}}
+//{{{
+class cLcd9225b : public cLcd {
+public:
+  cLcd9225b();
+  virtual ~cLcd9225b() {}
   virtual bool initialise();
   };
 //}}}

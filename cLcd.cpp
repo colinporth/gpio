@@ -31,7 +31,7 @@ constexpr uint8_t kDataCommandGpio  = 24;  // J8 pin18
 // - SPI0 - SCLK                              J8 pin21
 constexpr uint8_t kResetGpio = 25;         // J8 pin22
 // - SPI0 - CE0                               J8 pin24
-constexpr uint8_t kSpiCe0Gpio = 8;         // J8 pin22
+constexpr uint8_t kSpiCe0Gpio = 8;         // J8 pin24
 
 // cLcd - public
 //{{{
@@ -187,7 +187,6 @@ void cLcd::writeCommand (const uint8_t command) {
     spiWrite (mSpiHandle, (char*)commandSequence, 3);
     gpioWrite (mChipEnableGpio, 1);
     }
-
   else {
     gpioWrite (mDataCommandGpio, 0);
     spiWrite (mSpiHandle, (char*)(&command), 1);
@@ -199,49 +198,30 @@ void cLcd::writeCommand (const uint8_t command) {
 //{{{
 void cLcd::writeCommandData (const uint8_t command, const uint16_t data) {
 
-  if (mUseSequence) {
-    uint8_t commandSequence[3] = { 0x70, 0, command };
-    gpioWrite (mChipEnableGpio, 0);
-    spiWrite (mSpiHandle, (char*)commandSequence, 3);
-    gpioWrite (mChipEnableGpio, 1);
+  writeCommand (command);
 
+  if (mUseSequence) {
     uint8_t dataSequence[3] = { 0x72, (uint8_t)(data >> 8), (uint8_t)(data & 0xff) };
     gpioWrite (mChipEnableGpio, 0);
     spiWrite (mSpiHandle, (char*)dataSequence, 3);
     gpioWrite (mChipEnableGpio, 1);
     }
-
   else {
-    gpioWrite (mDataCommandGpio, 0);
-    spiWrite (mSpiHandle, (char*)(&command), 1);
-    gpioWrite (mDataCommandGpio, 1);
-
     char dataBytes[2] = { (char)(data >> 8), (char)(data & 0xff) };
     spiWrite (mSpiHandle, (char*)dataBytes, 2);
     }
-
   }
 //}}}
 //{{{
 void cLcd::writeCommandMultipleData (const uint8_t command, const uint8_t* data, const int len) {
 
-  if (mUseSequence) {
-    // we manage the ce
-    uint8_t commandSequence[3] = { 0x70, 0, command };
-    gpioWrite (mChipEnableGpio, 0);
-    spiWrite (mSpiHandle, (char*)commandSequence, 3);
-    gpioWrite (mChipEnableGpio, 1);
+  writeCommand (command);
 
-    // send data start
+  if (mUseSequence) {
+    // we manage the ce, send data start
     uint8_t dataSequenceStart = 0x72;
     gpioWrite (mChipEnableGpio, 0);
     spiWrite (mSpiHandle, (char*)(&dataSequenceStart), 1);
-    }
-  else {
-    // spi manages the ce
-    gpioWrite (mDataCommandGpio, 0);
-    spiWrite (mSpiHandle, (char*)(&command), 1);
-    gpioWrite (mDataCommandGpio, 1);
     }
 
   // send data
@@ -276,6 +256,7 @@ void cLcd::launchUpdateThread (const uint8_t command) {
   }
 //}}}
 
+// specific device classes
 //{{{  cLcd7735
 constexpr uint16_t kWidth7735 = 128;
 constexpr uint16_t kHeight7735 = 160;
@@ -369,82 +350,6 @@ bool cLcd7735::initialise() {
   return false;
   }
 //}}}
-//{{{  cLcd9225b
-constexpr uint16_t kWidth9225b = 176;
-constexpr uint16_t kHeight9225b = 220;
-constexpr int kSpiClock9225b = 16000000;
-
-cLcd9225b::cLcd9225b() : cLcd(kWidth9225b, kHeight9225b, kSpiClock9225b, true,
-                              kResetGpio, kDataCommandGpio, 0xFF) {}
-
-bool cLcd9225b::initialise() {
-
-  if (initResources()) {
-    writeCommandData (0x01, 0x011C); // set SS and NL bit
-
-    writeCommandData (0x02, 0x0100); // set 1 line inversion
-    writeCommandData (0x03, 0x1030); // set GRAM write direction and BGR=1
-    writeCommandData (0x08, 0x0808); // set BP and FP
-    writeCommandData (0x0C, 0x0000); // RGB interface setting R0Ch=0x0110 for RGB 18Bit and R0Ch=0111for RGB16
-    writeCommandData (0x0F, 0x0b01); // Set frame rate//0b01
-
-    writeCommandData (0x20, 0x0000); // Set GRAM Address
-    writeCommandData (0x21, 0x0000); // Set GRAM Address
-    delayUs (50000);
-
-    //{{{  power On sequence
-    writeCommandData (0x10,0x0a00); // Set SAP,DSTB,STB//0800
-    writeCommandData (0x11,0x1038); // Set APON,PON,AON,VCI1EN,VC
-    delayUs (50000);
-    //}}}
-
-    writeCommandData (0x12, 0x1121); // Internal reference voltage= Vci;
-    writeCommandData (0x13, 0x0063); // Set GVDD
-    writeCommandData (0x14, 0x4b44); // Set VCOMH/VCOML voltage//3944
-
-    //{{{  set GRAM area
-    writeCommandData (0x30,0x0000);
-    writeCommandData (0x31,0x00DB);
-    writeCommandData (0x32,0x0000);
-    writeCommandData (0x33,0x0000);
-    writeCommandData (0x34,0x00DB);
-    writeCommandData (0x35,0x0000);
-    writeCommandData (0x36,0x00AF);
-    writeCommandData (0x37,0x0000);
-    writeCommandData (0x38,0x00DB);
-    writeCommandData (0x39,0x0000);
-    //}}}
-    //{{{  set Gamma Curve
-    writeCommandData (0x50,0x0003);
-    writeCommandData (0x51,0x0900);
-    writeCommandData (0x52,0x0d05);
-    writeCommandData (0x53,0x0900);
-    writeCommandData (0x54,0x0407);
-    writeCommandData (0x55,0x0502);
-    writeCommandData (0x56,0x0000);
-    writeCommandData (0x57,0x0005);
-    writeCommandData (0x58,0x1700);
-    writeCommandData (0x59,0x001F);
-    delayUs (50000);
-    //}}}
-
-    writeCommandData (0x07, 0x1017);
-    //{{{  set ram area
-    writeCommandData (0x36, getWidth()-1);
-    writeCommandData (0x37, 0);
-    writeCommandData (0x38, getHeight()-1);
-    writeCommandData (0x39, 0);
-    writeCommandData (0x20, 0);
-    writeCommandData (0x21, 0);
-    //}}}
-
-    launchUpdateThread (0x22);
-    return true;
-    }
-
-  return false;
-  }
-//}}}
 //{{{  cLcd9320
 constexpr uint16_t kWidth9320 = 240;
 constexpr uint16_t kHeight9320 = 320;
@@ -453,9 +358,7 @@ constexpr int kSpiClock9320 = 24000000;
 cLcd9320::cLcd9320() : cLcd(kWidth9320, kHeight9320, kSpiClock9320, false,
                             kResetGpio, 0xFF, kSpiCe0Gpio) {}
 
-//{{{
 bool cLcd9320::initialise() {
-
   if (initResources()) {
     writeCommandData (0xE5, 0x8000); // Set the Vcore voltage
     writeCommandData (0x00, 0x0000); // start oscillation - stopped?
@@ -519,4 +422,76 @@ bool cLcd9320::initialise() {
   return false;
   }
 //}}}
+//{{{  cLcd9225b
+constexpr uint16_t kWidth9225b = 176;
+constexpr uint16_t kHeight9225b = 220;
+constexpr int kSpiClock9225b = 16000000;
+
+cLcd9225b::cLcd9225b() : cLcd(kWidth9225b, kHeight9225b, kSpiClock9225b, true,
+                              kResetGpio, kDataCommandGpio, 0xFF) {}
+
+bool cLcd9225b::initialise() {
+  if (initResources()) {
+    writeCommandData (0x01, 0x011C); // set SS and NL bit
+
+    writeCommandData (0x02, 0x0100); // set 1 line inversion
+    writeCommandData (0x03, 0x1030); // set GRAM write direction and BGR=1
+    writeCommandData (0x08, 0x0808); // set BP and FP
+    writeCommandData (0x0C, 0x0000); // RGB interface setting R0Ch=0x0110 for RGB 18Bit and R0Ch=0111for RGB16
+    writeCommandData (0x0F, 0x0b01); // Set frame rate//0b01
+
+    writeCommandData (0x20, 0x0000); // Set GRAM Address
+    writeCommandData (0x21, 0x0000); // Set GRAM Address
+    delayUs (50000);
+
+    //{{{  power On sequence
+    writeCommandData (0x10,0x0a00); // Set SAP,DSTB,STB//0800
+    writeCommandData (0x11,0x1038); // Set APON,PON,AON,VCI1EN,VC
+    delayUs (50000);
+    //}}}
+    writeCommandData (0x12, 0x1121); // Internal reference voltage= Vci;
+    writeCommandData (0x13, 0x0063); // Set GVDD
+    writeCommandData (0x14, 0x4b44); // Set VCOMH/VCOML voltage//3944
+
+    //{{{  set GRAM area
+    writeCommandData (0x30,0x0000);
+    writeCommandData (0x31,0x00DB);
+    writeCommandData (0x32,0x0000);
+    writeCommandData (0x33,0x0000);
+    writeCommandData (0x34,0x00DB);
+    writeCommandData (0x35,0x0000);
+    writeCommandData (0x36,0x00AF);
+    writeCommandData (0x37,0x0000);
+    writeCommandData (0x38,0x00DB);
+    writeCommandData (0x39,0x0000);
+    //}}}
+    //{{{  set Gamma Curve
+    writeCommandData (0x50,0x0003);
+    writeCommandData (0x51,0x0900);
+    writeCommandData (0x52,0x0d05);
+    writeCommandData (0x53,0x0900);
+    writeCommandData (0x54,0x0407);
+    writeCommandData (0x55,0x0502);
+    writeCommandData (0x56,0x0000);
+    writeCommandData (0x57,0x0005);
+    writeCommandData (0x58,0x1700);
+    writeCommandData (0x59,0x001F);
+    delayUs (50000);
+    //}}}
+
+    writeCommandData (0x07, 0x1017);
+    //{{{  set ram area
+    writeCommandData (0x36, getWidth()-1);
+    writeCommandData (0x37, 0);
+    writeCommandData (0x38, getHeight()-1);
+    writeCommandData (0x39, 0);
+    writeCommandData (0x20, 0);
+    writeCommandData (0x21, 0);
+    //}}}
+
+    launchUpdateThread (0x22);
+    return true;
+    }
+  return false;
+  }
 //}}}
