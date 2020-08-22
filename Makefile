@@ -27,14 +27,14 @@ endif
 
 $(BUILD_DIR)/%.c.o: %.c
 	mkdir -p $(dir $@)
-	gcc -std=c11 $(CFLAGS) -c $< -o $@
+	clang++ -std=c11 $(CFLAGS) -c $< -o $@
 
 $(BUILD_DIR)/%.cpp.o: %.cpp
 	mkdir -p $(dir $@)
-	g++ -std=c++17 $(CFLAGS) -c $< -o $@
+	clang++ -std=c++17 $(CFLAGS) -c $< -o $@
 
 $(TARGET): $(OBJS)
-	g++ $(OBJS) -o $@ $(LIBS)
+	clang++ $(OBJS) -o $@ $(LIBS)
 
 clean:
 	rm -rf $(TARGET) $(CLEAN_DIRS)
