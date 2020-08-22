@@ -1,3 +1,6 @@
+CXX       = clang++
+//CXX       = g++
+
 TARGET    = lcd
 SRCS      = lcdTest.cpp \
 	    lcd.cpp \
@@ -27,14 +30,14 @@ endif
 
 $(BUILD_DIR)/%.c.o: %.c
 	mkdir -p $(dir $@)
-	clang++ -std=c11 $(CFLAGS) -c $< -o $@
+	$(CXX) -std=c11 $(CFLAGS) -c $< -o $@
 
 $(BUILD_DIR)/%.cpp.o: %.cpp
 	mkdir -p $(dir $@)
-	clang++ -std=c++17 $(CFLAGS) -c $< -o $@
+	$(CXX) -std=c++17 $(CFLAGS) -c $< -o $@
 
 $(TARGET): $(OBJS)
-	clang++ $(OBJS) -o $@ $(LIBS)
+	$(CXX) $(OBJS) -o $@ $(LIBS)
 
 clean:
 	rm -rf $(TARGET) $(CLEAN_DIRS)
