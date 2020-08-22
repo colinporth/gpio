@@ -188,93 +188,94 @@ void cLcd::initSpi (const int clockSpeed, const bool mode0, const bool enableAut
 //{{{
 void cLcd::command (const uint8_t command) {
 
-  gpioWrite (mDcPin, 0);
-  spiWrite (mHandle, (char*)(&command), 1);
-  gpioWrite (mDcPin, 1);
+  if ((mDcPin == 0xFF) && (mCePin != 0xFF)) {
+    gpioWrite (mDcPin, 0);
+    spiWrite (mHandle, (char*)(&command), 1);
+    gpioWrite (mDcPin, 1);
+    }
   }
 //}}}
 //{{{
 void cLcd::commandData (const uint8_t command, const uint16_t data) {
 
-  gpioWrite (mDcPin, 0);
-  spiWrite (mHandle, (char*)(&command), 1);
-  gpioWrite (mDcPin, 1);
+  if ((mDcPin == 0xFF) && (mCePin != 0xFF)) {
+    uint8_t commandSequence[3] = { 0x70, 0, command };
+    uint8_t dataSequence[3] = { 0x72, (uint8_t)(data >> 8), (uint8_t)(data & 0xff) };
 
-  char dataBytes[2] = { (char)(data >> 8), (char)(data & 0xff) };
-  spiWrite (mHandle, (char*)dataBytes, 2);
+    gpioWrite (mCePin, 0);
+    spiWrite (mHandle, (char*)commandSequence, 3);
+    gpioWrite (mCePin, 1);
+
+    gpioWrite (mCePin, 0);
+    spiWrite (mHandle, (char*)dataSequence, 3);
+    gpioWrite (mCePin, 1);
+    }
+  else {
+    gpioWrite (mDcPin, 0);
+    spiWrite (mHandle, (char*)(&command), 1);
+    gpioWrite (mDcPin, 1);
+
+    char dataBytes[2] = { (char)(data >> 8), (char)(data & 0xff) };
+    spiWrite (mHandle, (char*)dataBytes, 2);
+    }
   }
 //}}}
 //{{{
 void cLcd::commandData (const uint8_t command, const uint8_t* data, const int len) {
 
-  gpioWrite (mDcPin, 0);
-  spiWrite (mHandle, (char*)(&command), 1);
-  gpioWrite (mDcPin, 1);
+  if ((mDcPin == 0xFF) && (mCePin != 0xFF)) {
+    uint8_t commandSequence[3] = { 0x70, 0, command };
+    uint8_t dataSequenceStart = 0x72;
 
-  if (data) {
+    gpioWrite (mCePin, 0);
+    spiWrite (mHandle, (char*)commandSequence, 3);
+    gpioWrite (mCePin, 1);
+
+    gpioWrite (mCePin, 0);
+    spiWrite (mHandle, (char*)(&dataSequenceStart), 1);
+
+    int bytesLeft = len;
     if (len >= 0x10000) {
-      int bytesSent = 0;
-      int bytesLeft = len;
-      while (bytesSent < len) {
+      auto ptr = (char*)data;
+      while (bytesLeft > 0) {
         int sendBytes = (bytesLeft > 0x10000) ? 0x10000 : bytesLeft;
-        spiWrite (mHandle, (char*)data+bytesSent, sendBytes);
-        bytesSent += sendBytes;
+        spiWrite (mHandle, ptr, sendBytes);
+        ptr += sendBytes;
         bytesLeft -= sendBytes;
         }
       }
     else
       spiWrite (mHandle, (char*)data, len);
+
+    gpioWrite (mCePin, 1);
     }
-  }
-//}}}
 
-//{{{
-void cLcd::commandDataNoDc (const uint8_t command, const uint16_t data) {
+  else {
+    gpioWrite (mDcPin, 0);
+    spiWrite (mHandle, (char*)(&command), 1);
+    gpioWrite (mDcPin, 1);
 
-  uint8_t commandSequence[3] = { 0x70, 0, command };
-  uint8_t dataSequence[3] = { 0x72, (uint8_t)(data >> 8), (uint8_t)(data & 0xff) };
-
-  gpioWrite (mCePin, 0);
-  spiWrite (mHandle, (char*)commandSequence, 3);
-  gpioWrite (mCePin, 1);
-
-  gpioWrite (mCePin, 0);
-  spiWrite (mHandle, (char*)dataSequence, 3);
-  gpioWrite (mCePin, 1);
-  }
-//}}}
-//{{{
-void cLcd::commandDataNoDc (const uint8_t command, const uint8_t* data, const int len) {
-
-  uint8_t commandSequence[3] = { 0x70, 0, command };
-  uint8_t dataSequenceStart = 0x72;
-
-  gpioWrite (mCePin, 0);
-  spiWrite (mHandle, (char*)commandSequence, 3);
-  gpioWrite (mCePin, 1);
-
-  gpioWrite (mCePin, 0);
-  spiWrite (mHandle, (char*)(&dataSequenceStart), 1);
-
-  int bytesLeft = len;
-  if (len >= 0x10000) {
-    auto ptr = (char*)data;
-    while (bytesLeft > 0) {
-      int sendBytes = (bytesLeft > 0x10000) ? 0x10000 : bytesLeft;
-      spiWrite (mHandle, ptr, sendBytes);
-      ptr += sendBytes;
-      bytesLeft -= sendBytes;
+    if (data) {
+      if (len >= 0x10000) {
+        int bytesSent = 0;
+        int bytesLeft = len;
+        while (bytesSent < len) {
+          int sendBytes = (bytesLeft > 0x10000) ? 0x10000 : bytesLeft;
+          spiWrite (mHandle, (char*)data+bytesSent, sendBytes);
+          bytesSent += sendBytes;
+          bytesLeft -= sendBytes;
+          }
+        }
+      else
+        spiWrite (mHandle, (char*)data, len);
       }
     }
-  else
-    spiWrite (mHandle, (char*)data, len);
 
-  gpioWrite (mCePin, 1);
   }
 //}}}
 
 //{{{
-void cLcd::launchUpdateThread (const uint8_t command, bool hasDc) {
+void cLcd::launchUpdateThread (const uint8_t command) {
 
   thread ([=]() {
     // write frameBuffer to lcd ram thread if changed
@@ -282,10 +283,7 @@ void cLcd::launchUpdateThread (const uint8_t command, bool hasDc) {
       if (mUpdate || (mAutoUpdate && mChanged)) {
         mChanged = false;
         mUpdate = false;
-        if (hasDc)
-          commandData (command, (const uint8_t*)mFrameBuf, getWidth() * getHeight() * 2);
-        else
-          commandDataNoDc (command, (const uint8_t*)mFrameBuf, getWidth() * getHeight() * 2);
+        commandData (command, (const uint8_t*)mFrameBuf, getWidth() * getHeight() * 2);
         }
       gpioDelay (16000);
       }
@@ -293,7 +291,7 @@ void cLcd::launchUpdateThread (const uint8_t command, bool hasDc) {
   }
 //}}}
 
-// cLcd7735 - public
+//{{{  cLcd7735
 constexpr uint16_t kWidth7735 = 128;
 constexpr uint16_t kHeight7735 = 160;
 constexpr static const int kSpiClock7735 = 24000000;
@@ -347,7 +345,7 @@ constexpr uint8_t k7335_GMCTRN1Data[16] = { 0x03, 0x1d, 0x07, 0x06, 0x2E, 0x2C, 
                                             0x2E, 0x2E, 0x37, 0x3F, 0x00, 0x00, 0x02, 0x10 } ;
 //}}}
 
-cLcd7735::cLcd7735() : cLcd (kWidth7735, kHeight7735, kDcPin, 0) {}
+cLcd7735::cLcd7735() : cLcd (kWidth7735, kHeight7735, kDcPin, 0xFF) {}
 //{{{
 bool cLcd7735::initialise() {
 
@@ -382,20 +380,20 @@ bool cLcd7735::initialise() {
 
     command (k7335_DISPON); // display ON
 
-    launchUpdateThread (k7335_RAMWR, true);
+    launchUpdateThread (k7335_RAMWR);
     return true;
     }
 
   return false;
   }
 //}}}
-
-// cLcd9225b - public
+//}}}
+//{{{  cLcd9225b
 constexpr uint16_t kWidth9225b = 176;
 constexpr uint16_t kHeight9225b = 220;
 constexpr int kSpiClock9225b = 16000000;
 
-cLcd9225b::cLcd9225b() : cLcd(kWidth9225b, kHeight9225b, kDcPin, 0) {}
+cLcd9225b::cLcd9225b() : cLcd(kWidth9225b, kHeight9225b, kDcPin, 0xFF) {}
 //{{{
 bool cLcd9225b::initialise() {
 
@@ -462,20 +460,20 @@ bool cLcd9225b::initialise() {
     commandData (0x21, 0);
     //}}}
 
-    launchUpdateThread (0x22, true);
+    launchUpdateThread (0x22);
     return true;
     }
 
   return false;
   }
 //}}}
-
-// cLcd9320 - public
+//}}}
+//{{{  cLcd9320
 constexpr uint16_t kWidth9320 = 240;
 constexpr uint16_t kHeight9320 = 320;
 constexpr int kSpiClock9320 = 24000000;
 
-cLcd9320::cLcd9320() : cLcd(kWidth9320, kHeight9320, 0, kSpiCe0in) {}
+cLcd9320::cLcd9320() : cLcd(kWidth9320, kHeight9320, 0xFF, kSpiCe0in) {}
 //{{{
 bool cLcd9320::initialise() {
 
@@ -483,64 +481,65 @@ bool cLcd9320::initialise() {
     reset (kResetPin);
     initSpi (kSpiClock9320, false, false);
 
-    commandDataNoDc (0x00, 0x0000);  // start oscillation - stopped?
-    commandDataNoDc (0x01, 0x0100);  // Driver Output Control 1 - SS=1 and SM=0
-    commandDataNoDc (0x02, 0x0700);  // LCD Driving Control - set line inversion
-    commandDataNoDc (0x03, 0x1030);  // Entry Mode - BGR, HV inc, vert write,
-    commandDataNoDc (0x04, 0x0000);  // Resize Control
-    commandDataNoDc (0x08, 0x0202);  // Display Control 2
-    commandDataNoDc (0x09, 0x0000);  // Display Control 3
-    commandDataNoDc (0x0a, 0x0000);  // Display Control 4 - frame marker
-    commandDataNoDc (0x0c, 0x0001);  // RGB Display Interface Control 1
-    commandDataNoDc (0x0d, 0x0000);  // Frame Marker Position
-    commandDataNoDc (0x0f, 0x0000);  // RGB Display Interface Control 2
+    commandData (0x00, 0x0000);  // start oscillation - stopped?
+    commandData (0x01, 0x0100);  // Driver Output Control 1 - SS=1 and SM=0
+    commandData (0x02, 0x0700);  // LCD Driving Control - set line inversion
+    commandData (0x03, 0x1030);  // Entry Mode - BGR, HV inc, vert write,
+    commandData (0x04, 0x0000);  // Resize Control
+    commandData (0x08, 0x0202);  // Display Control 2
+    commandData (0x09, 0x0000);  // Display Control 3
+    commandData (0x0a, 0x0000);  // Display Control 4 - frame marker
+    commandData (0x0c, 0x0001);  // RGB Display Interface Control 1
+    commandData (0x0d, 0x0000);  // Frame Marker Position
+    commandData (0x0f, 0x0000);  // RGB Display Interface Control 2
     delayUs (40000);
 
-    commandDataNoDc (0x07, 0x0101);  // Display Control 1
+    commandData (0x07, 0x0101);  // Display Control 1
     delayUs (40000);
 
-    commandDataNoDc (0x10, 0x10C0);  // Power Control 1
-    commandDataNoDc (0x11, 0x0007);  // Power Control 2
-    commandDataNoDc (0x12, 0x0110);  // Power Control 3
-    commandDataNoDc (0x13, 0x0b00);  // Power Control 4
-    commandDataNoDc (0x29, 0x0000);  // Power Control 7
-    commandDataNoDc (0x2b, 0x4010);  // Frame Rate and Color Control
+    commandData (0x10, 0x10C0);  // Power Control 1
+    commandData (0x11, 0x0007);  // Power Control 2
+    commandData (0x12, 0x0110);  // Power Control 3
+    commandData (0x13, 0x0b00);  // Power Control 4
+    commandData (0x29, 0x0000);  // Power Control 7
+    commandData (0x2b, 0x4010);  // Frame Rate and Color Control
 
     // 0x30 - 0x3d gamma
-    commandDataNoDc (0x60, 0x2700);  // Driver Output Control 2
-    commandDataNoDc (0x61, 0x0001);  // Base Image Display Control
-    commandDataNoDc (0x6a, 0x0000);  // Vertical Scroll Control
+    commandData (0x60, 0x2700);  // Driver Output Control 2
+    commandData (0x61, 0x0001);  // Base Image Display Control
+    commandData (0x6a, 0x0000);  // Vertical Scroll Control
 
-    commandDataNoDc (0x80, 0x0000);  // Partial Image 1 Display Position
-    commandDataNoDc (0x81, 0x0000);  // Partial Image 1 Area Start Line
-    commandDataNoDc (0x82, 0x0000);  // Partial Image 1 Area End Line
-    commandDataNoDc (0x83, 0x0000);  // Partial Image 2 Display Position
-    commandDataNoDc (0x84, 0x0000);  // Partial Image 2 Area Start Line
-    commandDataNoDc (0x85, 0x0000);  // Partial Image 2 Area End Line
+    commandData (0x80, 0x0000);  // Partial Image 1 Display Position
+    commandData (0x81, 0x0000);  // Partial Image 1 Area Start Line
+    commandData (0x82, 0x0000);  // Partial Image 1 Area End Line
+    commandData (0x83, 0x0000);  // Partial Image 2 Display Position
+    commandData (0x84, 0x0000);  // Partial Image 2 Area Start Line
+    commandData (0x85, 0x0000);  // Partial Image 2 Area End Line
 
-    commandDataNoDc (0x90, 0x0010);  // Panel Interface Control 1
-    commandDataNoDc (0x92, 0x0000);  // Panel Interface Control 2
-    commandDataNoDc (0x93, 0x0001);  // Panel Interface Control 3
-    commandDataNoDc (0x95, 0x0110);  // Panel Interface Control 4
-    commandDataNoDc (0x97, 0x0000);  // Panel Interface Control 5
-    commandDataNoDc (0x98, 0x0000);  // Panel Interface Control 6
+    commandData (0x90, 0x0010);  // Panel Interface Control 1
+    commandData (0x92, 0x0000);  // Panel Interface Control 2
+    commandData (0x93, 0x0001);  // Panel Interface Control 3
+    commandData (0x95, 0x0110);  // Panel Interface Control 4
+    commandData (0x97, 0x0000);  // Panel Interface Control 5
+    commandData (0x98, 0x0000);  // Panel Interface Control 6
 
-    commandDataNoDc (0x07, 0x0133);  // Display Control 1
+    commandData (0x07, 0x0133);  // Display Control 1
     delayUs (40000);
 
-    commandDataNoDc (0x50, 0); // Horizontal Start Position
-    commandDataNoDc (0x51, getWidth()-1); // Horizontal End Position
+    commandData (0x50, 0); // Horizontal Start Position
+    commandData (0x51, getWidth()-1); // Horizontal End Position
 
-    commandDataNoDc (0x52, 0); // Vertical Start Position
-    commandDataNoDc (0x53, getHeight()-1); // Vertical End Position
+    commandData (0x52, 0); // Vertical Start Position
+    commandData (0x53, getHeight()-1); // Vertical End Position
 
-    commandDataNoDc (0x20, 0); // Horizontal GRAM Address Set
-    commandDataNoDc (0x21, 0); // Vertical GRAM Address Set
+    commandData (0x20, 0); // Horizontal GRAM Address Set
+    commandData (0x21, 0); // Vertical GRAM Address Set
 
-    launchUpdateThread (0x22, false);
+    launchUpdateThread (0x22);
     return true;
     }
 
   return false;
   }
+//}}}
 //}}}
