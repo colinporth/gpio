@@ -1,9 +1,9 @@
-// lcd.h - cLcd display classes
+// lcd.h - cLcd uint16 rgb565 display classes
 #pragma once
 #include <cstdint>
 #include <string>
 
-// colours - bigEndian
+// colours - bigEndian uint16 RGB565
 constexpr uint16_t kBlue        =  0x001F;  //   0,   0, 255
 constexpr uint16_t kNavy        =  0x000F;  //   0,   0, 128
 constexpr uint16_t kGreen       =  0x07E0;  //   0, 255,   0
@@ -27,7 +27,7 @@ constexpr uint16_t kWhite       =  0xFFFF;  // 255, 255, 255
 //{{{
 class cLcd {
 public:
-  cLcd (const uint8_t width, const uint8_t height, const uint8_t dcPin) 
+  cLcd (const uint8_t width, const uint8_t height, const uint8_t dcPin)
     : mWidth(width), mHeight(height), mDcPin(dcPin) {}
   virtual ~cLcd();
 
