@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <thread>
 #include <pigpio.h>
+#include <byteswap.h>
 
 #include <ft2build.h>
 #include FT_FREETYPE_H
@@ -61,11 +62,12 @@ public:
   //{{{
   void rect (uint16_t colour, int xorg, int yorg, int xlen, int ylen) {
 
-    uint16_t colourReversed = (colour >> 8) | (colour << 8);
+    colour = bswap_16 (colour);
 
     for (int y = yorg; (y < yorg+ylen) && (y < getHeight()); y++)
+      //wmemset ((wchar_t*)(mFrameBuf + (y*getWidth()) + xorg), (wchar_t)colourReversed, getWidth());
       for (int x = xorg; (x < xorg+xlen) && (x < getWidth()); x++)
-        mFrameBuf[(y*getWidth()) + x] = colourReversed;
+        mFrameBuf[(y*getWidth()) + x] = colour;
 
     mChanged = true;
     }
@@ -73,39 +75,41 @@ public:
   //{{{
   void pixel (uint16_t colour, int x, int y) {
 
-    mFrameBuf[(y*getWidth()) + x] = (colour >> 8) | (colour << 8);
+    mFrameBuf[(y*getWidth()) + x] = bswap_16 (colour);
     mChanged = true;
     }
   //}}}
   //{{{
   void blendPixel (uint16_t colour, uint8_t alpha, int x, int y) {
   // magical rgb565 alpha composite
-  // - linear interp bg * (1.0 - alpha) + fg * alpha
-  //   - factorized into: result = bg + (fg - bg) * alpha
+  // - linear interp background * (1.0 - alpha) + foreground * alpha
+  //   - factorized into: result = background + (foreground - background) * alpha
   //   - alpha is in Q1.5 format, so 0.0 is represented by 0, and 1.0 is represented by 32
   // - Converts  0000000000000000rrrrrggggggbbbbb
   // -     into  00000gggggg00000rrrrr000000bbbbb
 
-    if (alpha >= 0) {
-      if ((x >= 0) && (y > 0) && (x < getWidth()) && (y < getHeight())) {
-        if (alpha == 0xFF) {
-          mFrameBuf[(y*getWidth()) + x] = (colour >> 8) | (colour << 8);
-          }
-        else {
-          uint16_t value = mFrameBuf[(y*getWidth()) + x];
-          uint32_t bg = (value >> 8) | (value << 8);
+    if ((alpha >= 0) && (x >= 0) && (y > 0) && (x < getWidth()) && (y < getHeight())) {
+      // clip opaque and offscreen
+      if (alpha == 0xFF)
+        // simple case - set bigEndian frame buffer to littleEndian colour
+        mFrameBuf[(y*getWidth()) + x] = bswap_16 (colour);
+      else {
+        // get bigEndian frame buffer into littleEndian background
+        uint32_t background = bswap_16 (mFrameBuf[(y*getWidth()) + x]);
 
-          uint32_t fg = colour;
-          fg = (fg | fg << 16) & 0x07e0f81f;
-          bg = (bg | bg << 16) & 0x07e0f81f;
-          bg += (((fg - bg) * ((alpha + 4) >> 3)) >> 5) & 0x07e0f81f;
-          bg |= bg >> 16;
+        // composite littleEndian colour
+        uint32_t foreground = colour;
+        foreground = (foreground | (foreground << 16)) & 0x07e0f81f;
+        background = (background | (background << 16)) & 0x07e0f81f;
+        background += (((foreground - background) * ((alpha + 4) >> 3)) >> 5) & 0x07e0f81f;
 
-          mFrameBuf[(y*getWidth()) + x] = (bg >> 8) | (bg << 8);
-          }
-        mChanged = true;
+        // set bigEndian frame buffer to littleEndian result
+        mFrameBuf[(y*getWidth()) + x] = bswap_16 (background | (background >> 16));
         }
+
+      mChanged = true;
       }
+
     }
   //}}}
   //{{{

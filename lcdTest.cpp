@@ -14,8 +14,8 @@ int main() {
   lcd->initialise();
 
   while (true) {
-    for (int i = 0; i < 1000; i += 3) {
-      lcd->clear (Black);
+    for (int i = 0; i < 200; i++) {
+      lcd->clear (Blue);
       lcd->text (White, 0,0, 100, dec(i,3));
       lcd->update();
       gpioDelay (40000);
