@@ -176,12 +176,6 @@ bool cLcd::initResources() {
   return false;
   }
 //}}}
-//{{{
-void cLcd::initSpi (const int clockSpeed, const bool mode0) {
-// setup spi0, use CE0 active lo as CS
-
-  }
-//}}}
 
 //{{{
 void cLcd::writeCommand (const uint8_t command) {

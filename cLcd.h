@@ -55,9 +55,6 @@ public:
 //{{{
 protected:
   bool initResources();
-  void reset (const uint8_t gpio);
-  void setDataCommandGpio (const uint8_t gpio);
-  void initSpi (const int clockSpeed, const bool mode0);
 
   void writeCommand (const uint8_t command);
   void writeCommandData (const uint8_t command, const uint16_t data);
