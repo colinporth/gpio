@@ -1,4 +1,4 @@
-#include <stdint.h>
+#pragma once
 
-int getFreeSansBoldSize();
-const uint8_t* getFreeSansBold();
+const int getFreeSansBoldSize();
+const unsigned char* getFreeSansBold();

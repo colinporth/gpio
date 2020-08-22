@@ -1,8 +1,8 @@
+// FreeSansBold.cpp
 #include "FreeSansBold.h"
 
-static const int kFreeSansBoldLen = 64228;
 //{{{
-static const uint8_t kFreeSansBold[kFreeSansBoldLen] = {
+constexpr unsigned char kFreeSansBold[] = {
 	0x00,0x01,0x00,0x00,0x00,0x0C,0x00,0x80,0x00,0x03,0x00,
 	0x40,0x4F,0x53,0x2F,0x32,0xA3,0xC7,0x2E,0x70,0x00,0x00,
 	0x00,0xCC,0x00,0x00,0x00,0x56,0x63,0x6D,0x61,0x70,0x96,
@@ -5845,5 +5845,5 @@ static const uint8_t kFreeSansBold[kFreeSansBoldLen] = {
 };
 //}}}
 
-int getFreeSansBoldSize() { return kFreeSansBoldLen; }
-const uint8_t* getFreeSansBold() { return kFreeSansBold; }
+const int getFreeSansBoldSize() { return sizeof(kFreeSansBold); }
+const unsigned char* getFreeSansBold() { return kFreeSansBold; }
