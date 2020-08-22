@@ -76,13 +76,12 @@ private:
 
   const int mSpiClock;
   const bool mSpiMode0;
+  int mSpiHandle = 0;
 
   const bool mUseSequence;
   const uint8_t mResetGpio;
   const uint8_t mDataCommandGpio;
   const uint8_t mChipEnableGpio;
-
-  int mHandle = 0;
 //}}}
   };
 

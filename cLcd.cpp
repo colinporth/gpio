@@ -36,7 +36,7 @@ constexpr uint8_t kSpiCe0Gpio = 8;         // J8 pin22
 // cLcd - public
 //{{{
 cLcd::~cLcd() {
-  spiClose (mHandle);
+  spiClose (mSpiHandle);
   gpioTerminate();
   }
 //}}}
@@ -138,8 +138,9 @@ void cLcd::delayUs (const int us) {
 //{{{
 bool cLcd::initResources() {
 
-  unsigned hardwareRevision = gpioHardwareRevision();
   unsigned version = gpioVersion();
+  unsigned hardwareRevision = gpioHardwareRevision();
+
   cLog::log (LOGINFO, "pigpio hwRev:%x version:%d", hardwareRevision, version);
 
   if (gpioInitialise() >= 0) {
@@ -165,7 +166,7 @@ bool cLcd::initResources() {
 
     // if mChipEnableGpio then disable autoSpiCe0
     // - can't send multiple SPI's without pulsing CE screwing up dataSequence
-    mHandle = spiOpen (0, mSpiClock, (mSpiMode0 ? 0 : 3) | ((mChipEnableGpio == 0xFF) ? 0x00 : 0x40));
+    mSpiHandle = spiOpen (0, mSpiClock, (mSpiMode0 ? 0 : 3) | ((mChipEnableGpio == 0xFF) ? 0x00 : 0x40));
 
     setFont (getFreeSansBold(), getFreeSansBoldSize());
 
@@ -183,13 +184,13 @@ void cLcd::writeCommand (const uint8_t command) {
   if (mUseSequence) {
     uint8_t commandSequence[3] = { 0x70, 0, command };
     gpioWrite (mChipEnableGpio, 0);
-    spiWrite (mHandle, (char*)commandSequence, 3);
+    spiWrite (mSpiHandle, (char*)commandSequence, 3);
     gpioWrite (mChipEnableGpio, 1);
     }
 
   else {
     gpioWrite (mDataCommandGpio, 0);
-    spiWrite (mHandle, (char*)(&command), 1);
+    spiWrite (mSpiHandle, (char*)(&command), 1);
     gpioWrite (mDataCommandGpio, 1);
     }
 
@@ -201,22 +202,22 @@ void cLcd::writeCommandData (const uint8_t command, const uint16_t data) {
   if (mUseSequence) {
     uint8_t commandSequence[3] = { 0x70, 0, command };
     gpioWrite (mChipEnableGpio, 0);
-    spiWrite (mHandle, (char*)commandSequence, 3);
+    spiWrite (mSpiHandle, (char*)commandSequence, 3);
     gpioWrite (mChipEnableGpio, 1);
 
     uint8_t dataSequence[3] = { 0x72, (uint8_t)(data >> 8), (uint8_t)(data & 0xff) };
     gpioWrite (mChipEnableGpio, 0);
-    spiWrite (mHandle, (char*)dataSequence, 3);
+    spiWrite (mSpiHandle, (char*)dataSequence, 3);
     gpioWrite (mChipEnableGpio, 1);
     }
 
   else {
     gpioWrite (mDataCommandGpio, 0);
-    spiWrite (mHandle, (char*)(&command), 1);
+    spiWrite (mSpiHandle, (char*)(&command), 1);
     gpioWrite (mDataCommandGpio, 1);
 
     char dataBytes[2] = { (char)(data >> 8), (char)(data & 0xff) };
-    spiWrite (mHandle, (char*)dataBytes, 2);
+    spiWrite (mSpiHandle, (char*)dataBytes, 2);
     }
 
   }
@@ -228,26 +229,26 @@ void cLcd::writeCommandMultipleData (const uint8_t command, const uint8_t* data,
     uint8_t commandSequence[3] = { 0x70, 0, command };
 
     gpioWrite (mChipEnableGpio, 0);
-    spiWrite (mHandle, (char*)commandSequence, 3);
+    spiWrite (mSpiHandle, (char*)commandSequence, 3);
     gpioWrite (mChipEnableGpio, 1);
 
     if (data) {
       uint8_t dataSequenceStart = 0x72;
       gpioWrite (mChipEnableGpio, 0);
-      spiWrite (mHandle, (char*)(&dataSequenceStart), 1);
+      spiWrite (mSpiHandle, (char*)(&dataSequenceStart), 1);
 
       int bytesLeft = len;
       if (len >= 0x10000) {
         auto ptr = (char*)data;
         while (bytesLeft > 0) {
           int sendBytes = (bytesLeft > 0x10000) ? 0x10000 : bytesLeft;
-          spiWrite (mHandle, ptr, sendBytes);
+          spiWrite (mSpiHandle, ptr, sendBytes);
           ptr += sendBytes;
           bytesLeft -= sendBytes;
           }
         }
       else
-        spiWrite (mHandle, (char*)data, len);
+        spiWrite (mSpiHandle, (char*)data, len);
 
       gpioWrite (mChipEnableGpio, 1);
       }
@@ -255,7 +256,7 @@ void cLcd::writeCommandMultipleData (const uint8_t command, const uint8_t* data,
 
   else {
     gpioWrite (mDataCommandGpio, 0);
-    spiWrite (mHandle, (char*)(&command), 1);
+    spiWrite (mSpiHandle, (char*)(&command), 1);
     gpioWrite (mDataCommandGpio, 1);
 
     if (data) {
@@ -264,13 +265,13 @@ void cLcd::writeCommandMultipleData (const uint8_t command, const uint8_t* data,
         int bytesLeft = len;
         while (bytesSent < len) {
           int sendBytes = (bytesLeft > 0x10000) ? 0x10000 : bytesLeft;
-          spiWrite (mHandle, (char*)data+bytesSent, sendBytes);
+          spiWrite (mSpiHandle, (char*)data+bytesSent, sendBytes);
           bytesSent += sendBytes;
           bytesLeft -= sendBytes;
           }
         }
       else
-        spiWrite (mHandle, (char*)data, len);
+        spiWrite (mSpiHandle, (char*)data, len);
       }
     }
 
