@@ -1,6 +1,6 @@
-// lcd.cpp
+// cLcd.cpp
 //{{{  includes
-#include "lcd.h"
+#include "cLcd.h"
 
 #include <cstdint>
 #include <string>

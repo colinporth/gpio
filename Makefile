@@ -3,7 +3,7 @@ CXX       = clang++
 
 TARGET    = lcd
 SRCS      = lcdTest.cpp \
-	    lcd.cpp \
+	    cLcd.cpp \
 	    ../shared/utils/cLog.cpp \
 	    fonts/FreeSansBold.cpp \
 #            pigpio/pigpio.c \

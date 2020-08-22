@@ -2,7 +2,7 @@
 #include <cstdint>
 #include <string>
 
-#include "lcd.h"
+#include "cLcd.h"
 
 #include "../shared/utils/utils.h"
 #include "../shared/utils/cLog.h"
