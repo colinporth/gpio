@@ -1,6 +1,8 @@
 // lcd.cpp
 #include "lcd.h"
 
+#include <cstdint>
+#include <string>
 #include <thread>
 #include <byteswap.h>
 
@@ -16,6 +18,16 @@
 FT_Library mLibrary;
 FT_Face mFace;
 
+// J8 header pins
+// - 3.3v                            J8 pin17
+constexpr uint8_t kDcPin  = 24;   // J8 pin18
+// - SPI0 - MOSI                     J8 pin19
+// - 0v                              J8 pin20
+// - SPI0 - SCLK                     J8 pin21
+constexpr uint8_t kResetPin = 25; // J8 pin22
+// - SPI0 - CE0                      J8 pin24
+
+// cLcd - public
 //{{{
 cLcd::~cLcd() {
   spiClose (mHandle);
@@ -116,7 +128,7 @@ void cLcd::delayMs (int ms) {
   }
 //}}}
 
-// protected
+// cLcd - protected
 //{{{
 bool cLcd::initResources() {
 
@@ -214,77 +226,68 @@ void cLcd::launchUpdateThread (uint8_t command) {
   }
 //}}}
 
-// J8 header pins
-// - 3.3v                            J8 pin17
-constexpr uint8_t kDcPin  = 24;   // J8 pin18
-// - SPI0 - MOSI                     J8 pin19
-// - 0v                              J8 pin20
-// - SPI0 - SCLK                     J8 pin21
-constexpr uint8_t kResetPin = 25; // J8 pin22
-// - SPI0 - CE0                      J8 pin24
-
-// cLcd7735
-constexpr static uint8_t kWidth7735 = 128;
-constexpr static uint8_t kHeight7735 = 160;
-constexpr static const int kSpiClock = 24000000;
-//{{{  command constexpr
-constexpr static uint8_t ST7735_SLPOUT  = 0x11; // no data
-constexpr static uint8_t ST7735_DISPOFF = 0x28; // no data
-constexpr static uint8_t ST7735_DISPON  = 0x29; // no data
-
-constexpr static uint8_t ST7735_CASET = 0x2A;
-constexpr static uint8_t caSetData[4] = { 0, 0, 0, kWidth7735 - 1 };
-
-constexpr static uint8_t ST7735_RASET = 0x2B;
-constexpr static uint8_t raSetData[4] = { 0, 0, 0, kHeight7735 - 1 };
-
-constexpr static uint8_t ST7735_RAMWR = 0x2C; // followed by frameBuffer data
-
-constexpr static uint8_t ST7735_MADCTL = 0x36;
-constexpr static uint8_t kMADCTData[1] = { 0xc0 };
-
-constexpr static uint8_t ST7735_COLMOD  = 0x3A;
-constexpr static uint8_t kCOLMODData[1] = { 0x05 };
-
-constexpr static uint8_t ST7735_FRMCTR1 = 0xB1;
-constexpr static uint8_t ST7735_FRMCTR2 = 0xB2;
-constexpr static uint8_t ST7735_FRMCTR3 = 0xB3;
-constexpr static uint8_t kFRMCTRData[6] = { 0x01, 0x2c, 0x2d, 0x01, 0x2c, 0x2d };
-
-constexpr static uint8_t ST7735_INVCTR  = 0xB4;
-constexpr static uint8_t kINVCTRData[1] = { 0x07 };
-
-constexpr static uint8_t ST7735_PWCTR1  = 0xC0;
-constexpr static uint8_t kPowerControlData1[3] = { 0xA2, 0x02 /* -4.6V */, 0x84 /* AUTO mode */ };
-constexpr static uint8_t ST7735_PWCTR2  = 0xC1;
-constexpr static uint8_t kPowerControlData2[1] = { 0xc5 }; // VGH25 = 2.4C VGSEL =-10 VGH = 3*AVDD
-constexpr static uint8_t ST7735_PWCTR3  = 0xC2;
-constexpr static uint8_t kPowerControlData3[2] = { 0x0A /* Opamp current small */, 0x00 /* Boost freq */ };
-constexpr static uint8_t ST7735_PWCTR4  = 0xC3;
-constexpr static uint8_t kPowerControlData4[2] = { 0x8A /* BCLK/2, Opamp current small/medium low */, 0x2A };
-constexpr static uint8_t ST7735_PWCTR5  = 0xC4;
-constexpr static uint8_t kPowerControlData5[2] = { 0x8A /* BCLK/2, Opamp current small/medium low */, 0xEE };
-
-constexpr static uint8_t ST7735_VMCTR1  = 0xC5;
-constexpr static uint8_t kVMCTR1Data[1] = { 0x0E };
-
-constexpr static uint8_t ST7735_GMCTRP1 = 0xE0;
-constexpr static uint8_t kGMCTRP1Data[16] = { 0x02, 0x1c, 0x07, 0x12, 0x37, 0x32, 0x29, 0x2d,
-                                              0x29, 0x25, 0x2B, 0x39, 0x00, 0x01, 0x03, 0x10 } ;
-
-constexpr static uint8_t ST7735_GMCTRN1 = 0xE1;
-constexpr static uint8_t kGMCTRN1Data[16] = { 0x03, 0x1d, 0x07, 0x06, 0x2E, 0x2C, 0x29, 0x2D,
-                                              0x2E, 0x2E, 0x37, 0x3F, 0x00, 0x00, 0x02, 0x10 } ;
-//}}}
-
+// cLcd7735 - public
+constexpr uint8_t kWidth7735 = 128;
+constexpr uint8_t kHeight7735 = 160;
 cLcd7735::cLcd7735() : cLcd (kWidth7735, kHeight7735, kDcPin) {}
+
+//{{{  command constexpr
+constexpr uint8_t ST7735_SLPOUT  = 0x11; // no data
+constexpr uint8_t ST7735_DISPOFF = 0x28; // no data
+constexpr uint8_t ST7735_DISPON  = 0x29; // no data
+
+constexpr uint8_t ST7735_CASET = 0x2A;
+constexpr uint8_t caSetData[4] = { 0, 0, 0, kWidth7735 - 1 };
+
+constexpr uint8_t ST7735_RASET = 0x2B;
+constexpr uint8_t raSetData[4] = { 0, 0, 0, kHeight7735 - 1 };
+
+constexpr uint8_t ST7735_RAMWR = 0x2C; // followed by frameBuffer data
+
+constexpr uint8_t ST7735_MADCTL = 0x36;
+constexpr uint8_t kMADCTData[1] = { 0xc0 };
+
+constexpr uint8_t ST7735_COLMOD  = 0x3A;
+constexpr uint8_t kCOLMODData[1] = { 0x05 };
+
+constexpr uint8_t ST7735_FRMCTR1 = 0xB1;
+constexpr uint8_t ST7735_FRMCTR2 = 0xB2;
+constexpr uint8_t ST7735_FRMCTR3 = 0xB3;
+constexpr uint8_t kFRMCTRData[6] = { 0x01, 0x2c, 0x2d, 0x01, 0x2c, 0x2d };
+
+constexpr uint8_t ST7735_INVCTR  = 0xB4;
+constexpr uint8_t kINVCTRData[1] = { 0x07 };
+
+constexpr uint8_t ST7735_PWCTR1  = 0xC0;
+constexpr uint8_t kPowerControlData1[3] = { 0xA2, 0x02 /* -4.6V */, 0x84 /* AUTO mode */ };
+constexpr uint8_t ST7735_PWCTR2  = 0xC1;
+constexpr uint8_t kPowerControlData2[1] = { 0xc5 }; // VGH25 = 2.4C VGSEL =-10 VGH = 3*AVDD
+constexpr uint8_t ST7735_PWCTR3  = 0xC2;
+constexpr uint8_t kPowerControlData3[2] = { 0x0A /* Opamp current small */, 0x00 /* Boost freq */ };
+constexpr uint8_t ST7735_PWCTR4  = 0xC3;
+constexpr uint8_t kPowerControlData4[2] = { 0x8A /* BCLK/2, Opamp current small/medium low */, 0x2A };
+constexpr uint8_t ST7735_PWCTR5  = 0xC4;
+constexpr uint8_t kPowerControlData5[2] = { 0x8A /* BCLK/2, Opamp current small/medium low */, 0xEE };
+
+constexpr uint8_t ST7735_VMCTR1  = 0xC5;
+constexpr uint8_t kVMCTR1Data[1] = { 0x0E };
+
+constexpr uint8_t ST7735_GMCTRP1 = 0xE0;
+constexpr uint8_t kGMCTRP1Data[16] = { 0x02, 0x1c, 0x07, 0x12, 0x37, 0x32, 0x29, 0x2d,
+                                       0x29, 0x25, 0x2B, 0x39, 0x00, 0x01, 0x03, 0x10 } ;
+
+constexpr uint8_t ST7735_GMCTRN1 = 0xE1;
+constexpr uint8_t kGMCTRN1Data[16] = { 0x03, 0x1d, 0x07, 0x06, 0x2E, 0x2C, 0x29, 0x2D,
+                                       0x2E, 0x2E, 0x37, 0x3F, 0x00, 0x00, 0x02, 0x10 } ;
+//}}}
+constexpr static const int kSpiClock7735 = 24000000;
 //{{{
 bool cLcd7735::initialise() {
 
   if (initResources()) {
     reset (kResetPin);
     initDcPin (kDcPin);
-    initSpi (kSpiClock);
+    initSpi (kSpiClock7735);
 
     command (ST7735_SLPOUT);
     delayMs (120);
@@ -320,12 +323,12 @@ bool cLcd7735::initialise() {
   }
 //}}}
 
-// cLcd9225b
+// cLcd9225b - public
 constexpr uint8_t kWidth9225b = 176;
 constexpr int8_t kHeight9225b = 220;
-constexpr int kSpiClock9225b = 16000000;
-
 cLcd9225b::cLcd9225b() : cLcd(kWidth9225b, kHeight9225b, kDcPin) {}
+
+constexpr int kSpiClock9225b = 16000000;
 //{{{
 bool cLcd9225b::initialise() {
 
