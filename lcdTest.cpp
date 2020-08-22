@@ -19,7 +19,7 @@ int main() {
   while (true) {
     for (int i = 0; i < 200; i++) {
       lcd->clear (kOrange);
-      lcd->text (kBlack, 0,0, 100, dec(i,3));
+      lcd->text (kWhite, 0,0, 100, dec(i,3));
       lcd->update();
       lcd->delayMs (40000);
       }

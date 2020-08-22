@@ -1,4 +1,4 @@
-// lcd.h
+// lcd.h - cLcd display classes
 #pragma once
 #include <cstdint>
 #include <string>
@@ -27,27 +27,28 @@ constexpr uint16_t kWhite       =  0xFFFF;  // 255, 255, 255
 //{{{
 class cLcd {
 public:
-  cLcd (const uint8_t width, const uint8_t height, const uint8_t dcPin) :
-    mWidth(width), mHeight(height), mDcPin(dcPin) {}
+  cLcd (const uint8_t width, const uint8_t height, const uint8_t dcPin) 
+    : mWidth(width), mHeight(height), mDcPin(dcPin) {}
   virtual ~cLcd();
 
   virtual bool initialise() = 0;
-  void setFont (const uint8_t* font, int fontSize);
+
+  void setFont (const uint8_t* font, const int fontSize);
 
   constexpr uint8_t getWidth() { return mWidth; }
   constexpr uint8_t getHeight() { return mHeight; }
 
-  void rect (uint16_t colour, int xorg, int yorg, int xlen, int ylen);
-  void pixel (uint16_t colour, int x, int y);
-  void blendPixel (uint16_t colour, uint8_t alpha, int x, int y);
-  int text (uint16_t colour, int strX, int strY, int height, std::string str);
+  void rect (const uint16_t colour, const int xorg, const int yorg, const int xlen, const int ylen);
+  void pixel (const uint16_t colour, const int x, const int y);
+  void blendPixel (const uint16_t colour, const uint8_t alpha, const int x, const int y);
+  int text (const uint16_t colour, const int strX, const int strY, const int height, const std::string& str);
 
-  void clear (uint16_t colour) { rect (colour, 0,0, getWidth(), getHeight()); }
+  void clear (const uint16_t colour) { rect (colour, 0,0, getWidth(), getHeight()); }
 
   void update() { mUpdate = true; }
   void setAutoUpdate() { mAutoUpdate = true; }
 
-  void delayMs (int ms);
+  void delayMs (const int ms);
 
 protected:
   bool initResources();
@@ -55,11 +56,11 @@ protected:
   void initDcPin (const uint8_t pin);
   void initSpi (const int clockSpeed);
 
-  void command (uint8_t command);
-  void commandData (uint8_t command, const uint16_t data);
-  void commandData (uint8_t command, const uint8_t* data, int len);
+  void command (const uint8_t command);
+  void commandData (const uint8_t command, const uint16_t data);
+  void commandData (const uint8_t command, const uint8_t* data, const int len);
 
-  void launchUpdateThread (uint8_t command);
+  void launchUpdateThread (const uint8_t command);
 
 private:
   const uint8_t mWidth;

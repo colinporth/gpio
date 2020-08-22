@@ -10,7 +10,7 @@
 
 #include "../shared/utils/utils.h"
 #include "../shared/utils/cLog.h"
-#include "FreeSansBold.h"
+#include "fonts/FreeSansBold.h"
 
 // !!! singleton assumed !|! saves exporting FREETYPE outside
 #include <ft2build.h>
@@ -35,7 +35,7 @@ cLcd::~cLcd() {
   }
 //}}}
 //{{{
-void cLcd::setFont (const uint8_t* font, int fontSize)  {
+void cLcd::setFont (const uint8_t* font, const int fontSize)  {
 
   FT_Init_FreeType (&mLibrary);
   FT_New_Memory_Face (mLibrary, (FT_Byte*)font, fontSize, 0, &mFace);
@@ -43,27 +43,26 @@ void cLcd::setFont (const uint8_t* font, int fontSize)  {
 //}}}
 
 //{{{
-void cLcd::rect (uint16_t colour, int xorg, int yorg, int xlen, int ylen) {
+void cLcd::rect (const uint16_t colour, const int xorg, const int yorg, const int xlen, const int ylen) {
 
-  colour = bswap_16 (colour);
+  uint16_t bigEndianColour = bswap_16 (colour);
 
   for (int y = yorg; (y < yorg+ylen) && (y < getHeight()); y++)
-    //wmemset ((wchar_t*)(mFrameBuf + (y*getWidth()) + xorg), (wchar_t)colourReversed, getWidth());
     for (int x = xorg; (x < xorg+xlen) && (x < getWidth()); x++)
-      mFrameBuf[(y*getWidth()) + x] = colour;
+      mFrameBuf[(y*getWidth()) + x] = bigEndianColour;
 
   mChanged = true;
   }
 //}}}
 //{{{
-void cLcd::pixel (uint16_t colour, int x, int y) {
+void cLcd::pixel (const uint16_t colour, const int x, const int y) {
 
   mFrameBuf[(y*getWidth()) + x] = bswap_16 (colour);
   mChanged = true;
   }
 //}}}
 //{{{
-void cLcd::blendPixel (uint16_t colour, uint8_t alpha, int x, int y) {
+void cLcd::blendPixel (const uint16_t colour, const uint8_t alpha, const int x, const int y) {
 // magical rgb565 alpha composite
 // - linear interp background * (1.0 - alpha) + foreground * alpha
 //   - factorized into: result = background + (foreground - background) * alpha
@@ -96,15 +95,16 @@ void cLcd::blendPixel (uint16_t colour, uint8_t alpha, int x, int y) {
   }
 //}}}
 //{{{
-int cLcd::text (uint16_t colour, int strX, int strY, int height, std::string str) {
+int cLcd::text (const uint16_t colour, const int strX, const int strY, const int height, const std::string& str) {
 
   FT_Set_Pixel_Sizes (mFace, 0, height);
 
+  int curX = strX;
   for (unsigned i = 0; i < str.size(); i++) {
     FT_Load_Char (mFace, str[i], FT_LOAD_RENDER);
     FT_GlyphSlot slot = mFace->glyph;
 
-    int x = strX + slot->bitmap_left;
+    int x = curX + slot->bitmap_left;
     int y = strY + height - slot->bitmap_top;
 
     if (slot->bitmap.buffer) {
@@ -115,15 +115,15 @@ int cLcd::text (uint16_t colour, int strX, int strY, int height, std::string str
         }
 
       }
-    strX += slot->advance.x / 64;
+    curX += slot->advance.x / 64;
     }
 
-  return strX;
+  return curX;
   }
 //}}}
 
 //{{{
-void cLcd::delayMs (int ms) {
+void cLcd::delayMs (const int ms) {
   gpioDelay (ms);
   }
 //}}}
@@ -173,7 +173,7 @@ void cLcd::initSpi (const int clockSpeed) {
 //}}}
 
 //{{{
-void cLcd::command (uint8_t command) {
+void cLcd::command (const uint8_t command) {
 
   gpioWrite (mDcPin, 0);
   spiWrite (mHandle, (char*)(&command), 1);
@@ -181,7 +181,7 @@ void cLcd::command (uint8_t command) {
   }
 //}}}
 //{{{
-void cLcd::commandData (uint8_t command, const uint16_t data) {
+void cLcd::commandData (const uint8_t command, const uint16_t data) {
 
   gpioWrite (mDcPin, 0);
   spiWrite (mHandle, (char*)(&command), 1);
@@ -192,7 +192,7 @@ void cLcd::commandData (uint8_t command, const uint16_t data) {
   }
 //}}}
 //{{{
-void cLcd::commandData (uint8_t command, const uint8_t* data, int len) {
+void cLcd::commandData (const uint8_t command, const uint8_t* data, const int len) {
 
   gpioWrite (mDcPin, 0);
   spiWrite (mHandle, (char*)(&command), 1);
@@ -210,7 +210,7 @@ void cLcd::commandData (uint8_t command, const uint8_t* data, int len) {
 //}}}
 
 //{{{
-void cLcd::launchUpdateThread (uint8_t command) {
+void cLcd::launchUpdateThread (const uint8_t command) {
 
   std::thread ([=]() {
     // write frameBuffer to lcd ram thread if changed

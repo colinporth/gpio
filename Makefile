@@ -2,7 +2,7 @@ TARGET    = lcd
 SRCS      = lcdTest.cpp \
 	    lcd.cpp \
 	    ../shared/utils/cLog.cpp \
-	    FreeSansBold.cpp \
+	    fonts/FreeSansBold.cpp \
 #            pigpio/pigpio.c \
 #            pigpio/command.c \
 
