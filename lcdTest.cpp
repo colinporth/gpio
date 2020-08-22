@@ -1,8 +1,11 @@
 // lcdTest.cpp
 #include <cstdint>
+#include <string>
+
 #include "lcd.h"
 
 #include "../shared/utils/utils.h"
+#include "../shared/utils/cLog.h"
 
 using namespace std;
 
@@ -18,7 +21,7 @@ int main() {
       lcd->clear (Blue);
       lcd->text (White, 0,0, 100, dec(i,3));
       lcd->update();
-      gpioDelay (40000);
+      lcd->delayMs (40000);
       }
 
     int height = 8;
@@ -37,7 +40,7 @@ int main() {
         }
       lcd->text (Yellow, 0,0, 20, "Hello Colin");
       lcd->update();
-      gpioDelay (40000);
+      lcd->delayMs (40000);
       }
     }
 

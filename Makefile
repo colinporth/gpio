@@ -1,5 +1,6 @@
 TARGET    = lcd
 SRCS      = lcdTest.cpp \
+	    lcd.cpp \
 	    ../shared/utils/cLog.cpp \
 	    FreeSansBold.cpp \
 #            pigpio/pigpio.c \
