@@ -226,55 +226,36 @@ void cLcd::writeCommandData (const uint8_t command, const uint16_t data) {
 void cLcd::writeCommandMultipleData (const uint8_t command, const uint8_t* data, const int len) {
 
   if (mUseSequence) {
+    // we manage the ce
     uint8_t commandSequence[3] = { 0x70, 0, command };
-
     gpioWrite (mChipEnableGpio, 0);
     spiWrite (mSpiHandle, (char*)commandSequence, 3);
     gpioWrite (mChipEnableGpio, 1);
 
-    if (data) {
-      uint8_t dataSequenceStart = 0x72;
-      gpioWrite (mChipEnableGpio, 0);
-      spiWrite (mSpiHandle, (char*)(&dataSequenceStart), 1);
-
-      int bytesLeft = len;
-      if (len >= 0x10000) {
-        auto ptr = (char*)data;
-        while (bytesLeft > 0) {
-          int sendBytes = (bytesLeft > 0x10000) ? 0x10000 : bytesLeft;
-          spiWrite (mSpiHandle, ptr, sendBytes);
-          ptr += sendBytes;
-          bytesLeft -= sendBytes;
-          }
-        }
-      else
-        spiWrite (mSpiHandle, (char*)data, len);
-
-      gpioWrite (mChipEnableGpio, 1);
-      }
+    // send data start
+    uint8_t dataSequenceStart = 0x72;
+    gpioWrite (mChipEnableGpio, 0);
+    spiWrite (mSpiHandle, (char*)(&dataSequenceStart), 1);
     }
-
   else {
+    // spi manages the ce
     gpioWrite (mDataCommandGpio, 0);
     spiWrite (mSpiHandle, (char*)(&command), 1);
     gpioWrite (mDataCommandGpio, 1);
-
-    if (data) {
-      if (len >= 0x10000) {
-        int bytesSent = 0;
-        int bytesLeft = len;
-        while (bytesSent < len) {
-          int sendBytes = (bytesLeft > 0x10000) ? 0x10000 : bytesLeft;
-          spiWrite (mSpiHandle, (char*)data+bytesSent, sendBytes);
-          bytesSent += sendBytes;
-          bytesLeft -= sendBytes;
-          }
-        }
-      else
-        spiWrite (mSpiHandle, (char*)data, len);
-      }
     }
 
+  // send data
+  int bytesLeft = len;
+  auto ptr = (char*)data;
+  while (bytesLeft > 0) {
+   int sendBytes = (bytesLeft > 0xFFFF) ? 0xFFFF : bytesLeft;
+    spiWrite (mSpiHandle, ptr, sendBytes);
+    ptr += sendBytes;
+    bytesLeft -= sendBytes;
+    }
+
+  if (mUseSequence)
+    gpioWrite (mChipEnableGpio, 1);
   }
 //}}}
 
