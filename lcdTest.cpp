@@ -18,8 +18,8 @@ int main() {
 
   while (true) {
     for (int i = 0; i < 200; i++) {
-      lcd->clear (Blue);
-      lcd->text (White, 0,0, 100, dec(i,3));
+      lcd->clear (kOrange);
+      lcd->text (kBlack, 0,0, 100, dec(i,3));
       lcd->update();
       lcd->delayMs (40000);
       }
@@ -28,9 +28,9 @@ int main() {
     while (height++ < lcd->getHeight()) {
       int x = 0;
       int y = 0;
-      lcd->clear (Magenta);
+      lcd->clear (kMagenta);
       for (char ch = 'A'; ch < 0x7f; ch++) {
-        x = lcd->text (White, x, y, height, string(1,ch));
+        x = lcd->text (kWhite, x, y, height, string(1,ch));
         if (x > lcd->getWidth()) {
           x = 0;
           y += height;
@@ -38,7 +38,7 @@ int main() {
             break;
           }
         }
-      lcd->text (Yellow, 0,0, 20, "Hello Colin");
+      lcd->text (kYellow, 0,0, 20, "Hello Colin");
       lcd->update();
       lcd->delayMs (40000);
       }

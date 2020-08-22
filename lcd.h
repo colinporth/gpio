@@ -1,33 +1,29 @@
 // lcd.h
 #pragma once
-
 #include <cstdint>
 #include <string>
 
-//{{{  colours
-// bigEndian colours
-constexpr uint16_t Black       =  0x0000;  //   0,   0,   0
-constexpr uint16_t Blue        =  0x001F;  //   0,   0, 255
-constexpr uint16_t Green       =  0x07E0;  //   0, 255,   0
-constexpr uint16_t Cyan        =  0x07FF;  //   0, 255, 255
-constexpr uint16_t Red         =  0xF800;  // 255,   0,   0
-constexpr uint16_t Magenta     =  0xF81F;  // 255,   0, 255
-constexpr uint16_t Yellow      =  0xFFE0;  // 255, 255,   0
-constexpr uint16_t White       =  0xFFFF;  // 255, 255, 255
+// colours - bigEndian
+constexpr uint16_t kBlue        =  0x001F;  //   0,   0, 255
+constexpr uint16_t kNavy        =  0x000F;  //   0,   0, 128
+constexpr uint16_t kGreen       =  0x07E0;  //   0, 255,   0
+constexpr uint16_t kDarkGreen   =  0x03E0;  //   0, 128,   0
+constexpr uint16_t kCyan        =  0x07FF;  //   0, 255, 255
+constexpr uint16_t kDarkCyan    =  0x03EF;  //   0, 128, 128
+constexpr uint16_t kRed         =  0xF800;  // 255,   0,   0
+constexpr uint16_t kMaroon      =  0x7800;  // 128,   0,   0
+constexpr uint16_t kMagenta     =  0xF81F;  // 255,   0, 255
+constexpr uint16_t kPurple      =  0x780F;  // 128,   0, 128
+constexpr uint16_t kOrange      =  0xFD20;  // 255, 165,   0
+constexpr uint16_t kYellow      =  0xFFE0;  // 255, 255,   0
+constexpr uint16_t kOlive       =  0x7BE0;  // 128, 128,   0
+constexpr uint16_t kGreenYellow =  0xAFE5;  // 173, 255,  47
 
-constexpr uint16_t Navy        =  0x000F;  //   0,   0, 128
-constexpr uint16_t DarkGreen   =  0x03E0;  //   0, 128,   0
-constexpr uint16_t DarkCyan    =  0x03EF;  //   0, 128, 128
-constexpr uint16_t Maroon      =  0x7800;  // 128,   0,   0
-constexpr uint16_t Purple      =  0x780F;  // 128,   0, 128
-constexpr uint16_t Olive       =  0x7BE0;  // 128, 128,   0
+constexpr uint16_t kBlack       =  0x0000;  //   0,   0,   0
+constexpr uint16_t kLightGrey   =  0xC618;  // 192, 192, 192
+constexpr uint16_t kDarkGrey    =  0x7BEF;  // 128, 128, 128
+constexpr uint16_t kWhite       =  0xFFFF;  // 255, 255, 255
 
-constexpr uint16_t LightGrey   =  0xC618;  // 192, 192, 192
-constexpr uint16_t DarkGrey    =  0x7BEF;  // 128, 128, 128
-
-constexpr uint16_t Orange      =  0xFD20;  // 255, 165,   0
-constexpr uint16_t GreenYellow =  0xAFE5;  // 173, 255,  47
-//}}}
 //{{{
 class cLcd {
 public:
