@@ -365,7 +365,7 @@ bool cLcd7735::initialise() {
   if (initResources()) {
     reset (kResetGpio);
     setDataCommandGpio (kDataCommandGpio);
-    initSpi (kSpiClock7735, true, true);
+    initSpi (kSpiClock7735, true);
 
     writeCommand (k7335_SLPOUT);
     delayUs (120000);
@@ -413,7 +413,7 @@ bool cLcd9225b::initialise() {
   if (initResources()) {
     reset (kResetGpio);
     setDataCommandGpio (kDataCommandGpio);
-    initSpi (kSpiClock9225b, true, true);
+    initSpi (kSpiClock9225b, true);
 
     writeCommandData (0x01, 0x011C); // set SS and NL bit
 
@@ -492,7 +492,7 @@ bool cLcd9320::initialise() {
 
   if (initResources()) {
     reset (kResetGpio);
-    initSpi (kSpiClock9320, false, false);
+    initSpi (kSpiClock9320, false);
 
     writeCommandData (0xE5, 0x8000); // Set the Vcore voltage
     writeCommandData (0x00, 0x0000); // start oscillation - stopped?
