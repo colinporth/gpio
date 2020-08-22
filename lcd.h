@@ -266,7 +266,7 @@ private:
 //{{{
 class cLcd7735 : public cLcd {
 public:
-  cLcd7735() : cLcd (kWidth, kHeight,kDcPin) {}
+  cLcd7735() : cLcd (kWidth, kHeight, kDcPin) {}
   virtual ~cLcd7735() {}
 
   //{{{
