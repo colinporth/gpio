@@ -221,7 +221,50 @@ void cLcd::commandData (const uint8_t command, const uint8_t* data, const int le
 //}}}
 
 //{{{
-void cLcd::launchUpdateThread (const uint8_t command) {
+void cLcd::commandNoDc (const uint8_t command) {
+
+  uint8_t buf[3] = {0x70, 0, command};
+  spiWrite (mHandle, (char*)buf, 3);
+  }
+//}}}
+//{{{
+void cLcd::commandDataNoDc (const uint8_t command, const uint16_t data) {
+
+  uint8_t buf[3] = {0x70, 0, command};
+  spiWrite (mHandle, (char*)buf, 3);
+
+  char buf1[3] = { 0x72, (char)(data >> 8), (char)(data & 0xff) };
+  spiWrite (mHandle, (char*)buf1, 3);
+  }
+//}}}
+//{{{
+void cLcd::commandDataNoDc (const uint8_t command, const uint8_t* data, const int len) {
+
+  uint8_t buf[3] = { 0x70, 0, command };
+  spiWrite (mHandle, (char*)buf, 3);
+
+  char dataBuf = 0x72;
+  spiWrite (mHandle, &dataBuf, 1);
+
+  if (data) {
+    if (len >= 0x10000) {
+      int bytesSent = 0;
+      int bytesLeft = len;
+      while (bytesSent < len) {
+        int sendBytes = (bytesLeft > 0x10000) ? 0x10000 : bytesLeft;
+        spiWrite (mHandle, (char*)data+bytesSent, sendBytes);
+        bytesSent += sendBytes;
+        bytesLeft -= sendBytes;
+        }
+      }
+    else
+      spiWrite (mHandle, (char*)data, len);
+    }
+  }
+//}}}
+
+//{{{
+void cLcd::launchUpdateThread (const uint8_t command, bool hasDc) {
 
   thread ([=]() {
     // write frameBuffer to lcd ram thread if changed
@@ -229,7 +272,10 @@ void cLcd::launchUpdateThread (const uint8_t command) {
       if (mUpdate || (mAutoUpdate && mChanged)) {
         mChanged = false;
         mUpdate = false;
-        commandData (command, (const uint8_t*)mFrameBuf, getWidth() * getHeight() * 2);
+        if (hasDc)
+          commandData (command, (const uint8_t*)mFrameBuf, getWidth() * getHeight() * 2);
+        else
+          commandDataNoDc (command, (const uint8_t*)mFrameBuf, getWidth() * getHeight() * 2);
         }
       gpioDelay (16000);
       }
@@ -326,7 +372,7 @@ bool cLcd7735::initialise() {
 
     command (k7335_DISPON); // display ON
 
-    launchUpdateThread (k7335_RAMWR);
+    launchUpdateThread (k7335_RAMWR, true);
     return true;
     }
 
@@ -406,7 +452,7 @@ bool cLcd9225b::initialise() {
     commandData (0x21, 0);
     //}}}
 
-    launchUpdateThread (0x22);
+    launchUpdateThread (0x22, true);
     return true;
     }
 
@@ -419,7 +465,7 @@ constexpr uint16_t kWidth9320 = 240;
 constexpr uint16_t kHeight9320 = 320;
 constexpr int kSpiClock9320 = 2000000;
 
-cLcd9320::cLcd9320() : cLcd(kWidth9320, kHeight9320, kDcPin) {}
+cLcd9320::cLcd9320() : cLcd(kWidth9320, kHeight9320, 0) {}
 //{{{
 bool cLcd9320::initialise() {
 
@@ -427,7 +473,61 @@ bool cLcd9320::initialise() {
     reset (kResetPin);
     initSpi (kSpiClock9320);
 
-    launchUpdateThread (0x22);
+    commandDataNoDc (0x00,0x0000);  // start oscillation - stopped?
+    commandDataNoDc (0x01,0x0100);  // Driver Output Control 1 - SS=1 and SM=0
+    commandDataNoDc (0x02,0x0700);  // LCD Driving Control - set line inversion
+    commandDataNoDc (0x03,0x1030);  // Entry Mode - BGR, HV inc, vert write,
+    commandDataNoDc (0x04,0x0000);  // Resize Control
+    commandDataNoDc (0x08,0x0202);  // Display Control 2
+    commandDataNoDc (0x09,0x0000);  // Display Control 3
+    commandDataNoDc (0x0a,0x0000);  // Display Control 4 - frame marker
+    commandDataNoDc (0x0c,0x0001);  // RGB Display Interface Control 1
+    commandDataNoDc (0x0d,0x0000);  // Frame Marker Position
+    commandDataNoDc (0x0f,0x0000);  // RGB Display Interface Control 2
+    delayMs (40000);
+
+    commandDataNoDc (0x07,0x0101);  // Display Control 1
+    delayMs (40000);
+
+    commandDataNoDc (0x10,0x10C0);  // Power Control 1
+    commandDataNoDc (0x11,0x0007);  // Power Control 2
+    commandDataNoDc (0x12,0x0110);  // Power Control 3
+    commandDataNoDc (0x13,0x0b00);  // Power Control 4
+    commandDataNoDc (0x29,0x0000);  // Power Control 7
+    commandDataNoDc (0x2b,0x4010);  // Frame Rate and Color Control
+
+    // 0x30 - 0x3d gamma
+    commandDataNoDc (0x60,0x2700);  // Driver Output Control 2
+    commandDataNoDc (0x61,0x0001);  // Base Image Display Control
+    commandDataNoDc (0x6a,0x0000);  // Vertical Scroll Control
+
+    commandDataNoDc (0x80,0x0000);  // Partial Image 1 Display Position
+    commandDataNoDc (0x81,0x0000);  // Partial Image 1 Area Start Line
+    commandDataNoDc (0x82,0x0000);  // Partial Image 1 Area End Line
+    commandDataNoDc (0x83,0x0000);  // Partial Image 2 Display Position
+    commandDataNoDc (0x84,0x0000);  // Partial Image 2 Area Start Line
+    commandDataNoDc (0x85,0x0000);  // Partial Image 2 Area End Line
+
+    commandDataNoDc (0x90,0x0010);  // Panel Interface Control 1
+    commandDataNoDc (0x92,0x0000);  // Panel Interface Control 2
+    commandDataNoDc (0x93,0x0001);  // Panel Interface Control 3
+    commandDataNoDc (0x95,0x0110);  // Panel Interface Control 4
+    commandDataNoDc (0x97,0x0000);  // Panel Interface Control 5
+    commandDataNoDc (0x98,0x0000);  // Panel Interface Control 6
+
+    commandDataNoDc (0x07,0x0133);  // Display Control 1
+    delayMs (40000);
+
+    commandDataNoDc (0x50, 0); // Horizontal Start Position
+    commandDataNoDc (0x51, getWidth()-1); // Horizontal End Position
+
+    commandDataNoDc (0x52, 0); // Vertical Start Position
+    commandDataNoDc (0x53, getHeight()-1); // Vertical End Position
+
+    commandDataNoDc (0x20, 0); // Horizontal GRAM Address Set
+    commandDataNoDc (0x21, 0); // Vertical GRAM Address Set
+
+    launchUpdateThread (0x22, false);
     return true;
     }
 

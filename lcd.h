@@ -60,7 +60,11 @@ protected:
   void commandData (const uint8_t command, const uint16_t data);
   void commandData (const uint8_t command, const uint8_t* data, const int len);
 
-  void launchUpdateThread (const uint8_t command);
+  void commandNoDc (const uint8_t command);
+  void commandDataNoDc (const uint8_t command, const uint16_t data);
+  void commandDataNoDc (const uint8_t command, const uint8_t* data, const int len);
+
+  void launchUpdateThread (const uint8_t command, bool hasDc);
 
 private:
   const uint16_t mWidth;
