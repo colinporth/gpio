@@ -48,19 +48,18 @@ public:
   void update() { mUpdate = true; }
   void setAutoUpdate() { mAutoUpdate = true; }
 
-  void delayMs (const int ms);
+  void delayUs (const int us);
 
 protected:
   bool initResources();
   void reset (const uint8_t pin);
   void initDcPin (const uint8_t pin);
-  void initSpi (const int clockSpeed);
+  void initSpi (const int clockSpeed, const bool mode0);
 
   void command (const uint8_t command);
   void commandData (const uint8_t command, const uint16_t data);
   void commandData (const uint8_t command, const uint8_t* data, const int len);
 
-  void commandNoDc (const uint8_t command);
   void commandDataNoDc (const uint8_t command, const uint16_t data);
   void commandDataNoDc (const uint8_t command, const uint8_t* data, const int len);
 

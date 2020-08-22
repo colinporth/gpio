@@ -128,8 +128,8 @@ int cLcd::text (const uint16_t colour, const int strX, const int strY, const int
 //}}}
 
 //{{{
-void cLcd::delayMs (const int ms) {
-  gpioDelay (ms);
+void cLcd::delayUs (const int us) {
+  gpioDelay (us);
   }
 //}}}
 
@@ -171,9 +171,10 @@ void cLcd::initDcPin (const uint8_t pin) {
   }
 //}}}
 //{{{
-void cLcd::initSpi (const int clockSpeed) {
-  // setup spi0, use CE0 active lo as CS
-  mHandle = spiOpen (0, clockSpeed, 0);
+void cLcd::initSpi (const int clockSpeed, const bool mode0) {
+// setup spi0, use CE0 active lo as CS
+
+  mHandle = spiOpen (0, clockSpeed, mode0 ? 0 : 3);
   }
 //}}}
 
@@ -220,13 +221,6 @@ void cLcd::commandData (const uint8_t command, const uint8_t* data, const int le
   }
 //}}}
 
-//{{{
-void cLcd::commandNoDc (const uint8_t command) {
-
-  uint8_t buf[3] = {0x70, 0, command};
-  spiWrite (mHandle, (char*)buf, 3);
-  }
-//}}}
 //{{{
 void cLcd::commandDataNoDc (const uint8_t command, const uint16_t data) {
 
@@ -344,10 +338,10 @@ bool cLcd7735::initialise() {
   if (initResources()) {
     reset (kResetPin);
     initDcPin (kDcPin);
-    initSpi (kSpiClock7735);
+    initSpi (kSpiClock7735, true);
 
     command (k7335_SLPOUT);
-    delayMs (120);
+    delayUs (120000);
 
     commandData (k7335_FRMCTR1, k7335_FRMCTRData, 3); // frameRate normal mode
     commandData (k7335_FRMCTR2, k7335_FRMCTRData, 3); // frameRate idle mode
@@ -392,7 +386,7 @@ bool cLcd9225b::initialise() {
   if (initResources()) {
     reset (kResetPin);
     initDcPin (kDcPin);
-    initSpi (kSpiClock9225b);
+    initSpi (kSpiClock9225b, true);
 
     commandData (0x01,0x011C); // set SS and NL bit
 
@@ -404,12 +398,12 @@ bool cLcd9225b::initialise() {
 
     commandData (0x20,0x0000); // Set GRAM Address
     commandData (0x21,0x0000); // Set GRAM Address
-    delayMs (50000);
+    delayUs (50000);
 
     //{{{  power On sequence
     commandData (0x10,0x0a00); // Set SAP,DSTB,STB//0800
     commandData (0x11,0x1038); // Set APON,PON,AON,VCI1EN,VC
-    delayMs (50000);
+    delayUs (50000);
     //}}}
 
     commandData (0x12,0x1121); // Internal reference voltage= Vci;
@@ -439,7 +433,7 @@ bool cLcd9225b::initialise() {
     commandData (0x57,0x0005);
     commandData (0x58,0x1700);
     commandData (0x59,0x001F);
-    delayMs (50000);
+    delayUs (50000);
     //}}}
 
     commandData (0x07,0x1017);
@@ -471,7 +465,7 @@ bool cLcd9320::initialise() {
 
   if (initResources()) {
     reset (kResetPin);
-    initSpi (kSpiClock9320);
+    initSpi (kSpiClock9320, false);
 
     commandDataNoDc (0x00,0x0000);  // start oscillation - stopped?
     commandDataNoDc (0x01,0x0100);  // Driver Output Control 1 - SS=1 and SM=0
@@ -484,10 +478,10 @@ bool cLcd9320::initialise() {
     commandDataNoDc (0x0c,0x0001);  // RGB Display Interface Control 1
     commandDataNoDc (0x0d,0x0000);  // Frame Marker Position
     commandDataNoDc (0x0f,0x0000);  // RGB Display Interface Control 2
-    delayMs (40000);
+    delayUs (40000);
 
     commandDataNoDc (0x07,0x0101);  // Display Control 1
-    delayMs (40000);
+    delayUs (40000);
 
     commandDataNoDc (0x10,0x10C0);  // Power Control 1
     commandDataNoDc (0x11,0x0007);  // Power Control 2
@@ -516,7 +510,7 @@ bool cLcd9320::initialise() {
     commandDataNoDc (0x98,0x0000);  // Panel Interface Control 6
 
     commandDataNoDc (0x07,0x0133);  // Display Control 1
-    delayMs (40000);
+    delayUs (40000);
 
     commandDataNoDc (0x50, 0); // Horizontal Start Position
     commandDataNoDc (0x51, getWidth()-1); // Horizontal End Position

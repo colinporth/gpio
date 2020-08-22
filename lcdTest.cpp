@@ -13,7 +13,7 @@ int main() {
 
   cLog::init (LOGINFO, false, "", "gpio");
 
-  cLcd* lcd = new cLcd9225b();
+  cLcd* lcd = new cLcd9320();
   lcd->initialise();
 
   while (true) {
@@ -21,7 +21,7 @@ int main() {
       lcd->clear (kOrange);
       lcd->text (kWhite, 0,0, 100, dec(i,3));
       lcd->update();
-      lcd->delayMs (40000);
+      lcd->delayUs (40000);
       }
 
     int height = 8;
@@ -40,7 +40,7 @@ int main() {
         }
       lcd->text (kYellow, 0,0, 20, "Hello Colin");
       lcd->update();
-      lcd->delayMs (40000);
+      lcd->delayUs (40000);
       }
     }
 
