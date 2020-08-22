@@ -31,6 +31,7 @@ constexpr uint8_t kDcPin  = 24;   // J8 pin18
 // - SPI0 - SCLK                     J8 pin21
 constexpr uint8_t kResetPin = 25; // J8 pin22
 // - SPI0 - CE0                      J8 pin24
+constexpr uint8_t kSpiCe0in = 8;  // J8 pin22
 
 // cLcd - public
 //{{{
@@ -165,16 +166,22 @@ void cLcd::reset (const uint8_t pin) {
 //}}}
 //{{{
 void cLcd::initDcPin (const uint8_t pin) {
-  // setup data/command pin to data (hi)
+// setup data/command pin to data (hi)
+
   gpioSetMode (pin, PI_OUTPUT);
   gpioWrite (pin, 1);
   }
 //}}}
 //{{{
-void cLcd::initSpi (const int clockSpeed, const bool mode0) {
+void cLcd::initSpi (const int clockSpeed, const bool mode0, const bool enableAutoCE0) {
 // setup spi0, use CE0 active lo as CS
 
-  mHandle = spiOpen (0, clockSpeed, mode0 ? 0 : 3);
+  if (!enableAutoCE0) {
+    gpioSetMode (mCePin, PI_OUTPUT);
+    gpioWrite (mCePin, 1);
+    }
+
+  mHandle = spiOpen (0, clockSpeed, (mode0 ? 0 : 3) | (enableAutoCE0 ? 0x00 : 0x40));
   }
 //}}}
 
@@ -224,36 +231,45 @@ void cLcd::commandData (const uint8_t command, const uint8_t* data, const int le
 //{{{
 void cLcd::commandDataNoDc (const uint8_t command, const uint16_t data) {
 
-  uint8_t buf[3] = {0x70, 0, command};
-  spiWrite (mHandle, (char*)buf, 3);
+  uint8_t commandSequence[3] = { 0x70, 0, command };
+  uint8_t dataSequence[3] = { 0x72, (uint8_t)(data >> 8), (uint8_t)(data & 0xff) };
 
-  char buf1[3] = { 0x72, (char)(data >> 8), (char)(data & 0xff) };
-  spiWrite (mHandle, (char*)buf1, 3);
+  gpioWrite (mCePin, 0);
+  spiWrite (mHandle, (char*)commandSequence, 3);
+  gpioWrite (mCePin, 1);
+
+  gpioWrite (mCePin, 0);
+  spiWrite (mHandle, (char*)dataSequence, 3);
+  gpioWrite (mCePin, 1);
   }
 //}}}
 //{{{
 void cLcd::commandDataNoDc (const uint8_t command, const uint8_t* data, const int len) {
 
-  uint8_t buf[3] = { 0x70, 0, command };
-  spiWrite (mHandle, (char*)buf, 3);
+  uint8_t commandSequence[3] = { 0x70, 0, command };
+  uint8_t dataSequenceStart = 0x72;
 
-  char dataBuf = 0x72;
-  spiWrite (mHandle, &dataBuf, 1);
+  gpioWrite (mCePin, 0);
+  spiWrite (mHandle, (char*)commandSequence, 3);
+  gpioWrite (mCePin, 1);
 
-  if (data) {
-    if (len >= 0x10000) {
-      int bytesSent = 0;
-      int bytesLeft = len;
-      while (bytesSent < len) {
-        int sendBytes = (bytesLeft > 0x10000) ? 0x10000 : bytesLeft;
-        spiWrite (mHandle, (char*)data+bytesSent, sendBytes);
-        bytesSent += sendBytes;
-        bytesLeft -= sendBytes;
-        }
+  gpioWrite (mCePin, 0);
+  spiWrite (mHandle, (char*)(&dataSequenceStart), 1);
+
+  int bytesLeft = len;
+  if (len >= 0x10000) {
+    auto ptr = (char*)data;
+    while (bytesLeft > 0) {
+      int sendBytes = (bytesLeft > 0x10000) ? 0x10000 : bytesLeft;
+      spiWrite (mHandle, ptr, sendBytes);
+      ptr += sendBytes;
+      bytesLeft -= sendBytes;
       }
-    else
-      spiWrite (mHandle, (char*)data, len);
     }
+  else
+    spiWrite (mHandle, (char*)data, len);
+
+  gpioWrite (mCePin, 1);
   }
 //}}}
 
@@ -331,14 +347,14 @@ constexpr uint8_t k7335_GMCTRN1Data[16] = { 0x03, 0x1d, 0x07, 0x06, 0x2E, 0x2C, 
                                             0x2E, 0x2E, 0x37, 0x3F, 0x00, 0x00, 0x02, 0x10 } ;
 //}}}
 
-cLcd7735::cLcd7735() : cLcd (kWidth7735, kHeight7735, kDcPin) {}
+cLcd7735::cLcd7735() : cLcd (kWidth7735, kHeight7735, kDcPin, 0) {}
 //{{{
 bool cLcd7735::initialise() {
 
   if (initResources()) {
     reset (kResetPin);
     initDcPin (kDcPin);
-    initSpi (kSpiClock7735, true);
+    initSpi (kSpiClock7735, true, true);
 
     command (k7335_SLPOUT);
     delayUs (120000);
@@ -379,14 +395,14 @@ constexpr uint16_t kWidth9225b = 176;
 constexpr uint16_t kHeight9225b = 220;
 constexpr int kSpiClock9225b = 16000000;
 
-cLcd9225b::cLcd9225b() : cLcd(kWidth9225b, kHeight9225b, kDcPin) {}
+cLcd9225b::cLcd9225b() : cLcd(kWidth9225b, kHeight9225b, kDcPin, 0) {}
 //{{{
 bool cLcd9225b::initialise() {
 
   if (initResources()) {
     reset (kResetPin);
     initDcPin (kDcPin);
-    initSpi (kSpiClock9225b, true);
+    initSpi (kSpiClock9225b, true, true);
 
     commandData (0x01,0x011C); // set SS and NL bit
 
@@ -457,59 +473,59 @@ bool cLcd9225b::initialise() {
 // cLcd9320 - public
 constexpr uint16_t kWidth9320 = 240;
 constexpr uint16_t kHeight9320 = 320;
-constexpr int kSpiClock9320 = 2000000;
+constexpr int kSpiClock9320 = 24000000;
 
-cLcd9320::cLcd9320() : cLcd(kWidth9320, kHeight9320, 0) {}
+cLcd9320::cLcd9320() : cLcd(kWidth9320, kHeight9320, 0, kSpiCe0in) {}
 //{{{
 bool cLcd9320::initialise() {
 
   if (initResources()) {
     reset (kResetPin);
-    initSpi (kSpiClock9320, false);
+    initSpi (kSpiClock9320, false, false);
 
-    commandDataNoDc (0x00,0x0000);  // start oscillation - stopped?
-    commandDataNoDc (0x01,0x0100);  // Driver Output Control 1 - SS=1 and SM=0
-    commandDataNoDc (0x02,0x0700);  // LCD Driving Control - set line inversion
-    commandDataNoDc (0x03,0x1030);  // Entry Mode - BGR, HV inc, vert write,
-    commandDataNoDc (0x04,0x0000);  // Resize Control
-    commandDataNoDc (0x08,0x0202);  // Display Control 2
-    commandDataNoDc (0x09,0x0000);  // Display Control 3
-    commandDataNoDc (0x0a,0x0000);  // Display Control 4 - frame marker
-    commandDataNoDc (0x0c,0x0001);  // RGB Display Interface Control 1
-    commandDataNoDc (0x0d,0x0000);  // Frame Marker Position
-    commandDataNoDc (0x0f,0x0000);  // RGB Display Interface Control 2
+    commandDataNoDc (0x00, 0x0000);  // start oscillation - stopped?
+    commandDataNoDc (0x01, 0x0100);  // Driver Output Control 1 - SS=1 and SM=0
+    commandDataNoDc (0x02, 0x0700);  // LCD Driving Control - set line inversion
+    commandDataNoDc (0x03, 0x1030);  // Entry Mode - BGR, HV inc, vert write,
+    commandDataNoDc (0x04, 0x0000);  // Resize Control
+    commandDataNoDc (0x08, 0x0202);  // Display Control 2
+    commandDataNoDc (0x09, 0x0000);  // Display Control 3
+    commandDataNoDc (0x0a, 0x0000);  // Display Control 4 - frame marker
+    commandDataNoDc (0x0c, 0x0001);  // RGB Display Interface Control 1
+    commandDataNoDc (0x0d, 0x0000);  // Frame Marker Position
+    commandDataNoDc (0x0f, 0x0000);  // RGB Display Interface Control 2
     delayUs (40000);
 
-    commandDataNoDc (0x07,0x0101);  // Display Control 1
+    commandDataNoDc (0x07, 0x0101);  // Display Control 1
     delayUs (40000);
 
-    commandDataNoDc (0x10,0x10C0);  // Power Control 1
-    commandDataNoDc (0x11,0x0007);  // Power Control 2
-    commandDataNoDc (0x12,0x0110);  // Power Control 3
-    commandDataNoDc (0x13,0x0b00);  // Power Control 4
-    commandDataNoDc (0x29,0x0000);  // Power Control 7
-    commandDataNoDc (0x2b,0x4010);  // Frame Rate and Color Control
+    commandDataNoDc (0x10, 0x10C0);  // Power Control 1
+    commandDataNoDc (0x11, 0x0007);  // Power Control 2
+    commandDataNoDc (0x12, 0x0110);  // Power Control 3
+    commandDataNoDc (0x13, 0x0b00);  // Power Control 4
+    commandDataNoDc (0x29, 0x0000);  // Power Control 7
+    commandDataNoDc (0x2b, 0x4010);  // Frame Rate and Color Control
 
     // 0x30 - 0x3d gamma
-    commandDataNoDc (0x60,0x2700);  // Driver Output Control 2
-    commandDataNoDc (0x61,0x0001);  // Base Image Display Control
-    commandDataNoDc (0x6a,0x0000);  // Vertical Scroll Control
+    commandDataNoDc (0x60, 0x2700);  // Driver Output Control 2
+    commandDataNoDc (0x61, 0x0001);  // Base Image Display Control
+    commandDataNoDc (0x6a, 0x0000);  // Vertical Scroll Control
 
-    commandDataNoDc (0x80,0x0000);  // Partial Image 1 Display Position
-    commandDataNoDc (0x81,0x0000);  // Partial Image 1 Area Start Line
-    commandDataNoDc (0x82,0x0000);  // Partial Image 1 Area End Line
-    commandDataNoDc (0x83,0x0000);  // Partial Image 2 Display Position
-    commandDataNoDc (0x84,0x0000);  // Partial Image 2 Area Start Line
-    commandDataNoDc (0x85,0x0000);  // Partial Image 2 Area End Line
+    commandDataNoDc (0x80, 0x0000);  // Partial Image 1 Display Position
+    commandDataNoDc (0x81, 0x0000);  // Partial Image 1 Area Start Line
+    commandDataNoDc (0x82, 0x0000);  // Partial Image 1 Area End Line
+    commandDataNoDc (0x83, 0x0000);  // Partial Image 2 Display Position
+    commandDataNoDc (0x84, 0x0000);  // Partial Image 2 Area Start Line
+    commandDataNoDc (0x85, 0x0000);  // Partial Image 2 Area End Line
 
-    commandDataNoDc (0x90,0x0010);  // Panel Interface Control 1
-    commandDataNoDc (0x92,0x0000);  // Panel Interface Control 2
-    commandDataNoDc (0x93,0x0001);  // Panel Interface Control 3
-    commandDataNoDc (0x95,0x0110);  // Panel Interface Control 4
-    commandDataNoDc (0x97,0x0000);  // Panel Interface Control 5
-    commandDataNoDc (0x98,0x0000);  // Panel Interface Control 6
+    commandDataNoDc (0x90, 0x0010);  // Panel Interface Control 1
+    commandDataNoDc (0x92, 0x0000);  // Panel Interface Control 2
+    commandDataNoDc (0x93, 0x0001);  // Panel Interface Control 3
+    commandDataNoDc (0x95, 0x0110);  // Panel Interface Control 4
+    commandDataNoDc (0x97, 0x0000);  // Panel Interface Control 5
+    commandDataNoDc (0x98, 0x0000);  // Panel Interface Control 6
 
-    commandDataNoDc (0x07,0x0133);  // Display Control 1
+    commandDataNoDc (0x07, 0x0133);  // Display Control 1
     delayUs (40000);
 
     commandDataNoDc (0x50, 0); // Horizontal Start Position

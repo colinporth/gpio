@@ -27,8 +27,8 @@ constexpr uint16_t kWhite       =  0xFFFF;  // 255, 255, 255
 //{{{
 class cLcd {
 public:
-  cLcd (const uint16_t width, const uint16_t height, const uint8_t dcPin)
-    : mWidth(width), mHeight(height), mDcPin(dcPin) {}
+  cLcd (const uint16_t width, const uint16_t height, const uint8_t dcPin, const uint8_t cePin)
+    : mWidth(width), mHeight(height), mDcPin(dcPin), mCePin(cePin) {}
   virtual ~cLcd();
 
   virtual bool initialise() = 0;
@@ -54,7 +54,7 @@ protected:
   bool initResources();
   void reset (const uint8_t pin);
   void initDcPin (const uint8_t pin);
-  void initSpi (const int clockSpeed, const bool mode0);
+  void initSpi (const int clockSpeed, const bool mode0, const bool enableAutoCE0);
 
   void command (const uint8_t command);
   void commandData (const uint8_t command, const uint16_t data);
@@ -75,6 +75,7 @@ private:
   uint16_t* mFrameBuf = nullptr;  // bigEndian RGB565 uint16 colour pixels
 
   const uint8_t mDcPin;
+  const uint8_t mCePin;
   int mHandle = 0;
   };
 //}}}
