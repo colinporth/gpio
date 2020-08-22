@@ -173,15 +173,17 @@ void cLcd::setDataCommandGpio (const uint8_t gpio) {
   }
 //}}}
 //{{{
-void cLcd::initSpi (const int clockSpeed, const bool mode0, const bool enableAutoCE0) {
+void cLcd::initSpi (const int clockSpeed, const bool mode0) {
 // setup spi0, use CE0 active lo as CS
 
-  if (!enableAutoCE0) {
+  if (mChipEnableGpio != 0xFF) {
     gpioSetMode (mChipEnableGpio, PI_OUTPUT);
     gpioWrite (mChipEnableGpio, 1);
     }
 
-  mHandle = spiOpen (0, clockSpeed, (mode0 ? 0 : 3) | (enableAutoCE0 ? 0x00 : 0x40));
+  // if mChipEnableGpio then disable autoSpiCe0
+  // - can't send multiple SPI's without pulsing CE screwing up dataSequence
+  mHandle = spiOpen (0, clockSpeed, (mode0 ? 0 : 3) | ((mChipEnableGpio == 0xFF) ? 0x00 : 0x40));
   }
 //}}}
 
