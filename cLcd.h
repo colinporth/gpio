@@ -27,10 +27,14 @@ constexpr uint16_t kWhite       =  0xFFFF;  // 255, 255, 255
 //{{{
 class cLcd {
 public:
-  cLcd (const uint16_t width, const uint16_t height, const uint8_t dataCommandGpio, const uint8_t chipEnableGpio)
+  cLcd (const uint16_t width, const uint16_t height,
+        const int spiClock, const bool spiMode0,
+        const uint8_t resetGpio, const uint8_t dataCommandGpio, const uint8_t chipEnableGpio)
     : mWidth(width), mHeight(height),
+      mSpiClock(spiClock), mSpiMode0(spiMode0),
       mUseSequence((dataCommandGpio == 0xFF) && (chipEnableGpio != 0xFF)),
-      mDataCommandGpio(dataCommandGpio), mChipEnableGpio(chipEnableGpio) {}
+      mResetGpio(resetGpio), mDataCommandGpio(dataCommandGpio), mChipEnableGpio(chipEnableGpio) {
+    }
   virtual ~cLcd();
 
   virtual bool initialise() = 0;
@@ -73,9 +77,14 @@ private:
   bool mAutoUpdate = false;
   uint16_t* mFrameBuf = nullptr;  // bigEndian RGB565 uint16 colour pixels
 
+  const int mSpiClock;
+  const bool mSpiMode0;
+
   const bool mUseSequence;
+  const uint8_t mResetGpio;
   const uint8_t mDataCommandGpio;
   const uint8_t mChipEnableGpio;
+
   int mHandle = 0;
   };
 //}}}

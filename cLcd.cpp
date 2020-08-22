@@ -143,6 +143,30 @@ bool cLcd::initResources() {
   cLog::log (LOGINFO, "pigpio hwRev:%x version:%d", hardwareRevision, version);
 
   if (gpioInitialise() >= 0) {
+    if (mChipEnableGpio != 0xFF) {
+      gpioSetMode (mChipEnableGpio, PI_OUTPUT);
+      gpioWrite (mChipEnableGpio, 1);
+      }
+
+    if (mDataCommandGpio != 0xFF) {
+      gpioSetMode (mDataCommandGpio, PI_OUTPUT);
+      gpioWrite (mDataCommandGpio, 1);
+      }
+
+    if (mResetGpio != 0xFF) {
+      gpioSetMode (mResetGpio, PI_OUTPUT);
+
+      gpioWrite (mResetGpio, 0);
+      gpioDelay (10000);
+
+      gpioWrite (mResetGpio, 1);
+      gpioDelay (120000);
+      }
+
+    // if mChipEnableGpio then disable autoSpiCe0
+    // - can't send multiple SPI's without pulsing CE screwing up dataSequence
+    mHandle = spiOpen (0, mSpiClock, (mSpiMode0 ? 0 : 3) | ((mChipEnableGpio == 0xFF) ? 0x00 : 0x40));
+
     setFont (getFreeSansBold(), getFreeSansBoldSize());
 
     mFrameBuf = (uint16_t*)malloc (getWidth() * getHeight() * 2);
@@ -153,37 +177,9 @@ bool cLcd::initResources() {
   }
 //}}}
 //{{{
-void cLcd::reset (const uint8_t gpio) {
-  // setup and pulse reset gpio
-  gpioSetMode (gpio, PI_OUTPUT);
-
-  gpioWrite (gpio, 0);
-  gpioDelay (10000);
-
-  gpioWrite (gpio, 1);
-  gpioDelay (120000);
-  }
-//}}}
-//{{{
-void cLcd::setDataCommandGpio (const uint8_t gpio) {
-// setup data/command gpio to data (hi)
-
-  gpioSetMode (gpio, PI_OUTPUT);
-  gpioWrite (gpio, 1);
-  }
-//}}}
-//{{{
 void cLcd::initSpi (const int clockSpeed, const bool mode0) {
 // setup spi0, use CE0 active lo as CS
 
-  if (mChipEnableGpio != 0xFF) {
-    gpioSetMode (mChipEnableGpio, PI_OUTPUT);
-    gpioWrite (mChipEnableGpio, 1);
-    }
-
-  // if mChipEnableGpio then disable autoSpiCe0
-  // - can't send multiple SPI's without pulsing CE screwing up dataSequence
-  mHandle = spiOpen (0, clockSpeed, (mode0 ? 0 : 3) | ((mChipEnableGpio == 0xFF) ? 0x00 : 0x40));
   }
 //}}}
 
@@ -358,15 +354,12 @@ constexpr uint8_t k7335_GMCTRN1Data[16] = { 0x03, 0x1d, 0x07, 0x06, 0x2E, 0x2C, 
                                             0x2E, 0x2E, 0x37, 0x3F, 0x00, 0x00, 0x02, 0x10 } ;
 //}}}
 
-cLcd7735::cLcd7735() : cLcd (kWidth7735, kHeight7735, kDataCommandGpio, 0xFF) {}
-//{{{
+cLcd7735::cLcd7735() : cLcd (kWidth7735, kHeight7735, kSpiClock7735, true,
+                             kResetGpio, kDataCommandGpio, 0xFF) {}
+
 bool cLcd7735::initialise() {
 
   if (initResources()) {
-    reset (kResetGpio);
-    setDataCommandGpio (kDataCommandGpio);
-    initSpi (kSpiClock7735, true);
-
     writeCommand (k7335_SLPOUT);
     delayUs (120000);
 
@@ -400,21 +393,17 @@ bool cLcd7735::initialise() {
   return false;
   }
 //}}}
-//}}}
 //{{{  cLcd9225b
 constexpr uint16_t kWidth9225b = 176;
 constexpr uint16_t kHeight9225b = 220;
 constexpr int kSpiClock9225b = 16000000;
 
-cLcd9225b::cLcd9225b() : cLcd(kWidth9225b, kHeight9225b, kDataCommandGpio, 0xFF) {}
-//{{{
+cLcd9225b::cLcd9225b() : cLcd(kWidth9225b, kHeight9225b, kSpiClock9225b, true,
+                              kResetGpio, kDataCommandGpio, 0xFF) {}
+
 bool cLcd9225b::initialise() {
 
   if (initResources()) {
-    reset (kResetGpio);
-    setDataCommandGpio (kDataCommandGpio);
-    initSpi (kSpiClock9225b, true);
-
     writeCommandData (0x01, 0x011C); // set SS and NL bit
 
     writeCommandData (0x02, 0x0100); // set 1 line inversion
@@ -480,20 +469,18 @@ bool cLcd9225b::initialise() {
   return false;
   }
 //}}}
-//}}}
 //{{{  cLcd9320
 constexpr uint16_t kWidth9320 = 240;
 constexpr uint16_t kHeight9320 = 320;
 constexpr int kSpiClock9320 = 24000000;
 
-cLcd9320::cLcd9320() : cLcd(kWidth9320, kHeight9320, 0xFF, kSpiCe0Gpio) {}
+cLcd9320::cLcd9320() : cLcd(kWidth9320, kHeight9320, kSpiClock9320, false,
+                            kResetGpio, 0xFF, kSpiCe0Gpio) {}
+
 //{{{
 bool cLcd9320::initialise() {
 
   if (initResources()) {
-    reset (kResetGpio);
-    initSpi (kSpiClock9320, false);
-
     writeCommandData (0xE5, 0x8000); // Set the Vcore voltage
     writeCommandData (0x00, 0x0000); // start oscillation - stopped?
     writeCommandData (0x01, 0x0100); // Driver Output Control 1 - SS=1 and SM=0
