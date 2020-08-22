@@ -78,10 +78,10 @@ void cLcd::blendPixel (const uint16_t colour, const uint8_t alpha, const int x, 
   if ((alpha >= 0) && (x >= 0) && (y > 0) && (x < getWidth()) && (y < getHeight())) {
     // clip opaque and offscreen
     if (alpha == 0xFF)
-      // simple case - set bigEndian frame buffer to littleEndian colour
+      // simple case - set bigEndianColour frameBuf pixel to littleEndian colour
       mFrameBuf[(y*getWidth()) + x] = bswap_16 (colour);
     else {
-      // get bigEndian frame buffer into littleEndian background
+      // get bigEndianColour frame buffer into littleEndian background
       uint32_t background = bswap_16 (mFrameBuf[(y*getWidth()) + x]);
 
       // composite littleEndian colour
@@ -90,7 +90,7 @@ void cLcd::blendPixel (const uint16_t colour, const uint8_t alpha, const int x, 
       background = (background | (background << 16)) & 0x07e0f81f;
       background += (((foreground - background) * ((alpha + 4) >> 3)) >> 5) & 0x07e0f81f;
 
-      // set bigEndian frame buffer to littleEndian result
+      // set bigEndianColour frameBuf pixel to littleEndian background result
       mFrameBuf[(y*getWidth()) + x] = bswap_16 (background | (background >> 16));
       }
 
@@ -237,8 +237,8 @@ constexpr uint8_t kHeight7735 = 160;
 constexpr static const int kSpiClock7735 = 24000000;
 //{{{  command constexpr
 constexpr uint8_t k7335_SLPOUT  = 0x11; // no data
-constexpr uint8_t k7335_DISPOFF = 0x28; // no data
 constexpr uint8_t k7335_DISPON  = 0x29; // no data
+//constexpr uint8_t k7335_DISPOFF = 0x28; // no data
 
 constexpr uint8_t k7335_CASET = 0x2A;
 constexpr uint8_t k7335_caSetData[4] = { 0, 0, 0, kWidth7735 - 1 };

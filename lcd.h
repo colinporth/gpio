@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <string>
 
-// colours - bigEndian uint16 RGB565
+// colours - uint16 RGB565
 constexpr uint16_t kBlue        =  0x001F;  //   0,   0, 255
 constexpr uint16_t kNavy        =  0x000F;  //   0,   0, 128
 constexpr uint16_t kGreen       =  0x07E0;  //   0, 255,   0
@@ -69,7 +69,7 @@ private:
   bool mUpdate = false;
   bool mChanged = false;
   bool mAutoUpdate = false;
-  uint16_t* mFrameBuf = nullptr;
+  uint16_t* mFrameBuf = nullptr;  // bigEndian RGB565 uint16 colour pixels
 
   const uint8_t mDcPin;
   int mHandle = 0;
