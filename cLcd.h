@@ -24,9 +24,9 @@ constexpr uint16_t kLightGrey   =  0xC618;  // 192, 192, 192
 constexpr uint16_t kDarkGrey    =  0x7BEF;  // 128, 128, 128
 constexpr uint16_t kWhite       =  0xFFFF;  // 255, 255, 255
 
-//{{{
 class cLcd {
 public:
+  //{{{
   cLcd (const uint16_t width, const uint16_t height,
         const int spiClock, const bool spiMode0,
         const uint8_t resetGpio, const uint8_t dataCommandGpio, const uint8_t chipEnableGpio)
@@ -35,11 +35,9 @@ public:
       mUseSequence((dataCommandGpio == 0xFF) && (chipEnableGpio != 0xFF)),
       mResetGpio(resetGpio), mDataCommandGpio(dataCommandGpio), mChipEnableGpio(chipEnableGpio) {
     }
+  //}}}
   virtual ~cLcd();
-
   virtual bool initialise() = 0;
-
-  void setFont (const uint8_t* font, const int fontSize);
 
   constexpr uint16_t getWidth() { return mWidth; }
   constexpr uint16_t getHeight() { return mHeight; }
@@ -48,14 +46,13 @@ public:
   void pixel (const uint16_t colour, const int x, const int y);
   void blendPixel (const uint16_t colour, const uint8_t alpha, const int x, const int y);
   int text (const uint16_t colour, const int strX, const int strY, const int height, const std::string& str);
-
   void clear (const uint16_t colour) { rect (colour, 0,0, getWidth(), getHeight()); }
 
   void update() { mUpdate = true; }
   void setAutoUpdate() { mAutoUpdate = true; }
-
   void delayUs (const int us);
 
+//{{{
 protected:
   bool initResources();
   void reset (const uint8_t gpio);
@@ -67,8 +64,11 @@ protected:
   void writeCommandMultipleData (const uint8_t command, const uint8_t* data, const int len);
 
   void launchUpdateThread (const uint8_t command);
-
+//}}}
+//{{{
 private:
+  void setFont (const uint8_t* font, const int fontSize);
+
   const uint16_t mWidth;
   const uint16_t mHeight;
 
@@ -86,8 +86,8 @@ private:
   const uint8_t mChipEnableGpio;
 
   int mHandle = 0;
-  };
 //}}}
+  };
 
 //{{{
 class cLcd7735 : public cLcd {
