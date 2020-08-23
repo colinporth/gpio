@@ -19,11 +19,12 @@ using namespace std;
 // !!! singleton assumed !|! saves exporting FREETYPE outside
 #include <ft2build.h>
 #include FT_FREETYPE_H
+
 static FT_Library mLibrary;
 static FT_Face mFace;
 //}}}
 
-// raspberry pi J8 header pins
+// J8 header pins
 // - 3.3v                                     J8 pin17
 constexpr uint8_t kDataCommandGpio  = 24;  // J8 pin18
 // - SPI0 - MOSI                              J8 pin19
@@ -97,7 +98,6 @@ void cLcd::blendPixel (const uint16_t colour, const uint8_t alpha, const int x, 
 
     mChanged = true;
     }
-
   }
 //}}}
 //{{{
@@ -201,13 +201,13 @@ void cLcd::writeCommandData (const uint8_t command, const uint16_t data) {
   writeCommand (command);
 
   if (mUseSequence) {
-    uint8_t dataSequence[3] = { 0x72, (uint8_t)(data >> 8), (uint8_t)(data & 0xff) };
+    uint8_t dataSequence[3] = { 0x72, uint8_t(data >> 8), uint8_t(data & 0xff) };
     gpioWrite (mChipEnableGpio, 0);
     spiWrite (mSpiHandle, (char*)dataSequence, 3);
     gpioWrite (mChipEnableGpio, 1);
     }
   else {
-    char dataBytes[2] = { (char)(data >> 8), (char)(data & 0xff) };
+    uint8_t dataBytes[2] = { uint8_t(data >> 8), uint8_t(data & 0xff) };
     spiWrite (mSpiHandle, (char*)dataBytes, 2);
     }
   }
