@@ -27,6 +27,7 @@ static FT_Face mFace;
 // J8 header pins
 // - 3.3v                                     J8 pin17
 constexpr uint8_t kDataCommandGpio  = 24;  // J8 pin18
+constexpr uint8_t kBackLightGpio  = 24;    // J8 pin18
 // - SPI0 - MOSI                              J8 pin19
 // - 0v                                       J8 pin20
 // - SPI0 - SCLK                              J8 pin21
