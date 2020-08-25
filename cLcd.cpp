@@ -524,15 +524,13 @@ bool cLcd9225b::initialise() {
   }
 //}}}
 //{{{  cLcd1289
-constexpr uint8_t kRsGpio = 16;
-constexpr uint8_t kWrGpio = 17;
+constexpr uint8_t kWrGpio = 16;
+constexpr uint8_t kRsGpio = 17;
 constexpr uint8_t kRdGpio = 18;
-constexpr uint8_t kCsGpio = 19;
-constexpr uint8_t kResetGpio1289 = 20;
 
 constexpr uint16_t kWidth1289 = 240;
 constexpr uint16_t kHeight1289 = 320;
-cLcd1289::cLcd1289() : cLcd(kWidth1289, kHeight1289, 0, true, kResetGpio1289, kRsGpio, kCsGpio) {}
+cLcd1289::cLcd1289() : cLcd(kWidth1289, kHeight1289, 0, true, kResetGpio, kRsGpio, 0xFF) {}
 
 //{{{
 bool cLcd1289::initialise() {
@@ -541,16 +539,15 @@ bool cLcd1289::initialise() {
     initResetPin();
     initDataCommandPin();
 
-    gpioSetMode (kCsGpio, PI_OUTPUT);
-    gpioWrite (kCsGpio, 0);
-
-    // parallel data pins
+    // wr
     gpioSetMode (kWrGpio, PI_OUTPUT);
     gpioWrite (kWrGpio, 1);
 
+    // rd unused
     gpioSetMode (kRdGpio, PI_OUTPUT);
     gpioWrite (kRdGpio, 1);
 
+    // parallel d0-15
     for (int i = 0; i < 16; i++) {
       gpioSetMode (i, PI_OUTPUT);
       gpioWrite (i, 0);
@@ -611,10 +608,9 @@ void cLcd1289::writeCommand (const uint8_t command) {
 
   gpioWrite (mDataCommandGpio, 0);
 
-  gpioWrite_Bits_0_31_Set (command & 0xFFFF);
-  gpioWrite_Bits_0_31_Clear ((~command) & 0xFFFF);
-  gpioWrite (kWrGpio, 0);
-  gpioWrite (kWrGpio, 1);
+  gpioWrite_Bits_0_31_Set (command & 0xFFFF);     // set hi data bits
+  gpioWrite_Bits_0_31_Clear (~command & 0x1FFFF); // clear lo data bits and kWrGpio
+  gpioWrite (kWrGpio, 1);                         // set kWrGpio hi to complete write
 
   gpioWrite (mDataCommandGpio, 1);
   }
@@ -624,10 +620,9 @@ void cLcd1289::writeCommandData (const uint8_t command, const uint16_t data) {
 
   writeCommand (command);
 
-  gpioWrite_Bits_0_31_Set (data & 0xFFFF);
-  gpioWrite_Bits_0_31_Clear ((~data) & 0xFFFF);
-  gpioWrite (kWrGpio, 0);
-  gpioWrite (kWrGpio, 1);
+  gpioWrite_Bits_0_31_Set (data & 0xFFFF);     // set hi data bits
+  gpioWrite_Bits_0_31_Clear (~data & 0x1FFFF); // clear lo data bits and kWrGpio lo
+  gpioWrite (kWrGpio, 1);                      // set kWrGpio hi to complete write
   }
 //}}}
 //{{{
@@ -637,12 +632,12 @@ void cLcd1289::writeCommandMultipleData (const uint8_t command, const uint8_t* d
 
   // send data
   uint16_t* ptr = (uint16_t*)dataPtr;
-  uint16_t* ptrEnd = dataPtr + len/2;
+  uint16_t* ptrEnd = (uint16_t*)dataPtr + len/2;
 
   while (ptr++ < ptrEnd) {
-    gpioWrite_Bits_0_31_Set (*ptr);
-    gpioWrite_Bits_0_31_Clear ((~*ptr) & 0x2FFFF);
-    gpioWrite (kWrGpio, 1);
+    gpioWrite_Bits_0_31_Set (*ptr);              // set hi data bits
+    gpioWrite_Bits_0_31_Clear (~*ptr & 0x1FFFF); // clear lo data bits and kWrGpio lo
+    gpioWrite (kWrGpio, 1);                      // set kWrGpio hi to complete write
     }
   }
 //}}}
