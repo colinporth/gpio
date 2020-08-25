@@ -57,9 +57,12 @@ void cLcd::rect (const uint16_t colour, const int xorg, const int yorg, const in
 
   int xmax = min (xorg+xlen, (int)getWidth());
   int ymax = min (yorg+ylen, (int)getHeight());
-  for (int y = yorg; y < ymax; y++)
+
+  for (int y = yorg; y < ymax; y++) {
+    uint16_t* ptr = mFrameBuf + y*getWidth() + xorg;
     for (int x = xorg; x < xmax; x++)
-      mFrameBuf[(y*getWidth()) + x] = bigEndianColour;
+      *ptr++ = bigEndianColour;
+      }
 
   mChanged = true;
   }
@@ -278,15 +281,18 @@ void cLcdSpi::writeCommandMultipleData (const uint8_t command, const uint8_t* da
   }
 //}}}
 
-// cLcdParallel16 - override littleEndian frameBuf
+// cLcdParallel16 - override with littleEndian frameBuf
 //{{{
 void cLcdParallel16::rect (const uint16_t colour, const int xorg, const int yorg, const int xlen, const int ylen) {
 
   int xmax = min (xorg+xlen, (int)getWidth());
   int ymax = min (yorg+ylen, (int)getHeight());
-  for (int y = yorg; y < ymax; y++)
+
+  for (int y = yorg; y < ymax; y++) {
+    uint16_t* ptr = mFrameBuf + y*getWidth() + xorg;
     for (int x = xorg; x < xmax; x++)
-      mFrameBuf[(y*getWidth()) + x] = colour;
+      *ptr++ = colour;
+      }
 
   mChanged = true;
   }
