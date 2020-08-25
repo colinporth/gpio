@@ -71,6 +71,9 @@ protected:
   const uint8_t mDataCommandGpio;
   const uint8_t mChipEnableGpio;
   const bool mUseSequence;
+
+  bool mUpdate = false;
+  uint16_t* mFrameBuf = nullptr;  // uint16 colour pixels
 //}}}
 //{{{
 private:
@@ -79,10 +82,8 @@ private:
   const uint16_t mWidth;
   const uint16_t mHeight;
 
-  bool mUpdate = false;
   bool mChanged = false;
   bool mAutoUpdate = false;
-  uint16_t* mFrameBuf = nullptr;  // bigEndian RGB565 uint16 colour pixels
 
   const int mSpiClock;
   const bool mSpiMode0;
