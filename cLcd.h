@@ -28,13 +28,10 @@ class cLcd {
 public:
   //{{{
   cLcd (const uint16_t width, const uint16_t height,
-        const int spiClock, const bool spiMode0,
         const uint8_t resetGpio, const uint8_t dataCommandGpio, const uint8_t chipEnableGpio)
     : mResetGpio(resetGpio), mDataCommandGpio(dataCommandGpio), mChipEnableGpio(chipEnableGpio),
       mUseSequence((dataCommandGpio == 0xFF) && (chipEnableGpio != 0xFF)),
-      mWidth(width), mHeight(height),
-      mSpiClock(spiClock), mSpiMode0(spiMode0) {
-    }
+      mWidth(width), mHeight(height) {}
   //}}}
   virtual ~cLcd();
   virtual bool initialise() = 0;
@@ -56,14 +53,13 @@ public:
 //{{{
 protected:
   bool initResources();
-  void initSpi();
   void initResetPin();
   void initChipEnablePin();
   void initDataCommandPin();
 
-  virtual void writeCommand (const uint8_t command);
-  virtual void writeCommandData (const uint8_t command, const uint16_t data);
-  virtual void writeCommandMultipleData (const uint8_t command, const uint8_t* dataPtr, const int len);
+  virtual void writeCommand (const uint8_t command) = 0;
+  virtual void writeCommandData (const uint8_t command, const uint16_t data) = 0;
+  virtual void writeCommandMultipleData (const uint8_t command, const uint8_t* dataPtr, const int len) = 0;
 
   void launchUpdateThread (const uint8_t command);
 
@@ -84,44 +80,46 @@ private:
 
   bool mUpdate = false;
   bool mAutoUpdate = false;
+//}}}
+  };
 
+//{{{
+class cLcdSpi : public cLcd {
+public:
+  //{{{
+  cLcdSpi (const uint16_t width, const uint16_t height,
+           const int spiClock, const bool spiMode0,
+           const uint8_t resetGpio, const uint8_t dataCommandGpio, const uint8_t chipEnableGpio)
+    : cLcd (width, height, dataCommandGpio, chipEnableGpio, chipEnableGpio),
+      mSpiClock(spiClock), mSpiMode0(spiMode0) {}
+  //}}}
+  virtual ~cLcdSpi();
+
+protected:
+  void initSpi();
+
+  virtual void writeCommand (const uint8_t command) = 0;
+  virtual void writeCommandData (const uint8_t command, const uint16_t data) = 0;
+  virtual void writeCommandMultipleData (const uint8_t command, const uint8_t* dataPtr, const int len) = 0;
+
+private:
   const int mSpiClock;
   const bool mSpiMode0;
   int mSpiHandle = 0;
-//}}}
   };
+//}}}
+//{{{
+class cLcdParallel16 : public cLcd {
+public:
+  //{{{
+  cLcdParallel16 (const uint16_t width, const uint16_t height,
+                  const uint8_t resetGpio, const uint8_t dataCommandGpio, const uint8_t chipEnableGpio, const uint8_t wrGpio)
+    : cLcd (width, height, dataCommandGpio, chipEnableGpio, chipEnableGpio), 
+      mWrGpio(wrGpio),  mClrMask(0xFFFF | (1 << mWrGpio)) {}
+  //}}}
+  virtual ~cLcdParallel16() {}
 
-//{{{
-class cLcd7735 : public cLcd {
-public:
-  cLcd7735();
-  virtual ~cLcd7735() {}
-  virtual bool initialise();
-  };
-//}}}
-//{{{
-class cLcd9320 : public cLcd {
-public:
-  cLcd9320();
-  virtual ~cLcd9320() {}
-  virtual bool initialise();
-  };
-//}}}
-//{{{
-class cLcd9225b : public cLcd {
-public:
-  cLcd9225b();
-  virtual ~cLcd9225b() {}
-  virtual bool initialise();
-  };
-//}}}
-//{{{
-class cLcd1289 : public cLcd {
-public:
-  cLcd1289();
-  virtual ~cLcd1289() {}
-  virtual bool initialise();
-
+protected:
   virtual void rect (const uint16_t colour, const int xorg, const int yorg, const int xlen, const int ylen);
   virtual void pixel (const uint16_t colour, const int x, const int y);
   virtual void blendPixel (const uint16_t colour, const uint8_t alpha, const int x, const int y);
@@ -129,5 +127,43 @@ public:
   virtual void writeCommand (const uint8_t command);
   virtual void writeCommandData (const uint8_t command, const uint16_t data);
   virtual void writeCommandMultipleData (const uint8_t command, const uint8_t* data, const int len);
+
+private:
+  const uint8_t mWrGpio;
+  const uint32_t mClrMask;
+  };
+//}}}
+
+//{{{
+class cLcd7735 : public cLcdSpi {
+public:
+  cLcd7735();
+  virtual ~cLcd7735() {}
+  virtual bool initialise();
+  };
+//}}}
+//{{{
+class cLcd9320 : public cLcdSpi {
+public:
+  cLcd9320();
+  virtual ~cLcd9320() {}
+  virtual bool initialise();
+  };
+//}}}
+//{{{
+class cLcd9225b : public cLcdSpi {
+public:
+  cLcd9225b();
+  virtual ~cLcd9225b() {}
+  virtual bool initialise();
+  };
+//}}}
+//{{{
+class cLcd1289 : public cLcdParallel16 {
+public:
+  cLcd1289();
+  virtual ~cLcd1289() {}
+
+  virtual bool initialise();
   };
 //}}}

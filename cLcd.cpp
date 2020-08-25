@@ -27,7 +27,7 @@ static FT_Face mFace;
 // J8 header pins
 // - 3.3v                                     J8 pin17
 constexpr uint8_t kDataCommandGpio  = 24;  // J8 pin18
-//constexpr uint8_t kBackLightGpio  = 24;    // J8 pin18
+//constexpr uint8_t kBackLightGpio  = 24;  // J8 pin18
 // - SPI0 - MOSI                              J8 pin19
 // - 0v                                       J8 pin20
 // - SPI0 - SCLK                              J8 pin21
@@ -38,7 +38,6 @@ constexpr uint8_t kSpiCe0Gpio = 8;         // J8 pin24
 // cLcd - public
 //{{{
 cLcd::~cLcd() {
-  spiClose (mSpiHandle);
   gpioTerminate();
   }
 //}}}
@@ -50,6 +49,7 @@ void cLcd::setFont (const uint8_t* font, const int fontSize)  {
   }
 //}}}
 
+// bigEndian frameBuf
 //{{{
 void cLcd::rect (const uint16_t colour, const int xorg, const int yorg, const int xlen, const int ylen) {
 
@@ -101,7 +101,6 @@ void cLcd::blendPixel (const uint16_t colour, const uint8_t alpha, const int x, 
     }
   }
 //}}}
-
 //{{{
 int cLcd::text (const uint16_t colour, const int strX, const int strY, const int height, const string& str) {
 
@@ -129,7 +128,6 @@ int cLcd::text (const uint16_t colour, const int strX, const int strY, const int
   return curX;
   }
 //}}}
-
 //{{{
 void cLcd::delayUs (const int us) {
   gpioDelay (us);
@@ -152,14 +150,6 @@ bool cLcd::initResources() {
     }
 
   return false;
-  }
-//}}}
-//{{{
-void cLcd::initSpi() {
-// if mChipEnableGpio then disable autoSpiCe0
-// - can't send multiple SPI's without pulsing CE screwing up dataSequence
-
-  mSpiHandle = spiOpen (0, mSpiClock, (mSpiMode0 ? 0 : 3) | ((mChipEnableGpio == 0xFF) ? 0x00 : 0x40));
   }
 //}}}
 //{{{
@@ -194,9 +184,39 @@ void cLcd::initDataCommandPin() {
     }
   }
 //}}}
-
 //{{{
-void cLcd::writeCommand (const uint8_t command) {
+void cLcd::launchUpdateThread (const uint8_t command) {
+
+  thread ([=]() {
+    // write frameBuffer to lcd ram thread if changed
+    while (true) {
+      if (mUpdate || (mAutoUpdate && mChanged)) {
+        mChanged = false;
+        mUpdate = false;
+        writeCommandMultipleData (command, (const uint8_t*)mFrameBuf, getWidth() * getHeight() * 2);
+        }
+      gpioDelay (16000);
+      }
+    } ).detach();
+  }
+//}}}
+
+// cLcdSpi - uses bigEndian frameBuf
+//{{{
+cLcdSpi::~cLcdSpi() {
+  spiClose (mSpiHandle);
+  }
+//}}}
+//{{{
+void cLcdSpi::initSpi() {
+// if mChipEnableGpio then disable autoSpiCe0
+// - can't send multiple SPI's without pulsing CE screwing up dataSequence
+
+  mSpiHandle = spiOpen (0, mSpiClock, (mSpiMode0 ? 0 : 3) | ((mChipEnableGpio == 0xFF) ? 0x00 : 0x40));
+  }
+//}}}
+//{{{
+void cLcdSpi::writeCommand (const uint8_t command) {
 
   if (mUseSequence) {
     uint8_t commandSequence[3] = { 0x70, 0, command };
@@ -213,7 +233,7 @@ void cLcd::writeCommand (const uint8_t command) {
   }
 //}}}
 //{{{
-void cLcd::writeCommandData (const uint8_t command, const uint16_t data) {
+void cLcdSpi::writeCommandData (const uint8_t command, const uint16_t data) {
 
   writeCommand (command);
 
@@ -230,7 +250,7 @@ void cLcd::writeCommandData (const uint8_t command, const uint16_t data) {
   }
 //}}}
 //{{{
-void cLcd::writeCommandMultipleData (const uint8_t command, const uint8_t* dataPtr, const int len) {
+void cLcdSpi::writeCommandMultipleData (const uint8_t command, const uint8_t* dataPtr, const int len) {
 
   writeCommand (command);
 
@@ -256,20 +276,92 @@ void cLcd::writeCommandMultipleData (const uint8_t command, const uint8_t* dataP
   }
 //}}}
 
+// cLcdParallel16 - overides with littleEndian frameBuf
 //{{{
-void cLcd::launchUpdateThread (const uint8_t command) {
+void cLcdParallel16::rect (const uint16_t colour, const int xorg, const int yorg, const int xlen, const int ylen) {
 
-  thread ([=]() {
-    // write frameBuffer to lcd ram thread if changed
-    while (true) {
-      if (mUpdate || (mAutoUpdate && mChanged)) {
-        mChanged = false;
-        mUpdate = false;
-        writeCommandMultipleData (command, (const uint8_t*)mFrameBuf, getWidth() * getHeight() * 2);
-        }
-      gpioDelay (16000);
+  for (int y = yorg; (y < yorg+ylen) && (y < getHeight()); y++)
+    for (int x = xorg; (x < xorg+xlen) && (x < getWidth()); x++)
+      mFrameBuf[(y*getWidth()) + x] = colour;
+
+  mChanged = true;
+  }
+//}}}
+//{{{
+void cLcdParallel16::pixel (const uint16_t colour, const int x, const int y) {
+
+  mFrameBuf[(y*getWidth()) + x] = colour;
+  mChanged = true;
+  }
+//}}}
+//{{{
+void cLcdParallel16::blendPixel (const uint16_t colour, const uint8_t alpha, const int x, const int y) {
+// magical rgb565 alpha composite
+// - linear interp background * (1.0 - alpha) + foreground * alpha
+//   - factorized into: result = background + (foreground - background) * alpha
+//   - alpha is in Q1.5 format, so 0.0 is represented by 0, and 1.0 is represented by 32
+// - Converts  0000000000000000rrrrrggggggbbbbb
+// -     into  00000gggggg00000rrrrr000000bbbbb
+
+  if ((alpha >= 0) && (x >= 0) && (y > 0) && (x < getWidth()) && (y < getHeight())) {
+    // clip opaque and offscreen
+    if (alpha == 0xFF)
+      // simple case - set bigEndianColour frameBuf pixel to littleEndian colour
+      mFrameBuf[(y*getWidth()) + x] = colour;
+    else {
+      // get bigEndianColour frame buffer into littleEndian background
+      uint32_t background = mFrameBuf[(y*getWidth()) + x];
+
+      // composite littleEndian colour
+      uint32_t foreground = colour;
+      foreground = (foreground | (foreground << 16)) & 0x07e0f81f;
+      background = (background | (background << 16)) & 0x07e0f81f;
+      background += (((foreground - background) * ((alpha + 4) >> 3)) >> 5) & 0x07e0f81f;
+
+      // set bigEndianColour frameBuf pixel to littleEndian background result
+      mFrameBuf[(y*getWidth()) + x] = background | (background >> 16);
       }
-    } ).detach();
+
+    mChanged = true;
+    }
+  }
+//}}}
+//{{{
+void cLcdParallel16::writeCommand (const uint8_t command) {
+
+  gpioWrite (mDataCommandGpio, 0);
+
+  gpioWrite_Bits_0_31_Set (command);               // set hi data bits
+  gpioWrite_Bits_0_31_Clear (~command & mClrMask); // clear lo data bits + kWrGpio bit 16 lo
+  gpioWrite (mWrGpio, 1);                         // set kWrGpio hi to complete write
+
+  gpioWrite (mDataCommandGpio, 1);
+  }
+//}}}
+//{{{
+void cLcdParallel16::writeCommandData (const uint8_t command, const uint16_t data) {
+
+  writeCommand (command);
+
+  gpioWrite_Bits_0_31_Set (data);               // set hi data bits
+  gpioWrite_Bits_0_31_Clear (~data & mClrMask); // clear lo data bits + kWrGpio bit 16 lo
+  gpioWrite (mWrGpio, 1);                       // set kWrGpio hi to complete write
+  }
+//}}}
+//{{{
+void cLcdParallel16::writeCommandMultipleData (const uint8_t command, const uint8_t* dataPtr, const int len) {
+
+  writeCommand (command);
+
+  // send data
+  uint16_t* ptr = (uint16_t*)dataPtr;
+  uint16_t* ptrEnd = (uint16_t*)dataPtr + len/2;
+
+  while (ptr++ < ptrEnd) {
+    gpioWrite_Bits_0_31_Set (*ptr);               // set hi data bits
+    gpioWrite_Bits_0_31_Clear (~*ptr & mClrMask); // clear lo data bits + kWrGpio bit 16 lo
+    gpioWrite (mWrGpio, 1);                       // set kWrGpio hi to complete write
+    }
   }
 //}}}
 
@@ -328,8 +420,8 @@ constexpr uint8_t k7335_GMCTRN1Data[16] = { 0x03, 0x1d, 0x07, 0x06, 0x2E, 0x2C, 
                                             0x2E, 0x2E, 0x37, 0x3F, 0x00, 0x00, 0x02, 0x10 } ;
 //}}}
 
-cLcd7735::cLcd7735() : cLcd (kWidth7735, kHeight7735, kSpiClock7735, true,
-                             kResetGpio, kDataCommandGpio, 0xFF) {}
+cLcd7735::cLcd7735() : cLcdSpi (kWidth7735, kHeight7735, kSpiClock7735, true,
+                                kResetGpio, kDataCommandGpio, 0xFF) {}
 
 bool cLcd7735::initialise() {
   if (initResources()) {
@@ -376,8 +468,8 @@ constexpr uint16_t kWidth9320 = 240;
 constexpr uint16_t kHeight9320 = 320;
 constexpr int kSpiClock9320 = 24000000;
 
-cLcd9320::cLcd9320() : cLcd(kWidth9320, kHeight9320, kSpiClock9320, false,
-                            kResetGpio, 0xFF, kSpiCe0Gpio) {}
+cLcd9320::cLcd9320() : cLcdSpi(kWidth9320, kHeight9320, kSpiClock9320, false,
+                               kResetGpio, 0xFF, kSpiCe0Gpio) {}
 
 bool cLcd9320::initialise() {
   if (initResources()) {
@@ -454,8 +546,8 @@ constexpr uint16_t kWidth9225b = 176;
 constexpr uint16_t kHeight9225b = 220;
 constexpr int kSpiClock9225b = 16000000;
 
-cLcd9225b::cLcd9225b() : cLcd(kWidth9225b, kHeight9225b, kSpiClock9225b, true,
-                              kResetGpio, kDataCommandGpio, 0xFF) {}
+cLcd9225b::cLcd9225b() : cLcdSpi(kWidth9225b, kHeight9225b, kSpiClock9225b, true,
+                                 kResetGpio, kDataCommandGpio, 0xFF) {}
 
 bool cLcd9225b::initialise() {
   if (initResources()) {
@@ -534,9 +626,8 @@ constexpr uint8_t kRdGpio = 18;
 
 constexpr uint16_t kWidth1289 = 240;
 constexpr uint16_t kHeight1289 = 320;
-cLcd1289::cLcd1289() : cLcd(kWidth1289, kHeight1289, 0, true, kResetGpio, kRsGpio, 0xFF) {}
+cLcd1289::cLcd1289() : cLcdParallel16(kWidth1289, kHeight1289, kResetGpio, kRsGpio, 0xFF, kWrGpio) {}
 
-//{{{
 bool cLcd1289::initialise() {
 
   if (initResources()) {
@@ -633,94 +724,4 @@ bool cLcd1289::initialise() {
 
   return false;
   }
-//}}}
-
-//{{{
-void cLcd1289::rect (const uint16_t colour, const int xorg, const int yorg, const int xlen, const int ylen) {
-
-  for (int y = yorg; (y < yorg+ylen) && (y < getHeight()); y++)
-    for (int x = xorg; (x < xorg+xlen) && (x < getWidth()); x++)
-      mFrameBuf[(y*getWidth()) + x] = colour;
-
-  mChanged = true;
-  }
-//}}}
-//{{{
-void cLcd1289::pixel (const uint16_t colour, const int x, const int y) {
-
-  mFrameBuf[(y*getWidth()) + x] = colour;
-  mChanged = true;
-  }
-//}}}
-//{{{
-void cLcd1289::blendPixel (const uint16_t colour, const uint8_t alpha, const int x, const int y) {
-// magical rgb565 alpha composite
-// - linear interp background * (1.0 - alpha) + foreground * alpha
-//   - factorized into: result = background + (foreground - background) * alpha
-//   - alpha is in Q1.5 format, so 0.0 is represented by 0, and 1.0 is represented by 32
-// - Converts  0000000000000000rrrrrggggggbbbbb
-// -     into  00000gggggg00000rrrrr000000bbbbb
-
-  if ((alpha >= 0) && (x >= 0) && (y > 0) && (x < getWidth()) && (y < getHeight())) {
-    // clip opaque and offscreen
-    if (alpha == 0xFF)
-      // simple case - set bigEndianColour frameBuf pixel to littleEndian colour
-      mFrameBuf[(y*getWidth()) + x] = colour;
-    else {
-      // get bigEndianColour frame buffer into littleEndian background
-      uint32_t background = mFrameBuf[(y*getWidth()) + x];
-
-      // composite littleEndian colour
-      uint32_t foreground = colour;
-      foreground = (foreground | (foreground << 16)) & 0x07e0f81f;
-      background = (background | (background << 16)) & 0x07e0f81f;
-      background += (((foreground - background) * ((alpha + 4) >> 3)) >> 5) & 0x07e0f81f;
-
-      // set bigEndianColour frameBuf pixel to littleEndian background result
-      mFrameBuf[(y*getWidth()) + x] = background | (background >> 16);
-      }
-
-    mChanged = true;
-    }
-  }
-//}}}
-
-//{{{
-void cLcd1289::writeCommand (const uint8_t command) {
-
-  gpioWrite (mDataCommandGpio, 0);
-
-  gpioWrite_Bits_0_31_Set (command & 0xFFFF);     // set hi data bits
-  gpioWrite_Bits_0_31_Clear (~command & 0x1FFFF); // clear lo data bits + kWrGpio
-  gpioWrite (kWrGpio, 1);                         // set kWrGpio hi to complete write
-
-  gpioWrite (mDataCommandGpio, 1);
-  }
-//}}}
-//{{{
-void cLcd1289::writeCommandData (const uint8_t command, const uint16_t data) {
-
-  writeCommand (command);
-
-  gpioWrite_Bits_0_31_Set (data & 0xFFFF);     // set hi data bits
-  gpioWrite_Bits_0_31_Clear (~data & 0x1FFFF); // clear lo data bits + kWrGpio lo
-  gpioWrite (kWrGpio, 1);                      // set kWrGpio hi to complete write
-  }
-//}}}
-//{{{
-void cLcd1289::writeCommandMultipleData (const uint8_t command, const uint8_t* dataPtr, const int len) {
-
-  writeCommand (command);
-
-  // send data
-  uint16_t* ptr = (uint16_t*)dataPtr;
-  uint16_t* ptrEnd = (uint16_t*)dataPtr + len/2;
-
-  while (ptr++ < ptrEnd) {
-    gpioWrite_Bits_0_31_Set (*ptr);              // set hi data bits
-    gpioWrite_Bits_0_31_Clear (~*ptr & 0x1FFFF); // clear lo data bits + kWrGpio lo
-    gpioWrite (kWrGpio, 1);                      // set kWrGpio hi to complete write
-    }
-  }
-//}}}
 //}}}
