@@ -42,9 +42,10 @@ public:
   constexpr uint16_t getWidth() { return mWidth; }
   constexpr uint16_t getHeight() { return mHeight; }
 
-  void rect (const uint16_t colour, const int xorg, const int yorg, const int xlen, const int ylen);
-  void pixel (const uint16_t colour, const int x, const int y);
-  void blendPixel (const uint16_t colour, const uint8_t alpha, const int x, const int y);
+  virtual void rect (const uint16_t colour, const int xorg, const int yorg, const int xlen, const int ylen);
+  virtual void pixel (const uint16_t colour, const int x, const int y);
+  virtual void blendPixel (const uint16_t colour, const uint8_t alpha, const int x, const int y);
+
   int text (const uint16_t colour, const int strX, const int strY, const int height, const std::string& str);
   void clear (const uint16_t colour) { rect (colour, 0,0, getWidth(), getHeight()); }
 
@@ -119,6 +120,10 @@ public:
   cLcd1289();
   virtual ~cLcd1289() {}
   virtual bool initialise();
+
+  virtual void rect (const uint16_t colour, const int xorg, const int yorg, const int xlen, const int ylen);
+  virtual void pixel (const uint16_t colour, const int x, const int y);
+  virtual void blendPixel (const uint16_t colour, const uint8_t alpha, const int x, const int y);
 
   virtual void writeCommand (const uint8_t command);
   virtual void writeCommandData (const uint8_t command, const uint16_t data);

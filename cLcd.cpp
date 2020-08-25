@@ -101,6 +101,7 @@ void cLcd::blendPixel (const uint16_t colour, const uint8_t alpha, const int x, 
     }
   }
 //}}}
+
 //{{{
 int cLcd::text (const uint16_t colour, const int strX, const int strY, const int height, const string& str) {
 
@@ -631,6 +632,56 @@ bool cLcd1289::initialise() {
     }
 
   return false;
+  }
+//}}}
+
+//{{{
+void cLcd1289::rect (const uint16_t colour, const int xorg, const int yorg, const int xlen, const int ylen) {
+
+  for (int y = yorg; (y < yorg+ylen) && (y < getHeight()); y++)
+    for (int x = xorg; (x < xorg+xlen) && (x < getWidth()); x++)
+      mFrameBuf[(y*getWidth()) + x] = colour;
+
+  mChanged = true;
+  }
+//}}}
+//{{{
+void cLcd1289::pixel (const uint16_t colour, const int x, const int y) {
+
+  mFrameBuf[(y*getWidth()) + x] = colour;
+  mChanged = true;
+  }
+//}}}
+//{{{
+void cLcd1289::blendPixel (const uint16_t colour, const uint8_t alpha, const int x, const int y) {
+// magical rgb565 alpha composite
+// - linear interp background * (1.0 - alpha) + foreground * alpha
+//   - factorized into: result = background + (foreground - background) * alpha
+//   - alpha is in Q1.5 format, so 0.0 is represented by 0, and 1.0 is represented by 32
+// - Converts  0000000000000000rrrrrggggggbbbbb
+// -     into  00000gggggg00000rrrrr000000bbbbb
+
+  if ((alpha >= 0) && (x >= 0) && (y > 0) && (x < getWidth()) && (y < getHeight())) {
+    // clip opaque and offscreen
+    if (alpha == 0xFF)
+      // simple case - set bigEndianColour frameBuf pixel to littleEndian colour
+      mFrameBuf[(y*getWidth()) + x] = colour;
+    else {
+      // get bigEndianColour frame buffer into littleEndian background
+      uint32_t background = mFrameBuf[(y*getWidth()) + x];
+
+      // composite littleEndian colour
+      uint32_t foreground = colour;
+      foreground = (foreground | (foreground << 16)) & 0x07e0f81f;
+      background = (background | (background << 16)) & 0x07e0f81f;
+      background += (((foreground - background) * ((alpha + 4) >> 3)) >> 5) & 0x07e0f81f;
+
+      // set bigEndianColour frameBuf pixel to littleEndian background result
+      mFrameBuf[(y*getWidth()) + x] = background | (background >> 16);
+      }
+
+    mChanged = true;
+    }
   }
 //}}}
 
