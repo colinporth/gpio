@@ -114,8 +114,8 @@ public:
   //{{{
   cLcdParallel16 (const uint16_t width, const uint16_t height,
                   const uint8_t resetGpio, const uint8_t dataCommandGpio, const uint8_t chipEnableGpio, const uint8_t wrGpio)
-    : cLcd (width, height, dataCommandGpio, chipEnableGpio, chipEnableGpio), 
-      mWrGpio(wrGpio),  mClrMask(0xFFFF | (1 << mWrGpio)) {}
+    : cLcd (width, height, dataCommandGpio, chipEnableGpio, chipEnableGpio),
+      mWrGpio(wrGpio),  mClrMask(0xFFFF | (1 << wrGpio)) {}
   //}}}
   virtual ~cLcdParallel16() {}
 

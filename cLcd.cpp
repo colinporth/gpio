@@ -332,8 +332,8 @@ void cLcdParallel16::writeCommand (const uint8_t command) {
   gpioWrite (mDataCommandGpio, 0);
 
   gpioWrite_Bits_0_31_Set (command);               // set hi data bits
-  gpioWrite_Bits_0_31_Clear (~command & mClrMask); // clear lo data bits + kWrGpio bit 16 lo
-  gpioWrite (mWrGpio, 1);                         // set kWrGpio hi to complete write
+  gpioWrite_Bits_0_31_Clear (~command & mClrMask); // clear lo data bits + kWrGpio bit lo
+  gpioWrite (mWrGpio, 1);                          // set kWrGpio hi to complete write
 
   gpioWrite (mDataCommandGpio, 1);
   }
@@ -344,7 +344,7 @@ void cLcdParallel16::writeCommandData (const uint8_t command, const uint16_t dat
   writeCommand (command);
 
   gpioWrite_Bits_0_31_Set (data);               // set hi data bits
-  gpioWrite_Bits_0_31_Clear (~data & mClrMask); // clear lo data bits + kWrGpio bit 16 lo
+  gpioWrite_Bits_0_31_Clear (~data & mClrMask); // clear lo data bits + kWrGpio bit lo
   gpioWrite (mWrGpio, 1);                       // set kWrGpio hi to complete write
   }
 //}}}
@@ -359,7 +359,7 @@ void cLcdParallel16::writeCommandMultipleData (const uint8_t command, const uint
 
   while (ptr++ < ptrEnd) {
     gpioWrite_Bits_0_31_Set (*ptr);               // set hi data bits
-    gpioWrite_Bits_0_31_Clear (~*ptr & mClrMask); // clear lo data bits + kWrGpio bit 16 lo
+    gpioWrite_Bits_0_31_Clear (~*ptr & mClrMask); // clear lo data bits + kWrGpio bit lo
     gpioWrite (mWrGpio, 1);                       // set kWrGpio hi to complete write
     }
   }
