@@ -72,7 +72,7 @@ protected:
   const uint8_t mChipEnableGpio;
   const bool mUseSequence;
 
-  bool mUpdate = false;
+  bool mChanged = false;
   uint16_t* mFrameBuf = nullptr;  // uint16 colour pixels
 //}}}
 //{{{
@@ -82,7 +82,7 @@ private:
   const uint16_t mWidth;
   const uint16_t mHeight;
 
-  bool mChanged = false;
+  bool mUpdate = false;
   bool mAutoUpdate = false;
 
   const int mSpiClock;
