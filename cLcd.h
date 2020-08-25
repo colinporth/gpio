@@ -62,7 +62,7 @@ protected:
 
   virtual void writeCommand (const uint8_t command);
   virtual void writeCommandData (const uint8_t command, const uint16_t data);
-  virtual void writeCommandMultipleData (const uint8_t command, const uint8_t* data, const int len);
+  virtual void writeCommandMultipleData (const uint8_t command, const uint8_t* dataPtr, const int len);
 
   void launchUpdateThread (const uint8_t command);
 
