@@ -26,14 +26,14 @@ constexpr uint16_t kWhite       =  0xFFFF;  // 255, 255, 255
 
 class cLcd {
 public:
-  //{{{
   cLcd (const uint16_t width, const uint16_t height,
         const uint8_t resetGpio, const uint8_t dataCommandGpio, const uint8_t chipEnableGpio)
-    : mResetGpio(resetGpio), mDataCommandGpio(dataCommandGpio), mChipEnableGpio(chipEnableGpio),
+    : mDataCommandGpio(dataCommandGpio), mChipEnableGpio(chipEnableGpio),
       mUseSequence((dataCommandGpio == 0xFF) && (chipEnableGpio != 0xFF)),
-      mWidth(width), mHeight(height) {}
-  //}}}
+      mWidth(width), mHeight(height), mResetGpio(resetGpio) {}
+
   virtual ~cLcd();
+
   virtual bool initialise() = 0;
 
   constexpr uint16_t getWidth() { return mWidth; }
@@ -63,7 +63,6 @@ protected:
 
   void launchUpdateThread (const uint8_t command);
 
-  const uint8_t mResetGpio;
   const uint8_t mDataCommandGpio;
   const uint8_t mChipEnableGpio;
   const bool mUseSequence;
@@ -80,19 +79,19 @@ private:
 
   bool mUpdate = false;
   bool mAutoUpdate = false;
+
+  const uint8_t mResetGpio;
 //}}}
   };
 
 //{{{
 class cLcdSpi : public cLcd {
 public:
-  //{{{
   cLcdSpi (const uint16_t width, const uint16_t height,
            const int spiClock, const bool spiMode0,
            const uint8_t resetGpio, const uint8_t dataCommandGpio, const uint8_t chipEnableGpio)
-    : cLcd (width, height, dataCommandGpio, chipEnableGpio, chipEnableGpio),
-      mSpiClock(spiClock), mSpiMode0(spiMode0) {}
-  //}}}
+    : cLcd (width, height, resetGpio, dataCommandGpio, chipEnableGpio), mSpiClock(spiClock), mSpiMode0(spiMode0) {}
+
   virtual ~cLcdSpi();
 
 protected:
@@ -111,13 +110,12 @@ private:
 //{{{
 class cLcdParallel16 : public cLcd {
 public:
-  //{{{
   cLcdParallel16 (const uint16_t width, const uint16_t height,
                   const uint8_t resetGpio, const uint8_t dataCommandGpio, const uint8_t chipEnableGpio,
                   const uint8_t wrGpio, const uint8_t rdGpio)
-    : cLcd (width, height, dataCommandGpio, chipEnableGpio, chipEnableGpio),
-      mWrGpio(wrGpio), mRdGpio(rdGpio), mClrMask (0x0000FFFF | (1 << wrGpio)) {}
-  //}}}
+    : cLcd (width, height, resetGpio, dataCommandGpio, chipEnableGpio),
+      mWrGpio(wrGpio), mWrClrMask ((1 << wrGpio) | 0xFFFF), mRdGpio(rdGpio) {}
+
   virtual ~cLcdParallel16() {}
 
 protected:
@@ -131,8 +129,8 @@ protected:
 
 protected:
   const uint8_t mWrGpio;
+  const uint32_t mWrClrMask;
   const uint8_t mRdGpio;
-  const uint32_t mClrMask;
   };
 //}}}
 
