@@ -30,10 +30,10 @@ public:
   cLcd (const uint16_t width, const uint16_t height,
         const int spiClock, const bool spiMode0,
         const uint8_t resetGpio, const uint8_t dataCommandGpio, const uint8_t chipEnableGpio)
-    : mWidth(width), mHeight(height),
-      mSpiClock(spiClock), mSpiMode0(spiMode0),
+    : mResetGpio(resetGpio), mDataCommandGpio(dataCommandGpio), mChipEnableGpio(chipEnableGpio),
       mUseSequence((dataCommandGpio == 0xFF) && (chipEnableGpio != 0xFF)),
-      mResetGpio(resetGpio), mDataCommandGpio(dataCommandGpio), mChipEnableGpio(chipEnableGpio) {
+      mWidth(width), mHeight(height),
+      mSpiClock(spiClock), mSpiMode0(spiMode0) {
     }
   //}}}
   virtual ~cLcd();
@@ -55,12 +55,21 @@ public:
 //{{{
 protected:
   bool initResources();
+  void initSpi();
+  void initResetPin();
+  void initChipEnablePin();
+  void initDataCommandPin();
 
-  void writeCommand (const uint8_t command);
-  void writeCommandData (const uint8_t command, const uint16_t data);
-  void writeCommandMultipleData (const uint8_t command, const uint8_t* data, const int len);
+  virtual void writeCommand (const uint8_t command);
+  virtual void writeCommandData (const uint8_t command, const uint16_t data);
+  virtual void writeCommandMultipleData (const uint8_t command, const uint8_t* data, const int len);
 
   void launchUpdateThread (const uint8_t command);
+
+  const uint8_t mResetGpio;
+  const uint8_t mDataCommandGpio;
+  const uint8_t mChipEnableGpio;
+  const bool mUseSequence;
 //}}}
 //{{{
 private:
@@ -77,11 +86,6 @@ private:
   const int mSpiClock;
   const bool mSpiMode0;
   int mSpiHandle = 0;
-
-  const bool mUseSequence;
-  const uint8_t mResetGpio;
-  const uint8_t mDataCommandGpio;
-  const uint8_t mChipEnableGpio;
 //}}}
   };
 
@@ -107,5 +111,17 @@ public:
   cLcd9225b();
   virtual ~cLcd9225b() {}
   virtual bool initialise();
+  };
+//}}}
+//{{{
+class cLcd1289 : public cLcd {
+public:
+  cLcd1289();
+  virtual ~cLcd1289() {}
+  virtual bool initialise();
+
+  virtual void writeCommand (const uint8_t command);
+  virtual void writeCommandData (const uint8_t command, const uint16_t data);
+  virtual void writeCommandMultipleData (const uint8_t command, const uint8_t* data, const int len);
   };
 //}}}

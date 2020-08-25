@@ -13,7 +13,7 @@ int main() {
 
   cLog::init (LOGINFO, false, "", "gpio");
 
-  cLcd* lcd = new cLcd9320();
+  cLcd* lcd = new cLcd1289();
   lcd->initialise();
 
   while (true) {

@@ -27,7 +27,7 @@ static FT_Face mFace;
 // J8 header pins
 // - 3.3v                                     J8 pin17
 constexpr uint8_t kDataCommandGpio  = 24;  // J8 pin18
-constexpr uint8_t kBackLightGpio  = 24;    // J8 pin18
+//constexpr uint8_t kBackLightGpio  = 24;    // J8 pin18
 // - SPI0 - MOSI                              J8 pin19
 // - 0v                                       J8 pin20
 // - SPI0 - SCLK                              J8 pin21
@@ -145,37 +145,49 @@ bool cLcd::initResources() {
   cLog::log (LOGINFO, "pigpio hwRev:%x version:%d", hardwareRevision, version);
 
   if (gpioInitialise() >= 0) {
-    if (mChipEnableGpio != 0xFF) {
-      gpioSetMode (mChipEnableGpio, PI_OUTPUT);
-      gpioWrite (mChipEnableGpio, 1);
-      }
-
-    if (mDataCommandGpio != 0xFF) {
-      gpioSetMode (mDataCommandGpio, PI_OUTPUT);
-      gpioWrite (mDataCommandGpio, 1);
-      }
-
-    if (mResetGpio != 0xFF) {
-      gpioSetMode (mResetGpio, PI_OUTPUT);
-
-      gpioWrite (mResetGpio, 0);
-      gpioDelay (10000);
-
-      gpioWrite (mResetGpio, 1);
-      gpioDelay (120000);
-      }
-
-    // if mChipEnableGpio then disable autoSpiCe0
-    // - can't send multiple SPI's without pulsing CE screwing up dataSequence
-    mSpiHandle = spiOpen (0, mSpiClock, (mSpiMode0 ? 0 : 3) | ((mChipEnableGpio == 0xFF) ? 0x00 : 0x40));
-
     setFont (getFreeSansBold(), getFreeSansBoldSize());
-
     mFrameBuf = (uint16_t*)malloc (getWidth() * getHeight() * 2);
     return true;
     }
 
   return false;
+  }
+//}}}
+//{{{
+void cLcd::initSpi() {
+// if mChipEnableGpio then disable autoSpiCe0
+// - can't send multiple SPI's without pulsing CE screwing up dataSequence
+
+  mSpiHandle = spiOpen (0, mSpiClock, (mSpiMode0 ? 0 : 3) | ((mChipEnableGpio == 0xFF) ? 0x00 : 0x40));
+  }
+//}}}
+//{{{
+void cLcd::initResetPin() {
+  if (mResetGpio != 0xFF) {
+    gpioSetMode (mResetGpio, PI_OUTPUT);
+
+    gpioWrite (mResetGpio, 0);
+    gpioDelay (10000);
+
+    gpioWrite (mResetGpio, 1);
+    gpioDelay (120000);
+    }
+  }
+//}}}
+//{{{
+void cLcd::initChipEnablePin() {
+  if (mChipEnableGpio != 0xFF) {
+    gpioSetMode (mChipEnableGpio, PI_OUTPUT);
+    gpioWrite (mChipEnableGpio, 1);
+    }
+  }
+//}}}
+//{{{
+void cLcd::initDataCommandPin() {
+  if (mDataCommandGpio != 0xFF) {
+    gpioSetMode (mDataCommandGpio, PI_OUTPUT);
+    gpioWrite (mDataCommandGpio, 1);
+    }
   }
 //}}}
 
@@ -316,8 +328,12 @@ cLcd7735::cLcd7735() : cLcd (kWidth7735, kHeight7735, kSpiClock7735, true,
                              kResetGpio, kDataCommandGpio, 0xFF) {}
 
 bool cLcd7735::initialise() {
-
   if (initResources()) {
+    initResetPin();
+    initChipEnablePin();
+    initDataCommandPin();
+    initSpi();
+
     writeCommand (k7335_SLPOUT);
     delayUs (120000);
 
@@ -361,6 +377,12 @@ cLcd9320::cLcd9320() : cLcd(kWidth9320, kHeight9320, kSpiClock9320, false,
 
 bool cLcd9320::initialise() {
   if (initResources()) {
+
+    initResetPin();
+    initChipEnablePin();
+    initDataCommandPin();
+    initSpi();
+
     writeCommandData (0xE5, 0x8000); // Set the Vcore voltage
     writeCommandData (0x00, 0x0000); // start oscillation - stopped?
     writeCommandData (0x01, 0x0100); // Driver Output Control 1 - SS=1 and SM=0
@@ -433,6 +455,11 @@ cLcd9225b::cLcd9225b() : cLcd(kWidth9225b, kHeight9225b, kSpiClock9225b, true,
 
 bool cLcd9225b::initialise() {
   if (initResources()) {
+    initResetPin();
+    initChipEnablePin();
+    initDataCommandPin();
+    initSpi();
+
     writeCommandData (0x01, 0x011C); // set SS and NL bit
 
     writeCommandData (0x02, 0x0100); // set 1 line inversion
@@ -495,4 +522,183 @@ bool cLcd9225b::initialise() {
     }
   return false;
   }
+//}}}
+//{{{  cLcd1289
+constexpr uint8_t kRsGpio = 16;
+constexpr uint8_t kWrGpio = 17;
+constexpr uint8_t kRdGpio = 18;
+constexpr uint8_t kCsGpio = 19;
+constexpr uint8_t kResetGpio1289 = 20;
+
+constexpr uint16_t kWidth1289 = 240;
+constexpr uint16_t kHeight1289 = 320;
+cLcd1289::cLcd1289() : cLcd(kWidth1289, kHeight1289, 0, true, kResetGpio1289, kRsGpio, kCsGpio) {}
+
+//{{{
+bool cLcd1289::initialise() {
+  if (initResources()) {
+    initResetPin();
+    initChipEnablePin();
+    initDataCommandPin();
+
+    // parallel data pins
+    gpioSetMode (kWrGpio, PI_OUTPUT);
+    gpioWrite (kWrGpio, 1);
+
+    gpioSetMode (kRdGpio, PI_OUTPUT);
+    gpioWrite (kRdGpio, 1);
+
+    for (int i = 0; i < 16; i++) {
+      gpioSetMode (i, PI_OUTPUT);
+      gpioWrite (i, 0);
+      }
+
+    //{{{  commands
+    #define SSD1289_REG_OSCILLATION      0x00
+    #define SSD1289_REG_DRIVER_OUT_CTRL  0x01
+    #define SSD1289_REG_LCD_DRIVE_AC     0x02
+    #define SSD1289_REG_POWER_CTRL_1     0x03
+    #define SSD1289_REG_DISPLAY_CTRL     0x07
+    #define SSD1289_REG_FRAME_CYCLE      0x0b
+    #define SSD1289_REG_POWER_CTRL_2     0x0c
+    #define SSD1289_REG_POWER_CTRL_3     0x0d
+    #define SSD1289_REG_POWER_CTRL_4     0x0e
+    #define SSD1289_REG_GATE_SCAN_START  0x0f
+
+    #define SSD1289_REG_SLEEP_MODE       0x10
+    #define SSD1289_REG_ENTRY_MODE       0x11
+    #define SSD1289_REG_POWER_CTRL_5     0x1e
+
+    #define SSD1289_REG_GDDRAM_DATA      0x22
+    #define SSD1289_REG_WR_DATA_MASK_1   0x23
+    #define SSD1289_REG_WR_DATA_MASK_2   0x24
+    #define SSD1289_REG_FRAME_FREQUENCY  0x25
+
+    #define SSD1289_REG_GAMMA_CTRL_1     0x30
+    #define SSD1289_REG_GAMME_CTRL_2     0x31
+    #define SSD1289_REG_GAMMA_CTRL_3     0x32
+    #define SSD1289_REG_GAMMA_CTRL_4     0x33
+    #define SSD1289_REG_GAMMA_CTRL_5     0x34
+    #define SSD1289_REG_GAMMA_CTRL_6     0x35
+    #define SSD1289_REG_GAMMA_CTRL_7     0x36
+    #define SSD1289_REG_GAMMA_CTRL_8     0x37
+    #define SSD1289_REG_GAMMA_CTRL_9     0x3a
+    #define SSD1289_REG_GAMMA_CTRL_10    0x3b
+
+    #define SSD1289_REG_V_SCROLL_CTRL_1  0x41
+    #define SSD1289_REG_V_SCROLL_CTRL_2  0x42
+    #define SSD1289_REG_H_RAM_ADR_POS    0x44
+    #define SSD1289_REG_V_RAM_ADR_START  0x45
+    #define SSD1289_REG_V_RAM_ADR_END    0x46
+    #define SSD1289_REG_FIRST_WIN_START  0x48
+    #define SSD1289_REG_FIRST_WIN_END    0x49
+    #define SSD1289_REG_SECND_WIN_START  0x4a
+    #define SSD1289_REG_SECND_WIN_END    0x4b
+    #define SSD1289_REG_GDDRAM_X_ADDR    0x4e
+    #define SSD1289_REG_GDDRAM_Y_ADDR    0x4f
+    //}}}
+    //{{{
+    writeCommandData (SSD1289_REG_OSCILLATION, 0x0001);
+    writeCommandData (SSD1289_REG_POWER_CTRL_1, 0xA8A4);
+    writeCommandData (SSD1289_REG_POWER_CTRL_2, 0x0000);
+    writeCommandData (SSD1289_REG_POWER_CTRL_3, 0x080C);
+    writeCommandData (SSD1289_REG_POWER_CTRL_4, 0x2B00);
+    writeCommandData (SSD1289_REG_POWER_CTRL_5, 0x00B7);
+
+    writeCommandData (SSD1289_REG_DRIVER_OUT_CTRL,0x2B3F);
+
+    writeCommandData (SSD1289_REG_LCD_DRIVE_AC, 0x0600);
+    writeCommandData (SSD1289_REG_SLEEP_MODE, 0x0000);
+
+    writeCommandData (SSD1289_REG_ENTRY_MODE, 0x6070);
+
+    writeCommandData (SSD1289_REG_DISPLAY_CTRL, 0x0233);
+    writeCommandData (SSD1289_REG_FRAME_CYCLE, 0x0000);
+    writeCommandData (SSD1289_REG_GATE_SCAN_START,0x0000);
+
+    writeCommandData (SSD1289_REG_V_SCROLL_CTRL_1,0x0000);
+    writeCommandData (SSD1289_REG_FIRST_WIN_START,0x0000);
+    writeCommandData (SSD1289_REG_FIRST_WIN_END,  0x013F);
+
+    writeCommandData (SSD1289_REG_GAMMA_CTRL_1, 0x0707);
+    writeCommandData (SSD1289_REG_GAMME_CTRL_2, 0x0204);
+    writeCommandData (SSD1289_REG_GAMMA_CTRL_3, 0x0204);
+    writeCommandData (SSD1289_REG_GAMMA_CTRL_4, 0x0502);
+    writeCommandData (SSD1289_REG_GAMMA_CTRL_5, 0x0507);
+    writeCommandData (SSD1289_REG_GAMMA_CTRL_6, 0x0204);
+    writeCommandData (SSD1289_REG_GAMMA_CTRL_7, 0x0204);
+    writeCommandData (SSD1289_REG_GAMMA_CTRL_8, 0x0502);
+    writeCommandData (SSD1289_REG_GAMMA_CTRL_9, 0x0302);
+    writeCommandData (SSD1289_REG_GAMMA_CTRL_10, 0x0302);
+
+    writeCommandData (SSD1289_REG_WR_DATA_MASK_1, 0x0000);
+    writeCommandData (SSD1289_REG_WR_DATA_MASK_2, 0x0000);
+    writeCommandData (SSD1289_REG_FRAME_FREQUENCY, 0x8000);
+    //}}}
+
+    writeCommandData (SSD1289_REG_H_RAM_ADR_POS, ((getWidth()-1)<<8) | 0);
+    writeCommandData (SSD1289_REG_V_RAM_ADR_START, 0);
+    writeCommandData (SSD1289_REG_V_RAM_ADR_END, getHeight()-1);
+    writeCommandData (SSD1289_REG_GDDRAM_X_ADDR, 0);
+    writeCommandData (SSD1289_REG_GDDRAM_Y_ADDR, 0);
+
+    writeCommand (SSD1289_REG_GDDRAM_DATA);
+    launchUpdateThread (SSD1289_REG_GDDRAM_DATA);
+    return true;
+    }
+  return false;
+  }
+//}}}
+//{{{
+void cLcd1289::writeCommand (const uint8_t command) {
+
+  gpioWrite (mChipEnableGpio, 0);
+
+  gpioWrite (mDataCommandGpio, 0);
+
+  gpioWrite_Bits_0_31_Set (command & 0xFFFF);
+  gpioWrite_Bits_0_31_Clear ((~command) & 0xFFFF);
+
+  gpioWrite (kWrGpio, 0);
+  gpioWrite (kWrGpio, 1);
+
+  gpioWrite (mDataCommandGpio, 1);
+  gpioWrite (mChipEnableGpio, 1);
+  }
+//}}}
+//{{{
+void cLcd1289::writeCommandData (const uint8_t command, const uint16_t data) {
+
+  writeCommand (command);
+
+  gpioWrite (mChipEnableGpio, 0);
+
+  gpioWrite_Bits_0_31_Set (data & 0xFFFF);
+  gpioWrite_Bits_0_31_Clear ((~data) & 0xFFFF);
+  gpioWrite (kWrGpio, 0);
+  gpioWrite (kWrGpio, 1);
+
+  gpioWrite (mChipEnableGpio, 1);
+  }
+//}}}
+//{{{
+void cLcd1289::writeCommandMultipleData (const uint8_t command, const uint8_t* data, const int len) {
+
+  writeCommand (command);
+
+  // send data
+  gpioWrite (mChipEnableGpio, 0);
+
+  uint16_t* ptr = (uint16_t*)data;
+  for (int i = 0; i < len/2; i++) {
+    uint16_t dataWord = *ptr++;
+    gpioWrite_Bits_0_31_Set (dataWord & 0xFFFF);
+    gpioWrite_Bits_0_31_Clear ((~dataWord) & 0xFFFF);
+    gpioWrite (kWrGpio, 0);
+    gpioWrite (kWrGpio, 1);
+    }
+
+  gpioWrite (mChipEnableGpio, 1);
+  }
+//}}}
 //}}}
