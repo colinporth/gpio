@@ -163,6 +163,7 @@ void cLcd::initSpi() {
 //}}}
 //{{{
 void cLcd::initResetPin() {
+
   if (mResetGpio != 0xFF) {
     gpioSetMode (mResetGpio, PI_OUTPUT);
 
@@ -176,6 +177,7 @@ void cLcd::initResetPin() {
 //}}}
 //{{{
 void cLcd::initChipEnablePin() {
+
   if (mChipEnableGpio != 0xFF) {
     gpioSetMode (mChipEnableGpio, PI_OUTPUT);
     gpioWrite (mChipEnableGpio, 1);
@@ -184,6 +186,7 @@ void cLcd::initChipEnablePin() {
 //}}}
 //{{{
 void cLcd::initDataCommandPin() {
+
   if (mDataCommandGpio != 0xFF) {
     gpioSetMode (mDataCommandGpio, PI_OUTPUT);
     gpioWrite (mDataCommandGpio, 1);
@@ -561,6 +564,7 @@ bool cLcd1289::initialise() {
     writeCommandData (0x0e, 0x2B00); // SSD1289_REG_POWER_CTRL_4
     writeCommandData (0x1e, 0x00B7); // SSD1289_REG_POWER_CTRL_5
 
+    //write_reg(0x01, (1 << 13) | (par->bgr << 11) | (1 << 9) | (HEIGHT - 1));
     writeCommandData (0x01, 0x2B3F); // SSD1289_REG_DRIVER_OUT_CTRL
     writeCommandData (0x02, 0x0600); // SSD1289_REG_LCD_DRIVE_AC
     writeCommandData (0x10, 0x0000); // SSD1289_REG_SLEEP_MODE
@@ -586,6 +590,7 @@ bool cLcd1289::initialise() {
     writeCommandData (0x3b, 0x0302); // SSD1289_REG_GAMMA_CTRL_10
 
     writeCommandData (0x41, 0x0000); // SSD1289_REG_V_SCROLL_CTRL_1
+    //write_reg(0x42, 0x0000);
     writeCommandData (0x48, 0x0000); // SSD1289_REG_FIRST_WIN_START
     writeCommandData (0x49, 0x013F); // SSD1289_REG_FIRST_WIN_END
 
@@ -595,6 +600,32 @@ bool cLcd1289::initialise() {
     writeCommandData (0x4e, 0x0000); // SSD1289_REG_GDDRAM_X_ADDR
     writeCommandData (0x4f, 0x0000); // SSD1289_REG_GDDRAM_Y_ADDR
 
+    //{{{  rotates
+    //switch (par->info->var.rotate) {
+      ///* R4Eh - Set GDDRAM X address counter */
+      ///* R4Fh - Set GDDRAM Y address counter */
+      //case 0:
+        //write_reg(par, 0x4e, xs);
+        //write_reg(par, 0x4f, ys);
+        //write_reg(par, 0x11, reg11 | 0b110000);
+        //break;
+      //case 180:
+        //write_reg(par, 0x4e, par->info->var.xres - 1 - xs);
+        //write_reg(par, 0x4f, par->info->var.yres - 1 - ys);
+        //write_reg(par, 0x11, reg11 | 0b000000);
+        //break;
+      //case 270:
+        //write_reg(par, 0x4e, par->info->var.yres - 1 - ys);
+        //write_reg(par, 0x4f, xs);
+        //write_reg(par, 0x11, reg11 | 0b101000);
+        //break;
+      //case 90:
+        //write_reg(par, 0x4e, ys);
+        //write_reg(par, 0x4f, par->info->var.xres - 1 - xs);
+        //write_reg(par, 0x11, reg11 | 0b011000);
+        //break;
+      //}
+    //}}}
     launchUpdateThread (0x22); // SSD1289_REG_GDDRAM_DATA
     return true;
     }
@@ -609,7 +640,7 @@ void cLcd1289::writeCommand (const uint8_t command) {
   gpioWrite (mDataCommandGpio, 0);
 
   gpioWrite_Bits_0_31_Set (command & 0xFFFF);     // set hi data bits
-  gpioWrite_Bits_0_31_Clear (~command & 0x1FFFF); // clear lo data bits and kWrGpio
+  gpioWrite_Bits_0_31_Clear (~command & 0x1FFFF); // clear lo data bits + kWrGpio
   gpioWrite (kWrGpio, 1);                         // set kWrGpio hi to complete write
 
   gpioWrite (mDataCommandGpio, 1);
@@ -621,7 +652,7 @@ void cLcd1289::writeCommandData (const uint8_t command, const uint16_t data) {
   writeCommand (command);
 
   gpioWrite_Bits_0_31_Set (data & 0xFFFF);     // set hi data bits
-  gpioWrite_Bits_0_31_Clear (~data & 0x1FFFF); // clear lo data bits and kWrGpio lo
+  gpioWrite_Bits_0_31_Clear (~data & 0x1FFFF); // clear lo data bits + kWrGpio lo
   gpioWrite (kWrGpio, 1);                      // set kWrGpio hi to complete write
   }
 //}}}
@@ -636,7 +667,7 @@ void cLcd1289::writeCommandMultipleData (const uint8_t command, const uint8_t* d
 
   while (ptr++ < ptrEnd) {
     gpioWrite_Bits_0_31_Set (*ptr);              // set hi data bits
-    gpioWrite_Bits_0_31_Clear (~*ptr & 0x1FFFF); // clear lo data bits and kWrGpio lo
+    gpioWrite_Bits_0_31_Clear (~*ptr & 0x1FFFF); // clear lo data bits + kWrGpio lo
     gpioWrite (kWrGpio, 1);                      // set kWrGpio hi to complete write
     }
   }
