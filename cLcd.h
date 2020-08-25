@@ -113,9 +113,10 @@ class cLcdParallel16 : public cLcd {
 public:
   //{{{
   cLcdParallel16 (const uint16_t width, const uint16_t height,
-                  const uint8_t resetGpio, const uint8_t dataCommandGpio, const uint8_t chipEnableGpio, const uint8_t wrGpio)
+                  const uint8_t resetGpio, const uint8_t dataCommandGpio, const uint8_t chipEnableGpio,
+                  const uint8_t wrGpio, const uint8_t rdGpio)
     : cLcd (width, height, dataCommandGpio, chipEnableGpio, chipEnableGpio),
-      mWrGpio(wrGpio),  mClrMask(0xFFFF | (1 << wrGpio)) {}
+      mWrGpio(wrGpio), mRdGpio(rdGpio), mClrMask (0x0000FFFF | (1 << wrGpio)) {}
   //}}}
   virtual ~cLcdParallel16() {}
 
@@ -128,8 +129,9 @@ protected:
   virtual void writeCommandData (const uint8_t command, const uint16_t data);
   virtual void writeCommandMultipleData (const uint8_t command, const uint8_t* data, const int len);
 
-private:
+protected:
   const uint8_t mWrGpio;
+  const uint8_t mRdGpio;
   const uint32_t mClrMask;
   };
 //}}}

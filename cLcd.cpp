@@ -626,21 +626,24 @@ constexpr uint8_t kRdGpio = 18;
 
 constexpr uint16_t kWidth1289 = 240;
 constexpr uint16_t kHeight1289 = 320;
-cLcd1289::cLcd1289() : cLcdParallel16(kWidth1289, kHeight1289, kResetGpio, kRsGpio, 0xFF, kWrGpio) {}
+cLcd1289::cLcd1289() : cLcdParallel16(kWidth1289, kHeight1289, kResetGpio, kRsGpio, 0xFF, kWrGpio, kRdGpio) {}
 
 bool cLcd1289::initialise() {
-
   if (initResources()) {
     initResetPin();
     initDataCommandPin();
 
     // wr
-    gpioSetMode (kWrGpio, PI_OUTPUT);
-    gpioWrite (kWrGpio, 1);
+    if (mWrGpio != 0xFF) {
+      gpioSetMode (mWrGpio, PI_OUTPUT);
+      gpioWrite (mWrGpio, 1);
+      }
 
     // rd unused
-    gpioSetMode (kRdGpio, PI_OUTPUT);
-    gpioWrite (kRdGpio, 1);
+    if (mRdGpio != 0xFF) {
+      gpioSetMode (mRdGpio, PI_OUTPUT);
+      gpioWrite (mRdGpio, 1);
+      }
 
     // parallel d0-15
     for (int i = 0; i < 16; i++) {
