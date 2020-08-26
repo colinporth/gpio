@@ -154,23 +154,20 @@
 #define MILLION  1000000
 #define BILLION  1000000000
 
-#define BANK (gpio>>5)
-#define BIT  (1<<(gpio&0x1F))
+#define BANK (gpio >> 5)
+#define BIT  (1 << (gpio & 0x1F))
 
-#ifndef EMBEDDED_IN_VM
-  #define DBG(level, format, arg...) DO_DBG(level, format, ## arg)
-#else
+#ifdef EMBEDDED_IN_VM
   #define DBG(level, format, arg...)
+#else
+  #define DBG(level, format, arg...) DO_DBG(level, format, ## arg)
 #endif
 
 //{{{
-#define DO_DBG(level, format, arg...)                              \
-   {                                                               \
-      if ((gpioCfg.dbgLevel >= level) &&                           \
-         (!(gpioCfg.internals & PI_CFG_NOSIGHANDLER)))             \
-         fprintf(stderr, "%s %s: " format "\n" ,                   \
-            myTimeStamp(), __FUNCTION__ , ## arg);                 \
-   }
+#define DO_DBG(level, format, arg...) { \
+  if ((gpioCfg.dbgLevel >= level) && (!(gpioCfg.internals & PI_CFG_NOSIGHANDLER))) \
+    fprintf(stderr, "%s %s: " format "\n" , myTimeStamp(), __FUNCTION__ , ## arg); \
+  }
 //}}}
 
 #ifndef DISABLE_SER_CHECK_INITED
@@ -180,17 +177,13 @@
 #endif
 
 //{{{
-#define CHECK_INITED                                               \
-   do                                                              \
-   {                                                               \
-      if (!libInitialised)                                         \
-      {                                                            \
-         DBG(DBG_ALWAYS,                                           \
-           "pigpio uninitialised, call gpioInitialise()");         \
-         return PI_NOT_INITIALISED;                                \
-      }                                                            \
-   }                                                               \
-   while (0)
+#define CHECK_INITED  \
+  do { \
+    if (!libInitialised) { \
+      DBG(DBG_ALWAYS, "pigpio uninitialised, call gpioInitialise()"); \
+      return PI_NOT_INITIALISED; \
+      } \
+    } while (0)
 //}}}
 //{{{
 #define CHECK_INITED_RET_NULL_PTR                                  \
@@ -7766,7 +7759,7 @@ static void initPWM (unsigned bits) {
   }
 //}}}
 //{{{
-static void initPCM (unsigned bits) { 
+static void initPCM (unsigned bits) {
 
   DBG(DBG_STARTUP, "bits=%d", bits);
 
