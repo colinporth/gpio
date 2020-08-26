@@ -380,55 +380,6 @@ void cLcdParallel16::writeCommandMultipleData (const uint8_t command, const uint
 constexpr uint16_t kWidth7735 = 128;
 constexpr uint16_t kHeight7735 = 160;
 constexpr static const int kSpiClock7735 = 24000000;
-//{{{  command constexpr
-constexpr uint8_t k7335_SLPOUT  = 0x11; // no data
-constexpr uint8_t k7335_DISPON  = 0x29; // no data
-//constexpr uint8_t k7335_DISPOFF = 0x28; // no data
-
-constexpr uint8_t k7335_CASET = 0x2A;
-constexpr uint8_t k7335_caSetData[4] = { 0, 0, 0, kWidth7735 - 1 };
-
-constexpr uint8_t k7335_RASET = 0x2B;
-constexpr uint8_t k7335_raSetData[4] = { 0, 0, 0, kHeight7735 - 1 };
-
-constexpr uint8_t k7335_RAMWR = 0x2C; // followed by frameBuffer data
-
-constexpr uint8_t k7335_MADCTL = 0x36;
-constexpr uint8_t k7735_MADCTLData[1] = { 0xc0 };
-
-constexpr uint8_t k7335_COLMOD  = 0x3A;
-constexpr uint8_t k7335_COLMODData[1] = { 0x05 };
-
-constexpr uint8_t k7335_FRMCTR1 = 0xB1;
-constexpr uint8_t k7335_FRMCTR2 = 0xB2;
-constexpr uint8_t k7335_FRMCTR3 = 0xB3;
-constexpr uint8_t k7335_FRMCTRData[6] = { 0x01, 0x2c, 0x2d, 0x01, 0x2c, 0x2d };
-
-constexpr uint8_t k7335_INVCTR  = 0xB4;
-constexpr uint8_t k7335_INVCTRData[1] = { 0x07 };
-
-constexpr uint8_t k7335_PWCTR1  = 0xC0;
-constexpr uint8_t k7335_PowerControlData1[3] = { 0xA2, 0x02 /* -4.6V */, 0x84 /* AUTO mode */ };
-constexpr uint8_t k7335_PWCTR2  = 0xC1;
-constexpr uint8_t k7335_PowerControlData2[1] = { 0xc5 }; // VGH25 = 2.4C VGSEL =-10 VGH = 3*AVDD
-constexpr uint8_t k7335_PWCTR3  = 0xC2;
-constexpr uint8_t k7335_PowerControlData3[2] = { 0x0A /* Opamp current small */, 0x00 /* Boost freq */ };
-constexpr uint8_t k7335_PWCTR4  = 0xC3;
-constexpr uint8_t k7335_PowerControlData4[2] = { 0x8A /* BCLK/2, Opamp current small/medium low */, 0x2A };
-constexpr uint8_t k7335_PWCTR5  = 0xC4;
-constexpr uint8_t k7335_PowerControlData5[2] = { 0x8A /* BCLK/2, Opamp current small/medium low */, 0xEE };
-
-constexpr uint8_t k7335_VMCTR1  = 0xC5;
-constexpr uint8_t k7335_VMCTR1Data[1] = { 0x0E };
-
-constexpr uint8_t k7335_GMCTRP1 = 0xE0;
-constexpr uint8_t k7335_GMCTRP1Data[16] = { 0x02, 0x1c, 0x07, 0x12, 0x37, 0x32, 0x29, 0x2d,
-                                            0x29, 0x25, 0x2B, 0x39, 0x00, 0x01, 0x03, 0x10 } ;
-
-constexpr uint8_t k7335_GMCTRN1 = 0xE1;
-constexpr uint8_t k7335_GMCTRN1Data[16] = { 0x03, 0x1d, 0x07, 0x06, 0x2E, 0x2C, 0x29, 0x2D,
-                                            0x2E, 0x2E, 0x37, 0x3F, 0x00, 0x00, 0x02, 0x10 } ;
-//}}}
 
 cLcd7735::cLcd7735() : cLcdSpi (kWidth7735, kHeight7735, kSpiClock7735, true,
                                 kResetGpio, kDataCommandGpio, 0xFF) {}
@@ -440,6 +391,55 @@ bool cLcd7735::initialise() {
     initDataCommandPin();
     initSpi();
 
+    //{{{  command constexpr
+    constexpr uint8_t k7335_SLPOUT  = 0x11; // no data
+    constexpr uint8_t k7335_DISPON  = 0x29; // no data
+    //constexpr uint8_t k7335_DISPOFF = 0x28; // no data
+
+    constexpr uint8_t k7335_CASET = 0x2A;
+    constexpr uint8_t k7335_caSetData[4] = { 0, 0, 0, kWidth7735 - 1 };
+
+    constexpr uint8_t k7335_RASET = 0x2B;
+    constexpr uint8_t k7335_raSetData[4] = { 0, 0, 0, kHeight7735 - 1 };
+
+    constexpr uint8_t k7335_RAMWR = 0x2C; // followed by frameBuffer data
+
+    constexpr uint8_t k7335_MADCTL = 0x36;
+    constexpr uint8_t k7735_MADCTLData[1] = { 0xc0 };
+
+    constexpr uint8_t k7335_COLMOD  = 0x3A;
+    constexpr uint8_t k7335_COLMODData[1] = { 0x05 };
+
+    constexpr uint8_t k7335_FRMCTR1 = 0xB1;
+    constexpr uint8_t k7335_FRMCTR2 = 0xB2;
+    constexpr uint8_t k7335_FRMCTR3 = 0xB3;
+    constexpr uint8_t k7335_FRMCTRData[6] = { 0x01, 0x2c, 0x2d, 0x01, 0x2c, 0x2d };
+
+    constexpr uint8_t k7335_INVCTR  = 0xB4;
+    constexpr uint8_t k7335_INVCTRData[1] = { 0x07 };
+
+    constexpr uint8_t k7335_PWCTR1  = 0xC0;
+    constexpr uint8_t k7335_PowerControlData1[3] = { 0xA2, 0x02 /* -4.6V */, 0x84 /* AUTO mode */ };
+    constexpr uint8_t k7335_PWCTR2  = 0xC1;
+    constexpr uint8_t k7335_PowerControlData2[1] = { 0xc5 }; // VGH25 = 2.4C VGSEL =-10 VGH = 3*AVDD
+    constexpr uint8_t k7335_PWCTR3  = 0xC2;
+    constexpr uint8_t k7335_PowerControlData3[2] = { 0x0A /* Opamp current small */, 0x00 /* Boost freq */ };
+    constexpr uint8_t k7335_PWCTR4  = 0xC3;
+    constexpr uint8_t k7335_PowerControlData4[2] = { 0x8A /* BCLK/2, Opamp current small/medium low */, 0x2A };
+    constexpr uint8_t k7335_PWCTR5  = 0xC4;
+    constexpr uint8_t k7335_PowerControlData5[2] = { 0x8A /* BCLK/2, Opamp current small/medium low */, 0xEE };
+
+    constexpr uint8_t k7335_VMCTR1  = 0xC5;
+    constexpr uint8_t k7335_VMCTR1Data[1] = { 0x0E };
+
+    constexpr uint8_t k7335_GMCTRP1 = 0xE0;
+    constexpr uint8_t k7335_GMCTRP1Data[16] = { 0x02, 0x1c, 0x07, 0x12, 0x37, 0x32, 0x29, 0x2d,
+                                                0x29, 0x25, 0x2B, 0x39, 0x00, 0x01, 0x03, 0x10 } ;
+
+    constexpr uint8_t k7335_GMCTRN1 = 0xE1;
+    constexpr uint8_t k7335_GMCTRN1Data[16] = { 0x03, 0x1d, 0x07, 0x06, 0x2E, 0x2C, 0x29, 0x2D,
+                                                0x2E, 0x2E, 0x37, 0x3F, 0x00, 0x00, 0x02, 0x10 } ;
+    //}}}
     writeCommand (k7335_SLPOUT);
     delayUs (120000);
 
@@ -483,7 +483,6 @@ cLcd9320::cLcd9320() : cLcdSpi(kWidth9320, kHeight9320, kSpiClock9320, false,
 
 bool cLcd9320::initialise() {
   if (initResources()) {
-
     initResetPin();
     initChipEnablePin();
     initDataCommandPin();

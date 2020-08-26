@@ -1,4 +1,4 @@
-// cLcd uint16 rgb565 display classes
+// cLcd - uint16 rgb565 display classes
 #pragma once
 #include <cstdint>
 #include <string>
