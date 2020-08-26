@@ -411,7 +411,7 @@ constexpr static const int kSpiClock7735 = 24000000;
 
 cLcd7735::cLcd7735() : cLcdSpi (kWidth7735, kHeight7735, kSpiClock7735, true, 0xFF, false) {}
 
-bool cLcd7735::initialise() {
+bool cLcd7735::initialise (const int rotate) {
   if (initResources()) {
     initResetPin();
     initChipEnablePin();
@@ -507,7 +507,7 @@ constexpr int kSpiClock9320 = 24000000;
 
 cLcd9320::cLcd9320() : cLcdSpi(kWidth9320, kHeight9320, kSpiClock9320, false, kSpiCe0Gpio, false) {}
 
-bool cLcd9320::initialise() {
+bool cLcd9320::initialise (const int rotate) {
   if (initResources()) {
     initResetPin();
     initChipEnablePin();
@@ -583,7 +583,7 @@ constexpr int kSpiClock9225b = 16000000;
 
 cLcd9225b::cLcd9225b() : cLcdSpi(kWidth9225b, kHeight9225b, kSpiClock9225b, true, 0xFF, true) {}
 
-bool cLcd9225b::initialise() {
+bool cLcd9225b::initialise (const int rotate) {
   if (initResources()) {
     initResetPin();
     initChipEnablePin();
@@ -659,7 +659,7 @@ constexpr uint16_t kHeight1289 = 320;
 cLcd1289::cLcd1289() : cLcdParallel16(kWidth1289, kHeight1289) {}
 
 //{{{
-bool cLcd1289::initialise() {
+bool cLcd1289::initialise (const int rotate) {
 
   if (initResources()) {
     initResetPin();
@@ -693,7 +693,6 @@ bool cLcd1289::initialise() {
     writeCommandData (0x01, 0x2B3F); // SSD1289_REG_DRIVER_OUT_CTRL
     writeCommandData (0x02, 0x0600); // SSD1289_REG_LCD_DRIVE_AC
     writeCommandData (0x10, 0x0000); // SSD1289_REG_SLEEP_MODE
-    writeCommandData (0x11, 0x6070); // SSD1289_REG_ENTRY_MODE
 
     writeCommandData (0x07, 0x0233); // SSD1289_REG_DISPLAY_CTRL
     writeCommandData (0x0b, 0x0000); // SSD1289_REG_FRAME_CYCLE
@@ -722,8 +721,37 @@ bool cLcd1289::initialise() {
     writeCommandData (0x44, ((getWidth()-1) << 8) | 0); // SSD1289_REG_H_RAM_ADR_POS
     writeCommandData (0x45, 0x0000); // SSD1289_REG_V_RAM_ADR_START
     writeCommandData (0x46, getHeight()-1);  // SSD1289_REG_V_RAM_ADR_END
-    writeCommandData (0x4e, 0x0000); // SSD1289_REG_GDDRAM_X_ADDR
-    writeCommandData (0x4f, 0x0000); // SSD1289_REG_GDDRAM_Y_ADDR
+
+    int xs = 0;
+    int ys = 0;
+    int xres = 240;
+    int yres = 320;
+
+    switch (rotate) {
+      // 0x11 REG_ENTRY_MODE
+      // 0x4E GDDRAM X address counter
+      // 0x4F GDDRAM Y address counter
+      case 0:
+        writeCommandData (0x4e, xs);
+        writeCommandData (0x4f, ys);
+        writeCommandData (0x11, 0x6040 | 0b110000);
+        break;
+      case 180:
+        writeCommandData (0x4e, xres - 1 - xs);
+        writeCommandData (0x4f, yres - 1 - ys);
+        writeCommandData (0x11, 0x6040 | 0b000000);
+        break;
+      case 270:
+        writeCommandData (0x4e, yres - 1 - ys);
+        writeCommandData (0x4f, xs);
+        writeCommandData (0x11, 0x6040 | 0b101000);
+        break;
+      case 90:
+        writeCommandData (0x4e, ys);
+        writeCommandData (0x4f, xres - 1 - xs);
+        writeCommandData (0x11, 0x6040 | 0b011000);
+        break;
+      }
 
     launchUpdateThread (0x22); // SSD1289_REG_GDDRAM_DATA
     return true;
@@ -732,40 +760,4 @@ bool cLcd1289::initialise() {
   return false;
   }
 //}}}
-//{{{
-void cLcd1289::setRotate (int rotate) {
-
-  int xs = 0;
-  int ys = 0;
-  int xres = 240;
-  int yres = 320;
-
-  switch (rotate) {
-    // 0x11 REG_ENTRY_MODE
-    // 0x4E GDDRAM X address counter
-    // 0x4F GDDRAM Y address counter
-    case 0:
-      writeCommandData (0x4e, xs);
-      writeCommandData (0x4f, ys);
-      writeCommandData (0x11, 0x6040 | 0b110000);
-      break;
-    case 180:
-      writeCommandData (0x4e, xres - 1 - xs);
-      writeCommandData (0x4f, yres - 1 - ys);
-      writeCommandData (0x11, 0x6040 | 0b000000);
-      break;
-    case 270:
-      writeCommandData (0x4e, yres - 1 - ys);
-      writeCommandData (0x4f, xs);
-      writeCommandData (0x11, 0x6040 | 0b101000);
-      break;
-    case 90:
-      writeCommandData (0x4e, ys);
-      writeCommandData (0x4f, xres - 1 - xs);
-      writeCommandData (0x11, 0x6040 | 0b011000);
-      break;
-    }
-  }
 //}}}
-//}}}
-

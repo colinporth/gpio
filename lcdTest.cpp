@@ -13,11 +13,10 @@ int main() {
 
   cLog::init (LOGINFO, false, "", "gpio");
 
-  cLcd* lcd = new cLcd1289();
-  lcd->initialise();
-
   int rotate = 0;
   while (true) {
+    cLcd* lcd = new cLcd1289();
+    lcd->initialise (rotate);
 
     for (int i = 0; i < 100; i++) {
       lcd->clear (kOrange);
@@ -46,9 +45,8 @@ int main() {
       }
 
     rotate = (rotate + 90) % 360;
-    lcd->setRotate (rotate);
+    delete (lcd);
     }
 
-  delete lcd;
   return 0;
   }

@@ -30,7 +30,7 @@ public:
     : mChipEnableGpio(chipEnableGpio), mUseSequence(useSequence), mWidth(width), mHeight(height) {}
   virtual ~cLcd();
 
-  virtual bool initialise() = 0;
+  virtual bool initialise (const int rotate) = 0;
 
   constexpr uint16_t getWidth() { return mWidth; }
   constexpr uint16_t getHeight() { return mHeight; }
@@ -124,7 +124,7 @@ class cLcd7735 : public cLcdSpi {
 public:
   cLcd7735();
   virtual ~cLcd7735() {}
-  virtual bool initialise();
+  virtual bool initialise (const int rotate);
   };
 //}}}
 //{{{
@@ -132,7 +132,7 @@ class cLcd9320 : public cLcdSpi {
 public:
   cLcd9320();
   virtual ~cLcd9320() {}
-  virtual bool initialise();
+  virtual bool initialise (const int rotate);
   };
 //}}}
 //{{{
@@ -140,7 +140,7 @@ class cLcd9225b : public cLcdSpi {
 public:
   cLcd9225b();
   virtual ~cLcd9225b() {}
-  virtual bool initialise();
+  virtual bool initialise (const int rotate);
   };
 //}}}
 //{{{
@@ -149,7 +149,6 @@ public:
   cLcd1289();
   virtual ~cLcd1289() {}
 
-  virtual bool initialise();
-  virtual void setRotate (int rotate);
+  virtual bool initialise (const int rotate);
   };
 //}}}
