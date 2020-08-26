@@ -35,6 +35,8 @@ public:
   constexpr uint16_t getWidth() { return mWidth; }
   constexpr uint16_t getHeight() { return mHeight; }
 
+  virtual void setRotate (int rotate) {}
+
   virtual void rect (const uint16_t colour, const int xorg, const int yorg, const int xlen, const int ylen);
   virtual void pixel (const uint16_t colour, const int x, const int y);
   virtual void blendPixel (const uint16_t colour, const uint8_t alpha, const int x, const int y);
@@ -148,5 +150,6 @@ public:
   virtual ~cLcd1289() {}
 
   virtual bool initialise();
+  virtual void setRotate (int rotate);
   };
 //}}}

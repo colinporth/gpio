@@ -1,4 +1,5 @@
-CXX       = clang++
+CXX       = clang
+CCX       = clang++
 //CXX       = g++
 
 TARGET    = lcd
@@ -6,8 +7,8 @@ SRCS      = lcdTest.cpp \
 	    cLcd.cpp \
 	    ../shared/utils/cLog.cpp \
 	    fonts/FreeSansBold.cpp \
-#            pigpio/pigpio.c \
-#            pigpio/command.c \
+	    pigpio/pigpio.c \
+	    pigpio/command.c \
 
 BUILD_DIR = ./build
 CLEAN_DIRS = $(BUILD_DIR)
@@ -34,10 +35,10 @@ $(BUILD_DIR)/%.c.o: %.c
 
 $(BUILD_DIR)/%.cpp.o: %.cpp
 	mkdir -p $(dir $@)
-	$(CXX) -std=c++17 $(CFLAGS) -c $< -o $@
+	$(CCX) -std=c++17 $(CFLAGS) -c $< -o $@
 
 $(TARGET): $(OBJS)
-	$(CXX) $(OBJS) -o $@ $(LIBS)
+	$(CCX) $(OBJS) -o $@ $(LIBS)
 
 clean:
 	rm -rf $(TARGET) $(CLEAN_DIRS)

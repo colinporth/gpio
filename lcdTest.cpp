@@ -16,8 +16,10 @@ int main() {
   cLcd* lcd = new cLcd1289();
   lcd->initialise();
 
+  int rotate = 0;
   while (true) {
-    for (int i = 0; i < 200; i++) {
+
+    for (int i = 0; i < 100; i++) {
       lcd->clear (kOrange);
       lcd->text (kWhite, 0,0, 100, dec(i,3));
       lcd->update();
@@ -42,6 +44,9 @@ int main() {
       lcd->update();
       lcd->delayUs (40000);
       }
+
+    rotate = (rotate + 90) % 360;
+    lcd->setRotate (rotate);
     }
 
   delete lcd;

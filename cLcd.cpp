@@ -658,7 +658,9 @@ constexpr uint16_t kWidth1289 = 240;
 constexpr uint16_t kHeight1289 = 320;
 cLcd1289::cLcd1289() : cLcdParallel16(kWidth1289, kHeight1289) {}
 
+//{{{
 bool cLcd1289::initialise() {
+
   if (initResources()) {
     initResetPin();
 
@@ -674,7 +676,7 @@ bool cLcd1289::initialise() {
     gpioSetMode (kParallelRegisterSelectGpio, PI_OUTPUT);
     gpioWrite (kParallelRegisterSelectGpio, 1);
 
-    // parallel d0-15
+    // parallel d0-d15
     for (int i = 0; i < 16; i++)
       gpioSetMode (i, PI_OUTPUT);
     gpioWrite_Bits_0_31_Clear (kParallelDataMask);
@@ -723,32 +725,6 @@ bool cLcd1289::initialise() {
     writeCommandData (0x4e, 0x0000); // SSD1289_REG_GDDRAM_X_ADDR
     writeCommandData (0x4f, 0x0000); // SSD1289_REG_GDDRAM_Y_ADDR
 
-    //{{{  rotates
-    //switch (par->info->var.rotate) {
-      ///* R4Eh - Set GDDRAM X address counter */
-      ///* R4Fh - Set GDDRAM Y address counter */
-      //case 0:
-        //write_reg(par, 0x4e, xs);
-        //write_reg(par, 0x4f, ys);
-        //write_reg(par, 0x11, reg11 | 0b110000);
-        //break;
-      //case 180:
-        //write_reg(par, 0x4e, par->info->var.xres - 1 - xs);
-        //write_reg(par, 0x4f, par->info->var.yres - 1 - ys);
-        //write_reg(par, 0x11, reg11 | 0b000000);
-        //break;
-      //case 270:
-        //write_reg(par, 0x4e, par->info->var.yres - 1 - ys);
-        //write_reg(par, 0x4f, xs);
-        //write_reg(par, 0x11, reg11 | 0b101000);
-        //break;
-      //case 90:
-        //write_reg(par, 0x4e, ys);
-        //write_reg(par, 0x4f, par->info->var.xres - 1 - xs);
-        //write_reg(par, 0x11, reg11 | 0b011000);
-        //break;
-      //}
-    //}}}
     launchUpdateThread (0x22); // SSD1289_REG_GDDRAM_DATA
     return true;
     }
@@ -756,3 +732,40 @@ bool cLcd1289::initialise() {
   return false;
   }
 //}}}
+//{{{
+void cLcd1289::setRotate (int rotate) {
+
+  int xs = 0;
+  int ys = 0;
+  int xres = 240;
+  int yres = 320;
+
+  switch (rotate) {
+    // 0x11 REG_ENTRY_MODE
+    // 0x4E GDDRAM X address counter
+    // 0x4F GDDRAM Y address counter
+    case 0:
+      writeCommandData (0x4e, xs);
+      writeCommandData (0x4f, ys);
+      writeCommandData (0x11, 0x6040 | 0b110000);
+      break;
+    case 180:
+      writeCommandData (0x4e, xres - 1 - xs);
+      writeCommandData (0x4f, yres - 1 - ys);
+      writeCommandData (0x11, 0x6040 | 0b000000);
+      break;
+    case 270:
+      writeCommandData (0x4e, yres - 1 - ys);
+      writeCommandData (0x4f, xs);
+      writeCommandData (0x11, 0x6040 | 0b101000);
+      break;
+    case 90:
+      writeCommandData (0x4e, ys);
+      writeCommandData (0x4f, xres - 1 - xs);
+      writeCommandData (0x11, 0x6040 | 0b011000);
+      break;
+    }
+  }
+//}}}
+//}}}
+
