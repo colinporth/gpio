@@ -188,18 +188,15 @@ void cLcd::launchUpdateThread (const uint8_t command) {
 //}}}
 
 // cLcdSpi - uses bigEndian frameBuf
-//{{{  spi J8 header pins
-// 3.3v                   pin17
-// registerSelect gpio24        pin18
-// backLight gpio24             pin18
-// SPI0 - MOSI            pin19
-// 0v                           pin20
-// SPI0 - SCLK            pin21
-// reset gpio25                 pin22
-// SPI0 - CE0                   pin24
-//}}}
+//{{{  spi J8 header pins, gpio, spi
+//      3.3v - 17  18 - gpio24 - registerSelect
+// SPI0 MOSI - 19  20 - 0v
+// SPI0 SCLK - 21  22 - gpio25 - reset
+//                 24 - SPI0 CE0
+
 constexpr uint8_t kSpiCe0Gpio = 8;
 constexpr uint8_t kSpiRegisterSelectGpio  = 24;
+//}}}
 //{{{
 cLcdSpi::~cLcdSpi() {
   spiClose (mSpiHandle);
@@ -282,12 +279,15 @@ void cLcdSpi::writeCommandMultipleData (const uint8_t command, const uint8_t* da
 //}}}
 
 // cLcdParallel16 - override with littleEndian frameBuf
-constexpr uint8_t kParallelWrGpio = 16;
+//{{{  gpio and masks
+constexpr uint8_t kParallelWriteGpio = 16;
 constexpr uint8_t kParallelRegisterSelectGpio = 17;
-constexpr uint8_t kParallelRdGpio = 18;
+constexpr uint8_t kParallelReadGpio = 18;
+
 constexpr uint32_t kParallelDataMask =  0xFFFF;
-constexpr uint32_t kParallelWrMask = 1 << kParallelWrGpio;
-constexpr uint32_t kParallelWrClrMask = kParallelWrMask | kParallelDataMask;
+constexpr uint32_t kParallelWriteMask = 1 << kParallelWriteGpio;
+constexpr uint32_t kParallelWriteClrMask = kParallelWriteMask | kParallelDataMask;
+//}}}
 //{{{
 void cLcdParallel16::rect (const uint16_t colour, const int xorg, const int yorg, const int xlen, const int ylen) {
 
@@ -347,9 +347,9 @@ void cLcdParallel16::writeCommand (const uint8_t command) {
 
   gpioWrite (kParallelRegisterSelectGpio, 0);
 
-  gpioWrite_Bits_0_31_Clear (~command & kParallelWrClrMask); // clear lo data bits + kParallelWrGpio bit lo
-  gpioWrite_Bits_0_31_Set (command);                         // set hi data bits
-  gpioWrite_Bits_0_31_Set (kParallelWrMask);              // write on kParallelWrGpio rising edge
+  gpioWrite_Bits_0_31_Clear (~command & kParallelWriteClrMask); // clear lo data bits + kParallelWrGpio bit lo
+  gpioWrite_Bits_0_31_Set (command);                            // set hi data bits
+  gpioWrite_Bits_0_31_Set (kParallelWriteMask);                 // write on kParallelWrGpio rising edge
 
   gpioWrite (kParallelRegisterSelectGpio, 1);
   }
@@ -359,9 +359,9 @@ void cLcdParallel16::writeCommandData (const uint8_t command, const uint16_t dat
 
   writeCommand (command);
 
-  gpioWrite_Bits_0_31_Clear (~data & kParallelWrClrMask); // clear lo data bits + kParallelWrGpio bit lo
-  gpioWrite_Bits_0_31_Set (data);                         // set hi data bits
-  gpioWrite_Bits_0_31_Set (kParallelWrMask);              // write on kParallelWrGpio rising edge
+  gpioWrite_Bits_0_31_Clear (~data & kParallelWriteClrMask); // clear lo data bits + kParallelWrGpio bit lo
+  gpioWrite_Bits_0_31_Set (data);                            // set hi data bits
+  gpioWrite_Bits_0_31_Set (kParallelWriteMask);              // write on kParallelWrGpio rising edge
   }
 //}}}
 //{{{
@@ -375,9 +375,9 @@ void cLcdParallel16::writeCommandMultipleData (const uint8_t command, const uint
 
   while (ptr < ptrEnd) {
     uint16_t data = *ptr++;
-    fastGpioWrite_Bits_0_31_Clear (~data & kParallelWrClrMask); // clear lo data bits + kParallelWrGpio bit lo
-    fastGpioWrite_Bits_0_31_Set (data);                        // set hi data bits
-    fastGpioWrite_Bits_0_31_Set (kParallelWrMask);              // write on kParallelWrGpio rising edge
+    fastGpioWrite_Bits_0_31_Clear (~data & kParallelWriteClrMask); // clear lo data bits + kParallelWrGpio bit lo
+    fastGpioWrite_Bits_0_31_Set (data);                            // set hi data bits
+    fastGpioWrite_Bits_0_31_Set (kParallelWriteMask);              // write on kParallelWrGpio rising edge
     }
   }
 //}}}
@@ -642,12 +642,12 @@ bool cLcd1289::initialise() {
     initResetPin();
 
     // wr
-    gpioSetMode (kParallelWrGpio, PI_OUTPUT);
-    gpioWrite (kParallelWrGpio, 1);
+    gpioSetMode (kParallelWriteGpio, PI_OUTPUT);
+    gpioWrite (kParallelWriteGpio, 1);
 
     // rd unused
-    gpioSetMode (kParallelRdGpio, PI_OUTPUT);
-    gpioWrite (kParallelRdGpio, 1);
+    gpioSetMode (kParallelReadGpio, PI_OUTPUT);
+    gpioWrite (kParallelReadGpio, 1);
 
     // rs
     gpioSetMode (kParallelRegisterSelectGpio, PI_OUTPUT);
