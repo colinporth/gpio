@@ -24,9 +24,14 @@ int main (int numArgs, char* args[]) {
 
   while (true) {
     for (int i = 0; i < 100; i++) {
+      double startTime = lcd->time();
       lcd->clear (kOrange);
       lcd->text (kWhite, 0,0, 100, dec(i,3));
       lcd->update();
+
+      int ms = (int)((lcd->time() - startTime) * 1000000.f);
+      cLog::log (LOGINFO, "test took " + dec(ms));
+
       lcd->delayUs (40000);
       }
 
@@ -47,8 +52,8 @@ int main (int numArgs, char* args[]) {
         }
       lcd->text (kYellow, 0,0, 20, "Hello Colin");
       lcd->update();
-      double took = lcd->time() - startTime;
-      int ms = (int)(took * 1000000);
+
+      int ms = (int)((lcd->time() - startTime) * 1000000.0);
       cLog::log (LOGINFO, "test took " + dec(ms));
 
       lcd->delayUs (40000);

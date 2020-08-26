@@ -104,7 +104,7 @@ int cLcd::text (const uint16_t colour, const int strX, const int strY, const int
   FT_Set_Pixel_Sizes (mFace, 0, height);
 
   int curX = strX;
-  for (unsigned i = 0; i < str.size(); i++) {
+  for (unsigned i = 0; (i < str.size()) && (curX < getWidth()); i++) {
     FT_Load_Char (mFace, str[i], FT_LOAD_RENDER);
     FT_GlyphSlot slot = mFace->glyph;
 
@@ -117,7 +117,6 @@ int cLcd::text (const uint16_t colour, const int strX, const int strY, const int
         for (unsigned bitmapX = 0; bitmapX < slot->bitmap.width; bitmapX++)
           blendPixel (colour, *bitmapPtr++, x + bitmapX, y + bitmapY);
         }
-
       }
     curX += slot->advance.x / 64;
     }
@@ -182,12 +181,12 @@ void cLcd::launchUpdateThread (const uint8_t command) {
     // write frameBuffer to lcd ram thread if changed
     while (!mExit) {
       if (mUpdate || (mAutoUpdate && mChanged)) {
-        double time = time_time();
+        double startTime = time_time();
         mChanged = false;
         mUpdate = false;
         writeCommandMultipleData (command, (const uint8_t*)mFrameBuf, getWidth() * getHeight() * 2);
-        double took = time_time() - time;
-        int ms = (int)(took * 1000000);
+        double took = time_time() - startTime;
+        int ms = (int)((time_time() - startTime) * 1000000.0);
         cLog::log (LOGINFO, "update took " + dec(ms));
         }
       gpioDelay (16000);
