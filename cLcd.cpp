@@ -279,8 +279,28 @@ void cLcdSpi::writeCommandMultipleData (const uint8_t command, const uint8_t* da
 //}}}
 
 // cLcdParallel16 - override with littleEndian frameBuf
-//{{{  gpio and masks
-constexpr uint8_t kParallelWriteGpio = 16;
+//{{{  spi J8 header pins, gpio, parallel
+//      3.3v led -  1  2  - 5v
+//     d2  gpio2 -  3  4  - 5v
+//     d3  gpio3 -  5  6  - 0v
+//     d4  gpio4 -  7  8  - gpio14 d14
+//            0v -  9  10 - gpio15 d15
+//     rs gpio17 - 11  12 - gpio18 rd
+// unused gpio27 - 13  14 - 0v cs
+// unused gpio22 - 15  16 - gpio23 unused
+//          3.3v - 17  18 - gpio24 unused
+//    d10 gpio10 - 19  20 - 0v
+//     d9  gpio9 - 21  22 - gpio25 reset
+//    d11 gpio11 - 23  24 - gpio8  d8
+//            0v - 25  26 - gpio7  d7
+//     d0  gpio0 - 27  28 - gpio1  d1
+//     d5  gpio5 - 29  30 - 0v
+//     d6  gpio6 - 31  32 - gpio12 d12
+//    d13 gpio13 - 33  34 - 0v
+// unused gpio19 - 35  36 - gpio16 wr
+// unused gpio26 - 37  38 - gpio20 unused
+//            0v - 39  40 - gpio21 unused
+constexpr uint8_t kParallelWriteReadGpio = 18;
 constexpr uint8_t kParallelRegisterSelectGpio = 17;
 constexpr uint8_t kParallelReadGpio = 18;
 
