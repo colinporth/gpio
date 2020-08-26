@@ -94,7 +94,6 @@ public:
 
 protected:
   void initSpi();
-  void initRegisterSelectPin();
 
   virtual void writeCommand (const uint8_t command) = 0;
   virtual void writeCommandData (const uint8_t command, const uint16_t data) = 0;

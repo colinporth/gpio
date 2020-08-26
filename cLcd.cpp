@@ -204,13 +204,6 @@ cLcdSpi::~cLcdSpi() {
   }
 //}}}
 //{{{
-void cLcdSpi::initRegisterSelectPin() {
-
-  gpioSetMode (kSpiRegisterSelectGpio, PI_OUTPUT);
-  gpioWrite (kSpiRegisterSelectGpio, 1);
-  }
-//}}}
-//{{{
 void cLcdSpi::initSpi() {
 // if mChipEnableGpio then disable autoSpiCe0
 // - can't send multiple SPI's without pulsing CE screwing up dataSequence
@@ -415,8 +408,9 @@ cLcd7735::cLcd7735 (const int rotate) : cLcdSpi (kWidth7735, kHeight7735, rotate
 bool cLcd7735::initialise() {
   if (initResources()) {
     initResetPin();
-    initChipEnablePin();
-    initRegisterSelectPin();
+
+    gpioSetMode (kSpiRegisterSelectGpio, PI_OUTPUT);
+    gpioWrite (kSpiRegisterSelectGpio, 1);
     initSpi();
 
     //{{{  command constexpr
@@ -512,7 +506,9 @@ bool cLcd9320::initialise() {
   if (initResources()) {
     initResetPin();
     initChipEnablePin();
-    initRegisterSelectPin();
+
+    gpioSetMode (kSpiRegisterSelectGpio, PI_OUTPUT);
+    gpioWrite (kSpiRegisterSelectGpio, 1);
     initSpi();
 
     writeCommandData (0xE5, 0x8000); // Set the Vcore voltage
@@ -587,8 +583,9 @@ cLcd9225b::cLcd9225b (const int rotate) : cLcdSpi(kWidth9225b, kHeight9225b, rot
 bool cLcd9225b::initialise() {
   if (initResources()) {
     initResetPin();
-    initChipEnablePin();
-    initRegisterSelectPin();
+
+    gpioSetMode (kSpiRegisterSelectGpio, PI_OUTPUT);
+    gpioWrite (kSpiRegisterSelectGpio, 1);
     initSpi();
 
     writeCommandData (0x01, 0x011C); // set SS and NL bit
