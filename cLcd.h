@@ -18,7 +18,6 @@ constexpr uint16_t kOrange      =  0xFD20;  // 255, 165,   0
 constexpr uint16_t kYellow      =  0xFFE0;  // 255, 255,   0
 constexpr uint16_t kOlive       =  0x7BE0;  // 128, 128,   0
 constexpr uint16_t kGreenYellow =  0xAFE5;  // 173, 255,  47
-
 constexpr uint16_t kBlack       =  0x0000;  //   0,   0,   0
 constexpr uint16_t kLightGrey   =  0xC618;  // 192, 192, 192
 constexpr uint16_t kDarkGrey    =  0x7BEF;  // 128, 128, 128
