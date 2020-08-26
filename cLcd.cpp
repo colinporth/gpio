@@ -185,7 +185,6 @@ void cLcd::launchUpdateThread (const uint8_t command) {
         mChanged = false;
         mUpdate = false;
         writeCommandMultipleData (command, (const uint8_t*)mFrameBuf, getWidth() * getHeight() * 2);
-        double took = time_time() - startTime;
         int ms = (int)((time_time() - startTime) * 1000000.0);
         cLog::log (LOGINFO, "update took " + dec(ms));
         }
@@ -664,9 +663,7 @@ constexpr uint16_t kWidth1289 = 240;
 constexpr uint16_t kHeight1289 = 320;
 cLcd1289::cLcd1289 (const int rotate) : cLcdParallel16(kWidth1289, kHeight1289, rotate) {}
 
-//{{{
 bool cLcd1289::initialise() {
-
   if (initResources()) {
     initResetPin();
 
@@ -762,4 +759,98 @@ bool cLcd1289::initialise() {
   return false;
   }
 //}}}
+//{{{  cLcdD51e5ta7601
+constexpr uint16_t kWidthD51e5ta7601 = 320;
+constexpr uint16_t kHeightD51e5ta7601 = 480;
+cLcdD51e5ta7601::cLcdD51e5ta7601 (const int rotate) : cLcdParallel16(kWidthD51e5ta7601, kHeightD51e5ta7601, rotate) {}
+
+bool cLcdD51e5ta7601::initialise() {
+  if (initResources()) {
+    initResetPin();
+
+    // wr
+    gpioSetMode (kParallelWriteGpio, PI_OUTPUT);
+    gpioWrite (kParallelWriteGpio, 1);
+
+    // rd unused
+    gpioSetMode (kParallelReadGpio, PI_OUTPUT);
+    gpioWrite (kParallelReadGpio, 1);
+
+    // rs
+    gpioSetMode (kParallelRegisterSelectGpio, PI_OUTPUT);
+    gpioWrite (kParallelRegisterSelectGpio, 1);
+
+    // parallel d0-d15
+    for (int i = 0; i < 16; i++)
+      gpioSetMode (i, PI_OUTPUT);
+    gpioWrite_Bits_0_31_Clear (kParallelDataMask);
+
+    // portrait mode with (0,0) being the top left. top is the side opposite the LCD connector.
+    writeCommandData (0x01, 0x023C);
+    writeCommandData (0x02, 0x0100);
+    writeCommandData (0x03, 0x1030);
+    writeCommandData (0x08, 0x0808);
+    writeCommandData (0x0A, 0x0500);
+    writeCommandData (0x0B, 0x0000);
+    writeCommandData (0x0C, 0x0770);
+    writeCommandData (0x0D, 0x0000);
+    writeCommandData (0x0E, 0x0001);
+    writeCommandData (0x11, 0x0406);
+    writeCommandData (0x12, 0x000E);
+    writeCommandData (0x13, 0x0222);
+    writeCommandData (0x14, 0x0015);
+    writeCommandData (0x15, 0x4277);
+    writeCommandData (0x16, 0x0000);
+
+    writeCommandData (0x30, 0x6A50);
+    writeCommandData (0x31, 0x00C9);
+    writeCommandData (0x32, 0xC7BE);
+    writeCommandData (0x33, 0x0003);
+    writeCommandData (0x36, 0x3443);
+    writeCommandData (0x3B, 0x0000);
+    writeCommandData (0x3C, 0x0000);
+    writeCommandData (0x2C, 0x6A50);
+    writeCommandData (0x2D, 0x00C9);
+    writeCommandData (0x2E, 0xC7BE);
+    writeCommandData (0x2F, 0x0003);
+    writeCommandData (0x35, 0x3443);
+    writeCommandData (0x39, 0x0000);
+    writeCommandData (0x3A, 0x0000);
+    writeCommandData (0x28, 0x6A50);
+    writeCommandData (0x29, 0x00C9);
+    writeCommandData (0x2A, 0xC7BE);
+    writeCommandData (0x2B, 0x0003);
+    writeCommandData (0x34, 0x3443);
+    writeCommandData (0x37, 0x0000);
+    writeCommandData (0x38, 0x0000);
+    delayUs (10000);
+
+    writeCommandData (0x12, 0x200E);
+    delayUs (10000);
+
+    writeCommandData (0x12, 0x2003);
+    delayUs (10000);
+
+    writeCommandData (0x44, 0x013F);
+    writeCommandData (0x45, 0x0000);
+    writeCommandData (0x46, 0x01DF);
+    writeCommandData (0x47, 0x0000);
+    writeCommandData (0x20, 0x0000);
+    writeCommandData (0x21, 0x013F);
+    writeCommandData (0x07, 0x0012);
+    delayUs (10000);
+
+    writeCommandData (0x07, 0x0017);
+    delayUs (10000);
+
+    writeCommandData (0x20, 0x0000);
+    writeCommandData (0x21, 0x0000);
+
+    // startup commands
+    launchUpdateThread (0x22);
+    return true;
+    }
+
+  return false;
+  }
 //}}}

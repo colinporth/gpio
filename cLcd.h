@@ -158,3 +158,12 @@ public:
   virtual bool initialise();
   };
 //}}}
+//{{{
+class cLcdD51e5ta7601 : public cLcdParallel16 {
+public:
+  cLcdD51e5ta7601 (const int rotate);
+  virtual ~cLcdD51e5ta7601() {}
+
+  virtual bool initialise();
+  };
+//}}}
