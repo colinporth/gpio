@@ -7,7 +7,7 @@
 #include <thread>
 #include <byteswap.h>
 
-#include <pigpio.h>
+#include "pigpio/pigpio.h"
 
 #include "../shared/utils/utils.h"
 #include "../shared/utils/cLog.h"
@@ -24,16 +24,8 @@ static FT_Library mLibrary;
 static FT_Face mFace;
 //}}}
 
-// J8 header pins
-// - 3.3v                                     J8 pin17
-constexpr uint8_t kDataCommandGpio  = 24;  // J8 pin18
-//constexpr uint8_t kBackLightGpio  = 24;  // J8 pin18
-// - SPI0 - MOSI                              J8 pin19
-// - 0v                                       J8 pin20
-// - SPI0 - SCLK                              J8 pin21
-constexpr uint8_t kResetGpio = 25;         // J8 pin22
-// - SPI0 - CE0                               J8 pin24
-constexpr uint8_t kSpiCe0Gpio = 8;         // J8 pin24
+// gpio/pin common to spi/parallel
+constexpr uint8_t kResetGpio = 25;
 
 // cLcd - public
 //{{{
@@ -160,15 +152,13 @@ bool cLcd::initResources() {
 //{{{
 void cLcd::initResetPin() {
 
-  if (mResetGpio != 0xFF) {
-    gpioSetMode (mResetGpio, PI_OUTPUT);
+  gpioSetMode (kResetGpio, PI_OUTPUT);
 
-    gpioWrite (mResetGpio, 0);
-    gpioDelay (10000);
+  gpioWrite (kResetGpio, 0);
+  gpioDelay (10000);
 
-    gpioWrite (mResetGpio, 1);
-    gpioDelay (120000);
-    }
+  gpioWrite (kResetGpio, 1);
+  gpioDelay (120000);
   }
 //}}}
 //{{{
@@ -177,15 +167,6 @@ void cLcd::initChipEnablePin() {
   if (mChipEnableGpio != 0xFF) {
     gpioSetMode (mChipEnableGpio, PI_OUTPUT);
     gpioWrite (mChipEnableGpio, 1);
-    }
-  }
-//}}}
-//{{{
-void cLcd::initDataCommandPin() {
-
-  if (mDataCommandGpio != 0xFF) {
-    gpioSetMode (mDataCommandGpio, PI_OUTPUT);
-    gpioWrite (mDataCommandGpio, 1);
     }
   }
 //}}}
@@ -207,9 +188,28 @@ void cLcd::launchUpdateThread (const uint8_t command) {
 //}}}
 
 // cLcdSpi - uses bigEndian frameBuf
+//{{{  spi J8 header pins
+// 3.3v                   pin17
+// registerSelect gpio24        pin18
+// backLight gpio24             pin18
+// SPI0 - MOSI            pin19
+// 0v                           pin20
+// SPI0 - SCLK            pin21
+// reset gpio25                 pin22
+// SPI0 - CE0                   pin24
+//}}}
+constexpr uint8_t kSpiCe0Gpio = 8;
+constexpr uint8_t kSpiRegisterSelectGpio  = 24;
 //{{{
 cLcdSpi::~cLcdSpi() {
   spiClose (mSpiHandle);
+  }
+//}}}
+//{{{
+void cLcdSpi::initRegisterSelectPin() {
+
+  gpioSetMode (kSpiRegisterSelectGpio, PI_OUTPUT);
+  gpioWrite (kSpiRegisterSelectGpio, 1);
   }
 //}}}
 //{{{
@@ -230,9 +230,9 @@ void cLcdSpi::writeCommand (const uint8_t command) {
     gpioWrite (mChipEnableGpio, 1);
     }
   else {
-    gpioWrite (mDataCommandGpio, 0);
+    gpioWrite (kSpiRegisterSelectGpio, 0);
     spiWrite (mSpiHandle, (char*)(&command), 1);
-    gpioWrite (mDataCommandGpio, 1);
+    gpioWrite (kSpiRegisterSelectGpio, 1);
     }
 
   }
@@ -282,6 +282,12 @@ void cLcdSpi::writeCommandMultipleData (const uint8_t command, const uint8_t* da
 //}}}
 
 // cLcdParallel16 - override with littleEndian frameBuf
+constexpr uint8_t kParallelWrGpio = 16;
+constexpr uint8_t kParallelRegisterSelectGpio = 17;
+constexpr uint8_t kParallelRdGpio = 18;
+constexpr uint32_t kParallelDataMask =  0xFFFF;
+constexpr uint32_t kParallelWrMask = 1 << kParallelWrGpio;
+constexpr uint32_t kParallelWrClrMask = kParallelWrMask | kParallelDataMask;
 //{{{
 void cLcdParallel16::rect (const uint16_t colour, const int xorg, const int yorg, const int xlen, const int ylen) {
 
@@ -339,13 +345,13 @@ void cLcdParallel16::blendPixel (const uint16_t colour, const uint8_t alpha, con
 //{{{
 void cLcdParallel16::writeCommand (const uint8_t command) {
 
-  gpioWrite (mDataCommandGpio, 0);
+  gpioWrite (kParallelRegisterSelectGpio, 0);
 
-  gpioWrite_Bits_0_31_Set (command);                 // set hi data bits
-  gpioWrite_Bits_0_31_Clear (~command & mWrClrMask); // clear lo data bits + kWrGpio bit lo
-  gpioWrite (mWrGpio, 1);                            // set kWrGpio hi to complete write
+  gpioWrite_Bits_0_31_Clear (~command & kParallelWrClrMask); // clear lo data bits + kParallelWrGpio bit lo
+  gpioWrite_Bits_0_31_Set (command);                         // set hi data bits
+  gpioWrite_Bits_0_31_Set (kParallelWrMask);              // write on kParallelWrGpio rising edge
 
-  gpioWrite (mDataCommandGpio, 1);
+  gpioWrite (kParallelRegisterSelectGpio, 1);
   }
 //}}}
 //{{{
@@ -353,9 +359,9 @@ void cLcdParallel16::writeCommandData (const uint8_t command, const uint16_t dat
 
   writeCommand (command);
 
-  gpioWrite_Bits_0_31_Set (data);                 // set hi data bits
-  gpioWrite_Bits_0_31_Clear (~data & mWrClrMask); // clear lo data bits + kWrGpio bit lo
-  gpioWrite (mWrGpio, 1);                         // set kWrGpio hi to complete write
+  gpioWrite_Bits_0_31_Clear (~data & kParallelWrClrMask); // clear lo data bits + kParallelWrGpio bit lo
+  gpioWrite_Bits_0_31_Set (data);                         // set hi data bits
+  gpioWrite_Bits_0_31_Set (kParallelWrMask);              // write on kParallelWrGpio rising edge
   }
 //}}}
 //{{{
@@ -367,10 +373,11 @@ void cLcdParallel16::writeCommandMultipleData (const uint8_t command, const uint
   uint16_t* ptr = (uint16_t*)dataPtr;
   uint16_t* ptrEnd = (uint16_t*)dataPtr + len/2;
 
-  while (ptr++ < ptrEnd) {
-    gpioWrite_Bits_0_31_Set (*ptr);                 // set hi data bits
-    gpioWrite_Bits_0_31_Clear (~*ptr & mWrClrMask); // clear lo data bits + kWrGpio bit lo
-    gpioWrite (mWrGpio, 1);                         // set kWrGpio hi to complete write
+  while (ptr < ptrEnd) {
+    uint16_t data = *ptr++;
+    fastGpioWrite_Bits_0_31_Clear (~data & kParallelWrClrMask); // clear lo data bits + kParallelWrGpio bit lo
+    fastGpioWrite_Bits_0_31_Set (data);                        // set hi data bits
+    fastGpioWrite_Bits_0_31_Set (kParallelWrMask);              // write on kParallelWrGpio rising edge
     }
   }
 //}}}
@@ -381,14 +388,13 @@ constexpr uint16_t kWidth7735 = 128;
 constexpr uint16_t kHeight7735 = 160;
 constexpr static const int kSpiClock7735 = 24000000;
 
-cLcd7735::cLcd7735() : cLcdSpi (kWidth7735, kHeight7735, kSpiClock7735, true,
-                                kResetGpio, kDataCommandGpio, 0xFF) {}
+cLcd7735::cLcd7735() : cLcdSpi (kWidth7735, kHeight7735, kSpiClock7735, true, 0xFF, false) {}
 
 bool cLcd7735::initialise() {
   if (initResources()) {
     initResetPin();
     initChipEnablePin();
-    initDataCommandPin();
+    initRegisterSelectPin();
     initSpi();
 
     //{{{  command constexpr
@@ -478,14 +484,13 @@ constexpr uint16_t kWidth9320 = 240;
 constexpr uint16_t kHeight9320 = 320;
 constexpr int kSpiClock9320 = 24000000;
 
-cLcd9320::cLcd9320() : cLcdSpi(kWidth9320, kHeight9320, kSpiClock9320, false,
-                               kResetGpio, 0xFF, kSpiCe0Gpio) {}
+cLcd9320::cLcd9320() : cLcdSpi(kWidth9320, kHeight9320, kSpiClock9320, false, kSpiCe0Gpio, false) {}
 
 bool cLcd9320::initialise() {
   if (initResources()) {
     initResetPin();
     initChipEnablePin();
-    initDataCommandPin();
+    initRegisterSelectPin();
     initSpi();
 
     writeCommandData (0xE5, 0x8000); // Set the Vcore voltage
@@ -555,14 +560,13 @@ constexpr uint16_t kWidth9225b = 176;
 constexpr uint16_t kHeight9225b = 220;
 constexpr int kSpiClock9225b = 16000000;
 
-cLcd9225b::cLcd9225b() : cLcdSpi(kWidth9225b, kHeight9225b, kSpiClock9225b, true,
-                                 kResetGpio, kDataCommandGpio, 0xFF) {}
+cLcd9225b::cLcd9225b() : cLcdSpi(kWidth9225b, kHeight9225b, kSpiClock9225b, true, 0xFF, true) {}
 
 bool cLcd9225b::initialise() {
   if (initResources()) {
     initResetPin();
     initChipEnablePin();
-    initDataCommandPin();
+    initRegisterSelectPin();
     initSpi();
 
     writeCommandData (0x01, 0x011C); // set SS and NL bit
@@ -629,36 +633,30 @@ bool cLcd9225b::initialise() {
   }
 //}}}
 //{{{  cLcd1289
-constexpr uint8_t kWrGpio = 16;
-constexpr uint8_t kRsGpio = 17;
-constexpr uint8_t kRdGpio = 18;
-
 constexpr uint16_t kWidth1289 = 240;
 constexpr uint16_t kHeight1289 = 320;
-cLcd1289::cLcd1289() : cLcdParallel16(kWidth1289, kHeight1289, kResetGpio, kRsGpio, 0xFF, kWrGpio, kRdGpio) {}
+cLcd1289::cLcd1289() : cLcdParallel16(kWidth1289, kHeight1289) {}
 
 bool cLcd1289::initialise() {
   if (initResources()) {
     initResetPin();
-    initDataCommandPin();
 
     // wr
-    if (mWrGpio != 0xFF) {
-      gpioSetMode (mWrGpio, PI_OUTPUT);
-      gpioWrite (mWrGpio, 1);
-      }
+    gpioSetMode (kParallelWrGpio, PI_OUTPUT);
+    gpioWrite (kParallelWrGpio, 1);
 
     // rd unused
-    if (mRdGpio != 0xFF) {
-      gpioSetMode (mRdGpio, PI_OUTPUT);
-      gpioWrite (mRdGpio, 1);
-      }
+    gpioSetMode (kParallelRdGpio, PI_OUTPUT);
+    gpioWrite (kParallelRdGpio, 1);
+
+    // rs
+    gpioSetMode (kParallelRegisterSelectGpio, PI_OUTPUT);
+    gpioWrite (kParallelRegisterSelectGpio, 1);
 
     // parallel d0-15
-    for (int i = 0; i < 16; i++) {
+    for (int i = 0; i < 16; i++)
       gpioSetMode (i, PI_OUTPUT);
-      gpioWrite (i, 0);
-      }
+    gpioWrite_Bits_0_31_Clear (kParallelDataMask);
 
     // startup commands
     writeCommandData (0x00, 0x0001); // SSD1289_REG_OSCILLATION

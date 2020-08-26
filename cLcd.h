@@ -26,11 +26,8 @@ constexpr uint16_t kWhite       =  0xFFFF;  // 255, 255, 255
 
 class cLcd {
 public:
-  cLcd (const uint16_t width, const uint16_t height,
-        const uint8_t resetGpio, const uint8_t dataCommandGpio, const uint8_t chipEnableGpio)
-    : mDataCommandGpio(dataCommandGpio), mChipEnableGpio(chipEnableGpio),
-      mUseSequence((dataCommandGpio == 0xFF) && (chipEnableGpio != 0xFF)),
-      mWidth(width), mHeight(height), mResetGpio(resetGpio) {}
+  cLcd (const uint16_t width, const uint16_t height, const uint8_t chipEnableGpio, const bool useSequence)
+    : mChipEnableGpio(chipEnableGpio), mUseSequence(useSequence), mWidth(width), mHeight(height) {}
 
   virtual ~cLcd();
 
@@ -55,7 +52,6 @@ protected:
   bool initResources();
   void initResetPin();
   void initChipEnablePin();
-  void initDataCommandPin();
 
   virtual void writeCommand (const uint8_t command) = 0;
   virtual void writeCommandData (const uint8_t command, const uint16_t data) = 0;
@@ -63,7 +59,6 @@ protected:
 
   void launchUpdateThread (const uint8_t command);
 
-  const uint8_t mDataCommandGpio;
   const uint8_t mChipEnableGpio;
   const bool mUseSequence;
 
@@ -79,8 +74,6 @@ private:
 
   bool mUpdate = false;
   bool mAutoUpdate = false;
-
-  const uint8_t mResetGpio;
 //}}}
   };
 
@@ -88,14 +81,14 @@ private:
 class cLcdSpi : public cLcd {
 public:
   cLcdSpi (const uint16_t width, const uint16_t height,
-           const int spiClock, const bool spiMode0,
-           const uint8_t resetGpio, const uint8_t dataCommandGpio, const uint8_t chipEnableGpio)
-    : cLcd (width, height, resetGpio, dataCommandGpio, chipEnableGpio), mSpiClock(spiClock), mSpiMode0(spiMode0) {}
+           const int spiClock, const bool spiMode0, const uint8_t chipEnableGpio, const bool useSequence)
+    : cLcd (width, height, chipEnableGpio, useSequence), mSpiClock(spiClock), mSpiMode0(spiMode0) {}
 
   virtual ~cLcdSpi();
 
 protected:
   void initSpi();
+  void initRegisterSelectPin();
 
   virtual void writeCommand (const uint8_t command) = 0;
   virtual void writeCommandData (const uint8_t command, const uint16_t data) = 0;
@@ -110,11 +103,7 @@ private:
 //{{{
 class cLcdParallel16 : public cLcd {
 public:
-  cLcdParallel16 (const uint16_t width, const uint16_t height,
-                  const uint8_t resetGpio, const uint8_t dataCommandGpio, const uint8_t chipEnableGpio,
-                  const uint8_t wrGpio, const uint8_t rdGpio)
-    : cLcd (width, height, resetGpio, dataCommandGpio, chipEnableGpio),
-      mWrGpio(wrGpio), mWrClrMask ((1 << wrGpio) | 0xFFFF), mRdGpio(rdGpio) {}
+  cLcdParallel16 (const uint16_t width, const uint16_t height) : cLcd (width, height, 0xFF, false) {}
 
   virtual ~cLcdParallel16() {}
 
@@ -126,11 +115,6 @@ protected:
   virtual void writeCommand (const uint8_t command);
   virtual void writeCommandData (const uint8_t command, const uint16_t data);
   virtual void writeCommandMultipleData (const uint8_t command, const uint8_t* data, const int len);
-
-protected:
-  const uint8_t mWrGpio;
-  const uint32_t mWrClrMask;
-  const uint8_t mRdGpio;
   };
 //}}}
 

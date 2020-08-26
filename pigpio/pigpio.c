@@ -154,8 +154,8 @@
 #define MILLION  1000000
 #define BILLION  1000000000
 
-#define BANK (gpio >> 5)
-#define BIT  (1 << (gpio & 0x1F))
+#define BANK (gpio>>5)
+#define BIT  (1<<(gpio&0x1F))
 
 #ifdef EMBEDDED_IN_VM
   #define DBG(level, format, arg...)
@@ -164,10 +164,13 @@
 #endif
 
 //{{{
-#define DO_DBG(level, format, arg...) { \
-  if ((gpioCfg.dbgLevel >= level) && (!(gpioCfg.internals & PI_CFG_NOSIGHANDLER))) \
-    fprintf(stderr, "%s %s: " format "\n" , myTimeStamp(), __FUNCTION__ , ## arg); \
-  }
+#define DO_DBG(level, format, arg...)                              \
+   {                                                               \
+      if ((gpioCfg.dbgLevel >= level) &&                           \
+         (!(gpioCfg.internals & PI_CFG_NOSIGHANDLER)))             \
+         fprintf(stderr, "%s %s: " format "\n" ,                   \
+            myTimeStamp(), __FUNCTION__ , ## arg);                 \
+   }
 //}}}
 
 #ifndef DISABLE_SER_CHECK_INITED
@@ -178,12 +181,10 @@
 
 //{{{
 #define CHECK_INITED  \
-  do { \
-    if (!libInitialised) { \
-      DBG(DBG_ALWAYS, "pigpio uninitialised, call gpioInitialise()"); \
-      return PI_NOT_INITIALISED; \
-      } \
-    } while (0)
+  if (!libInitialised) {  \
+    DBG(DBG_ALWAYS, "pigpio uninitialised, call gpioInitialise()");  \
+    return PI_NOT_INITIALISED;  \
+    }
 //}}}
 //{{{
 #define CHECK_INITED_RET_NULL_PTR                                  \
@@ -9062,6 +9063,8 @@ int gpioWrite_Bits_32_53_Set (uint32_t bits) {
   return 0;
   }
 //}}}
+void fastGpioWrite_Bits_0_31_Clear (uint32_t bits) { *(gpioReg + GPCLR0) = bits; }
+void fastGpioWrite_Bits_0_31_Set (uint32_t bits) { *(gpioReg + GPSET0) = bits; }
 
 //{{{
 int gpioPWM (unsigned gpio, unsigned val)
