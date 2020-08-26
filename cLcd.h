@@ -28,7 +28,6 @@ class cLcd {
 public:
   cLcd (const uint16_t width, const uint16_t height, const uint8_t chipEnableGpio, const bool useSequence)
     : mChipEnableGpio(chipEnableGpio), mUseSequence(useSequence), mWidth(width), mHeight(height) {}
-
   virtual ~cLcd();
 
   virtual bool initialise() = 0;
