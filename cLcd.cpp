@@ -130,6 +130,11 @@ void cLcd::delayUs (const int us) {
   gpioDelay (us);
   }
 //}}}
+//{{{
+double cLcd::time() {
+  return time_time();
+  }
+//}}}
 
 // cLcd - protected
 //{{{
@@ -177,9 +182,13 @@ void cLcd::launchUpdateThread (const uint8_t command) {
     // write frameBuffer to lcd ram thread if changed
     while (!mExit) {
       if (mUpdate || (mAutoUpdate && mChanged)) {
+        double time = time_time();
         mChanged = false;
         mUpdate = false;
         writeCommandMultipleData (command, (const uint8_t*)mFrameBuf, getWidth() * getHeight() * 2);
+        double took = time_time() - time;
+        int ms = (int)(took * 1000000);
+        cLog::log (LOGINFO, "update took " + dec(ms));
         }
       gpioDelay (16000);
       }

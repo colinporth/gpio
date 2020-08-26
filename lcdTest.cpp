@@ -32,6 +32,7 @@ int main (int numArgs, char* args[]) {
 
     int height = 8;
     while (height++ < lcd->getHeight()) {
+      double startTime = lcd->time();
       int x = 0;
       int y = 0;
       lcd->clear (kMagenta);
@@ -46,6 +47,10 @@ int main (int numArgs, char* args[]) {
         }
       lcd->text (kYellow, 0,0, 20, "Hello Colin");
       lcd->update();
+      double took = lcd->time() - startTime;
+      int ms = (int)(took * 1000000);
+      cLog::log (LOGINFO, "test took " + dec(ms));
+
       lcd->delayUs (40000);
       }
     }

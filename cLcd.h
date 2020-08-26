@@ -49,6 +49,7 @@ public:
   void update() { mUpdate = true; }
   void setAutoUpdate() { mAutoUpdate = true; }
   void delayUs (const int us);
+  double time();
 
 //{{{
 protected:
