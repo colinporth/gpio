@@ -26,11 +26,13 @@ constexpr uint16_t kWhite       =  0xFFFF;  // 255, 255, 255
 
 class cLcd {
 public:
-  cLcd (const uint16_t width, const uint16_t height, const uint8_t chipEnableGpio, const bool useSequence)
-    : mChipEnableGpio(chipEnableGpio), mUseSequence(useSequence), mWidth(width), mHeight(height) {}
+  cLcd (const uint16_t width, const uint16_t height, const int rotate, const uint8_t chipEnableGpio, const bool useSequence)
+    : mRotate(rotate), mChipEnableGpio(chipEnableGpio), mUseSequence(useSequence),
+      mWidth(((rotate == 90) || (rotate == 270)) ? height : width),
+      mHeight(((rotate == 90) || (rotate == 270)) ? width : height) {}
   virtual ~cLcd();
 
-  virtual bool initialise (const int rotate) = 0;
+  virtual bool initialise() = 0;
 
   constexpr uint16_t getWidth() { return mWidth; }
   constexpr uint16_t getHeight() { return mHeight; }
@@ -60,6 +62,7 @@ protected:
 
   void launchUpdateThread (const uint8_t command);
 
+  int mRotate = 0;
   const uint8_t mChipEnableGpio;
   const bool mUseSequence;
 
@@ -75,15 +78,17 @@ private:
 
   bool mUpdate = false;
   bool mAutoUpdate = false;
+  bool mExit = false;
+  bool mExited = false;
 //}}}
   };
 
 //{{{
 class cLcdSpi : public cLcd {
 public:
-  cLcdSpi (const uint16_t width, const uint16_t height,
+  cLcdSpi (const uint16_t width, const uint16_t height, const int rotate,
            const int spiClock, const bool spiMode0, const uint8_t chipEnableGpio, const bool useSequence)
-    : cLcd (width, height, chipEnableGpio, useSequence), mSpiClock(spiClock), mSpiMode0(spiMode0) {}
+    : cLcd (width, height, rotate, chipEnableGpio, useSequence), mSpiClock(spiClock), mSpiMode0(spiMode0) {}
 
   virtual ~cLcdSpi();
 
@@ -104,7 +109,8 @@ private:
 //{{{
 class cLcdParallel16 : public cLcd {
 public:
-  cLcdParallel16 (const uint16_t width, const uint16_t height) : cLcd (width, height, 0xFF, false) {}
+  cLcdParallel16 (const uint16_t width, const uint16_t height, const int rotate)
+    : cLcd (width, height, rotate, 0xFF, false) {}
 
   virtual ~cLcdParallel16() {}
 
@@ -122,33 +128,33 @@ protected:
 //{{{
 class cLcd7735 : public cLcdSpi {
 public:
-  cLcd7735();
+  cLcd7735 (const int rotate);
   virtual ~cLcd7735() {}
-  virtual bool initialise (const int rotate);
+  virtual bool initialise();
   };
 //}}}
 //{{{
 class cLcd9320 : public cLcdSpi {
 public:
-  cLcd9320();
+  cLcd9320 (const int rotate);
   virtual ~cLcd9320() {}
-  virtual bool initialise (const int rotate);
+  virtual bool initialise();
   };
 //}}}
 //{{{
 class cLcd9225b : public cLcdSpi {
 public:
-  cLcd9225b();
+  cLcd9225b (const int rotate);
   virtual ~cLcd9225b() {}
-  virtual bool initialise (const int rotate);
+  virtual bool initialise();
   };
 //}}}
 //{{{
 class cLcd1289 : public cLcdParallel16 {
 public:
-  cLcd1289();
+  cLcd1289 (const int rotate);
   virtual ~cLcd1289() {}
 
-  virtual bool initialise (const int rotate);
+  virtual bool initialise();
   };
 //}}}

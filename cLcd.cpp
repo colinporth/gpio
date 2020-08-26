@@ -175,7 +175,7 @@ void cLcd::launchUpdateThread (const uint8_t command) {
 
   thread ([=]() {
     // write frameBuffer to lcd ram thread if changed
-    while (true) {
+    while (!mExit) {
       if (mUpdate || (mAutoUpdate && mChanged)) {
         mChanged = false;
         mUpdate = false;
@@ -183,6 +183,7 @@ void cLcd::launchUpdateThread (const uint8_t command) {
         }
       gpioDelay (16000);
       }
+    mExited = true;
     } ).detach();
   }
 //}}}
@@ -409,9 +410,9 @@ constexpr uint16_t kWidth7735 = 128;
 constexpr uint16_t kHeight7735 = 160;
 constexpr static const int kSpiClock7735 = 24000000;
 
-cLcd7735::cLcd7735() : cLcdSpi (kWidth7735, kHeight7735, kSpiClock7735, true, 0xFF, false) {}
+cLcd7735::cLcd7735 (const int rotate) : cLcdSpi (kWidth7735, kHeight7735, rotate, kSpiClock7735, true, 0xFF, false) {}
 
-bool cLcd7735::initialise (const int rotate) {
+bool cLcd7735::initialise() {
   if (initResources()) {
     initResetPin();
     initChipEnablePin();
@@ -505,9 +506,9 @@ constexpr uint16_t kWidth9320 = 240;
 constexpr uint16_t kHeight9320 = 320;
 constexpr int kSpiClock9320 = 24000000;
 
-cLcd9320::cLcd9320() : cLcdSpi(kWidth9320, kHeight9320, kSpiClock9320, false, kSpiCe0Gpio, false) {}
+cLcd9320::cLcd9320 (const int rotate) : cLcdSpi(kWidth9320, kHeight9320, rotate, kSpiClock9320, false, kSpiCe0Gpio, false) {}
 
-bool cLcd9320::initialise (const int rotate) {
+bool cLcd9320::initialise() {
   if (initResources()) {
     initResetPin();
     initChipEnablePin();
@@ -581,9 +582,9 @@ constexpr uint16_t kWidth9225b = 176;
 constexpr uint16_t kHeight9225b = 220;
 constexpr int kSpiClock9225b = 16000000;
 
-cLcd9225b::cLcd9225b() : cLcdSpi(kWidth9225b, kHeight9225b, kSpiClock9225b, true, 0xFF, true) {}
+cLcd9225b::cLcd9225b (const int rotate) : cLcdSpi(kWidth9225b, kHeight9225b, rotate, kSpiClock9225b, true, 0xFF, true) {}
 
-bool cLcd9225b::initialise (const int rotate) {
+bool cLcd9225b::initialise() {
   if (initResources()) {
     initResetPin();
     initChipEnablePin();
@@ -656,10 +657,10 @@ bool cLcd9225b::initialise (const int rotate) {
 //{{{  cLcd1289
 constexpr uint16_t kWidth1289 = 240;
 constexpr uint16_t kHeight1289 = 320;
-cLcd1289::cLcd1289() : cLcdParallel16(kWidth1289, kHeight1289) {}
+cLcd1289::cLcd1289 (const int rotate) : cLcdParallel16(kWidth1289, kHeight1289, rotate) {}
 
 //{{{
-bool cLcd1289::initialise (const int rotate) {
+bool cLcd1289::initialise() {
 
   if (initResources()) {
     initResetPin();
@@ -718,38 +719,34 @@ bool cLcd1289::initialise (const int rotate) {
     writeCommandData (0x48, 0x0000); // SSD1289_REG_FIRST_WIN_START
     writeCommandData (0x49, 0x013F); // SSD1289_REG_FIRST_WIN_END
 
-    writeCommandData (0x44, ((getWidth()-1) << 8) | 0); // SSD1289_REG_H_RAM_ADR_POS
-    writeCommandData (0x45, 0x0000); // SSD1289_REG_V_RAM_ADR_START
-    writeCommandData (0x46, getHeight()-1);  // SSD1289_REG_V_RAM_ADR_END
+    writeCommandData (0x44, ((kWidth1289-1) << 8) | 0); // SSD1289_REG_H_RAM_ADR_POS
+    writeCommandData (0x45, 0x0000);                    // SSD1289_REG_V_RAM_ADR_START
+    writeCommandData (0x46, kHeight1289-1);             // SSD1289_REG_V_RAM_ADR_END
 
-    int xs = 0;
-    int ys = 0;
-    int xres = 240;
-    int yres = 320;
-
-    switch (rotate) {
-      // 0x11 REG_ENTRY_MODE
-      // 0x4E GDDRAM X address counter
-      // 0x4F GDDRAM Y address counter
-      case 0:
-        writeCommandData (0x4e, xs);
-        writeCommandData (0x4f, ys);
-        writeCommandData (0x11, 0x6040 | 0b110000);
+    int xstart = 0;
+    int ystart = 0;
+    int xres = kWidth1289-1;
+    int yres = kHeight1289-1;
+    switch (mRotate) {
+      case 90:
+        writeCommandData (0x11, 0x6040 | 0b011000); // 0x11 REG_ENTRY_MODE
+        writeCommandData (0x4e, ystart);            // 0x4E GDDRAM X address counter
+        writeCommandData (0x4f, xres - xstart);     // 0x4F GDDRAM Y address counter
         break;
       case 180:
-        writeCommandData (0x4e, xres - 1 - xs);
-        writeCommandData (0x4f, yres - 1 - ys);
-        writeCommandData (0x11, 0x6040 | 0b000000);
+        writeCommandData (0x11, 0x6040 | 0b000000); // 0x11 REG_ENTRY_MODE
+        writeCommandData (0x4e, xres - xstart);     // 0x4E GDDRAM X address counter
+        writeCommandData (0x4f, yres - ystart);     // 0x4F GDDRAM Y address counter
         break;
       case 270:
-        writeCommandData (0x4e, yres - 1 - ys);
-        writeCommandData (0x4f, xs);
-        writeCommandData (0x11, 0x6040 | 0b101000);
+        writeCommandData (0x11, 0x6040 | 0b101000); // 0x11 REG_ENTRY_MODE
+        writeCommandData (0x4e, yres - ystart);     // 0x4E GDDRAM X address counter
+        writeCommandData (0x4f, xstart);            // 0x4F GDDRAM Y address counter
         break;
-      case 90:
-        writeCommandData (0x4e, ys);
-        writeCommandData (0x4f, xres - 1 - xs);
-        writeCommandData (0x11, 0x6040 | 0b011000);
+      default:
+        writeCommandData (0x11, 0x6040 | 0b110000); // 0x11 REG_ENTRY_MODE
+        writeCommandData (0x4e, xstart);            // 0x4E GDDRAM X address counter
+        writeCommandData (0x4f, ystart);            // 0x4F GDDRAM Y address counter
         break;
       }
 

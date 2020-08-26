@@ -1,6 +1,7 @@
 // lcdTest.cpp
 #include <cstdint>
 #include <string>
+#include <vector>
 
 #include "cLcd.h"
 
@@ -9,15 +10,19 @@
 
 using namespace std;
 
-int main() {
+int main (int numArgs, char* args[]) {
+
+  vector <string> argStrings;
+  for (int i = 1; i < numArgs; i++)
+    argStrings.push_back (args[i]);
 
   cLog::init (LOGINFO, false, "", "gpio");
 
-  int rotate = 0;
-  while (true) {
-    cLcd* lcd = new cLcd1289();
-    lcd->initialise (rotate);
+  int rotate = argStrings.empty() ? 0 : stoi (argStrings[0]);
+  cLcd* lcd = new cLcd1289 (rotate);
+  lcd->initialise();
 
+  while (true) {
     for (int i = 0; i < 100; i++) {
       lcd->clear (kOrange);
       lcd->text (kWhite, 0,0, 100, dec(i,3));
@@ -43,9 +48,6 @@ int main() {
       lcd->update();
       lcd->delayUs (40000);
       }
-
-    rotate = (rotate + 90) % 360;
-    delete (lcd);
     }
 
   return 0;
