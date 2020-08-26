@@ -188,7 +188,7 @@ void cLcd::launchUpdateThread (const uint8_t command) {
 //}}}
 
 // cLcdSpi - uses bigEndian frameBuf
-//{{{  spi J8 header pins, gpio, constexpr 
+//{{{  spi J8 header pins, gpio, constexpr
 //      3.3v - 17  18 - gpio24 - registerSelect
 // SPI0 MOSI - 19  20 - 0v
 // SPI0 SCLK - 21  22 - gpio25 - reset
@@ -301,7 +301,7 @@ void cLcdSpi::writeCommandMultipleData (const uint8_t command, const uint8_t* da
 // unused gpio26 - 37  38 - gpio20 unused
 //            0v - 39  40 - gpio21 unused
 
-constexpr uint8_t kParallelWriteReadGpio = 16;
+constexpr uint8_t kParallelWriteGpio = 16;
 constexpr uint8_t kParallelRegisterSelectGpio = 17;
 constexpr uint8_t kParallelReadGpio = 18;
 
