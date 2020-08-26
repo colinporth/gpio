@@ -179,6 +179,7 @@ void cLcd::launchUpdateThread (const uint8_t command) {
 
   thread ([=]() {
     // write frameBuffer to lcd ram thread if changed
+    cLog::setThreadName ("upda");
     while (!mExit) {
       if (mUpdate || (mAutoUpdate && mChanged)) {
         double startTime = time_time();
@@ -186,7 +187,7 @@ void cLcd::launchUpdateThread (const uint8_t command) {
         mUpdate = false;
         writeCommandMultipleData (command, (const uint8_t*)mFrameBuf, getWidth() * getHeight() * 2);
         int ms = (int)((time_time() - startTime) * 1000000.0);
-        cLog::log (LOGINFO, "update took " + dec(ms));
+        cLog::log (LOGINFO, "took " + dec(ms));
         }
       gpioDelay (16000);
       }
@@ -371,6 +372,7 @@ void cLcdParallel16::writeCommand (const uint8_t command) {
 
   gpioWrite_Bits_0_31_Clear (~command & kParallelWriteClrMask); // clear lo data bits + kParallelWrGpio bit lo
   gpioWrite_Bits_0_31_Set (command);                            // set hi data bits
+  gpioWrite_Bits_0_31_Set (command);                            // set hi data bits
   gpioWrite_Bits_0_31_Set (kParallelWriteMask);                 // write on kParallelWrGpio rising edge
 
   gpioWrite (kParallelRegisterSelectGpio, 1);
@@ -382,6 +384,7 @@ void cLcdParallel16::writeCommandData (const uint8_t command, const uint16_t dat
   writeCommand (command);
 
   gpioWrite_Bits_0_31_Clear (~data & kParallelWriteClrMask); // clear lo data bits + kParallelWrGpio bit lo
+  gpioWrite_Bits_0_31_Set (data);                            // set hi data bits
   gpioWrite_Bits_0_31_Set (data);                            // set hi data bits
   gpioWrite_Bits_0_31_Set (kParallelWriteMask);              // write on kParallelWrGpio rising edge
   }
@@ -398,6 +401,8 @@ void cLcdParallel16::writeCommandMultipleData (const uint8_t command, const uint
   while (ptr < ptrEnd) {
     uint16_t data = *ptr++;
     fastGpioWrite_Bits_0_31_Clear (~data & kParallelWriteClrMask); // clear lo data bits + kParallelWrGpio bit lo
+    fastGpioWrite_Bits_0_31_Set (data);                            // set hi data bits
+    fastGpioWrite_Bits_0_31_Set (data);                            // set hi data bits
     fastGpioWrite_Bits_0_31_Set (data);                            // set hi data bits
     fastGpioWrite_Bits_0_31_Set (kParallelWriteMask);              // write on kParallelWrGpio rising edge
     }

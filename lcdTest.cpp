@@ -30,7 +30,7 @@ int main (int numArgs, char* args[]) {
       lcd->update();
 
       int ms = (int)((lcd->time() - startTime) * 1000000.f);
-      cLog::log (LOGINFO, "test took " + dec(ms));
+      cLog::log (LOGINFO, "took " + dec(ms));
 
       lcd->delayUs (40000);
       }
@@ -54,7 +54,7 @@ int main (int numArgs, char* args[]) {
       lcd->update();
 
       int ms = (int)((lcd->time() - startTime) * 1000000.0);
-      cLog::log (LOGINFO, "test took " + dec(ms));
+      cLog::log (LOGINFO, "took " + dec(ms));
 
       lcd->delayUs (40000);
       }
