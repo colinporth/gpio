@@ -84,7 +84,7 @@ int main (int numArgs, char* args[]) {
   cLog::log (LOGINFO, "Primary display is %d x %d", display_info.width, display_info.height);
 
   uint32_t image_prt;
-  DISPMANX_RESOURCE_HANDLE_T screen = vc_dispmanx_resource_create (VC_IMAGE_RGB565, 320, 480, &image_prt);
+  DISPMANX_RESOURCE_HANDLE_T screen = vc_dispmanx_resource_create (VC_IMAGE_RGB565, 480, 320, &image_prt);
   if (!screen) {
     //{{{  error return
     cLog::log (LOGERROR, "vc_dispmanx_resource_create failed");
@@ -92,22 +92,45 @@ int main (int numArgs, char* args[]) {
     }
     //}}}
 
+  VC_RECT_T rect1;
+  vc_dispmanx_rect_set (&rect1, 0, 0, 480, 320);
+  char* screenBuf = (char*)malloc (480 * 320 * 2);
+
   lcd->clear (kOrange);
 
-  VC_RECT_T rect1;
-  vc_dispmanx_rect_set (&rect1, 0, 0, 320, 480);
-  char* screenBuf = (char*)malloc (320 * 480 * 2);
-
+  int i = 0;
   while (true) {
     vc_dispmanx_snapshot (display, screen, DISPMANX_TRANSFORM_T(0));
-    vc_dispmanx_resource_read_data (screen, &rect1, screenBuf, 320 * 2);
-    lcd->copy ((uint16_t*)screenBuf, 320, 480);
+    vc_dispmanx_resource_read_data (screen, &rect1, screenBuf, 480 * 2);
+    lcd->copyRotate ((uint16_t*)screenBuf, 480, 320);
+    lcd->text (kWhite, 0,0, 16, dec(i++,3));
     lcd->update();
     lcd->delayUs (40000);
     }
 
   ret = vc_dispmanx_resource_delete (screen);
   vc_dispmanx_display_close (display);
+
+  while (true) {
+    int height = 8;
+    while (height++ < lcd->getHeight()) {
+      int x = 0;
+      int y = 0;
+      lcd->clear (kMagenta);
+      for (char ch = 'A'; ch < 0x7f; ch++) {
+        x = lcd->text (kWhite, x, y, height, string(1,ch));
+        if (x > lcd->getWidth()) {
+          x = 0;
+          y += height;
+          if (y > lcd->getHeight())
+            break;
+          }
+        }
+      lcd->text (kYellow, 0,0, 20, "Hello Colin");
+      lcd->update();
+      lcd->delayUs (40000);
+      }
+    }
 
   return 0;
   }
