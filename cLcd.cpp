@@ -124,6 +124,15 @@ int cLcd::text (const uint16_t colour, const int strX, const int strY, const int
   return curX;
   }
 //}}}
+
+//{{{
+void cLcd::copy (const uint16_t* fromPtr, const int xlen, const int ylen) {
+
+  for (int y = 0; y < ylen; y++)
+    memcpy (mFrameBuf + (y*getWidth()), (fromPtr + y*xlen), xlen*2);
+  }
+//}}}
+
 //{{{
 void cLcd::delayUs (const int us) {
   gpioDelay (us);

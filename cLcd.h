@@ -45,6 +45,8 @@ public:
   int text (const uint16_t colour, const int strX, const int strY, const int height, const std::string& str);
   void clear (const uint16_t colour) { rect (colour, 0,0, getWidth(), getHeight()); }
 
+  virtual void copy (const uint16_t* fromPtr, const int xlen, const int ylen);
+
   void update() { mUpdate = true; }
   void setAutoUpdate() { mAutoUpdate = true; }
   void delayUs (const int us);

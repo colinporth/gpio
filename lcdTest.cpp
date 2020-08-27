@@ -1,7 +1,14 @@
 // lcdTest.cpp
+//{{{  includes
 #include <cstdint>
 #include <string>
 #include <vector>
+
+#include <sys/fcntl.h>
+#include <sys/ioctl.h>
+#include <linux/fb.h>
+#include <sys/mman.h>
+#include <bcm_host.h>
 
 #include "cLcd.h"
 
@@ -9,6 +16,7 @@
 #include "../shared/utils/cLog.h"
 
 using namespace std;
+//}}}
 
 int main (int numArgs, char* args[]) {
 
@@ -22,43 +30,63 @@ int main (int numArgs, char* args[]) {
   cLcd* lcd = new cLcdD51e5ta7601 (rotate);
   lcd->initialise();
 
+  //{{{  fp0
+  int fbfd = open ("/dev/fb0", O_RDWR);
+  if (fbfd == -1)
+    return 0;
+
+  struct fb_fix_screeninfo finfo;
+  if (ioctl (fbfd, FBIOGET_FSCREENINFO, &finfo))
+    return 0;
+
+  struct fb_var_screeninfo vinfo;
+  if (ioctl (fbfd, FBIOGET_VSCREENINFO, &vinfo))
+    return 0;
+
+  cLog::log (LOGINFO, "fb0 %d x %d %dbps", vinfo.xres, vinfo.yres, vinfo.bits_per_pixel);
+
+  //char* fbp = (char*)mmap (0, finfo.smem_len, PROT_READ | PROT_WRITE, MAP_SHARED, fbfd, 0);
+  //if (fbp <= 0) {
+  //  return 0;
+
+  //munmap (fbp, finfo.smem_len);
+  //close (fbfd);
+  //}}}
+
+  bcm_host_init();
+  DISPMANX_DISPLAY_HANDLE_T display = vc_dispmanx_display_open(0);
+  if (!display)
+    return 0;
+
+  DISPMANX_MODEINFO_T display_info;
+  int ret = vc_dispmanx_display_get_info (display, &display_info);
+  if (ret)
+    return 0;
+  cLog::log (LOGINFO, "Primary display is %d x %d", display_info.width, display_info.height);
+
+  uint32_t image_prt;
+  DISPMANX_RESOURCE_HANDLE_T screen = vc_dispmanx_resource_create (VC_IMAGE_RGB565, 320, 480, &image_prt);
+  if (!screen)
+    return 0;
+  cLog::log (LOGINFO, "Primary display is %d x %d", display_info.width, display_info.height);
+
+  lcd->clear (kOrange);
+
+  VC_RECT_T rect1;
+  vc_dispmanx_rect_set (&rect1, 0, 0, 320, 480);
   while (true) {
-    for (int i = 0; i < 100; i++) {
-      double startTime = lcd->time();
-      lcd->clear (kOrange);
-      lcd->text (kWhite, 0,0, 100, dec(i,3));
-      lcd->update();
+    ret = vc_dispmanx_snapshot (display, screen, DISPMANX_TRANSFORM_T(0));
 
-      int ms = (int)((lcd->time() - startTime) * 1000000.f);
-      cLog::log (LOGINFO, "took " + dec(ms));
+    char* screenBuf = (char*)malloc (320 * 480 * 2);
+    vc_dispmanx_resource_read_data (screen, &rect1, screenBuf, 320 * 2);
 
-      lcd->delayUs (40000);
-      }
-
-    int height = 8;
-    while (height++ < lcd->getHeight()) {
-      double startTime = lcd->time();
-      int x = 0;
-      int y = 0;
-      lcd->clear (kMagenta);
-      for (char ch = 'A'; ch < 0x7f; ch++) {
-        x = lcd->text (kWhite, x, y, height, string(1,ch));
-        if (x > lcd->getWidth()) {
-          x = 0;
-          y += height;
-          if (y > lcd->getHeight())
-            break;
-          }
-        }
-      lcd->text (kYellow, 0,0, 20, "Hello Colin");
-      lcd->update();
-
-      int ms = (int)((lcd->time() - startTime) * 1000000.0);
-      cLog::log (LOGINFO, "took " + dec(ms));
-
-      lcd->delayUs (40000);
-      }
+    lcd->copy ((uint16_t*)screenBuf, 320, 480);
+    lcd->update();
+    lcd->delayUs (40000);
     }
+
+  ret = vc_dispmanx_resource_delete (screen);
+  vc_dispmanx_display_close (display);
 
   return 0;
   }
