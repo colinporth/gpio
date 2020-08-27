@@ -91,7 +91,6 @@ int main (int numArgs, char* args[]) {
     return 0;
     }
     //}}}
-  cLog::log (LOGINFO, "Primary display is %d x %d", display_info.width, display_info.height);
 
   lcd->clear (kOrange);
 
