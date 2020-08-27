@@ -185,21 +185,23 @@ void cLcd::initChipEnablePin() {
 //}}}
 //{{{
 void cLcd::launchUpdateThread (const uint8_t command) {
+// write frameBuffer to lcd ram thread if changed
 
   thread ([=]() {
-    // write frameBuffer to lcd ram thread if changed
     cLog::setThreadName ("upda");
     while (!mExit) {
       if (mUpdate || (mAutoUpdate && mChanged)) {
-        double startTime = time_time();
-        mChanged = false;
         mUpdate = false;
+        mChanged = false;
+
+        double startTime = time_time();
         writeCommandMultipleData (command, (const uint8_t*)mFrameBuf, getWidth() * getHeight() * 2);
-        int ms = (int)((time_time() - startTime) * 1000000.0);
-        cLog::log (LOGINFO, "took " + dec(ms));
+        mUpdateUs = (int)((time_time() - startTime) * 1000000.0);
         }
+
       gpioDelay (16000);
       }
+
     mExited = true;
     } ).detach();
   }

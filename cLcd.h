@@ -82,6 +82,7 @@ private:
   bool mAutoUpdate = false;
   bool mExit = false;
   bool mExited = false;
+  int mUpdateUs = 0;
 //}}}
   };
 
