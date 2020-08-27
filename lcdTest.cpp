@@ -32,7 +32,7 @@ int main (int numArgs, char* args[]) {
 
   //{{{  fp0
   int fbfd = open ("/dev/fb0", O_RDWR);
-  if (fbfd == -1)
+  if (fbfd == -1) {
     //{{{  error return
     cLog::log (LOGERROR, "fb0 open failed");
     return 0;
