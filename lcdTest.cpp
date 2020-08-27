@@ -40,14 +40,15 @@ int main (int numArgs, char* args[]) {
     //}}}
 
   struct fb_fix_screeninfo finfo;
-  if (ioctl (fbfd, FBIOGET_FSCREENINFO, &finfo))
+  if (ioctl (fbfd, FBIOGET_FSCREENINFO, &finfo)) {
     //{{{  error return
     cLog::log (LOGERROR, "fb0 get fscreeninfo failed");
     return 0;
     }
     //}}}
+
   struct fb_var_screeninfo vinfo;
-  if (ioctl (fbfd, FBIOGET_VSCREENINFO, &vinfo))
+  if (ioctl (fbfd, FBIOGET_VSCREENINFO, &vinfo)) {
     //{{{  error return
     cLog::log (LOGERROR, "fb0 get vscreeninfo failed");
     return 0;
