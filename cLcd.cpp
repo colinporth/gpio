@@ -137,7 +137,7 @@ void cLcd::copyRotate (const uint16_t* fromPtr, const int xlen, const int ylen) 
 
   for (int y = 0; y < ylen; y++)
     for (int x = 0; x < xlen; x++)
-      mFrameBuf[((getHeight() - x) * getWidth()) + y] = fromPtr[(y*xlen) + x];
+      mFrameBuf[(x * getWidth()) + (getWidth() - y)] = fromPtr[(y*xlen) + x];
   }
 //}}}
 

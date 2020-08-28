@@ -73,42 +73,41 @@ int main (int numArgs, char* args[]) {
     }
     //}}}
 
-  DISPMANX_MODEINFO_T display_info;
-  int ret = vc_dispmanx_display_get_info (display, &display_info);
-  if (ret) {
+  DISPMANX_MODEINFO_T modeInfo;
+  if (vc_dispmanx_display_get_info (display, &modeInfo)) {
     //{{{  error return
     cLog::log (LOGERROR, "vc_dispmanx_display_get_info failed");
     return 0;
     }
     //}}}
-  cLog::log (LOGINFO, "Primary display is %d x %d", display_info.width, display_info.height);
+  cLog::log (LOGINFO, "Primary display is %d x %d", modeInfo.width, modeInfo.height);
 
   uint32_t image_prt;
-  DISPMANX_RESOURCE_HANDLE_T screen = vc_dispmanx_resource_create (VC_IMAGE_RGB565, 480, 320, &image_prt);
-  if (!screen) {
+  DISPMANX_RESOURCE_HANDLE_T screenGrab = vc_dispmanx_resource_create (VC_IMAGE_RGB565, 480, 320, &image_prt);
+  if (!screenGrab) {
     //{{{  error return
     cLog::log (LOGERROR, "vc_dispmanx_resource_create failed");
     return 0;
     }
     //}}}
 
-  VC_RECT_T rect1;
-  vc_dispmanx_rect_set (&rect1, 0, 0, 480, 320);
+  VC_RECT_T vcRect;
+  vc_dispmanx_rect_set (&vcRect, 0, 0, 480, 320);
   char* screenBuf = (char*)malloc (480 * 320 * 2);
 
   lcd->clear (kOrange);
 
   int i = 0;
   while (true) {
-    vc_dispmanx_snapshot (display, screen, DISPMANX_TRANSFORM_T(0));
-    vc_dispmanx_resource_read_data (screen, &rect1, screenBuf, 480 * 2);
+    vc_dispmanx_snapshot (display, screenGrab, DISPMANX_TRANSFORM_T(0));
+    vc_dispmanx_resource_read_data (screenGrab, &vcRect, screenBuf, 480 * 2);
     lcd->copyRotate ((uint16_t*)screenBuf, 480, 320);
     lcd->text (kWhite, 0,0, 16, dec(i++,3));
     lcd->update();
-    lcd->delayUs (40000);
+    lcd->delayUs (16000);
     }
 
-  ret = vc_dispmanx_resource_delete (screen);
+  vc_dispmanx_resource_delete (screenGrab);
   vc_dispmanx_display_close (display);
 
   while (true) {
@@ -128,7 +127,7 @@ int main (int numArgs, char* args[]) {
         }
       lcd->text (kYellow, 0,0, 20, "Hello Colin");
       lcd->update();
-      lcd->delayUs (40000);
+      lcd->delayUs (16000);
       }
     }
 
