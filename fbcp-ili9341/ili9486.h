@@ -8,7 +8,7 @@
 #define DISPLAY_WRITE_PIXELS 0x2C
 
 #ifdef WAVESHARE35B_ILI9486
-#include "waveshare35b.h"
+  #include "waveshare35b.h"
 #endif
 
 #define DISPLAY_NATIVE_WIDTH 320

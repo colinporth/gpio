@@ -4,11 +4,11 @@
 #ifdef FREEPLAYTECH_WAVESHARE32B
 
 #if !defined(GPIO_TFT_DATA_CONTROL)
-#define GPIO_TFT_DATA_CONTROL 22
+  #define GPIO_TFT_DATA_CONTROL 22
 #endif
 
 #if !defined(GPIO_TFT_RESET_PIN)
-#define GPIO_TFT_RESET_PIN 27
+  #define GPIO_TFT_RESET_PIN 27
 #endif
 
 // On FreePlayTech GBA devices, a part of the screen is hidden by the bezels, since the GBA has a 2.8" screen surface area, but a 3.2" display is enclosed inside the case.

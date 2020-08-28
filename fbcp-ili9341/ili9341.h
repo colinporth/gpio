@@ -58,21 +58,20 @@
 #define ILI9341_PUMP_CONTROL_3XVCI 0x30
 
 #ifdef ILI9341
-#define ILI9341_PUMP_CONTROL ILI9341_PUMP_CONTROL_3XVCI 
+  #define ILI9341_PUMP_CONTROL ILI9341_PUMP_CONTROL_3XVCI
 #else
-#define ILI9341_PUMP_CONTROL ILI9341_PUMP_CONTROL_2XVCI
+  #define ILI9341_PUMP_CONTROL ILI9341_PUMP_CONTROL_2XVCI
 #endif
-
 
 #define DISPLAY_NATIVE_WIDTH 240
 #define DISPLAY_NATIVE_HEIGHT 320
 
 #ifdef ADAFRUIT_ILI9341_PITFT
-#include "pitft_28r_ili9341.h"
+  #include "pitft_28r_ili9341.h"
 #elif defined(ADAFRUIT_HX8357D_PITFT)
-#include "pitft_35r_hx8357d.h"
+  #include "pitft_35r_hx8357d.h"
 #elif defined(FREEPLAYTECH_WAVESHARE32B)
-#include "freeplaytech_waveshare32b.h"
+  #include "freeplaytech_waveshare32b.h"
 #endif
 
 #define InitSPIDisplay InitILI9341

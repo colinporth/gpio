@@ -4,22 +4,23 @@
 #include "display.h"
 //}}}
 
-void DrawText(uint16_t *framebuffer, int framebufferWidth, int framebufferStrideBytes, int framebufferHeight, const char *text, int x, int y, uint16_t color, uint16_t bgColor)
-{
-#ifdef DISPLAY_FLIP_ORIENTATION_IN_SOFTWARE
-  const int W = framebufferHeight;
-  const int H = framebufferWidth;
-#define AT(x, y) x*framebufferStrideBytes+y
-#else
-  const int W = framebufferWidth;
-  const int H = framebufferHeight;
-#define AT(x, y) y*framebufferStrideBytes+x
-#endif
+void DrawText (uint16_t *framebuffer, int framebufferWidth, int framebufferStrideBytes, int framebufferHeight, 
+               const char *text, int x, int y, uint16_t color, uint16_t bgColor) {
+
+
+  #ifdef DISPLAY_FLIP_ORIENTATION_IN_SOFTWARE
+    const int W = framebufferHeight;
+    const int H = framebufferWidth;
+    #define AT(x, y) x*framebufferStrideBytes+y
+  #else
+    const int W = framebufferWidth;
+    const int H = framebufferHeight;
+    #define AT(x, y) y*framebufferStrideBytes+x
+  #endif
 
   framebufferStrideBytes >>= 1; // to uint16 elements
   const int Y = y;
-  while(*text)
-  {
+  while (*text) {
     uint8_t ch = (uint8_t)*text;
     if (ch < 32 || ch >= 127) ch = 0;
     else ch -= 32;

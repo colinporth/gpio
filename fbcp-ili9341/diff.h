@@ -24,21 +24,18 @@ extern Span *spans;
 // after which the communication is ready to start pushing pixels. This totals to 8 bytes, or 4 pixels, meaning that if there are 4 unchanged pixels or less between two adjacent dirty
 // spans, it is all the same to just update through those pixels as well to not have to wait to flush the FIFO.
 #if defined(ALL_TASKS_SHOULD_DMA)
-#define SPAN_MERGE_THRESHOLD 320
+  #define SPAN_MERGE_THRESHOLD 320
 #elif defined(DISPLAY_SPI_BUS_IS_16BITS_WIDE)
-#define SPAN_MERGE_THRESHOLD 10
+  #define SPAN_MERGE_THRESHOLD 10
 #elif defined(HX8357D)
-#define SPAN_MERGE_THRESHOLD 6
+  #define SPAN_MERGE_THRESHOLD 6
 #else
-#define SPAN_MERGE_THRESHOLD 4
+  #define SPAN_MERGE_THRESHOLD 4
 #endif
 
 void DiffFramebuffersToSingleChangedRectangle(uint16_t *framebuffer, uint16_t *prevFramebuffer, Span *&head);
-
 void DiffFramebuffersToScanlineSpansExact(uint16_t *framebuffer, uint16_t *prevFramebuffer, bool interlacedDiff, int interlacedFieldParity, Span *&head);
-
 void DiffFramebuffersToScanlineSpansFastAndCoarse4Wide(uint16_t *framebuffer, uint16_t *prevFramebuffer, bool interlacedDiff, int interlacedFieldParity, Span *&head);
 
 void NoDiffChangedRectangle(Span *&head);
-
 void MergeScanlineSpanList(Span *listHead);

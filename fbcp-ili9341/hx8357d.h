@@ -8,7 +8,7 @@
 #define DISPLAY_WRITE_PIXELS 0x2C
 
 #ifdef ADAFRUIT_HX8357D_PITFT
-#include "pitft_35r_hx8357d.h"
+  #include "pitft_35r_hx8357d.h"
 #endif
 
 void InitHX8357D(void);

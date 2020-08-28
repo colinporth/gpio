@@ -5,6 +5,7 @@
 //}}}
 
 #ifdef STATISTICS
+
   //{{{
   #include <stdio.h>
   #include <stdlib.h>
@@ -90,7 +91,7 @@
   }
   //}}}
   //{{{
-  void DrawStatisticsOverlay(uint16_t *framebuffer)
+  void DrawStatisticsOverlay (uint16_t *framebuffer)
   {
     DrawText(framebuffer, gpuFrameWidth, gpuFramebufferScanlineStrideBytes, gpuFrameHeight, fpsText, 1, 1, fpsColor, 0);
     DrawText(framebuffer, gpuFrameWidth, gpuFramebufferScanlineStrideBytes, gpuFrameHeight, statsFrameSkipText, strlen(fpsText)*6, 1, RGB565(31,0,0), 0);
@@ -293,7 +294,10 @@
   }
   #endif
   //}}}
+
 #else
+
   void RefreshStatisticsOverlayText() {}
   void DrawStatisticsOverlay(uint16_t *) {}
+
 #endif // ~STATISTICS
