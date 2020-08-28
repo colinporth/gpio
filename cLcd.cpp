@@ -322,9 +322,11 @@ void cLcdSpi::writeCommandMultipleData (const uint8_t command, const uint8_t* da
 // unused gpio26 - 37  38 - gpio20 unused
 //            0v - 39  40 - gpio21 unused
 
-constexpr uint8_t kParallelWriteGpio = 16;
-constexpr uint8_t kParallelRegisterSelectGpio = 17;
-constexpr uint8_t kParallelReadGpio = 18;
+constexpr uint8_t kParallelWriteGpio = 17;
+constexpr uint8_t kParallelRegisterSelectGpio = 24;
+constexpr uint8_t kParallelReadGpio = 22;
+constexpr uint8_t kParallelChipSelectGpio = 23;
+constexpr uint8_t kParallelBacklightGpio = 27;
 
 constexpr uint32_t kParallelDataMask =  0xFFFF;
 constexpr uint32_t kParallelWriteMask = 1 << kParallelWriteGpio;
@@ -803,6 +805,14 @@ bool cLcdD51e5ta7601::initialise() {
     // rs
     gpioSetMode (kParallelRegisterSelectGpio, PI_OUTPUT);
     gpioWrite (kParallelRegisterSelectGpio, 1);
+
+    // chipSelect
+    gpioSetMode (kParallelChipSelectGpio, PI_OUTPUT);
+    gpioWrite (kParallelChipSelectGpio, 0);
+
+    // backlight
+    gpioSetMode (kParallelBacklightGpio, PI_OUTPUT);
+    gpioWrite (kParallelBacklightGpio, 1);
 
     // parallel d0-d15
     for (int i = 0; i < 16; i++)
