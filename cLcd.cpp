@@ -126,6 +126,16 @@ int cLcd::text (const uint16_t colour, const int strX, const int strY, const int
 //}}}
 
 //{{{
+void cLcd::rectOutline (const uint16_t colour, const int xorg, const int yorg, const int xlen, const int ylen) {
+  rect (colour, xorg, yorg, xlen, 1);
+  rect (colour, xorg, yorg+ylen, xlen, 1);
+
+  rect (colour, xorg, yorg, 1, ylen);
+  rect (colour, xorg+xlen, yorg, 1, ylen);
+  }
+//}}}
+
+//{{{
 void cLcd::copy (const uint16_t* fromPtr, const int xlen, const int ylen) {
 
   for (int y = 0; y < ylen; y++)
