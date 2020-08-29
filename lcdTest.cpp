@@ -93,8 +93,10 @@ int main (int numArgs, char* args[]) {
 
   VC_RECT_T vcRect;
   vc_dispmanx_rect_set (&vcRect, 0, 0, 480, 320);
-  char* screenBuf = (char*)malloc (480 * 320 * 2);
   //}}}
+
+  char* screenBuf = (char*)malloc (480 * 320 * 2);
+  char* lastScreenBuf = (char*)malloc (480 * 320 * 2);
 
   lcd->clear (kOrange);
 
@@ -102,10 +104,21 @@ int main (int numArgs, char* args[]) {
   while (true) {
     vc_dispmanx_snapshot (display, screenGrab, DISPMANX_TRANSFORM_T(0));
     vc_dispmanx_resource_read_data (screenGrab, &vcRect, screenBuf, 480 * 2);
+
+    int diff = 0;
+    for (int i = 0; i < 480 *320 * 2; i++)  {
+      if (screenBuf[i] != lastScreenBuf[i])
+        diff++;
+      }
+
     lcd->copyRotate ((uint16_t*)screenBuf, 480, 320);
-    lcd->text (kWhite, 0,0, 16, dec(i++) + " " + dec (lcd->getUpdateUs()));
+    lcd->text (kWhite, 0,0, 16, dec(i++) + " took " + dec (lcd->getUpdateUs()) + "us" + " " + dec(diff));
     lcd->update();
-    lcd->delayUs (16000);
+    lcd->delayUs (10000);
+
+    auto temp = lastScreenBuf;
+    lastScreenBuf = screenBuf;
+    screenBuf = temp;
     }
 
   vc_dispmanx_resource_delete (screenGrab);
