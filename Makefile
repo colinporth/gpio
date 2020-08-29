@@ -12,8 +12,8 @@ SRCS      = lcdTest.cpp \
 
 BUILD_DIR = ./build
 CLEAN_DIRS = $(BUILD_DIR)
-LIBS      = -lpthread -lbfd `pkg-config --libs freetype2` -lpigpio -lrt -L/opt/vc/lib -l vchiq_arm -l vchostif -l vcos -l bcm_host
-
+LIBS      = -l pthread -l bfd `pkg-config --libs freetype2` -l pigpio -l rt \
+	    -L /opt/vc/lib -l vchiq_arm -l vchostif -l vcos -l bcm_host
 #
 #
 OBJS      = $(SRCS:%=$(BUILD_DIR)/%.o)
@@ -22,10 +22,10 @@ DEPS      = $(OBJS:.o=.d)
 CFLAGS = -Wall \
 	 -MMD -MP \
 	 -g -O2 \
-	 -I/opt/vc/include \
-	 -I/opt/vc/include/interface/vcos/pthreads\
-	 -I/opt/vc/include/interface/vmcs_host \
-	 -I/opt/vc/include/interface/vmcs_host/linux \
+	 -I../opt/vc/include \
+	 -I../opt/vc/include/interface/vcos/pthreads\
+	 -I../opt/vc/include/interface/vmcs_host \
+	 -I../opt/vc/include/interface/vmcs_host/linux \
 	 `pkg-config --cflags freetype2`
 
 
