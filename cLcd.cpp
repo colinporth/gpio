@@ -24,7 +24,7 @@ static FT_Library mLibrary;
 static FT_Face mFace;
 //}}}
 
-// gpio/pin common to spi/parallel
+// gpio/pin common to spi/16bit
 constexpr uint8_t kResetGpio = 25;
 
 // cLcd - public
@@ -215,6 +215,342 @@ void cLcd::launchUpdateThread (const uint8_t command) {
   }
 //}}}
 
+// cLcd16 - override with littleEndian frameBuf
+//{{{  16bit J8 header pins, gpio, constexpr
+//      3.3v led -  1  2  - 5v
+//     d2  gpio2 -  3  4  - 5v
+//     d3  gpio3 -  5  6  - 0v
+//     d4  gpio4 -  7  8  - gpio14 d14
+//            0v -  9  10 - gpio15 d15
+//     rs gpio17 - 11  12 - gpio18 rd
+// unused gpio27 - 13  14 - 0v cs
+// unused gpio22 - 15  16 - gpio23 unused
+//          3.3v - 17  18 - gpio24 unused
+//    d10 gpio10 - 19  20 - 0v
+//     d9  gpio9 - 21  22 - gpio25 reset
+//    d11 gpio11 - 23  24 - gpio8  d8
+//            0v - 25  26 - gpio7  d7
+//     d0  gpio0 - 27  28 - gpio1  d1
+//     d5  gpio5 - 29  30 - 0v
+//     d6  gpio6 - 31  32 - gpio12 d12
+//    d13 gpio13 - 33  34 - 0v
+// unused gpio19 - 35  36 - gpio16 wr
+// unused gpio26 - 37  38 - gpio20 unused
+//            0v - 39  40 - gpio21 unused
+
+constexpr uint8_t k16WriteGpio = 17;
+constexpr uint8_t k16RegisterSelectGpio = 24;
+constexpr uint8_t k16ReadGpio = 22;
+constexpr uint8_t k16ChipSelectGpio = 23;
+constexpr uint8_t k16BacklightGpio = 27;
+
+constexpr uint32_t k16DataMask =  0xFFFF;
+constexpr uint32_t k16WriteMask = 1 << k16WriteGpio;
+constexpr uint32_t k16WriteClrMask = k16WriteMask | k16DataMask;
+//}}}
+//{{{
+void cLcd16::rect (const uint16_t colour, const int xorg, const int yorg, const int xlen, const int ylen) {
+
+  int xmax = min (xorg+xlen, (int)getWidth());
+  int ymax = min (yorg+ylen, (int)getHeight());
+
+  for (int y = yorg; y < ymax; y++) {
+    uint16_t* ptr = mFrameBuf + y*getWidth() + xorg;
+    for (int x = xorg; x < xmax; x++)
+      *ptr++ = colour;
+      }
+
+  mChanged = true;
+  }
+//}}}
+//{{{
+void cLcd16::pixel (const uint16_t colour, const int x, const int y) {
+
+  mFrameBuf[(y*getWidth()) + x] = colour;
+  mChanged = true;
+  }
+//}}}
+//{{{
+void cLcd16::blendPixel (const uint16_t colour, const uint8_t alpha, const int x, const int y) {
+// magical rgb565 alpha composite
+// - linear interp background * (1.0 - alpha) + foreground * alpha
+//   - factorized into: result = background + (foreground - background) * alpha
+//   - alpha is in Q1.5 format, so 0.0 is represented by 0, and 1.0 is represented by 32
+// - Converts  0000000000000000rrrrrggggggbbbbb
+// -     into  00000gggggg00000rrrrr000000bbbbb
+
+  if ((alpha >= 0) && (x >= 0) && (y > 0) && (x < getWidth()) && (y < getHeight())) {
+    // clip opaque and offscreen
+    if (alpha == 0xFF)
+      // simple case - set bigEndianColour frameBuf pixel to littleEndian colour
+      mFrameBuf[(y*getWidth()) + x] = colour;
+    else {
+      // get bigEndianColour frame buffer into littleEndian background
+      uint32_t background = mFrameBuf[(y*getWidth()) + x];
+
+      // composite littleEndian colour
+      uint32_t foreground = colour;
+      foreground = (foreground | (foreground << 16)) & 0x07e0f81f;
+      background = (background | (background << 16)) & 0x07e0f81f;
+      background += (((foreground - background) * ((alpha + 4) >> 3)) >> 5) & 0x07e0f81f;
+
+      // set bigEndianColour frameBuf pixel to littleEndian background result
+      mFrameBuf[(y*getWidth()) + x] = background | (background >> 16);
+      }
+
+    mChanged = true;
+    }
+  }
+//}}}
+//{{{
+void cLcd16::writeCommand (const uint8_t command) {
+
+  gpioWrite (k16RegisterSelectGpio, 0);
+
+  gpioWrite_Bits_0_31_Clear (~command & k16WriteClrMask); // clear lo data bits + k16WrGpio bit lo
+  gpioWrite_Bits_0_31_Set (command);                      // set hi data bits
+  gpioWrite_Bits_0_31_Set (command);                      // set hi data bits
+  gpioWrite_Bits_0_31_Set (k16WriteMask);                 // write on k16WrGpio rising edge
+
+  gpioWrite (k16RegisterSelectGpio, 1);
+  }
+//}}}
+//{{{
+void cLcd16::writeCommandData (const uint8_t command, const uint16_t data) {
+
+  writeCommand (command);
+
+  gpioWrite_Bits_0_31_Clear (~data & k16WriteClrMask); // clear lo data bits + k16WrGpio bit lo
+  gpioWrite_Bits_0_31_Set (data);                      // set hi data bits
+  gpioWrite_Bits_0_31_Set (data);                      // set hi data bits
+  gpioWrite_Bits_0_31_Set (k16WriteMask);              // write on k16WrGpio rising edge
+  }
+//}}}
+//{{{
+void cLcd16::writeCommandMultipleData (const uint8_t command, const uint8_t* dataPtr, const int len) {
+
+  writeCommand (command);
+
+  // send data
+  uint16_t* ptr = (uint16_t*)dataPtr;
+  uint16_t* ptrEnd = (uint16_t*)dataPtr + len/2;
+
+  while (ptr < ptrEnd) {
+    uint16_t data = *ptr++;
+    fastGpioWrite_Bits_0_31_Clear (~data & k16WriteClrMask); // clear lo data bits + k16WrGpio bit lo
+    fastGpioWrite_Bits_0_31_Set (data);                      // set hi data bits
+    fastGpioWrite_Bits_0_31_Set (data);                      // set hi data bits
+    fastGpioWrite_Bits_0_31_Set (data);                      // set hi data bits
+    fastGpioWrite_Bits_0_31_Set (k16WriteMask);              // write on k16WrGpio rising edge
+    }
+  }
+//}}}
+
+//{{{  cLcdTa7601
+constexpr uint16_t kWidthTa7601 = 320;
+constexpr uint16_t kHeightTa7601 = 480;
+cLcdTa7601::cLcdTa7601 (const int rotate) : cLcd16(kWidthTa7601, kHeightTa7601, rotate) {}
+
+bool cLcdTa7601::initialise() {
+  if (initResources()) {
+    initResetPin();
+
+    // wr
+    gpioSetMode (k16WriteGpio, PI_OUTPUT);
+    gpioWrite (k16WriteGpio, 1);
+
+    // rd unused
+    gpioSetMode (k16ReadGpio, PI_OUTPUT);
+    gpioWrite (k16ReadGpio, 1);
+
+    // rs
+    gpioSetMode (k16RegisterSelectGpio, PI_OUTPUT);
+    gpioWrite (k16RegisterSelectGpio, 1);
+
+    // chipSelect
+    gpioSetMode (k16ChipSelectGpio, PI_OUTPUT);
+    gpioWrite (k16ChipSelectGpio, 0);
+
+    // backlight
+    gpioSetMode (k16BacklightGpio, PI_OUTPUT);
+    gpioWrite (k16BacklightGpio, 1);
+
+    // 16 d0-d15
+    for (int i = 0; i < 16; i++)
+      gpioSetMode (i, PI_OUTPUT);
+    gpioWrite_Bits_0_31_Clear (k16DataMask);
+
+    // portrait mode with (0,0) being the top left. top is the side opposite the LCD connector.
+    writeCommandData (0x01, 0x023C);
+    writeCommandData (0x02, 0x0100);
+    writeCommandData (0x03, 0x1030);
+    writeCommandData (0x08, 0x0808);
+    writeCommandData (0x0A, 0x0500);
+    writeCommandData (0x0B, 0x0000);
+    writeCommandData (0x0C, 0x0770);
+    writeCommandData (0x0D, 0x0000);
+    writeCommandData (0x0E, 0x0001);
+    writeCommandData (0x11, 0x0406);
+    writeCommandData (0x12, 0x000E);
+    writeCommandData (0x13, 0x0222);
+    writeCommandData (0x14, 0x0015);
+    writeCommandData (0x15, 0x4277);
+    writeCommandData (0x16, 0x0000);
+
+    writeCommandData (0x30, 0x6A50);
+    writeCommandData (0x31, 0x00C9);
+    writeCommandData (0x32, 0xC7BE);
+    writeCommandData (0x33, 0x0003);
+    writeCommandData (0x36, 0x3443);
+    writeCommandData (0x3B, 0x0000);
+    writeCommandData (0x3C, 0x0000);
+    writeCommandData (0x2C, 0x6A50);
+    writeCommandData (0x2D, 0x00C9);
+    writeCommandData (0x2E, 0xC7BE);
+    writeCommandData (0x2F, 0x0003);
+    writeCommandData (0x35, 0x3443);
+    writeCommandData (0x39, 0x0000);
+    writeCommandData (0x3A, 0x0000);
+    writeCommandData (0x28, 0x6A50);
+    writeCommandData (0x29, 0x00C9);
+    writeCommandData (0x2A, 0xC7BE);
+    writeCommandData (0x2B, 0x0003);
+    writeCommandData (0x34, 0x3443);
+    writeCommandData (0x37, 0x0000);
+    writeCommandData (0x38, 0x0000);
+    delayUs (10000);
+
+    writeCommandData (0x12, 0x200E);
+    delayUs (10000);
+
+    writeCommandData (0x12, 0x2003);
+    delayUs (10000);
+
+    writeCommandData (0x44, 0x013F);
+    writeCommandData (0x45, 0x0000);
+    writeCommandData (0x46, 0x01DF);
+    writeCommandData (0x47, 0x0000);
+    writeCommandData (0x20, 0x0000);
+    writeCommandData (0x21, 0x013F);
+    writeCommandData (0x07, 0x0012);
+    delayUs (10000);
+
+    writeCommandData (0x07, 0x0017);
+    delayUs (10000);
+
+    writeCommandData (0x20, 0x0000);
+    writeCommandData (0x21, 0x0000);
+
+    // startup commands
+    launchUpdateThread (0x22);
+    return true;
+    }
+
+  return false;
+  }
+//}}}
+//{{{  cLcdSsd1289
+constexpr uint16_t kWidth1289 = 240;
+constexpr uint16_t kHeight1289 = 320;
+cLcdSsd1289::cLcdSsd1289 (const int rotate) : cLcd16(kWidth1289, kHeight1289, rotate) {}
+
+bool cLcdSsd1289::initialise() {
+  if (initResources()) {
+    initResetPin();
+
+    // wr
+    gpioSetMode (k16WriteGpio, PI_OUTPUT);
+    gpioWrite (k16WriteGpio, 1);
+
+    // rd unused
+    gpioSetMode (k16ReadGpio, PI_OUTPUT);
+    gpioWrite (k16ReadGpio, 1);
+
+    // rs
+    gpioSetMode (k16RegisterSelectGpio, PI_OUTPUT);
+    gpioWrite (k16RegisterSelectGpio, 1);
+
+    // 16 d0-d15
+    for (int i = 0; i < 16; i++)
+      gpioSetMode (i, PI_OUTPUT);
+    gpioWrite_Bits_0_31_Clear (k16DataMask);
+
+    // startup commands
+    writeCommandData (0x00, 0x0001); // SSD1289_REG_OSCILLATION
+    writeCommandData (0x03, 0xA8A4); // SSD1289_REG_POWER_CTRL_1
+    writeCommandData (0x0c, 0x0000); // SSD1289_REG_POWER_CTRL_2
+    writeCommandData (0x0d, 0x080C); // SSD1289_REG_POWER_CTRL_3
+    writeCommandData (0x0e, 0x2B00); // SSD1289_REG_POWER_CTRL_4
+    writeCommandData (0x1e, 0x00B7); // SSD1289_REG_POWER_CTRL_5
+
+    //write_reg(0x01, (1 << 13) | (par->bgr << 11) | (1 << 9) | (HEIGHT - 1));
+    writeCommandData (0x01, 0x2B3F); // SSD1289_REG_DRIVER_OUT_CTRL
+    writeCommandData (0x02, 0x0600); // SSD1289_REG_LCD_DRIVE_AC
+    writeCommandData (0x10, 0x0000); // SSD1289_REG_SLEEP_MODE
+
+    writeCommandData (0x07, 0x0233); // SSD1289_REG_DISPLAY_CTRL
+    writeCommandData (0x0b, 0x0000); // SSD1289_REG_FRAME_CYCLE
+    writeCommandData (0x0f, 0x0000); // SSD1289_REG_GATE_SCAN_START
+
+    writeCommandData (0x23, 0x0000); // SSD1289_REG_WR_DATA_MASK_1
+    writeCommandData (0x24, 0x0000); // SSD1289_REG_WR_DATA_MASK_2
+    writeCommandData (0x25, 0x8000); // SSD1289_REG_FRAME_FREQUENCY
+
+    writeCommandData (0x30, 0x0707); // SSD1289_REG_GAMMA_CTRL_1
+    writeCommandData (0x31, 0x0204); // SSD1289_REG_GAMMA_CTRL_2
+    writeCommandData (0x32, 0x0204); // SSD1289_REG_GAMMA_CTRL_3
+    writeCommandData (0x33, 0x0502); // SSD1289_REG_GAMMA_CTRL_4
+    writeCommandData (0x34, 0x0507); // SSD1289_REG_GAMMA_CTRL_5
+    writeCommandData (0x35, 0x0204); // SSD1289_REG_GAMMA_CTRL_6
+    writeCommandData (0x36, 0x0204); // SSD1289_REG_GAMMA_CTRL_7
+    writeCommandData (0x37, 0x0502); // SSD1289_REG_GAMMA_CTRL_8
+    writeCommandData (0x3a, 0x0302); // SSD1289_REG_GAMMA_CTRL_9
+    writeCommandData (0x3b, 0x0302); // SSD1289_REG_GAMMA_CTRL_10
+
+    writeCommandData (0x41, 0x0000); // SSD1289_REG_V_SCROLL_CTRL_1
+    //write_reg(0x42, 0x0000);
+    writeCommandData (0x48, 0x0000); // SSD1289_REG_FIRST_WIN_START
+    writeCommandData (0x49, 0x013F); // SSD1289_REG_FIRST_WIN_END
+
+    writeCommandData (0x44, ((kWidth1289-1) << 8) | 0); // SSD1289_REG_H_RAM_ADR_POS
+    writeCommandData (0x45, 0x0000);                    // SSD1289_REG_V_RAM_ADR_START
+    writeCommandData (0x46, kHeight1289-1);             // SSD1289_REG_V_RAM_ADR_END
+
+    int xstart = 0;
+    int ystart = 0;
+    int xres = kWidth1289-1;
+    int yres = kHeight1289-1;
+    switch (mRotate) {
+      case 90:
+        writeCommandData (0x11, 0x6040 | 0b011000); // 0x11 REG_ENTRY_MODE
+        writeCommandData (0x4e, ystart);            // 0x4E GDDRAM X address counter
+        writeCommandData (0x4f, xres - xstart);     // 0x4F GDDRAM Y address counter
+        break;
+      case 180:
+        writeCommandData (0x11, 0x6040 | 0b000000); // 0x11 REG_ENTRY_MODE
+        writeCommandData (0x4e, xres - xstart);     // 0x4E GDDRAM X address counter
+        writeCommandData (0x4f, yres - ystart);     // 0x4F GDDRAM Y address counter
+        break;
+      case 270:
+        writeCommandData (0x11, 0x6040 | 0b101000); // 0x11 REG_ENTRY_MODE
+        writeCommandData (0x4e, yres - ystart);     // 0x4E GDDRAM X address counter
+        writeCommandData (0x4f, xstart);            // 0x4F GDDRAM Y address counter
+        break;
+      default:
+        writeCommandData (0x11, 0x6040 | 0b110000); // 0x11 REG_ENTRY_MODE
+        writeCommandData (0x4e, xstart);            // 0x4E GDDRAM X address counter
+        writeCommandData (0x4f, ystart);            // 0x4F GDDRAM Y address counter
+        break;
+      }
+
+    launchUpdateThread (0x22); // SSD1289_REG_GDDRAM_DATA
+    return true;
+    }
+
+  return false;
+  }
+//}}}
+
 // cLcdSpi - uses bigEndian frameBuf
 //{{{  spi J8 header pins, gpio, constexpr
 //      3.3v - 17  18 - gpio24 - registerSelect
@@ -299,146 +635,14 @@ void cLcdSpi::writeCommandMultipleData (const uint8_t command, const uint8_t* da
   }
 //}}}
 
-// cLcdParallel16 - override with littleEndian frameBuf
-//{{{  parallel J8 header pins, gpio, constexpr
-//      3.3v led -  1  2  - 5v
-//     d2  gpio2 -  3  4  - 5v
-//     d3  gpio3 -  5  6  - 0v
-//     d4  gpio4 -  7  8  - gpio14 d14
-//            0v -  9  10 - gpio15 d15
-//     rs gpio17 - 11  12 - gpio18 rd
-// unused gpio27 - 13  14 - 0v cs
-// unused gpio22 - 15  16 - gpio23 unused
-//          3.3v - 17  18 - gpio24 unused
-//    d10 gpio10 - 19  20 - 0v
-//     d9  gpio9 - 21  22 - gpio25 reset
-//    d11 gpio11 - 23  24 - gpio8  d8
-//            0v - 25  26 - gpio7  d7
-//     d0  gpio0 - 27  28 - gpio1  d1
-//     d5  gpio5 - 29  30 - 0v
-//     d6  gpio6 - 31  32 - gpio12 d12
-//    d13 gpio13 - 33  34 - 0v
-// unused gpio19 - 35  36 - gpio16 wr
-// unused gpio26 - 37  38 - gpio20 unused
-//            0v - 39  40 - gpio21 unused
-
-constexpr uint8_t kParallelWriteGpio = 17;
-constexpr uint8_t kParallelRegisterSelectGpio = 24;
-constexpr uint8_t kParallelReadGpio = 22;
-constexpr uint8_t kParallelChipSelectGpio = 23;
-constexpr uint8_t kParallelBacklightGpio = 27;
-
-constexpr uint32_t kParallelDataMask =  0xFFFF;
-constexpr uint32_t kParallelWriteMask = 1 << kParallelWriteGpio;
-constexpr uint32_t kParallelWriteClrMask = kParallelWriteMask | kParallelDataMask;
-//}}}
-//{{{
-void cLcdParallel16::rect (const uint16_t colour, const int xorg, const int yorg, const int xlen, const int ylen) {
-
-  int xmax = min (xorg+xlen, (int)getWidth());
-  int ymax = min (yorg+ylen, (int)getHeight());
-
-  for (int y = yorg; y < ymax; y++) {
-    uint16_t* ptr = mFrameBuf + y*getWidth() + xorg;
-    for (int x = xorg; x < xmax; x++)
-      *ptr++ = colour;
-      }
-
-  mChanged = true;
-  }
-//}}}
-//{{{
-void cLcdParallel16::pixel (const uint16_t colour, const int x, const int y) {
-
-  mFrameBuf[(y*getWidth()) + x] = colour;
-  mChanged = true;
-  }
-//}}}
-//{{{
-void cLcdParallel16::blendPixel (const uint16_t colour, const uint8_t alpha, const int x, const int y) {
-// magical rgb565 alpha composite
-// - linear interp background * (1.0 - alpha) + foreground * alpha
-//   - factorized into: result = background + (foreground - background) * alpha
-//   - alpha is in Q1.5 format, so 0.0 is represented by 0, and 1.0 is represented by 32
-// - Converts  0000000000000000rrrrrggggggbbbbb
-// -     into  00000gggggg00000rrrrr000000bbbbb
-
-  if ((alpha >= 0) && (x >= 0) && (y > 0) && (x < getWidth()) && (y < getHeight())) {
-    // clip opaque and offscreen
-    if (alpha == 0xFF)
-      // simple case - set bigEndianColour frameBuf pixel to littleEndian colour
-      mFrameBuf[(y*getWidth()) + x] = colour;
-    else {
-      // get bigEndianColour frame buffer into littleEndian background
-      uint32_t background = mFrameBuf[(y*getWidth()) + x];
-
-      // composite littleEndian colour
-      uint32_t foreground = colour;
-      foreground = (foreground | (foreground << 16)) & 0x07e0f81f;
-      background = (background | (background << 16)) & 0x07e0f81f;
-      background += (((foreground - background) * ((alpha + 4) >> 3)) >> 5) & 0x07e0f81f;
-
-      // set bigEndianColour frameBuf pixel to littleEndian background result
-      mFrameBuf[(y*getWidth()) + x] = background | (background >> 16);
-      }
-
-    mChanged = true;
-    }
-  }
-//}}}
-//{{{
-void cLcdParallel16::writeCommand (const uint8_t command) {
-
-  gpioWrite (kParallelRegisterSelectGpio, 0);
-
-  gpioWrite_Bits_0_31_Clear (~command & kParallelWriteClrMask); // clear lo data bits + kParallelWrGpio bit lo
-  gpioWrite_Bits_0_31_Set (command);                            // set hi data bits
-  gpioWrite_Bits_0_31_Set (command);                            // set hi data bits
-  gpioWrite_Bits_0_31_Set (kParallelWriteMask);                 // write on kParallelWrGpio rising edge
-
-  gpioWrite (kParallelRegisterSelectGpio, 1);
-  }
-//}}}
-//{{{
-void cLcdParallel16::writeCommandData (const uint8_t command, const uint16_t data) {
-
-  writeCommand (command);
-
-  gpioWrite_Bits_0_31_Clear (~data & kParallelWriteClrMask); // clear lo data bits + kParallelWrGpio bit lo
-  gpioWrite_Bits_0_31_Set (data);                            // set hi data bits
-  gpioWrite_Bits_0_31_Set (data);                            // set hi data bits
-  gpioWrite_Bits_0_31_Set (kParallelWriteMask);              // write on kParallelWrGpio rising edge
-  }
-//}}}
-//{{{
-void cLcdParallel16::writeCommandMultipleData (const uint8_t command, const uint8_t* dataPtr, const int len) {
-
-  writeCommand (command);
-
-  // send data
-  uint16_t* ptr = (uint16_t*)dataPtr;
-  uint16_t* ptrEnd = (uint16_t*)dataPtr + len/2;
-
-  while (ptr < ptrEnd) {
-    uint16_t data = *ptr++;
-    fastGpioWrite_Bits_0_31_Clear (~data & kParallelWriteClrMask); // clear lo data bits + kParallelWrGpio bit lo
-    fastGpioWrite_Bits_0_31_Set (data);                            // set hi data bits
-    fastGpioWrite_Bits_0_31_Set (data);                            // set hi data bits
-    fastGpioWrite_Bits_0_31_Set (data);                            // set hi data bits
-    fastGpioWrite_Bits_0_31_Set (kParallelWriteMask);              // write on kParallelWrGpio rising edge
-    }
-  }
-//}}}
-
-// specific device classes
-//{{{  cLcd7735
+//{{{  cLcdSt7735r
 constexpr uint16_t kWidth7735 = 128;
 constexpr uint16_t kHeight7735 = 160;
 constexpr static const int kSpiClock7735 = 24000000;
 
-cLcd7735::cLcd7735 (const int rotate) : cLcdSpi (kWidth7735, kHeight7735, rotate, kSpiClock7735, true, 0xFF, false) {}
+cLcdSt7735r::cLcdSt7735r (const int rotate) : cLcdSpi (kWidth7735, kHeight7735, rotate, kSpiClock7735, true, 0xFF, false) {}
 
-bool cLcd7735::initialise() {
+bool cLcdSt7735r::initialise() {
   if (initResources()) {
     initResetPin();
 
@@ -528,14 +732,14 @@ bool cLcd7735::initialise() {
   return false;
   }
 //}}}
-//{{{  cLcd9320
+//{{{  cLcdIli9320
 constexpr uint16_t kWidth9320 = 240;
 constexpr uint16_t kHeight9320 = 320;
 constexpr int kSpiClock9320 = 24000000;
 
-cLcd9320::cLcd9320 (const int rotate) : cLcdSpi(kWidth9320, kHeight9320, rotate, kSpiClock9320, false, kSpiCe0Gpio, false) {}
+cLcdIli9320::cLcdIli9320 (const int rotate) : cLcdSpi(kWidth9320, kHeight9320, rotate, kSpiClock9320, false, kSpiCe0Gpio, false) {}
 
-bool cLcd9320::initialise() {
+bool cLcdIli9320::initialise() {
   if (initResources()) {
     initResetPin();
     initChipEnablePin();
@@ -606,14 +810,14 @@ bool cLcd9320::initialise() {
   return false;
   }
 //}}}
-//{{{  cLcd9225b
+//{{{  cLcdIli9225b
 constexpr uint16_t kWidth9225b = 176;
 constexpr uint16_t kHeight9225b = 220;
 constexpr int kSpiClock9225b = 16000000;
 
-cLcd9225b::cLcd9225b (const int rotate) : cLcdSpi(kWidth9225b, kHeight9225b, rotate, kSpiClock9225b, true, 0xFF, true) {}
+cLcdIli9225b::cLcdIli9225b (const int rotate) : cLcdSpi(kWidth9225b, kHeight9225b, rotate, kSpiClock9225b, true, 0xFF, true) {}
 
-bool cLcd9225b::initialise() {
+bool cLcdIli9225b::initialise() {
   if (initResources()) {
     initResetPin();
 
@@ -681,210 +885,6 @@ bool cLcd9225b::initialise() {
     launchUpdateThread (0x22);
     return true;
     }
-  return false;
-  }
-//}}}
-//{{{  cLcd1289
-constexpr uint16_t kWidth1289 = 240;
-constexpr uint16_t kHeight1289 = 320;
-cLcd1289::cLcd1289 (const int rotate) : cLcdParallel16(kWidth1289, kHeight1289, rotate) {}
-
-bool cLcd1289::initialise() {
-  if (initResources()) {
-    initResetPin();
-
-    // wr
-    gpioSetMode (kParallelWriteGpio, PI_OUTPUT);
-    gpioWrite (kParallelWriteGpio, 1);
-
-    // rd unused
-    gpioSetMode (kParallelReadGpio, PI_OUTPUT);
-    gpioWrite (kParallelReadGpio, 1);
-
-    // rs
-    gpioSetMode (kParallelRegisterSelectGpio, PI_OUTPUT);
-    gpioWrite (kParallelRegisterSelectGpio, 1);
-
-    // parallel d0-d15
-    for (int i = 0; i < 16; i++)
-      gpioSetMode (i, PI_OUTPUT);
-    gpioWrite_Bits_0_31_Clear (kParallelDataMask);
-
-    // startup commands
-    writeCommandData (0x00, 0x0001); // SSD1289_REG_OSCILLATION
-    writeCommandData (0x03, 0xA8A4); // SSD1289_REG_POWER_CTRL_1
-    writeCommandData (0x0c, 0x0000); // SSD1289_REG_POWER_CTRL_2
-    writeCommandData (0x0d, 0x080C); // SSD1289_REG_POWER_CTRL_3
-    writeCommandData (0x0e, 0x2B00); // SSD1289_REG_POWER_CTRL_4
-    writeCommandData (0x1e, 0x00B7); // SSD1289_REG_POWER_CTRL_5
-
-    //write_reg(0x01, (1 << 13) | (par->bgr << 11) | (1 << 9) | (HEIGHT - 1));
-    writeCommandData (0x01, 0x2B3F); // SSD1289_REG_DRIVER_OUT_CTRL
-    writeCommandData (0x02, 0x0600); // SSD1289_REG_LCD_DRIVE_AC
-    writeCommandData (0x10, 0x0000); // SSD1289_REG_SLEEP_MODE
-
-    writeCommandData (0x07, 0x0233); // SSD1289_REG_DISPLAY_CTRL
-    writeCommandData (0x0b, 0x0000); // SSD1289_REG_FRAME_CYCLE
-    writeCommandData (0x0f, 0x0000); // SSD1289_REG_GATE_SCAN_START
-
-    writeCommandData (0x23, 0x0000); // SSD1289_REG_WR_DATA_MASK_1
-    writeCommandData (0x24, 0x0000); // SSD1289_REG_WR_DATA_MASK_2
-    writeCommandData (0x25, 0x8000); // SSD1289_REG_FRAME_FREQUENCY
-
-    writeCommandData (0x30, 0x0707); // SSD1289_REG_GAMMA_CTRL_1
-    writeCommandData (0x31, 0x0204); // SSD1289_REG_GAMMA_CTRL_2
-    writeCommandData (0x32, 0x0204); // SSD1289_REG_GAMMA_CTRL_3
-    writeCommandData (0x33, 0x0502); // SSD1289_REG_GAMMA_CTRL_4
-    writeCommandData (0x34, 0x0507); // SSD1289_REG_GAMMA_CTRL_5
-    writeCommandData (0x35, 0x0204); // SSD1289_REG_GAMMA_CTRL_6
-    writeCommandData (0x36, 0x0204); // SSD1289_REG_GAMMA_CTRL_7
-    writeCommandData (0x37, 0x0502); // SSD1289_REG_GAMMA_CTRL_8
-    writeCommandData (0x3a, 0x0302); // SSD1289_REG_GAMMA_CTRL_9
-    writeCommandData (0x3b, 0x0302); // SSD1289_REG_GAMMA_CTRL_10
-
-    writeCommandData (0x41, 0x0000); // SSD1289_REG_V_SCROLL_CTRL_1
-    //write_reg(0x42, 0x0000);
-    writeCommandData (0x48, 0x0000); // SSD1289_REG_FIRST_WIN_START
-    writeCommandData (0x49, 0x013F); // SSD1289_REG_FIRST_WIN_END
-
-    writeCommandData (0x44, ((kWidth1289-1) << 8) | 0); // SSD1289_REG_H_RAM_ADR_POS
-    writeCommandData (0x45, 0x0000);                    // SSD1289_REG_V_RAM_ADR_START
-    writeCommandData (0x46, kHeight1289-1);             // SSD1289_REG_V_RAM_ADR_END
-
-    int xstart = 0;
-    int ystart = 0;
-    int xres = kWidth1289-1;
-    int yres = kHeight1289-1;
-    switch (mRotate) {
-      case 90:
-        writeCommandData (0x11, 0x6040 | 0b011000); // 0x11 REG_ENTRY_MODE
-        writeCommandData (0x4e, ystart);            // 0x4E GDDRAM X address counter
-        writeCommandData (0x4f, xres - xstart);     // 0x4F GDDRAM Y address counter
-        break;
-      case 180:
-        writeCommandData (0x11, 0x6040 | 0b000000); // 0x11 REG_ENTRY_MODE
-        writeCommandData (0x4e, xres - xstart);     // 0x4E GDDRAM X address counter
-        writeCommandData (0x4f, yres - ystart);     // 0x4F GDDRAM Y address counter
-        break;
-      case 270:
-        writeCommandData (0x11, 0x6040 | 0b101000); // 0x11 REG_ENTRY_MODE
-        writeCommandData (0x4e, yres - ystart);     // 0x4E GDDRAM X address counter
-        writeCommandData (0x4f, xstart);            // 0x4F GDDRAM Y address counter
-        break;
-      default:
-        writeCommandData (0x11, 0x6040 | 0b110000); // 0x11 REG_ENTRY_MODE
-        writeCommandData (0x4e, xstart);            // 0x4E GDDRAM X address counter
-        writeCommandData (0x4f, ystart);            // 0x4F GDDRAM Y address counter
-        break;
-      }
-
-    launchUpdateThread (0x22); // SSD1289_REG_GDDRAM_DATA
-    return true;
-    }
-
-  return false;
-  }
-//}}}
-//{{{  cLcdD51e5ta7601
-constexpr uint16_t kWidthD51e5ta7601 = 320;
-constexpr uint16_t kHeightD51e5ta7601 = 480;
-cLcdD51e5ta7601::cLcdD51e5ta7601 (const int rotate) : cLcdParallel16(kWidthD51e5ta7601, kHeightD51e5ta7601, rotate) {}
-
-bool cLcdD51e5ta7601::initialise() {
-  if (initResources()) {
-    initResetPin();
-
-    // wr
-    gpioSetMode (kParallelWriteGpio, PI_OUTPUT);
-    gpioWrite (kParallelWriteGpio, 1);
-
-    // rd unused
-    gpioSetMode (kParallelReadGpio, PI_OUTPUT);
-    gpioWrite (kParallelReadGpio, 1);
-
-    // rs
-    gpioSetMode (kParallelRegisterSelectGpio, PI_OUTPUT);
-    gpioWrite (kParallelRegisterSelectGpio, 1);
-
-    // chipSelect
-    gpioSetMode (kParallelChipSelectGpio, PI_OUTPUT);
-    gpioWrite (kParallelChipSelectGpio, 0);
-
-    // backlight
-    gpioSetMode (kParallelBacklightGpio, PI_OUTPUT);
-    gpioWrite (kParallelBacklightGpio, 1);
-
-    // parallel d0-d15
-    for (int i = 0; i < 16; i++)
-      gpioSetMode (i, PI_OUTPUT);
-    gpioWrite_Bits_0_31_Clear (kParallelDataMask);
-
-    // portrait mode with (0,0) being the top left. top is the side opposite the LCD connector.
-    writeCommandData (0x01, 0x023C);
-    writeCommandData (0x02, 0x0100);
-    writeCommandData (0x03, 0x1030);
-    writeCommandData (0x08, 0x0808);
-    writeCommandData (0x0A, 0x0500);
-    writeCommandData (0x0B, 0x0000);
-    writeCommandData (0x0C, 0x0770);
-    writeCommandData (0x0D, 0x0000);
-    writeCommandData (0x0E, 0x0001);
-    writeCommandData (0x11, 0x0406);
-    writeCommandData (0x12, 0x000E);
-    writeCommandData (0x13, 0x0222);
-    writeCommandData (0x14, 0x0015);
-    writeCommandData (0x15, 0x4277);
-    writeCommandData (0x16, 0x0000);
-
-    writeCommandData (0x30, 0x6A50);
-    writeCommandData (0x31, 0x00C9);
-    writeCommandData (0x32, 0xC7BE);
-    writeCommandData (0x33, 0x0003);
-    writeCommandData (0x36, 0x3443);
-    writeCommandData (0x3B, 0x0000);
-    writeCommandData (0x3C, 0x0000);
-    writeCommandData (0x2C, 0x6A50);
-    writeCommandData (0x2D, 0x00C9);
-    writeCommandData (0x2E, 0xC7BE);
-    writeCommandData (0x2F, 0x0003);
-    writeCommandData (0x35, 0x3443);
-    writeCommandData (0x39, 0x0000);
-    writeCommandData (0x3A, 0x0000);
-    writeCommandData (0x28, 0x6A50);
-    writeCommandData (0x29, 0x00C9);
-    writeCommandData (0x2A, 0xC7BE);
-    writeCommandData (0x2B, 0x0003);
-    writeCommandData (0x34, 0x3443);
-    writeCommandData (0x37, 0x0000);
-    writeCommandData (0x38, 0x0000);
-    delayUs (10000);
-
-    writeCommandData (0x12, 0x200E);
-    delayUs (10000);
-
-    writeCommandData (0x12, 0x2003);
-    delayUs (10000);
-
-    writeCommandData (0x44, 0x013F);
-    writeCommandData (0x45, 0x0000);
-    writeCommandData (0x46, 0x01DF);
-    writeCommandData (0x47, 0x0000);
-    writeCommandData (0x20, 0x0000);
-    writeCommandData (0x21, 0x013F);
-    writeCommandData (0x07, 0x0012);
-    delayUs (10000);
-
-    writeCommandData (0x07, 0x0017);
-    delayUs (10000);
-
-    writeCommandData (0x20, 0x0000);
-    writeCommandData (0x21, 0x0000);
-
-    // startup commands
-    launchUpdateThread (0x22);
-    return true;
-    }
-
   return false;
   }
 //}}}

@@ -1,9 +1,11 @@
 // cLcd - uint16 rgb565 display classes
 #pragma once
+//{{{  includes
 #include <cstdint>
 #include <string>
+//}}}
 
-// colours - uint16 RGB565
+//{{{  colours - uint16 RGB565
 constexpr uint16_t kBlue        =  0x001F;  //   0,   0, 255
 constexpr uint16_t kNavy        =  0x000F;  //   0,   0, 128
 constexpr uint16_t kGreen       =  0x07E0;  //   0, 255,   0
@@ -22,6 +24,7 @@ constexpr uint16_t kBlack       =  0x0000;  //   0,   0,   0
 constexpr uint16_t kLightGrey   =  0xC618;  // 192, 192, 192
 constexpr uint16_t kDarkGrey    =  0x7BEF;  // 128, 128, 128
 constexpr uint16_t kWhite       =  0xFFFF;  // 255, 255, 255
+//}}}
 
 class cLcd {
 public:
@@ -88,6 +91,43 @@ private:
   };
 
 //{{{
+class cLcd16 : public cLcd {
+public:
+  cLcd16 (const uint16_t width, const uint16_t height, const int rotate)
+    : cLcd (width, height, rotate, 0xFF, false) {}
+
+  virtual ~cLcd16() {}
+
+protected:
+  virtual void rect (const uint16_t colour, const int xorg, const int yorg, const int xlen, const int ylen);
+  virtual void pixel (const uint16_t colour, const int x, const int y);
+  virtual void blendPixel (const uint16_t colour, const uint8_t alpha, const int x, const int y);
+
+  virtual void writeCommand (const uint8_t command);
+  virtual void writeCommandData (const uint8_t command, const uint16_t data);
+  virtual void writeCommandMultipleData (const uint8_t command, const uint8_t* data, const int len);
+  };
+//}}}
+//{{{
+class cLcdTa7601 : public cLcd16 {
+public:
+  cLcdTa7601 (const int rotate);
+  virtual ~cLcdTa7601() {}
+
+  virtual bool initialise();
+  };
+//}}}
+//{{{
+class cLcdSsd1289 : public cLcd16 {
+public:
+  cLcdSsd1289 (const int rotate);
+  virtual ~cLcdSsd1289() {}
+
+  virtual bool initialise();
+  };
+//}}}
+
+//{{{
 class cLcdSpi : public cLcd {
 public:
   cLcdSpi (const uint16_t width, const uint16_t height, const int rotate,
@@ -110,63 +150,26 @@ private:
   };
 //}}}
 //{{{
-class cLcdParallel16 : public cLcd {
+class cLcdSt7735r : public cLcdSpi {
 public:
-  cLcdParallel16 (const uint16_t width, const uint16_t height, const int rotate)
-    : cLcd (width, height, rotate, 0xFF, false) {}
-
-  virtual ~cLcdParallel16() {}
-
-protected:
-  virtual void rect (const uint16_t colour, const int xorg, const int yorg, const int xlen, const int ylen);
-  virtual void pixel (const uint16_t colour, const int x, const int y);
-  virtual void blendPixel (const uint16_t colour, const uint8_t alpha, const int x, const int y);
-
-  virtual void writeCommand (const uint8_t command);
-  virtual void writeCommandData (const uint8_t command, const uint16_t data);
-  virtual void writeCommandMultipleData (const uint8_t command, const uint8_t* data, const int len);
-  };
-//}}}
-
-//{{{
-class cLcd7735 : public cLcdSpi {
-public:
-  cLcd7735 (const int rotate);
-  virtual ~cLcd7735() {}
+  cLcdSt7735r (const int rotate);
+  virtual ~cLcdSt7735r() {}
   virtual bool initialise();
   };
 //}}}
 //{{{
-class cLcd9320 : public cLcdSpi {
+class cLcdIli9320 : public cLcdSpi {
 public:
-  cLcd9320 (const int rotate);
-  virtual ~cLcd9320() {}
+  cLcdIli9320 (const int rotate);
+  virtual ~cLcdIli9320() {}
   virtual bool initialise();
   };
 //}}}
 //{{{
-class cLcd9225b : public cLcdSpi {
+class cLcdIli9225b : public cLcdSpi {
 public:
-  cLcd9225b (const int rotate);
-  virtual ~cLcd9225b() {}
-  virtual bool initialise();
-  };
-//}}}
-//{{{
-class cLcd1289 : public cLcdParallel16 {
-public:
-  cLcd1289 (const int rotate);
-  virtual ~cLcd1289() {}
-
-  virtual bool initialise();
-  };
-//}}}
-//{{{
-class cLcdD51e5ta7601 : public cLcdParallel16 {
-public:
-  cLcdD51e5ta7601 (const int rotate);
-  virtual ~cLcdD51e5ta7601() {}
-
+  cLcdIli9225b (const int rotate);
+  virtual ~cLcdIli9225b() {}
   virtual bool initialise();
   };
 //}}}
