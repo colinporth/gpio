@@ -310,6 +310,7 @@ foundRight:
   return true;
   }
 //}}}
+
 //{{{
 void diffScanlineSpansFastCoarse4Wide (uint16_t* frameBuf, uint16_t* prevframeBuf, sSpan*& head) {
 
