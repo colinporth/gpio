@@ -312,77 +312,6 @@ foundRight:
 //}}}
 
 //{{{
-void diffScanlineSpansFastCoarse4Wide (uint16_t* frameBuf, uint16_t* prevframeBuf, sSpan*& head) {
-
-  int numSpans = 0;
-  int y =  0;
-  int yInc = 1;
-
-  int scanlineInc = 480 >> 2;
-  uint64_t* scanline = (uint64_t*)(frameBuf + y * 480);
-
-  // same scanline from previous frame
-  uint64_t* prevScanline = (uint64_t*)(prevframeBuf + y * 480);
-
-  const int W = 480 >> 2;
-
-  sSpan* span = spans;
-  while (y < 320) {
-    uint16_t* scanlineStart = (uint16_t *)scanline;
-
-    for (int x = 0; x < W;) {
-      if (scanline[x] != prevScanline[x]) {
-        uint16_t* spanStart = (uint16_t*)(scanline + x) + (__builtin_ctzll (scanline[x] ^ prevScanline[x]) >> 4);
-        ++x;
-
-        // We've found a start of a span of different pixels on this scanline, now find where this span ends
-        uint16_t* spanEnd;
-        for (;;) {
-          if (x < W) {
-            if (scanline[x] != prevScanline[x]) {
-              ++x;
-              continue;
-              }
-            else {
-              spanEnd = (uint16_t*)(scanline + x) + 1 - (__builtin_clzll(scanline[x-1] ^ prevScanline[x-1]) >> 4);
-              ++x;
-              break;
-              }
-            }
-          else {
-            spanEnd = scanlineStart + 480;
-            break;
-            }
-          }
-
-        // Submit the span update task
-        span->x = spanStart - scanlineStart;
-        span->endX = span->lastScanEndX = spanEnd - scanlineStart;
-        span->y = y;
-        span->endY = y+1;
-        span->size = spanEnd - spanStart;
-        span->next = span+1;
-        ++span;
-        ++numSpans;
-        }
-      else
-        ++x;
-      }
-
-    y += yInc;
-    scanline += scanlineInc;
-    prevScanline += scanlineInc;
-    }
-
-  if (numSpans > 0) {
-    head = &spans[0];
-    spans[numSpans-1].next = 0;
-    }
-  else
-    head = 0;
-  }
-//}}}
-//{{{
 void diffScanlineSpansExact (uint16_t* frameBuf, uint16_t* prevframeBuf, sSpan*& head) {
 
   int numSpans = 0;
@@ -471,6 +400,77 @@ void diffScanlineSpansExact (uint16_t* frameBuf, uint16_t* prevframeBuf, sSpan*&
   }
 //}}}
 //{{{
+void diffScanlineSpansFastCoarse4Wide (uint16_t* frameBuf, uint16_t* prevframeBuf, sSpan*& head) {
+
+  int numSpans = 0;
+  int y =  0;
+  int yInc = 1;
+
+  int scanlineInc = 480 >> 2;
+  uint64_t* scanline = (uint64_t*)(frameBuf + y * 480);
+
+  // same scanline from previous frame
+  uint64_t* prevScanline = (uint64_t*)(prevframeBuf + y * 480);
+
+  const int W = 480 >> 2;
+
+  sSpan* span = spans;
+  while (y < 320) {
+    uint16_t* scanlineStart = (uint16_t *)scanline;
+
+    for (int x = 0; x < W;) {
+      if (scanline[x] != prevScanline[x]) {
+        uint16_t* spanStart = (uint16_t*)(scanline + x) + (__builtin_ctzll (scanline[x] ^ prevScanline[x]) >> 4);
+        ++x;
+
+        // We've found a start of a span of different pixels on this scanline, now find where this span ends
+        uint16_t* spanEnd;
+        for (;;) {
+          if (x < W) {
+            if (scanline[x] != prevScanline[x]) {
+              ++x;
+              continue;
+              }
+            else {
+              spanEnd = (uint16_t*)(scanline + x) + 1 - (__builtin_clzll(scanline[x-1] ^ prevScanline[x-1]) >> 4);
+              ++x;
+              break;
+              }
+            }
+          else {
+            spanEnd = scanlineStart + 480;
+            break;
+            }
+          }
+
+        // Submit the span update task
+        span->x = spanStart - scanlineStart;
+        span->endX = span->lastScanEndX = spanEnd - scanlineStart;
+        span->y = y;
+        span->endY = y+1;
+        span->size = spanEnd - spanStart;
+        span->next = span+1;
+        ++span;
+        ++numSpans;
+        }
+      else
+        ++x;
+      }
+
+    y += yInc;
+    scanline += scanlineInc;
+    prevScanline += scanlineInc;
+    }
+
+  if (numSpans > 0) {
+    head = &spans[0];
+    spans[numSpans-1].next = 0;
+    }
+  else
+    head = 0;
+  }
+//}}}
+//{{{
 void mergeScanlineSpans (sSpan* listHead) {
 
   for (sSpan* i = listHead; i; i = i->next) {
@@ -556,6 +556,7 @@ int main (int numArgs, char* args[]) {
   //}}}
   //{{{  dispmanx
   bcm_host_init();
+
   DISPMANX_DISPLAY_HANDLE_T display = vc_dispmanx_display_open (0);
   if (!display) {
     //{{{  error return
@@ -586,8 +587,8 @@ int main (int numArgs, char* args[]) {
   vc_dispmanx_rect_set (&vcRect, 0, 0, 480, 320);
   //}}}
 
-  char* screenBuf = (char*)malloc (480 * 320 * 2);
-  char* lastScreenBuf = (char*)malloc (480 * 320 * 2);
+  char* screenBuf = (char*)aligned_alloc (480 * 320 * 2, 32);
+  char* lastScreenBuf = (char*)aligned_alloc (480 * 320 * 2, 32);
 
   lcd->clear (kOrange);
 
@@ -598,10 +599,11 @@ int main (int numArgs, char* args[]) {
 
     double startTime = lcd->time();
     if (diffSingleRect ((uint16_t*)screenBuf, (uint16_t*)lastScreenBuf, spans)) {
-      int took = int((lcd->time()-startTime) * 10000000);
+      int diffTook = int((lcd->time()-startTime) * 10000000);
+
       i++;
       lcd->copyRotate ((uint16_t*)screenBuf, 480, 320);
-      lcd->text (kWhite, 0,0, 22, dec(i) + " " + dec(lcd->getUpdateUs(),5) + " " + dec(took,5));
+      lcd->text (kWhite, 0,0, 22, dec(i) + " upd:" + dec(lcd->getUpdateUs(),5) + " diff:" + dec(diffTook,5));
 
       lcd->rectOutline (kRed, 320-spans->endY, spans->x,  spans->endY - spans->y + 1, spans->endX - spans->x + 1);
       lcd->update();
@@ -615,6 +617,7 @@ int main (int numArgs, char* args[]) {
     }
 
   free (screenBuf);
+
   free (lastScreenBuf);
   vc_dispmanx_resource_delete (screenGrab);
   vc_dispmanx_display_close (display);
