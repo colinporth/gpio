@@ -18,6 +18,7 @@
 using namespace std;
 //}}}
 
+#define SPAN_MERGE_THRESHOLD 8
 #define SWAPU32(x, y) { uint32_t tmp = x; x = y; y = tmp; }
 //{{{
 struct sSpan {
@@ -32,81 +33,83 @@ struct sSpan {
   sSpan* next; // Maintain a linked skip list inside the array for fast seek to next active element when pruning
   };
 //}}}
+
 sSpan* spans = (sSpan*)malloc ((480 * 320 / 2) * sizeof(sSpan));
 
 //{{{
-// Coarse diffing of two framebuffers with tight stride, 16 pixels at a time
+int coarseLinearDiff (uint16_t* frameBuf, uint16_t* prevframeBuf, uint16_t* frameBufEnd) {
+// Coarse diffing of two frameBufs with tight stride, 16 pixels at a time
 // Finds the first changed pixel, coarse result aligned down to 8 pixels boundary
-int coarseLinearDiff (uint16_t* framebuffer, uint16_t* prevFramebuffer, uint16_t* framebufferEnd) {
 
   uint16_t* endPtr;
 
   asm volatile(
-    "mov r0, %[framebufferEnd]\n" // r0 <- pointer to end of current framebuffer
-    "mov r1, %[framebuffer]\n"   // r1 <- current framebuffer
-    "mov r2, %[prevFramebuffer]\n" // r2 <- framebuffer of previous frame
+    "mov r0, %[frameBufEnd]\n"   // r0 <- pointer to end of current frameBuf
+    "mov r1, %[frameBuf]\n"      // r1 <- current frameBuf
+    "mov r2, %[prevframeBuf]\n"  // r2 <- frameBuf of previous frame
 
     "start_%=:\n"
-      "pld [r1, #128]\n" // preload data caches for both current and previous framebuffers 128 bytes ahead of time
+      "pld [r1, #128]\n" // preload data caches for both current and previous frameBufs 128 bytes ahead of time
       "pld [r2, #128]\n"
 
-      "ldmia r1!, {r3,r4,r5,r6}\n" // load 4x32-bit elements (8 pixels) of current framebuffer
-      "ldmia r2!, {r7,r8,r9,r10}\n" // load corresponding 4x32-bit elements (8 pixels) of previous framebuffer
-      "cmp r3, r7\n" // compare all 8 pixels if they are different
+      "ldmia r1!, {r3,r4,r5,r6}\n"  // load 4x32-bit elements (8 pixels) of current frameBuf
+      "ldmia r2!, {r7,r8,r9,r10}\n" // load corresponding 4x32-bit elements (8 pixels) of previous frameBuf
+      "cmp r3, r7\n"                // compare all 8 pixels if they are different
       "cmpeq r4, r8\n"
       "cmpeq r5, r9\n"
       "cmpeq r6, r10\n"
-      "bne end_%=\n" // if we found a difference, we are done
+      "bne end_%=\n"                // if we found a difference, we are done
 
-      // Unroll once for another set of 4x32-bit elements. On Raspberry Pi Zero, data cache line is 32 bytes in size, so one iteration
-      // of the loop computes a single data cache line, with preloads in place at the top.
+      // Unroll once for another set of 4x32-bit elements.
+      // On Raspberry Pi Zero, data cache line is 32 bytes in size
+      // one iteration of the loop computes a single data cache line, with preloads in place at the top.
       "ldmia r1!, {r3,r4,r5,r6}\n"
       "ldmia r2!, {r7,r8,r9,r10}\n"
       "cmp r3, r7\n"
       "cmpeq r4, r8\n"
       "cmpeq r5, r9\n"
       "cmpeq r6, r10\n"
-      "bne end_%=\n" // if we found a difference, we are done
+      "bne end_%=\n"                // if we found a difference, we are done
 
-      "cmp r0, r1\n" // framebuffer == framebufferEnd? did we finish through the array?
+      "cmp r0, r1\n"                // frameBuf == frameBufEnd? did we finish through the array?
       "bne start_%=\n"
       "b done_%=\n"
 
     "end_%=:\n"
-      "sub r1, r1, #16\n" // ldmia r1! increments r1 after load, so subtract back the last increment in order to not shoot past the first changed pixels
-
+      "sub r1, r1, #16\n"           // ldmia r1! increments r1 after load
+                                    //subtract back last increment in order to not shoot past the first changed pixels
     "done_%=:\n"
-      "mov %[endPtr], r1\n" // output endPtr back to C code
+      "mov %[endPtr], r1\n"         // output endPtr back to C code
       : [endPtr]"=r"(endPtr)
-      : [framebuffer]"r"(framebuffer), [prevFramebuffer]"r"(prevFramebuffer), [framebufferEnd]"r"(framebufferEnd)
+      : [frameBuf]"r"(frameBuf), [prevframeBuf]"r"(prevframeBuf), [frameBufEnd]"r"(frameBufEnd)
       : "r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7", "r8", "r9", "r10", "cc"
     );
 
-  return endPtr - framebuffer;
+  return endPtr - frameBuf;
   }
 //}}}
 //{{{
+int coarseBackwardsLinearDiff (uint16_t* frameBuf, uint16_t* prevframeBuf, uint16_t* frameBufEnd) {
 // Same as coarse_linear_diff, but finds the last changed pixel in linear order instead of first, i.e.
 // Finds the last changed pixel, coarse result aligned up to 8 pixels boundary
-int coarseBackwardsLinearDiff (uint16_t* framebuffer, uint16_t* prevFramebuffer, uint16_t* framebufferEnd) {
 
-  uint16_t *endPtr;
+  uint16_t* endPtr;
   asm volatile(
-    "mov r0, %[framebufferBegin]\n" // r0 <- pointer to beginning of current framebuffer
-    "mov r1, %[framebuffer]\n"   // r1 <- current framebuffer (starting from end of framebuffer)
-    "mov r2, %[prevFramebuffer]\n" // r2 <- framebuffer of previous frame (starting from end of framebuffer)
+    "mov r0, %[frameBufBegin]\n" // r0 <- pointer to beginning of current frameBuf
+    "mov r1, %[frameBuf]\n"      // r1 <- current frameBuf (starting from end of frameBuf)
+    "mov r2, %[prevframeBuf]\n"  // r2 <- frameBuf of previous frame (starting from end of frameBuf)
 
     "start_%=:\n"
-      "pld [r1, #-128]\n" // preload data caches for both current and previous framebuffers 128 bytes ahead of time
+      "pld [r1, #-128]\n"           // preload data caches for both current and previous frameBufs 128 bytes ahead of time
       "pld [r2, #-128]\n"
 
-      "ldmdb r1!, {r3,r4,r5,r6}\n" // load 4x32-bit elements (8 pixels) of current framebuffer
-      "ldmdb r2!, {r7,r8,r9,r10}\n" // load corresponding 4x32-bit elements (8 pixels) of previous framebuffer
-      "cmp r3, r7\n" // compare all 8 pixels if they are different
+      "ldmdb r1!, {r3,r4,r5,r6}\n"  // load 4x32-bit elements (8 pixels) of current frameBuf
+      "ldmdb r2!, {r7,r8,r9,r10}\n" // load corresponding 4x32-bit elements (8 pixels) of previous frameBuf
+      "cmp r3, r7\n"                // compare all 8 pixels if they are different
       "cmpeq r4, r8\n"
       "cmpeq r5, r9\n"
       "cmpeq r6, r10\n"
-      "bne end_%=\n" // if we found a difference, we are done
+      "bne end_%=\n"                // if we found a difference, we are done
 
       // Unroll once for another set of 4x32-bit elements. On Raspberry Pi Zero, data cache line is 32 bytes in size, so one iteration
       // of the loop computes a single data cache line, with preloads in place at the top.
@@ -116,50 +119,50 @@ int coarseBackwardsLinearDiff (uint16_t* framebuffer, uint16_t* prevFramebuffer,
       "cmpeq r4, r8\n"
       "cmpeq r5, r9\n"
       "cmpeq r6, r10\n"
-      "bne end_%=\n" // if we found a difference, we are done
+      "bne end_%=\n"                // if we found a difference, we are done
 
-      "cmp r0, r1\n" // framebuffer == framebufferEnd? did we finish through the array?
+      "cmp r0, r1\n"                // frameBuf == frameBufEnd? did we finish through the array?
       "bne start_%=\n"
       "b done_%=\n"
 
     "end_%=:\n"
-      "add r1, r1, #16\n" // ldmdb r1! decrements r1 before load, so add back the last decrement in order to not shoot past the first changed pixels
-
+      "add r1, r1, #16\n"           // ldmdb r1! decrements r1 before load,
+                                    // so add back the last decrement in order to not shoot past the first changed pixels
     "done_%=:\n"
-      "mov %[endPtr], r1\n" // output endPtr back to C code
+      "mov %[endPtr], r1\n"         // output endPtr back to C code
       : [endPtr]"=r"(endPtr)
-      : [framebuffer]"r"(framebufferEnd), [prevFramebuffer]"r"(prevFramebuffer+(framebufferEnd-framebuffer)), [framebufferBegin]"r"(framebuffer)
+      : [frameBuf]"r"(frameBufEnd), [prevframeBuf]"r"(prevframeBuf+(frameBufEnd-frameBuf)), [frameBufBegin]"r"(frameBuf)
       : "r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7", "r8", "r9", "r10", "cc"
     );
 
-  return endPtr - framebuffer;
+  return endPtr - frameBuf;
   }
 //}}}
 //{{{
-bool diffFramebuffersToSingleChangedRectangle (uint16_t* framebuffer, uint16_t* prevFramebuffer, sSpan*& head) {
+bool diffSingleRect (uint16_t* frameBuf, uint16_t* prevframeBuf, sSpan*& head) {
 
   int minY = 0;
   int minX = -1;
 
   const int stride = 480; // Stride as uint16 elements.
-  const int WidthAligned4 = (uint32_t)480 & ~3u;
+  const int widthAligned4 = (uint32_t)480 & ~3u;
 
-  uint16_t* scanline = framebuffer;
-  uint16_t* prevScanline = prevFramebuffer;
+  uint16_t* scanline = frameBuf;
+  uint16_t* prevScanline = prevframeBuf;
 
-  bool framebufferSizeCompatibleWithCoarseDiff = true;
-  if (framebufferSizeCompatibleWithCoarseDiff) {
+  bool frameBufSizeCompatibleWithCoarseDiff = true;
+  if (frameBufSizeCompatibleWithCoarseDiff) {
     //{{{  coarse diff
     // Coarse diff computes a diff at 8 adjacent pixels at a time
     // returns the point to the 8-pixel aligned coordinate where the pixels began to differ.
 
     int numPixels = 480 * 320;
-    int firstDiff = coarseLinearDiff (framebuffer, prevFramebuffer, framebuffer + numPixels);
+    int firstDiff = coarseLinearDiff (frameBuf, prevframeBuf, frameBuf + numPixels);
     if (firstDiff == numPixels)
       return false; // No pixels changed, nothing to do.
 
     // Compute the precise diff position here.
-    while (framebuffer[firstDiff] == prevFramebuffer[firstDiff])
+    while (frameBuf[firstDiff] == prevframeBuf[firstDiff])
       ++firstDiff;
 
     minX = firstDiff % 480;
@@ -171,11 +174,11 @@ bool diffFramebuffersToSingleChangedRectangle (uint16_t* framebuffer, uint16_t* 
     while (minY < 320) {
       int x = 0;
       // diff 4 pixels at a time
-      for (; x < WidthAligned4; x += 4) {
+      for (; x < widthAligned4; x += 4) {
         uint64_t diff = *(uint64_t*)(scanline+x) ^ *(uint64_t*)(prevScanline+x);
         if (diff) {
-          minX = x + (__builtin_ctzll(diff) >> 4);
-          goto found_top;
+          minX = x + (__builtin_ctzll (diff) >> 4);
+          goto foundTop;
           }
         }
 
@@ -184,7 +187,7 @@ bool diffFramebuffersToSingleChangedRectangle (uint16_t* framebuffer, uint16_t* 
         uint16_t diff = *(scanline+x) ^ *(prevScanline+x);
         if (diff) {
           minX = x;
-          goto found_top;
+          goto foundTop;
           }
         }
 
@@ -198,46 +201,47 @@ bool diffFramebuffersToSingleChangedRectangle (uint16_t* framebuffer, uint16_t* 
     }
     //}}}
 
-found_top:
+foundTop:
   //{{{  found top
   int maxX = -1;
-  int maxY = 320-1;
+  int maxY = 320 - 1;
 
-  if (framebufferSizeCompatibleWithCoarseDiff) {
+  if (frameBufSizeCompatibleWithCoarseDiff) {
     int numPixels = 480 * 320;
-    int firstDiff = coarseBackwardsLinearDiff (framebuffer, prevFramebuffer, framebuffer + numPixels);
-    // Coarse diff computes a diff at 8 adjacent pixels at a time
-    // returns the point to the 8-pixel aligned coordinate where the pixels began to differ.
 
-    // Compute the precise diff position here.
-    while (firstDiff > 0 && framebuffer[firstDiff] == prevFramebuffer[firstDiff])
+    // coarse diff computes a diff at 8 adjacent pixels at a time
+    // returns the point to the 8-pixel aligned coordinate where the pixels began to differ.
+    int firstDiff = coarseBackwardsLinearDiff (frameBuf, prevframeBuf, frameBuf + numPixels);
+
+    // compute the precise diff position here.
+    while (firstDiff > 0 && frameBuf[firstDiff] == prevframeBuf[firstDiff])
       --firstDiff;
     maxX = firstDiff % 480;
     maxY = firstDiff / 480;
     }
 
   else {
-    scanline = framebuffer + (320 - 1)*stride;
+    scanline = frameBuf + (320 - 1)*stride;
     // same scanline from previous frame, not preceding scanline
-    prevScanline = prevFramebuffer + (320 - 1)*stride;
+    prevScanline = prevframeBuf + (320 - 1)*stride;
 
     while (maxY >= minY) {
       int x = 480-1;
       // tail unaligned 0-3 pixels one by one
-      for (; x >= WidthAligned4; --x) {
+      for (; x >= widthAligned4; --x) {
         if (scanline[x] != prevScanline[x]) {
           maxX = x;
-          goto found_bottom;
+          goto foundBottom;
           }
         }
 
       // diff 4 pixels at a time
       x = x & ~3u;
-      for(; x >= 0; x -= 4) {
-        uint64_t diff = *(uint64_t*)(scanline+x) ^ *(uint64_t*)(prevScanline+x);
+      for (; x >= 0; x -= 4) {
+        uint64_t diff = *(uint64_t*)(scanline + x) ^ *(uint64_t*)(prevScanline + x);
         if (diff) {
           maxX = x + 3 - (__builtin_clzll(diff) >> 4);
-          goto found_bottom;
+          goto foundBottom;
           }
         }
 
@@ -248,10 +252,10 @@ found_top:
     }
   //}}}
 
-found_bottom:
+foundBottom:
   //{{{  found bottom
-  scanline = framebuffer + minY*stride;
-  prevScanline = prevFramebuffer + minY*stride;
+  scanline = frameBuf + minY*stride;
+  prevScanline = prevframeBuf + minY*stride;
 
   int lastScanEndX = maxX;
   if (minX > maxX)
@@ -263,7 +267,8 @@ found_bottom:
     uint16_t* prevS = prevScanline + leftX;
     for (int y = minY; y <= maxY; ++y) {
       if (*s != *prevS)
-        goto found_left;
+        goto foundLeft;
+
       s += stride;
       prevS += stride;
       }
@@ -272,15 +277,16 @@ found_bottom:
     }
   //}}}
 
-found_left:
+foundLeft:
   //{{{  found left
   int rightX = 480-1;
   while (rightX > maxX) {
     uint16_t* s = scanline + rightX;
     uint16_t* prevS = prevScanline + rightX;
-    for(int y = minY; y <= maxY; ++y) {
+    for (int y = minY; y <= maxY; ++y) {
       if (*s != *prevS)
-        goto found_right;
+        goto foundRight;
+
       s += stride;
       prevS += stride;
       }
@@ -289,7 +295,7 @@ found_left:
     }
   //}}}
 
-found_right:
+foundRight:
   head = spans;
 
   head->x = leftX;
@@ -304,8 +310,203 @@ found_right:
   return true;
   }
 //}}}
+//{{{
+void diffScanlineSpansFastCoarse4Wide (uint16_t* frameBuf, uint16_t* prevframeBuf, sSpan*& head) {
 
-// DiffFramebuffersToSingleChangedRectangle(framebuffer[0], framebuffer[1], head);
+  int numSpans = 0;
+  int y =  0;
+  int yInc = 1;
+
+  int scanlineInc = 480 >> 2;
+  uint64_t* scanline = (uint64_t*)(frameBuf + y * 480);
+
+  // same scanline from previous frame
+  uint64_t* prevScanline = (uint64_t*)(prevframeBuf + y * 480);
+
+  const int W = 480 >> 2;
+
+  sSpan* span = spans;
+  while (y < 320) {
+    uint16_t* scanlineStart = (uint16_t *)scanline;
+
+    for (int x = 0; x < W;) {
+      if (scanline[x] != prevScanline[x]) {
+        uint16_t* spanStart = (uint16_t*)(scanline + x) + (__builtin_ctzll (scanline[x] ^ prevScanline[x]) >> 4);
+        ++x;
+
+        // We've found a start of a span of different pixels on this scanline, now find where this span ends
+        uint16_t* spanEnd;
+        for (;;) {
+          if (x < W) {
+            if (scanline[x] != prevScanline[x]) {
+              ++x;
+              continue;
+              }
+            else {
+              spanEnd = (uint16_t*)(scanline + x) + 1 - (__builtin_clzll(scanline[x-1] ^ prevScanline[x-1]) >> 4);
+              ++x;
+              break;
+              }
+            }
+          else {
+            spanEnd = scanlineStart + 480;
+            break;
+            }
+          }
+
+        // Submit the span update task
+        span->x = spanStart - scanlineStart;
+        span->endX = span->lastScanEndX = spanEnd - scanlineStart;
+        span->y = y;
+        span->endY = y+1;
+        span->size = spanEnd - spanStart;
+        span->next = span+1;
+        ++span;
+        ++numSpans;
+        }
+      else
+        ++x;
+      }
+
+    y += yInc;
+    scanline += scanlineInc;
+    prevScanline += scanlineInc;
+    }
+
+  if (numSpans > 0) {
+    head = &spans[0];
+    spans[numSpans-1].next = 0;
+    }
+  else
+    head = 0;
+  }
+//}}}
+//{{{
+void diffScanlineSpansExact (uint16_t* frameBuf, uint16_t* prevframeBuf, sSpan*& head) {
+
+  int numSpans = 0;
+  int y = 0;
+  int yInc = 1;
+
+  int scanlineInc = 480;
+  int scanlineEndInc = scanlineInc - 480;
+  uint16_t* scanline = frameBuf + y * 480;
+
+  // same scanline from previous frame
+  uint16_t* prevScanline = prevframeBuf + y * 480;
+
+  while (y < 320) {
+    uint16_t* scanlineStart = scanline;
+    uint16_t* scanlineEnd = scanline + 480;
+    while (scanline < scanlineEnd) {
+      uint16_t* spanStart;
+      uint16_t* spanEnd;
+      int numConsecutiveUnchangedPixels = 0;
+
+      if (scanline + 1 < scanlineEnd) {
+        uint32_t diff = (*(uint32_t*)scanline) ^ (*(uint32_t*)prevScanline);
+        scanline += 2;
+        prevScanline += 2;
+
+        if (diff == 0) // Both 1st and 2nd pixels are the same
+          continue;
+
+        if ((diff & 0xFFFF) == 0) {
+          // 1st pixels are the same, 2nd pixels are not
+          spanStart = scanline - 1;
+          spanEnd = scanline;
+          }
+        else {
+          // 1st pixels are different
+          spanStart = scanline - 2;
+          if ((diff & 0xFFFF0000u) != 0) // 2nd pixels are different?
+            spanEnd = scanline;
+          else {
+            spanEnd = scanline - 1;
+            numConsecutiveUnchangedPixels = 1;
+            }
+          }
+
+        // We've found a start of a span of different pixels on this scanline, now find where this span ends
+        while (scanline < scanlineEnd) {
+          if (*scanline++ != *prevScanline++) {
+            spanEnd = scanline;
+            numConsecutiveUnchangedPixels = 0;
+            }
+          else {
+            if (++numConsecutiveUnchangedPixels > SPAN_MERGE_THRESHOLD)
+              break;
+            }
+          }
+        }
+      else {
+        // handle the single last pixel on the row
+        if (*scanline++ == *prevScanline++)
+          break;
+
+        spanStart = scanline - 1;
+        spanEnd = scanline;
+        }
+
+      // Submit the span update task
+      sSpan* span = spans + numSpans;
+      span->x = spanStart - scanlineStart;
+      span->endX = span->lastScanEndX = spanEnd - scanlineStart;
+      span->y = y;
+      span->endY = y+1;
+      span->size = spanEnd - spanStart;
+      if (numSpans > 0)
+        span[-1].next = span;
+      else
+        head = span;
+      span->next = 0;
+      ++numSpans;
+      }
+
+    y += yInc;
+    scanline += scanlineEndInc;
+    prevScanline += scanlineEndInc;
+    }
+  }
+//}}}
+//{{{
+void mergeScanlineSpans (sSpan* listHead) {
+
+  for (sSpan* i = listHead; i; i = i->next) {
+    sSpan* prev = i;
+    for (sSpan* j = i->next; j; j = j->next) {
+      // If the spans i and j are vertically apart, don't attempt to merge span i any further
+      // since all spans >= j will also be farther vertically apart.
+      // (the list is nondecreasing with respect to Span::y)
+      if (j->y > i->endY)
+        break;
+
+      // Merge the spans i and j, and figure out the wastage of doing so
+      int x = std::min (i->x, j->x);
+      int y = std::min (i->y, j->y);
+      int endX = std::max (i->endX, j->endX);
+      int endY = std::max (i->endY, j->endY);
+      int lastScanEndX = (endY > i->endY) ?
+                           j->lastScanEndX : ((endY > j->endY) ?
+                             i->lastScanEndX : std::max (i->lastScanEndX, j->lastScanEndX));
+      int newSize = (endX - x) * (endY - y - 1) + (lastScanEndX - x);
+      int wastedPixels = newSize - i->size - j->size;
+      if (wastedPixels <= SPAN_MERGE_THRESHOLD) {
+        i->x = x;
+        i->y = y;
+        i->endX = endX;
+        i->endY = endY;
+        i->lastScanEndX = lastScanEndX;
+        i->size = newSize;
+        prev->next = j->next;
+        j = prev;
+        }
+      else // Not merging - travel to next node remembering where we came from
+        prev = j;
+        }
+      }
+    }
+//}}}
 
 int main (int numArgs, char* args[]) {
 
@@ -395,11 +596,11 @@ int main (int numArgs, char* args[]) {
     vc_dispmanx_resource_read_data (screenGrab, &vcRect, screenBuf, 480 * 2);
 
     double startTime = lcd->time();
-    if (diffFramebuffersToSingleChangedRectangle ((uint16_t*)screenBuf, (uint16_t*)lastScreenBuf, spans)) {
+    if (diffSingleRect ((uint16_t*)screenBuf, (uint16_t*)lastScreenBuf, spans)) {
       int took = int((lcd->time()-startTime) * 10000000);
       i++;
       lcd->copyRotate ((uint16_t*)screenBuf, 480, 320);
-      lcd->text (kWhite, 0,0, 22, dec(i) + " " + dec (lcd->getUpdateUs(),5) + " " + dec(took,5));
+      lcd->text (kWhite, 0,0, 22, dec(i) + " " + dec(lcd->getUpdateUs(),5) + " " + dec(took,5));
 
       lcd->rectOutline (kRed, 320-spans->endY, spans->x,  spans->endY - spans->y + 1, spans->endX - spans->x + 1);
       lcd->update();
