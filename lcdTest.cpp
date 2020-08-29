@@ -63,7 +63,7 @@ int main (int numArgs, char* args[]) {
   //munmap (fbp, finfo.smem_len);
   //close (fbfd);
   //}}}
-
+  //{{{  dispmanx
   bcm_host_init();
   DISPMANX_DISPLAY_HANDLE_T display = vc_dispmanx_display_open (0);
   if (!display) {
@@ -94,6 +94,7 @@ int main (int numArgs, char* args[]) {
   VC_RECT_T vcRect;
   vc_dispmanx_rect_set (&vcRect, 0, 0, 480, 320);
   char* screenBuf = (char*)malloc (480 * 320 * 2);
+  //}}}
 
   lcd->clear (kOrange);
 
@@ -102,7 +103,7 @@ int main (int numArgs, char* args[]) {
     vc_dispmanx_snapshot (display, screenGrab, DISPMANX_TRANSFORM_T(0));
     vc_dispmanx_resource_read_data (screenGrab, &vcRect, screenBuf, 480 * 2);
     lcd->copyRotate ((uint16_t*)screenBuf, 480, 320);
-    lcd->text (kWhite, 0,0, 16, dec(i++,3));
+    lcd->text (kWhite, 0,0, 16, dec(i++) + " " + dec (lcd->getUpdateUs()));
     lcd->update();
     lcd->delayUs (16000);
     }

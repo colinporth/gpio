@@ -203,7 +203,7 @@ void cLcd::launchUpdateThread (const uint8_t command) {
         mChanged = false;
 
         double startTime = time_time();
-        writeCommandMultipleData (command, (const uint8_t*)mFrameBuf, getWidth() * getHeight() * 2);
+        writeCommandMultiData (command, (const uint8_t*)mFrameBuf, getWidth() * getHeight() * 2);
         mUpdateUs = (int)((time_time() - startTime) * 1000000.0);
         }
 
@@ -327,7 +327,7 @@ void cLcd16::writeCommandData (const uint8_t command, const uint16_t data) {
   }
 //}}}
 //{{{
-void cLcd16::writeCommandMultipleData (const uint8_t command, const uint8_t* dataPtr, const int len) {
+void cLcd16::writeCommandMultiData (const uint8_t command, const uint8_t* dataPtr, const int len) {
 
   writeCommand (command);
 
@@ -569,7 +569,7 @@ cLcdSpi::~cLcdSpi() {
 //{{{
 void cLcdSpi::initSpi() {
 // if mChipEnableGpio then disable autoSpiCe0
-// - can't send multiple SPI's without pulsing CE screwing up dataSequence
+// - can't send multi SPI's without pulsing CE screwing up dataSequence
 
   mSpiHandle = spiOpen (0, mSpiClock, (mSpiMode0 ? 0 : 3) | ((mChipEnableGpio == 0xFF) ? 0x00 : 0x40));
   }
@@ -609,7 +609,7 @@ void cLcdSpi::writeCommandData (const uint8_t command, const uint16_t data) {
   }
 //}}}
 //{{{
-void cLcdSpi::writeCommandMultipleData (const uint8_t command, const uint8_t* dataPtr, const int len) {
+void cLcdSpi::writeCommandMultiData (const uint8_t command, const uint8_t* dataPtr, const int len) {
 
   writeCommand (command);
 
@@ -702,26 +702,26 @@ bool cLcdSt7735r::initialise() {
     writeCommand (k7335_SLPOUT);
     delayUs (120000);
 
-    writeCommandMultipleData (k7335_FRMCTR1, k7335_FRMCTRData, 3); // frameRate normal mode
-    writeCommandMultipleData (k7335_FRMCTR2, k7335_FRMCTRData, 3); // frameRate idle mode
-    writeCommandMultipleData (k7335_FRMCTR3, k7335_FRMCTRData, 6); // frameRate partial mode
-    writeCommandMultipleData (k7335_INVCTR, k7335_INVCTRData, sizeof(k7335_INVCTRData)); // Inverted mode off
+    writeCommandMultiData (k7335_FRMCTR1, k7335_FRMCTRData, 3); // frameRate normal mode
+    writeCommandMultiData (k7335_FRMCTR2, k7335_FRMCTRData, 3); // frameRate idle mode
+    writeCommandMultiData (k7335_FRMCTR3, k7335_FRMCTRData, 6); // frameRate partial mode
+    writeCommandMultiData (k7335_INVCTR, k7335_INVCTRData, sizeof(k7335_INVCTRData)); // Inverted mode off
 
-    writeCommandMultipleData (k7335_PWCTR1, k7335_PowerControlData1, sizeof(k7335_PowerControlData1)); // POWER CONTROL 1
-    writeCommandMultipleData (k7335_PWCTR2, k7335_PowerControlData2, sizeof(k7335_PowerControlData2)); // POWER CONTROL 2
-    writeCommandMultipleData (k7335_PWCTR3, k7335_PowerControlData3, sizeof(k7335_PowerControlData3)); // POWER CONTROL 3
-    writeCommandMultipleData (k7335_PWCTR4, k7335_PowerControlData4, sizeof(k7335_PowerControlData4)); // POWER CONTROL 4
-    writeCommandMultipleData (k7335_PWCTR5, k7335_PowerControlData5, sizeof(k7335_PowerControlData5)); // POWER CONTROL 5
+    writeCommandMultiData (k7335_PWCTR1, k7335_PowerControlData1, sizeof(k7335_PowerControlData1)); // POWER CONTROL 1
+    writeCommandMultiData (k7335_PWCTR2, k7335_PowerControlData2, sizeof(k7335_PowerControlData2)); // POWER CONTROL 2
+    writeCommandMultiData (k7335_PWCTR3, k7335_PowerControlData3, sizeof(k7335_PowerControlData3)); // POWER CONTROL 3
+    writeCommandMultiData (k7335_PWCTR4, k7335_PowerControlData4, sizeof(k7335_PowerControlData4)); // POWER CONTROL 4
+    writeCommandMultiData (k7335_PWCTR5, k7335_PowerControlData5, sizeof(k7335_PowerControlData5)); // POWER CONTROL 5
 
-    writeCommandMultipleData (k7335_VMCTR1, k7335_VMCTR1Data, sizeof(k7335_VMCTR1Data)); // POWER CONTROL 6
-    writeCommandMultipleData (k7335_MADCTL, k7735_MADCTLData, sizeof(k7735_MADCTLData)); // ORIENTATION
-    writeCommandMultipleData (k7335_COLMOD, k7335_COLMODData, sizeof(k7335_COLMODData)); // COLOR MODE - 16bit per pixel
+    writeCommandMultiData (k7335_VMCTR1, k7335_VMCTR1Data, sizeof(k7335_VMCTR1Data)); // POWER CONTROL 6
+    writeCommandMultiData (k7335_MADCTL, k7735_MADCTLData, sizeof(k7735_MADCTLData)); // ORIENTATION
+    writeCommandMultiData (k7335_COLMOD, k7335_COLMODData, sizeof(k7335_COLMODData)); // COLOR MODE - 16bit per pixel
 
-    writeCommandMultipleData (k7335_GMCTRP1, k7335_GMCTRP1Data, sizeof(k7335_GMCTRP1Data)); // gamma GMCTRP1
-    writeCommandMultipleData (k7335_GMCTRN1, k7335_GMCTRN1Data, sizeof(k7335_GMCTRN1Data)); // Gamma GMCTRN1
+    writeCommandMultiData (k7335_GMCTRP1, k7335_GMCTRP1Data, sizeof(k7335_GMCTRP1Data)); // gamma GMCTRP1
+    writeCommandMultiData (k7335_GMCTRN1, k7335_GMCTRN1Data, sizeof(k7335_GMCTRN1Data)); // Gamma GMCTRN1
 
-    writeCommandMultipleData (k7335_CASET, k7335_caSetData, sizeof(k7335_caSetData));
-    writeCommandMultipleData (k7335_RASET, k7335_raSetData, sizeof(k7335_raSetData));
+    writeCommandMultiData (k7335_CASET, k7335_caSetData, sizeof(k7335_caSetData));
+    writeCommandMultiData (k7335_RASET, k7335_raSetData, sizeof(k7335_raSetData));
 
     writeCommand (k7335_DISPON); // display ON
 

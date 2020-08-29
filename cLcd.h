@@ -38,6 +38,7 @@ public:
 
   constexpr uint16_t getWidth() { return mWidth; }
   constexpr uint16_t getHeight() { return mHeight; }
+  const int getUpdateUs() { return mUpdateUs; }
 
   virtual void setRotate (int rotate) {}
 
@@ -64,7 +65,7 @@ protected:
 
   virtual void writeCommand (const uint8_t command) = 0;
   virtual void writeCommandData (const uint8_t command, const uint16_t data) = 0;
-  virtual void writeCommandMultipleData (const uint8_t command, const uint8_t* dataPtr, const int len) = 0;
+  virtual void writeCommandMultiData (const uint8_t command, const uint8_t* dataPtr, const int len) = 0;
 
   void launchUpdateThread (const uint8_t command);
 
@@ -84,9 +85,10 @@ private:
 
   bool mUpdate = false;
   bool mAutoUpdate = false;
+  int mUpdateUs = 0;
+
   bool mExit = false;
   bool mExited = false;
-  int mUpdateUs = 0;
 //}}}
   };
 
@@ -105,7 +107,7 @@ protected:
 
   virtual void writeCommand (const uint8_t command);
   virtual void writeCommandData (const uint8_t command, const uint16_t data);
-  virtual void writeCommandMultipleData (const uint8_t command, const uint8_t* data, const int len);
+  virtual void writeCommandMultiData (const uint8_t command, const uint8_t* data, const int len);
   };
 //}}}
 //{{{
@@ -141,7 +143,7 @@ protected:
 
   virtual void writeCommand (const uint8_t command) = 0;
   virtual void writeCommandData (const uint8_t command, const uint16_t data) = 0;
-  virtual void writeCommandMultipleData (const uint8_t command, const uint8_t* dataPtr, const int len) = 0;
+  virtual void writeCommandMultiData (const uint8_t command, const uint8_t* dataPtr, const int len) = 0;
 
 private:
   const int mSpiClock;
