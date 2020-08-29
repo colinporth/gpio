@@ -23,20 +23,7 @@
 #define BCK2835_LIBRARY_BUILD
 #include "bcm2835.h"
 //}}}
-//{{{
-/* This define enables a little test program (by default a blinking output on pin RPI_GPIO_PIN_11)
-// You can do some safe, non-destructive testing on any platform with:
-// gcc bcm2835.c -D BCM2835_TEST
-// ./a.out
-*/
-/*#define BCM2835_TEST*/
-
-/* Uncommenting this define compiles alternative I2C code for the version 1 RPi
-// The P1 header I2C pins are connected to SDA0 and SCL0 on V1.
-// By default I2C code is generated for the V2 RPi which has SDA1 and SCL1 connected.
-*/
-/* #define I2C_V1*/
-//}}}
+#define DIV_ROUND_UP(n,d) (((n) + (d) - 1) / (d))
 
 // Physical address and size of the peripherals block May be overridden on RPi2
 off_t bcm2835_peripherals_base = BCM2835_PERI_BASE;
@@ -57,22 +44,18 @@ volatile uint32_t* bcm2835_st   = (uint32_t*)MAP_FAILED;
 volatile uint32_t* bcm2835_aux  = (uint32_t*)MAP_FAILED;
 volatile uint32_t* bcm2835_spi1 = (uint32_t*)MAP_FAILED;
 
-// This variable allows us to test on hardware other than RPi.
-// It prevents access to the kernel memory, and does not do any peripheral access
-// Instead it prints out what it _would_ do if debug were 0
 static uint8_t debug = 0;
 
 // RPI 4 has different pullup registers - we need to know if we have that type
-static uint8_t pud_type_rpi4 = 0;
-
 // RPI 4 has different pullup operation - make backwards compat
+static uint8_t pud_type_rpi4 = 0;
 static uint8_t pud_compat_setting = BCM2835_GPIO_PUD_OFF;
 
 // I2C The time needed to transmit one byte. In microseconds.
 static int i2c_byte_wait_us = 0;
 
-// SPI bit order. BCM2835 SPI0 only supports MSBFIRST, so we instead
-// have a software based bit reversal, based on a contribution by Damiano Benedetti
+// SPI bit order. BCM2835 SPI0 only supports MSBFIRST
+// software based bit reversal, based on a contribution by Damiano Benedetti
 static uint8_t bcm2835_spi_bit_order = BCM2835_SPI_BIT_ORDER_MSBFIRST;
 //{{{
 static uint8_t bcm2835_byte_reverse_table[] = {
@@ -166,7 +149,6 @@ uint32_t* bcm2835_regbase (uint8_t regbase) {
       return (uint32_t *)bcm2835_aux;
     case BCM2835_REGBASE_SPI1:
       return (uint32_t *)bcm2835_spi1;
-
     }
 
   return (uint32_t *)MAP_FAILED;
@@ -1005,7 +987,6 @@ void bcm2835_aux_spi_end()
     bcm2835_gpio_fsel(RPI_V2_GPIO_P1_40, BCM2835_GPIO_FSEL_INPT); /* SPI1_SCLK */
 }
 //}}}
-#define DIV_ROUND_UP(n,d) (((n) + (d) - 1) / (d))
 //{{{
 uint16_t bcm2835_aux_spi_CalcClockDivider (uint32_t speed_hz)
 {
@@ -1860,7 +1841,7 @@ int bcm2835_init() {
   // Figure out the base and size of the peripheral address block
   // using the device-tree. Required for RPi2/3/4, optional for RPi 1
   FILE* fp;
-  if ((fp = fopen(BMC2835_RPI2_DT_FILENAME , "rb"))) {
+  if ((fp = fopen (BMC2835_RPI2_DT_FILENAME , "rb"))) {
     unsigned char buf[16];
     uint32_t base_address;
     uint32_t peri_size;
@@ -1869,7 +1850,7 @@ int bcm2835_init() {
       peri_size = (buf[8] << 24) | (buf[9] << 16) | (buf[10] << 8) | (buf[11] << 0);
 
       if (!base_address) {
-        // looks like RPI 4 */
+        // looks like RPI 4
         base_address = (buf[8] << 24) | (buf[9] << 16) | (buf[10] << 8) | (buf[11] << 0);
         peri_size = (buf[12] << 24) | (buf[13] << 16) | (buf[14] << 8) | (buf[15] << 0);
         }
@@ -1978,86 +1959,3 @@ int bcm2835_close() {
   return 1; /* Success */
   }
 //}}}
-
-#ifdef BCM2835_TEST
-//{{{
-/* this is a simple test program that prints out what it will do rather than
-// actually doing it
-*/
-int main (int argc, char **argv)
-{
-    /* Be non-destructive */
-    bcm2835_set_debug(1);
-
-    if (!bcm2835_init())
-  return 1;
-
-    /* Configure some GPIO pins fo some testing
-    // Set RPI pin P1-11 to be an output
-    */
-    bcm2835_gpio_fsel(RPI_GPIO_P1_11, BCM2835_GPIO_FSEL_OUTP);
-    /* Set RPI pin P1-15 to be an input */
-    bcm2835_gpio_fsel(RPI_GPIO_P1_15, BCM2835_GPIO_FSEL_INPT);
-    /*  with a pullup */
-    bcm2835_gpio_set_pud(RPI_GPIO_P1_15, BCM2835_GPIO_PUD_UP);
-    /* And a low detect enable */
-    bcm2835_gpio_len(RPI_GPIO_P1_15);
-    /* and input hysteresis disabled on GPIOs 0 to 27 */
-    bcm2835_gpio_set_pad(BCM2835_PAD_GROUP_GPIO_0_27, BCM2835_PAD_SLEW_RATE_UNLIMITED|BCM2835_PAD_DRIVE_8mA);
-
-#if 1
-    /* Blink */
-    while (1)
-    {
-  /* Turn it on */
-  bcm2835_gpio_write(RPI_GPIO_P1_11, HIGH);
-
-  /* wait a bit */
-  bcm2835_delay(500);
-
-  /* turn it off */
-  bcm2835_gpio_write(RPI_GPIO_P1_11, LOW);
-
-  /* wait a bit */
-  bcm2835_delay(500);
-    }
-#endif
-
-#if 0
-    /* Read input */
-    while (1)
-    {
-  /* Read some data */
-  uint8_t value = bcm2835_gpio_lev(RPI_GPIO_P1_15);
-  printf("read from pin 15: %d\n", value);
-
-  /* wait a bit */
-  bcm2835_delay(500);
-    }
-#endif
-
-#if 0
-    /* Look for a low event detection
-    // eds will be set whenever pin 15 goes low
-    */
-    while (1)
-    {
-  if (bcm2835_gpio_eds(RPI_GPIO_P1_15))
-  {
-      /* Now clear the eds flag by setting it to 1 */
-      bcm2835_gpio_set_eds(RPI_GPIO_P1_15);
-      printf("low event detect for pin 15\n");
-  }
-
-  /* wait a bit */
-  bcm2835_delay(500);
-    }
-#endif
-
-    if (!bcm2835_close())
-  return 1;
-
-    return 0;
-}
-//}}}
-#endif

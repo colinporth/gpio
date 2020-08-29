@@ -30,7 +30,7 @@ int main (int numArgs, char* args[]) {
   cLcd* lcd = new cLcdTa7601 (rotate);
   lcd->initialise();
 
-  //{{{  fp0
+  //{{{  fb0
   int fbfd = open ("/dev/fb0", O_RDWR);
   if (fbfd == -1) {
     //{{{  error return

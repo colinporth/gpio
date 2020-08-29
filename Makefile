@@ -1,6 +1,7 @@
-CXX       = clang
-CCX       = clang++
-//CXX       = g++
+//CXX       = clang
+//CCX       = clang++
+CXX       = gcc
+CCX       = g++
 
 TARGET    = lcd
 SRCS      = lcdTest.cpp \
