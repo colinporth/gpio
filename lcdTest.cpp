@@ -425,7 +425,6 @@ public:
 
       if (numDiffSpans == 0)
         return nullptr;
-
       else if (mergeSpans) {
         //{{{  merge spans
         for (sDiffSpan* i = mDiffSpans; i; i = i->next) {
@@ -464,7 +463,7 @@ public:
         }
         //}}}
 
-      return numDiffSpans > 0 ? mDiffSpans : nullptr;
+      return mDiffSpans;
       }
     }
   //}}}
