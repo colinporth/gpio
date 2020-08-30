@@ -416,10 +416,13 @@ cScreen::sDiffSpan* cScreen::merge (int pixelThreshold) {
       int y = std::min (i->y, j->y);
       int endX = std::max (i->endX, j->endX);
       int endY = std::max (i->endY, j->endY);
+
       int lastScanEndX = (endY > i->endY) ?
                            j->lastScanEndX : ((endY > j->endY) ?
                              i->lastScanEndX : std::max (i->lastScanEndX, j->lastScanEndX));
+
       int newSize = (endX - x) * (endY - y - 1) + (lastScanEndX - x);
+
       int wastedPixels = newSize - i->size - j->size;
       if (wastedPixels <= pixelThreshold) {
         i->x = x;
@@ -437,6 +440,19 @@ cScreen::sDiffSpan* cScreen::merge (int pixelThreshold) {
     }
 
   return mDiffSpans;
+  }
+//}}}
+//{{{
+const int cScreen::getNumDiffPixels() {
+
+  int pixels = 0;
+  sDiffSpan* diffSpan = mDiffSpans;
+  while (diffSpan) {
+    pixels += diffSpan->size;
+    diffSpan = diffSpan->next;
+    }
+
+  return pixels;
   }
 //}}}
 

@@ -77,9 +77,10 @@ int main (int numArgs, char* args[]) {
       int diffTook = int((lcd->time() - startTime) * 10000000);
 
       lcd->copyRotate (screen.getBuf(), screen.getWidth(), screen.getHeight());
-      lcd->text (kWhite, 0,0, 22, dec(i++) + 
+      lcd->text (kWhite, 0,0, 22, dec(i++) +
                                   " " + dec(lcd->getUpdateUs(),5) +
                                   " " + dec(screen.getNumDiffSpans(),5) +
+                                  " " + dec((screen.getNumDiffPixels() * 100) / screen.getNumPixels(),3) +
                                   " " + dec(diffTook,5));
 
       while (diffSpans) {

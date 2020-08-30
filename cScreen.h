@@ -25,8 +25,12 @@ public:
 
   constexpr int getWidth() { return mWidth; }
   constexpr int getHeight() { return mHeight; }
+  constexpr int getNumPixels() { return mWidth * mHeight; }
+
   const uint16_t* getBuf() { return mBuf; }
+
   const int getNumDiffSpans() { return mNumDiffSpans; }
+  const int getNumDiffPixels();
 
   void snap();
 
