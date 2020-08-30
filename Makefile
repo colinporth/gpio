@@ -6,6 +6,7 @@ CCX       = g++
 TARGET    = lcd
 SRCS      = lcdTest.cpp \
 	    cLcd.cpp \
+	    cScreen.cpp \
 	    ../shared/utils/cLog.cpp \
 	    fonts/FreeSansBold.cpp \
 	    pigpio/pigpio.c \
