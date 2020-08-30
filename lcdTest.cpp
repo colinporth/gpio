@@ -77,22 +77,18 @@ int main (int numArgs, char* args[]) {
       int diffTook = int((lcd->time() - startTime) * 10000000);
 
       lcd->copyRotate (screen.getBuf(), screen.getWidth(), screen.getHeight());
-      lcd->text (kWhite, 0,0, 22, dec(i++) +
-                                  " " + dec(lcd->getUpdateUs(),5) +
-                                  " " + dec(screen.getNumDiffSpans(),5) +
-                                  " " + dec((screen.getNumDiffPixels() * 100) / screen.getNumPixels(),3) +
-                                  " " + dec(diffTook,5));
-
-      while (diffSpans) {
-        int x = 320 - diffSpans->endY;
-        int y = diffSpans->x;
-        int xlen = diffSpans->endY - diffSpans->y + 1;
-        int ylen = diffSpans->endX - diffSpans->x + 1;
-        lcd->rectOutline (kRed, x,y,xlen,ylen);
-        diffSpans = diffSpans->next;
-        }
-
+      //{{{  show pre merge in red
+      //while (diffSpans) {
+        //int x = 320 - diffSpans->endY;
+        //int y = diffSpans->x;
+        //int xlen = diffSpans->endY - diffSpans->y + 1;
+        //int ylen = diffSpans->endX - diffSpans->x + 1;
+        //lcd->rectOutline (kRed, x,y,xlen,ylen);
+        //diffSpans = diffSpans->next;
+        //}
+      //}}}
       diffSpans = screen.merge (16);
+      //{{{   show post merge in green
       while (diffSpans) {
         int x = 320 - diffSpans->endY;
         int y = diffSpans->x;
@@ -101,6 +97,12 @@ int main (int numArgs, char* args[]) {
         lcd->rectOutline (kGreen, x,y,xlen,ylen);
         diffSpans = diffSpans->next;
         }
+      //}}}
+      lcd->text (kWhite, 0,0, 22, dec(i++) +
+                                  " " + dec(lcd->getUpdateUs(),5) +
+                                  " " + dec(screen.getNumDiffSpans(),5) +
+                                  " " + dec((screen.getNumDiffPixels() * 100) / screen.getNumPixels(),3) +
+                                  " " + dec(diffTook,5));
 
       lcd->update();
       }
