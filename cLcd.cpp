@@ -648,7 +648,7 @@ void cLcdSpi::writeCommandMultiData (const uint8_t command, const uint8_t* dataP
 //{{{  cLcdSt7735r
 constexpr uint16_t kWidth7735 = 128;
 constexpr uint16_t kHeight7735 = 160;
-constexpr static const int kSpiClock7735 = 24000000;
+constexpr int kSpiClock7735 = 24000000;
 
 cLcdSt7735r::cLcdSt7735r (const int rotate) : cLcdSpi (kWidth7735, kHeight7735, rotate, kSpiClock7735, true, 0xFF, false) {}
 
