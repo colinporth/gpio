@@ -138,7 +138,7 @@ cScreen::sDiffSpan* cScreen::diffSingle() {
 
     // coarse diff computes a diff at 8 adjacent pixels at a time
     // returns the point to the 8-pixel aligned coordinate where the pixels began to differ.
-    int firstDiff = coarseBackLinearDiff (mBuf, mPrevBuf, mBuf + numPixels);
+    int firstDiff = coarseLinearDiffBack (mBuf, mPrevBuf, mBuf + numPixels);
 
     // compute the precise diff position here.
     while (firstDiff > 0 && mBuf[firstDiff] == mPrevBuf[firstDiff])
@@ -444,15 +444,17 @@ cScreen::sDiffSpan* cScreen::merge (int pixelThreshold) {
 //}}}
 //{{{
 const int cScreen::getNumDiffPixels() {
+// count number of diff pixels
 
-  int pixels = 0;
+  int numDiffPixels = 0;
+
   sDiffSpan* diffSpan = mDiffSpans;
   while (diffSpan) {
-    pixels += diffSpan->size;
+    numDiffPixels += diffSpan->size;
     diffSpan = diffSpan->next;
     }
 
-  return pixels;
+  return numDiffPixels;
   }
 //}}}
 
@@ -510,7 +512,7 @@ int cScreen::coarseLinearDiff (uint16_t* frameBuf, uint16_t* prevFrameBuf, uint1
   }
 //}}}
 //{{{
-int cScreen::coarseBackLinearDiff (uint16_t* frameBuf, uint16_t* prevFrameBuf, uint16_t* frameBufEnd) {
+int cScreen::coarseLinearDiffBack (uint16_t* frameBuf, uint16_t* prevFrameBuf, uint16_t* frameBufEnd) {
 // Same as coarse_linear_diff, but finds the last changed pixel in linear order instead of first, i.e.
 // Finds the last changed pixel, coarse result aligned up to 8 pixels boundary
 
