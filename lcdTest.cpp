@@ -100,371 +100,373 @@ public:
   #define SPAN_MERGE_THRESHOLD 8
   #define SWAPU32(x, y) { uint32_t tmp = x; x = y; y = tmp; }
   //{{{
-  sDiffSpan* diff() {
-  // form single diff rectangle
+  sDiffSpan* diff (bool singleSpan, bool mergeSpans) {
 
-    int minY = 0;
-    int minX = -1;
+    if (singleSpan) {
+      //{{{  single span
+      int minY = 0;
+      int minX = -1;
 
-    const int stride = getWidth(); // Stride as uint16 elements.
-    const int widthAligned4 = (uint32_t)getWidth() & ~3u;
+      const int stride = getWidth(); // Stride as uint16 elements.
+      const int widthAligned4 = (uint32_t)getWidth() & ~3u;
 
-    uint16_t* scanline = mBuf;
-    uint16_t* prevFrameScanline = mPrevBuf;
+      uint16_t* scanline = mBuf;
+      uint16_t* prevFrameScanline = mPrevBuf;
 
-    if (kCoarseDiff) {
-      //{{{  coarse diff
-      // Coarse diff computes a diff at 8 adjacent pixels at a time
-      // returns the point to the 8-pixel aligned coordinate where the pixels began to differ.
+      if (kCoarseDiff) {
+        //{{{  coarse diff
+        // Coarse diff computes a diff at 8 adjacent pixels at a time
+        // returns the point to the 8-pixel aligned coordinate where the pixels began to differ.
 
-      int numPixels = getWidth() * getHeight();
-      int firstDiff = coarseLinearDiff (mBuf, mPrevBuf, mBuf + numPixels);
-      if (firstDiff == numPixels)
-        return nullptr; // No pixels changed, nothing to do.
+        int numPixels = getWidth() * getHeight();
+        int firstDiff = coarseLinearDiff (mBuf, mPrevBuf, mBuf + numPixels);
+        if (firstDiff == numPixels)
+          return nullptr; // No pixels changed, nothing to do.
 
-      // Compute the precise diff position here.
-      while (mBuf[firstDiff] == mPrevBuf[firstDiff])
-        ++firstDiff;
+        // Compute the precise diff position here.
+        while (mBuf[firstDiff] == mPrevBuf[firstDiff])
+          ++firstDiff;
 
-      minX = firstDiff % getWidth();
-      minY = firstDiff / getWidth();
+        minX = firstDiff % getWidth();
+        minY = firstDiff / getWidth();
+        }
+        //}}}
+      else {
+        //{{{  fine diff
+        while (minY < getHeight()) {
+          int x = 0;
+          // diff 4 pixels at a time
+          for (; x < widthAligned4; x += 4) {
+            uint64_t diff = *(uint64_t*)(scanline+x) ^ *(uint64_t*)(prevFrameScanline+x);
+            if (diff) {
+              minX = x + (__builtin_ctzll (diff) >> 4);
+              goto foundTop;
+              }
+            }
+
+          // tail unaligned 0-3 pixels one by one
+          for (; x < getWidth(); ++x) {
+            uint16_t diff = *(scanline+x) ^ *(prevFrameScanline+x);
+            if (diff) {
+              minX = x;
+              goto foundTop;
+              }
+            }
+
+          scanline += stride;
+          prevFrameScanline += stride;
+          ++minY;
+          }
+
+        // No pixels changed, nothing to do.
+        return nullptr;
+        }
+        //}}}
+
+      foundTop:
+      //{{{  found top
+      int maxX = -1;
+      int maxY = getHeight() - 1;
+
+      if (kCoarseDiff) {
+        int numPixels = getWidth() * getHeight();
+
+        // coarse diff computes a diff at 8 adjacent pixels at a time
+        // returns the point to the 8-pixel aligned coordinate where the pixels began to differ.
+        int firstDiff = coarseBackLinearDiff (mBuf, mPrevBuf, mBuf + numPixels);
+
+        // compute the precise diff position here.
+        while (firstDiff > 0 && mBuf[firstDiff] == mPrevBuf[firstDiff])
+          --firstDiff;
+        maxX = firstDiff % getWidth();
+        maxY = firstDiff / getWidth();
+        }
+
+      else {
+        scanline = mBuf + (getHeight() - 1)*stride;
+        // same scanline from previous frame, not preceding scanline
+        prevFrameScanline = mPrevBuf + (getHeight() - 1)*stride;
+
+        while (maxY >= minY) {
+          int x = getWidth()-1;
+          // tail unaligned 0-3 pixels one by one
+          for (; x >= widthAligned4; --x) {
+            if (scanline[x] != prevFrameScanline[x]) {
+              maxX = x;
+              goto foundBottom;
+              }
+            }
+
+          // diff 4 pixels at a time
+          x = x & ~3u;
+          for (; x >= 0; x -= 4) {
+            uint64_t diff = *(uint64_t*)(scanline + x) ^ *(uint64_t*)(prevFrameScanline + x);
+            if (diff) {
+              maxX = x + 3 - (__builtin_clzll(diff) >> 4);
+              goto foundBottom;
+              }
+            }
+
+          scanline -= stride;
+          prevFrameScanline -= stride;
+          --maxY;
+          }
+        }
+      //}}}
+
+      foundBottom:
+      //{{{  found bottom
+      scanline = mBuf + minY*stride;
+      prevFrameScanline = mPrevBuf + minY*stride;
+
+      int lastScanEndX = maxX;
+      if (minX > maxX)
+        SWAPU32 (minX, maxX);
+
+      int leftX = 0;
+      while (leftX < minX) {
+        uint16_t* s = scanline + leftX;
+        uint16_t* prevS = prevFrameScanline + leftX;
+        for (int y = minY; y <= maxY; ++y) {
+          if (*s != *prevS)
+            goto foundLeft;
+
+          s += stride;
+          prevS += stride;
+          }
+
+        ++leftX;
+        }
+      //}}}
+
+      foundLeft:
+      //{{{  found left
+      int rightX = getWidth()-1;
+      while (rightX > maxX) {
+        uint16_t* s = scanline + rightX;
+        uint16_t* prevS = prevFrameScanline + rightX;
+        for (int y = minY; y <= maxY; ++y) {
+          if (*s != *prevS)
+            goto foundRight;
+
+          s += stride;
+          prevS += stride;
+          }
+
+        --rightX;
+        }
+      //}}}
+
+      foundRight:
+      sDiffSpan* head = mDiffSpans;
+
+      head->x = leftX;
+      head->endX = rightX+1;
+      head->lastScanEndX = lastScanEndX+1;
+      head->y = minY;
+      head->endY = maxY+1;
+
+      head->size = (head->endX-head->x) * (head->endY-head->y-1) + (head->lastScanEndX - head->x);
+      head->next = 0;
+
+      return mDiffSpans;
       }
       //}}}
-    else {
-      //{{{  fine diff
-      while (minY < getHeight()) {
-        int x = 0;
-        // diff 4 pixels at a time
-        for (; x < widthAligned4; x += 4) {
-          uint64_t diff = *(uint64_t*)(scanline+x) ^ *(uint64_t*)(prevFrameScanline+x);
-          if (diff) {
-            minX = x + (__builtin_ctzll (diff) >> 4);
-            goto foundTop;
-            }
-          }
-
-        // tail unaligned 0-3 pixels one by one
-        for (; x < getWidth(); ++x) {
-          uint16_t diff = *(scanline+x) ^ *(prevFrameScanline+x);
-          if (diff) {
-            minX = x;
-            goto foundTop;
-            }
-          }
-
-        scanline += stride;
-        prevFrameScanline += stride;
-        ++minY;
-        }
-
-      // No pixels changed, nothing to do.
-      return nullptr;
-      }
-      //}}}
-
-  foundTop:
-    //{{{  found top
-    int maxX = -1;
-    int maxY = getHeight() - 1;
-
-    if (kCoarseDiff) {
-      int numPixels = getWidth() * getHeight();
-
-      // coarse diff computes a diff at 8 adjacent pixels at a time
-      // returns the point to the 8-pixel aligned coordinate where the pixels began to differ.
-      int firstDiff = coarseBackLinearDiff (mBuf, mPrevBuf, mBuf + numPixels);
-
-      // compute the precise diff position here.
-      while (firstDiff > 0 && mBuf[firstDiff] == mPrevBuf[firstDiff])
-        --firstDiff;
-      maxX = firstDiff % getWidth();
-      maxY = firstDiff / getWidth();
-      }
 
     else {
-      scanline = mBuf + (getHeight() - 1)*stride;
-      // same scanline from previous frame, not preceding scanline
-      prevFrameScanline = mPrevBuf + (getHeight() - 1)*stride;
+      int y =  0;
+      int yInc = 1;
+      int numDiffSpans = 0;
 
-      while (maxY >= minY) {
-        int x = getWidth()-1;
-        // tail unaligned 0-3 pixels one by one
-        for (; x >= widthAligned4; --x) {
-          if (scanline[x] != prevFrameScanline[x]) {
-            maxX = x;
-            goto foundBottom;
-            }
-          }
+      if (kCoarseDiff) {
+        //{{{  coarse diff
+        uint64_t* scanline = (uint64_t*)(mBuf + y * getWidth());
+        uint64_t* prevFrameScanline = (uint64_t*)(mPrevBuf + y * getWidth());
 
-        // diff 4 pixels at a time
-        x = x & ~3u;
-        for (; x >= 0; x -= 4) {
-          uint64_t diff = *(uint64_t*)(scanline + x) ^ *(uint64_t*)(prevFrameScanline + x);
-          if (diff) {
-            maxX = x + 3 - (__builtin_clzll(diff) >> 4);
-            goto foundBottom;
-            }
-          }
+        const int width64 = getWidth() >> 2;
+        int scanlineInc = getWidth() >> 2;
 
-        scanline -= stride;
-        prevFrameScanline -= stride;
-        --maxY;
-        }
-      }
-    //}}}
+        sDiffSpan* span = mDiffSpans;
+        while (y < getHeight()) {
+          uint16_t* scanlineStart = (uint16_t*)scanline;
 
-  foundBottom:
-    //{{{  found bottom
-    scanline = mBuf + minY*stride;
-    prevFrameScanline = mPrevBuf + minY*stride;
+          for (int x = 0; x < width64;) {
+            if (scanline[x] != prevFrameScanline[x]) {
+              uint16_t* spanStart = (uint16_t*)(scanline + x) + (__builtin_ctzll (scanline[x] ^ prevFrameScanline[x]) >> 4);
+              ++x;
 
-    int lastScanEndX = maxX;
-    if (minX > maxX)
-      SWAPU32 (minX, maxX);
-
-    int leftX = 0;
-    while (leftX < minX) {
-      uint16_t* s = scanline + leftX;
-      uint16_t* prevS = prevFrameScanline + leftX;
-      for (int y = minY; y <= maxY; ++y) {
-        if (*s != *prevS)
-          goto foundLeft;
-
-        s += stride;
-        prevS += stride;
-        }
-
-      ++leftX;
-      }
-    //}}}
-
-  foundLeft:
-    //{{{  found left
-    int rightX = getWidth()-1;
-    while (rightX > maxX) {
-      uint16_t* s = scanline + rightX;
-      uint16_t* prevS = prevFrameScanline + rightX;
-      for (int y = minY; y <= maxY; ++y) {
-        if (*s != *prevS)
-          goto foundRight;
-
-        s += stride;
-        prevS += stride;
-        }
-
-      --rightX;
-      }
-    //}}}
-
-  foundRight:
-    sDiffSpan* head = mDiffSpans;
-
-    head->x = leftX;
-    head->endX = rightX+1;
-    head->lastScanEndX = lastScanEndX+1;
-    head->y = minY;
-    head->endY = maxY+1;
-
-    head->size = (head->endX-head->x) * (head->endY-head->y-1) + (head->lastScanEndX - head->x);
-    head->next = 0;
-
-    return mDiffSpans;
-    }
-  //}}}
-  //{{{
-  sDiffSpan* diffScanlines() {
-
-    int y =  0;
-    int yInc = 1;
-    int numDiffSpans = 0;
-
-    if (kCoarseDiff) {
-      //{{{  coarse diff
-      uint64_t* scanline = (uint64_t*)(mBuf + y * getWidth());
-      uint64_t* prevFrameScanline = (uint64_t*)(mPrevBuf + y * getWidth());
-
-      const int width64 = getWidth() >> 2;
-      int scanlineInc = getWidth() >> 2;
-
-      sDiffSpan* span = mDiffSpans;
-      while (y < getHeight()) {
-        uint16_t* scanlineStart = (uint16_t *)scanline;
-
-        for (int x = 0; x < width64;) {
-          if (scanline[x] != prevFrameScanline[x]) {
-            uint16_t* spanStart = (uint16_t*)(scanline + x) + (__builtin_ctzll (scanline[x] ^ prevFrameScanline[x]) >> 4);
-            ++x;
-
-           //{{{  We've found a start of a span of different pixels on this scanline, now find where this span ends
-           uint16_t* spanEnd;
-           for (;;) {
-             if (x < width64) {
-               if (scanline[x] != prevFrameScanline[x]) {
-                 ++x;
-                 continue;
+             //{{{  We've found a start of a span of different pixels on this scanline, now find where this span ends
+             uint16_t* spanEnd;
+             for (;;) {
+               if (x < width64) {
+                 if (scanline[x] != prevFrameScanline[x]) {
+                   ++x;
+                   continue;
+                   }
+                 else {
+                   spanEnd = (uint16_t*)(scanline + x) + 1 - (__builtin_clzll(scanline[x-1] ^ prevFrameScanline[x-1]) >> 4);
+                   ++x;
+                   break;
+                   }
                  }
                else {
-                 spanEnd = (uint16_t*)(scanline + x) + 1 - (__builtin_clzll(scanline[x-1] ^ prevFrameScanline[x-1]) >> 4);
-                 ++x;
+                 spanEnd = scanlineStart + getWidth();
                  break;
                  }
                }
-             else {
-               spanEnd = scanlineStart + getWidth();
+             //}}}
+
+              // Submit the span update task
+              span->x = spanStart - scanlineStart;
+              span->endX = span->lastScanEndX = spanEnd - scanlineStart;
+              span->y = y;
+              span->endY = y+1;
+              span->size = spanEnd - spanStart;
+              span->next = span+1;
+              ++span;
+              ++numDiffSpans;
+              }
+            else
+              ++x;
+            }
+
+          y += yInc;
+          scanline += scanlineInc;
+          prevFrameScanline += scanlineInc;
+          }
+
+        if (numDiffSpans > 0)
+          mDiffSpans[numDiffSpans-1].next = 0;
+        }
+        //}}}
+      else {
+        //{{{  exact diff
+        uint16_t* scanline = mBuf + y * getWidth();
+        uint16_t* prevFrameScanline = mPrevBuf + y * getWidth();
+
+        int scanlineInc = getWidth();
+        int scanlineEndInc = scanlineInc - getWidth();
+
+        while (y < getHeight()) {
+          uint16_t* scanlineStart = scanline;
+          uint16_t* scanlineEnd = scanline + getWidth();
+          while (scanline < scanlineEnd) {
+            uint16_t* spanStart;
+            uint16_t* spanEnd;
+            int numConsecutiveUnchangedPixels = 0;
+
+            if (scanline + 1 < scanlineEnd) {
+              uint32_t diff = (*(uint32_t*)scanline) ^ (*(uint32_t*)prevFrameScanline);
+              scanline += 2;
+              prevFrameScanline += 2;
+
+              if (diff == 0) // Both 1st and 2nd pixels are the same
+                continue;
+
+              if ((diff & 0xFFFF) == 0) {
+                //{{{  1st pixels are the same, 2nd pixels are not
+                spanStart = scanline - 1;
+                spanEnd = scanline;
+                }
+                //}}}
+              else {
+                //{{{  1st pixels are different
+                spanStart = scanline - 2;
+                if ((diff & 0xFFFF0000u) != 0) // 2nd pixels are different?
+                  spanEnd = scanline;
+                else {
+                  spanEnd = scanline - 1;
+                  numConsecutiveUnchangedPixels = 1;
+                  }
+                }
+                //}}}
+              //{{{  We've found a start of a span of different pixels on this scanline, now find where this span ends
+              while (scanline < scanlineEnd) {
+                if (*scanline++ != *prevFrameScanline++) {
+                  spanEnd = scanline;
+                  numConsecutiveUnchangedPixels = 0;
+                  }
+                else {
+                  if (++numConsecutiveUnchangedPixels > SPAN_MERGE_THRESHOLD)
+                    break;
+                  }
+                }
+              //}}}
+              }
+            else {
+             //{{{  handle the single last pixel on the row
+             if (*scanline++ == *prevFrameScanline++)
                break;
-               }
+
+             spanStart = scanline - 1;
+             spanEnd = scanline;
              }
-           //}}}
+             //}}}
 
             // Submit the span update task
+            sDiffSpan* span = mDiffSpans + numDiffSpans;
             span->x = spanStart - scanlineStart;
             span->endX = span->lastScanEndX = spanEnd - scanlineStart;
             span->y = y;
             span->endY = y+1;
             span->size = spanEnd - spanStart;
-            span->next = span+1;
-            ++span;
+            if (numDiffSpans > 0)
+              span[-1].next = span;
+            span->next = 0;
             ++numDiffSpans;
             }
-          else
-            ++x;
+
+          y += yInc;
+          scanline += scanlineEndInc;
+          prevFrameScanline += scanlineEndInc;
           }
-
-        y += yInc;
-        scanline += scanlineInc;
-        prevFrameScanline += scanlineInc;
         }
+        //}}}
 
-      if (numDiffSpans > 0)
-        mDiffSpans[numDiffSpans-1].next = 0;
-      }
-      //}}}
-    else {
-       //{{{  exact diff
-       uint16_t* scanline = mBuf + y * getWidth();
-       uint16_t* prevFrameScanline = mPrevBuf + y * getWidth();
+      if (numDiffSpans == 0)
+        return nullptr;
 
-       int scanlineInc = getWidth();
-       int scanlineEndInc = scanlineInc - getWidth();
-
-       while (y < getHeight()) {
-         uint16_t* scanlineStart = scanline;
-         uint16_t* scanlineEnd = scanline + getWidth();
-         while (scanline < scanlineEnd) {
-           uint16_t* spanStart;
-           uint16_t* spanEnd;
-           int numConsecutiveUnchangedPixels = 0;
-
-           if (scanline + 1 < scanlineEnd) {
-             uint32_t diff = (*(uint32_t*)scanline) ^ (*(uint32_t*)prevFrameScanline);
-             scanline += 2;
-             prevFrameScanline += 2;
-
-             if (diff == 0) // Both 1st and 2nd pixels are the same
-               continue;
-
-             if ((diff & 0xFFFF) == 0) {
-               //{{{  1st pixels are the same, 2nd pixels are not
-               spanStart = scanline - 1;
-               spanEnd = scanline;
-               }
-               //}}}
-             else {
-               //{{{  1st pixels are different
-               spanStart = scanline - 2;
-               if ((diff & 0xFFFF0000u) != 0) // 2nd pixels are different?
-                 spanEnd = scanline;
-               else {
-                 spanEnd = scanline - 1;
-                 numConsecutiveUnchangedPixels = 1;
-                 }
-               }
-               //}}}
-             //{{{  We've found a start of a span of different pixels on this scanline, now find where this span ends
-             while (scanline < scanlineEnd) {
-               if (*scanline++ != *prevFrameScanline++) {
-                 spanEnd = scanline;
-                 numConsecutiveUnchangedPixels = 0;
-                 }
-               else {
-                 if (++numConsecutiveUnchangedPixels > SPAN_MERGE_THRESHOLD)
-                   break;
-                 }
-               }
-             //}}}
-             }
-           else {
-            //{{{  handle the single last pixel on the row
-            if (*scanline++ == *prevFrameScanline++)
+      else if (mergeSpans) {
+        //{{{  merge spans
+        for (sDiffSpan* i = mDiffSpans; i; i = i->next) {
+          sDiffSpan* prev = i;
+          for (sDiffSpan* j = i->next; j; j = j->next) {
+            // If the spans i and j are vertically apart, don't attempt to merge span i any further
+            // since all spans >= j will also be farther vertically apart.
+            // (the list is nondecreasing with respect to Span::y)
+            if (j->y > i->endY)
               break;
 
-            spanStart = scanline - 1;
-            spanEnd = scanline;
+            // Merge the spans i and j, and figure out the wastage of doing so
+            int x = std::min (i->x, j->x);
+            int y = std::min (i->y, j->y);
+            int endX = std::max (i->endX, j->endX);
+            int endY = std::max (i->endY, j->endY);
+            int lastScanEndX = (endY > i->endY) ?
+                                 j->lastScanEndX : ((endY > j->endY) ?
+                                   i->lastScanEndX : std::max (i->lastScanEndX, j->lastScanEndX));
+            int newSize = (endX - x) * (endY - y - 1) + (lastScanEndX - x);
+            int wastedPixels = newSize - i->size - j->size;
+            if (wastedPixels <= SPAN_MERGE_THRESHOLD) {
+              i->x = x;
+              i->y = y;
+              i->endX = endX;
+              i->endY = endY;
+              i->lastScanEndX = lastScanEndX;
+              i->size = newSize;
+              prev->next = j->next;
+              j = prev;
+              }
+            else // Not merging - travel to next node remembering where we came from
+              prev = j;
             }
-            //}}}
-
-           // Submit the span update task
-           sDiffSpan* span = mDiffSpans + numDiffSpans;
-           span->x = spanStart - scanlineStart;
-           span->endX = span->lastScanEndX = spanEnd - scanlineStart;
-           span->y = y;
-           span->endY = y+1;
-           span->size = spanEnd - spanStart;
-           if (numDiffSpans > 0)
-             span[-1].next = span;
-           span->next = 0;
-           ++numDiffSpans;
-           }
-
-         y += yInc;
-         scanline += scanlineEndInc;
-         prevFrameScanline += scanlineEndInc;
-         }
-       }
-       //}}}
-
-    return numDiffSpans > 0 ? mDiffSpans : nullptr;
-    }
-  //}}}
-  //{{{
-  sDiffSpan* mergeSpans() {
-
-    for (sDiffSpan* i = mDiffSpans; i; i = i->next) {
-      sDiffSpan* prev = i;
-      for (sDiffSpan* j = i->next; j; j = j->next) {
-        // If the spans i and j are vertically apart, don't attempt to merge span i any further
-        // since all spans >= j will also be farther vertically apart.
-        // (the list is nondecreasing with respect to Span::y)
-        if (j->y > i->endY)
-          break;
-
-        // Merge the spans i and j, and figure out the wastage of doing so
-        int x = std::min (i->x, j->x);
-        int y = std::min (i->y, j->y);
-        int endX = std::max (i->endX, j->endX);
-        int endY = std::max (i->endY, j->endY);
-        int lastScanEndX = (endY > i->endY) ?
-                             j->lastScanEndX : ((endY > j->endY) ?
-                               i->lastScanEndX : std::max (i->lastScanEndX, j->lastScanEndX));
-        int newSize = (endX - x) * (endY - y - 1) + (lastScanEndX - x);
-        int wastedPixels = newSize - i->size - j->size;
-        if (wastedPixels <= SPAN_MERGE_THRESHOLD) {
-          i->x = x;
-          i->y = y;
-          i->endX = endX;
-          i->endY = endY;
-          i->lastScanEndX = lastScanEndX;
-          i->size = newSize;
-          prev->next = j->next;
-          j = prev;
-          }
-        else // Not merging - travel to next node remembering where we came from
-          prev = j;
           }
         }
+        //}}}
 
-      return mDiffSpans;
+      return numDiffSpans > 0 ? mDiffSpans : nullptr;
       }
+    }
   //}}}
 
 private:
@@ -644,9 +646,9 @@ int main (int numArgs, char* args[]) {
     screen.snap();
 
     double startTime = lcd->time();
-    if (screen.diffScanlines()) {
-      cScreen::sDiffSpan* diffSpans = screen.mergeSpans();
-      int diffTook = int((lcd->time()-startTime) * 10000000);
+    cScreen::sDiffSpan* diffSpans = screen.diff (false, true);
+    if (diffSpans) {
+      int diffTook = int((lcd->time() - startTime) * 10000000);
 
       lcd->copyRotate (screen.getBuf(), screen.getWidth(), screen.getHeight());
       lcd->text (kWhite, 0,0, 22, dec(i++) + " upd:" + dec(lcd->getUpdateUs(),5) + " diff:" + dec(diffTook,5));
