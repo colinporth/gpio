@@ -338,7 +338,7 @@ public:
       mDiffSpans[numDiffSpans-1].next = 0;
       return mDiffSpans;
       }
-    else 
+    else
       return nullptr;
     }
   //}}}
@@ -433,7 +433,7 @@ public:
     }
   //}}}
   //{{{
-  sDiffSpan* merge() {
+  sDiffSpan* merge (int pixelThreshold) {
 
     for (sDiffSpan* i = mDiffSpans; i; i = i->next) {
       sDiffSpan* prev = i;
@@ -454,7 +454,7 @@ public:
                                i->lastScanEndX : std::max (i->lastScanEndX, j->lastScanEndX));
         int newSize = (endX - x) * (endY - y - 1) + (lastScanEndX - x);
         int wastedPixels = newSize - i->size - j->size;
-        if (wastedPixels <= SPAN_MERGE_THRESHOLD) {
+        if (wastedPixels <= pixelThreshold) {
           i->x = x;
           i->y = y;
           i->endX = endX;
@@ -666,7 +666,7 @@ int main (int numArgs, char* args[]) {
         diffSpans = diffSpans->next;
         }
 
-      diffSpans = screen.merge();
+      diffSpans = screen.merge (16);
       while (diffSpans) {
         int x = 320 - diffSpans->endY;
         int y = diffSpans->x;
