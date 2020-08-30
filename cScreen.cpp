@@ -7,6 +7,7 @@
 using namespace std;
 constexpr bool kCoarseDiff = true;
 
+// public
 //{{{
 cScreen::cScreen (const int width, const int height) : mWidth(width), mHeight(height) {
 
@@ -49,6 +50,7 @@ cScreen::~cScreen() {
   free (mPrevBuf);
   }
 //}}}
+
 //{{{
 void cScreen::snap() {
 
@@ -238,9 +240,10 @@ cScreen::sDiffSpan* cScreen::diffSingle() {
 //{{{
 cScreen::sDiffSpan* cScreen::diffCoarse() {
 
+  mNumDiffSpans = 0;
+
   int y =  0;
   int yInc = 1;
-  int numDiffSpans = 0;
 
   uint64_t* scanline = (uint64_t*)(mBuf + y * getWidth());
   uint64_t* prevFrameScanline = (uint64_t*)(mPrevBuf + y * getWidth());
@@ -286,7 +289,7 @@ cScreen::sDiffSpan* cScreen::diffCoarse() {
         span->size = spanEnd - spanStart;
         span->next = span+1;
         ++span;
-        ++numDiffSpans;
+        ++mNumDiffSpans;
         }
       else
         ++x;
@@ -297,8 +300,8 @@ cScreen::sDiffSpan* cScreen::diffCoarse() {
     prevFrameScanline += scanlineInc;
     }
 
-  if (numDiffSpans > 0) {
-    mDiffSpans[numDiffSpans-1].next = 0;
+  if (mNumDiffSpans > 0) {
+    mDiffSpans[mNumDiffSpans-1].next = 0;
     return mDiffSpans;
     }
   else
@@ -308,9 +311,10 @@ cScreen::sDiffSpan* cScreen::diffCoarse() {
 //{{{
 cScreen::sDiffSpan* cScreen::diffExact() {
 
+  mNumDiffSpans = 0;
+
   int y =  0;
   int yInc = 1;
-  int numDiffSpans = 0;
 
   uint16_t* scanline = mBuf + y * getWidth();
   uint16_t* prevFrameScanline = mPrevBuf + y * getWidth();
@@ -375,16 +379,16 @@ cScreen::sDiffSpan* cScreen::diffExact() {
        //}}}
 
       // Submit the span update task
-      sDiffSpan* span = mDiffSpans + numDiffSpans;
+      sDiffSpan* span = mDiffSpans + mNumDiffSpans;
       span->x = spanStart - scanlineStart;
       span->endX = span->lastScanEndX = spanEnd - scanlineStart;
       span->y = y;
       span->endY = y+1;
       span->size = spanEnd - spanStart;
-      if (numDiffSpans > 0)
+      if (mNumDiffSpans > 0)
         span[-1].next = span;
       span->next = 0;
-      ++numDiffSpans;
+      ++mNumDiffSpans;
       }
 
     y += yInc;
@@ -392,7 +396,7 @@ cScreen::sDiffSpan* cScreen::diffExact() {
     prevFrameScanline += scanlineEndInc;
     }
 
-  return numDiffSpans ? mDiffSpans : nullptr;
+  return mNumDiffSpans ? mDiffSpans : nullptr;
   }
 //}}}
 //{{{
@@ -436,6 +440,7 @@ cScreen::sDiffSpan* cScreen::merge (int pixelThreshold) {
   }
 //}}}
 
+// private
 //{{{
 int cScreen::coarseLinearDiff (uint16_t* frameBuf, uint16_t* prevFrameBuf, uint16_t* frameBufEnd) {
 // Coarse diffing of two frameBufs with tight stride, 16 pixels at a time

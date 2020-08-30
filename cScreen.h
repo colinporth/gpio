@@ -26,6 +26,7 @@ public:
   constexpr int getWidth() { return mWidth; }
   constexpr int getHeight() { return mHeight; }
   const uint16_t* getBuf() { return mBuf; }
+  const int getNumDiffSpans() { return mNumDiffSpans; }
 
   void snap();
 
@@ -54,4 +55,5 @@ private:
 
   // diff spans
   sDiffSpan* mDiffSpans;
+  int mNumDiffSpans;
   };
