@@ -552,8 +552,8 @@ bool cLcdSsd1289::initialise() {
 //{{{  spi J8 header pins, gpio, constexpr
 //      3.3v - 17  18 - gpio24 - registerSelect/backlight
 // spi0 mosi - 19  20 - 0v
-// spi0  sck - 21  22 - gpio25 - reset
-//                 24 - spi0 Ce0
+// spi0 miso - 20  22 - gpio25 - reset
+// spi0 sck -  23  24 - spi0 Ce0 - gpio8 - cs
 constexpr uint8_t kSpiCe0Gpio = 8;
 constexpr uint8_t kSpiRegisterSelectGpio  = 24;
 constexpr uint8_t kBacklightGpio = 24;
