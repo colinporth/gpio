@@ -64,6 +64,27 @@ int main (int numArgs, char* args[]) {
   //close (fbfd);
   //}}}
 
+  //{{{  display font
+  int height = 8;
+  while (height++ < 100) {
+    int x = 0;
+    int y = 0;
+    lcd->clear (kMagenta);
+    for (char ch = 'A'; ch < 0x7f; ch++) {
+      x = lcd->text (kWhite, x, y, height, string(1,ch));
+      if (x > lcd->getWidth()) {
+        x = 0;
+        y += height;
+        if (y > lcd->getHeight())
+          break;
+        }
+      }
+    lcd->text (kYellow, 0,0, 20, "Hello Colin");
+    lcd->update();
+    lcd->delayUs (16000);
+    }
+  //}}}
+
   cScreen screen (480,320);
   lcd->clear (kOrange);
 
@@ -88,7 +109,7 @@ int main (int numArgs, char* args[]) {
         //}
       //}}}
       diffSpans = screen.merge (16);
-      //{{{   show post merge in green
+      //{{{  show post merge in green
       while (diffSpans) {
         int x = 320 - diffSpans->endY;
         int y = diffSpans->x;
@@ -109,29 +130,6 @@ int main (int numArgs, char* args[]) {
 
     lcd->delayUs (10000);
     }
-
-  while (true) {
-    //{{{  display font
-    int height = 8;
-    while (height++ < lcd->getHeight()) {
-      int x = 0;
-      int y = 0;
-      lcd->clear (kMagenta);
-      for (char ch = 'A'; ch < 0x7f; ch++) {
-        x = lcd->text (kWhite, x, y, height, string(1,ch));
-        if (x > lcd->getWidth()) {
-          x = 0;
-          y += height;
-          if (y > lcd->getHeight())
-            break;
-          }
-        }
-      lcd->text (kYellow, 0,0, 20, "Hello Colin");
-      lcd->update();
-      lcd->delayUs (16000);
-      }
-    }
-    //}}}
 
   return 0;
   }

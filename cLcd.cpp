@@ -391,68 +391,64 @@ bool cLcdTa7601::initialise() {
     gpioWrite_Bits_0_31_Clear (k16DataMask);
 
     // portrait mode with (0,0) being the top left. top is the side opposite the LCD connector.
-    writeCommandData (0x01, 0x023C);
-    writeCommandData (0x02, 0x0100);
-    writeCommandData (0x03, 0x1030);
-    writeCommandData (0x08, 0x0808);
-    writeCommandData (0x0A, 0x0500);
-    writeCommandData (0x0B, 0x0000);
-    writeCommandData (0x0C, 0x0770);
-    writeCommandData (0x0D, 0x0000);
-    writeCommandData (0x0E, 0x0001);
-    writeCommandData (0x11, 0x0406);
-    writeCommandData (0x12, 0x000E);
-    writeCommandData (0x13, 0x0222);
-    writeCommandData (0x14, 0x0015);
-    writeCommandData (0x15, 0x4277);
-    writeCommandData (0x16, 0x0000);
+    writeCommandData (0x01, 0x023C); // gate_scan & display boundary
+    writeCommandData (0x02, 0x0100); // inversion
+    writeCommandData (0x03, 0x1030); // GRAM access
+    writeCommandData (0x08, 0x0808); // Porch period
+    writeCommandData (0x0A, 0x0500); // osc control & clock number per 1H
+    writeCommandData (0x0B, 0x0000); // interface & display clock
+    writeCommandData (0x0C, 0x0770); // source and gate timing control
+    writeCommandData (0x0D, 0x0000); // gate scan position
+    writeCommandData (0x0E, 0x0001); // tearing effect prevention
+    writeCommandData (0x11, 0x0406); // power control
+    writeCommandData (0x12, 0x000E); // power control
+    writeCommandData (0x13, 0x0222); // power control
+    writeCommandData (0x14, 0x0015); // power control
+    writeCommandData (0x15, 0x4277); // power control
+    writeCommandData (0x16, 0x0000); // power control
 
-    writeCommandData (0x30, 0x6A50);
-    writeCommandData (0x31, 0x00C9);
-    writeCommandData (0x32, 0xC7BE);
-    writeCommandData (0x33, 0x0003);
-    writeCommandData (0x36, 0x3443);
-    writeCommandData (0x3B, 0x0000);
-    writeCommandData (0x3C, 0x0000);
-    writeCommandData (0x2C, 0x6A50);
-    writeCommandData (0x2D, 0x00C9);
-    writeCommandData (0x2E, 0xC7BE);
-    writeCommandData (0x2F, 0x0003);
-    writeCommandData (0x35, 0x3443);
-    writeCommandData (0x39, 0x0000);
-    writeCommandData (0x3A, 0x0000);
-    writeCommandData (0x28, 0x6A50);
-    writeCommandData (0x29, 0x00C9);
-    writeCommandData (0x2A, 0xC7BE);
-    writeCommandData (0x2B, 0x0003);
-    writeCommandData (0x34, 0x3443);
-    writeCommandData (0x37, 0x0000);
-    writeCommandData (0x38, 0x0000);
+    writeCommandData (0x30, 0x6A50); // gamma
+    writeCommandData (0x31, 0x00C9); // gamma
+    writeCommandData (0x32, 0xC7BE); // gamma
+    writeCommandData (0x33, 0x0003); // gamma
+    writeCommandData (0x36, 0x3443); // gamma
+    writeCommandData (0x3B, 0x0000); // gamma
+    writeCommandData (0x3C, 0x0000); // gamma
+    writeCommandData (0x2C, 0x6A50); // gamma
+    writeCommandData (0x2D, 0x00C9); // gamma
+    writeCommandData (0x2E, 0xC7BE); // gamma
+    writeCommandData (0x2F, 0x0003); // gamma
+    writeCommandData (0x35, 0x3443); // gamma
+    writeCommandData (0x39, 0x0000); // gamma
+    writeCommandData (0x3A, 0x0000); // gamma
+    writeCommandData (0x28, 0x6A50); // gamma
+    writeCommandData (0x29, 0x00C9); // gamma
+    writeCommandData (0x2A, 0xC7BE); // gamma
+    writeCommandData (0x2B, 0x0003); // gamma
+    writeCommandData (0x34, 0x3443); // gamma
+    writeCommandData (0x37, 0x0000); // gamma
+    writeCommandData (0x38, 0x0000); // gamma
     delayUs (10000);
 
-    writeCommandData (0x12, 0x200E);
+    writeCommandData (0x12, 0x200E);  // power control
+    delayUs (10000);
+    writeCommandData (0x12, 0x2003);  // power control
     delayUs (10000);
 
-    writeCommandData (0x12, 0x2003);
+    writeCommandData (0x07, 0x0012);  // partial, 8-color, display ON
+    delayUs (10000);
+    writeCommandData (0x07, 0x0017);  // partial, 8-color, display ON
     delayUs (10000);
 
-    writeCommandData (0x44, 0x013F);
-    writeCommandData (0x45, 0x0000);
-    writeCommandData (0x46, 0x01DF);
-    writeCommandData (0x47, 0x0000);
-    writeCommandData (0x20, 0x0000);
-    writeCommandData (0x21, 0x013F);
-    writeCommandData (0x07, 0x0012);
-    delayUs (10000);
-
-    writeCommandData (0x07, 0x0017);
-    delayUs (10000);
-
-    writeCommandData (0x20, 0x0000);
-    writeCommandData (0x21, 0x0000);
+    writeCommandData (0x45, 0x0000);  // horizontal start ram address window even - 0
+    writeCommandData (0x44, 0x013F);  // horizontal end ram address window even   - 320 - 1
+    writeCommandData (0x47, 0x0000);  // vertical start ram address window   - 0
+    writeCommandData (0x46, 0x01DF);  // vertical end ram address window     - 480 - 1
+    writeCommandData (0x20, 0x0000);  // Y start address of GRAM
+    writeCommandData (0x21, 0x0000);  // X start address of GRAM
 
     // startup commands
-    launchUpdateThread (0x22);
+    launchUpdateThread (0x22);        // write data to GRAM
     return true;
     }
 
