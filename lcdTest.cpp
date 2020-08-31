@@ -27,7 +27,7 @@ int main (int numArgs, char* args[]) {
   cLog::init (LOGINFO, false, "", "gpio");
 
   int rotate = argStrings.empty() ? 0 : stoi (argStrings[0]);
-  cLcd* lcd = new cLcdTa7601 (rotate);
+  cLcd* lcd = new cLcdIli9225b (rotate);
   lcd->initialise();
 
   //{{{  fb0
@@ -63,7 +63,6 @@ int main (int numArgs, char* args[]) {
   //munmap (fbp, finfo.smem_len);
   //close (fbfd);
   //}}}
-
   //{{{  display font
   int height = 8;
   while (height++ < 100) {
@@ -85,7 +84,7 @@ int main (int numArgs, char* args[]) {
     }
   //}}}
 
-  cScreen screen (480,320);
+  cScreen screen (240,320);
   lcd->clear (kOrange);
 
   int i = 0;

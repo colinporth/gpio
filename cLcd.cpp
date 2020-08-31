@@ -580,6 +580,7 @@ void cLcdSpi::writeCommand (const uint8_t command) {
     spiWrite (mSpiHandle, (char*)commandSequence, 3);
     gpioWrite (mChipEnableGpio, 1);
     }
+
   else {
     gpioWrite (kSpiRegisterSelectGpio, 0);
     spiWrite (mSpiHandle, (char*)(&command), 1);
@@ -599,6 +600,7 @@ void cLcdSpi::writeCommandData (const uint8_t command, const uint16_t data) {
     spiWrite (mSpiHandle, (char*)dataSequence, 3);
     gpioWrite (mChipEnableGpio, 1);
     }
+
   else {
     uint8_t dataBytes[2] = { uint8_t(data >> 8), uint8_t(data & 0xff) };
     spiWrite (mSpiHandle, (char*)dataBytes, 2);
@@ -736,7 +738,7 @@ constexpr uint16_t kWidth9225b = 176;
 constexpr uint16_t kHeight9225b = 220;
 constexpr int kSpiClock9225b = 16000000;
 
-cLcdIli9225b::cLcdIli9225b (const int rotate) : cLcdSpi(kWidth9225b, kHeight9225b, rotate, kSpiClock9225b, true, 0xFF, true) {}
+cLcdIli9225b::cLcdIli9225b (const int rotate) : cLcdSpi(kWidth9225b, kHeight9225b, rotate, kSpiClock9225b, true, kSpiCe0Gpio, true) {}
 
 bool cLcdIli9225b::initialise() {
   if (initResources()) {
@@ -816,7 +818,7 @@ constexpr uint16_t kWidth9320 = 240;
 constexpr uint16_t kHeight9320 = 320;
 constexpr int kSpiClock9320 = 24000000;
 
-cLcdIli9320::cLcdIli9320 (const int rotate) 
+cLcdIli9320::cLcdIli9320 (const int rotate)
     : cLcdSpi(kWidth9320, kHeight9320, rotate, kSpiClock9320, false, kSpiCe0Gpio, false) {}
 
 bool cLcdIli9320::initialise() {

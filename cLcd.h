@@ -114,7 +114,7 @@ protected:
 //{{{
 class cLcdTa7601 : public cLcd16 {
 public:
-  cLcdTa7601 (const int rotate);
+  cLcdTa7601 (const int rotate = 0);
   virtual ~cLcdTa7601() {}
 
   virtual bool initialise();
@@ -123,7 +123,7 @@ public:
 //{{{
 class cLcdSsd1289 : public cLcd16 {
 public:
-  cLcdSsd1289 (const int rotate);
+  cLcdSsd1289 (const int rotate = 0);
   virtual ~cLcdSsd1289() {}
 
   virtual bool initialise();
@@ -142,9 +142,9 @@ public:
 protected:
   void initSpi();
 
-  virtual void writeCommand (const uint8_t command) = 0;
-  virtual void writeCommandData (const uint8_t command, const uint16_t data) = 0;
-  virtual void writeCommandMultiData (const uint8_t command, const uint8_t* dataPtr, const int len) = 0;
+  virtual void writeCommand (const uint8_t command);
+  virtual void writeCommandData (const uint8_t command, const uint16_t data);
+  virtual void writeCommandMultiData (const uint8_t command, const uint8_t* dataPtr, const int len);
 
 private:
   const int mSpiClock;
@@ -156,7 +156,7 @@ private:
 class cLcdSt7735r : public cLcdSpi {
 // 1.8 inch 128x160
 public:
-  cLcdSt7735r (const int rotate);
+  cLcdSt7735r (const int rotate = 0);
   virtual ~cLcdSt7735r() {}
   virtual bool initialise();
   };
@@ -165,7 +165,7 @@ public:
 class cLcdIli9225b : public cLcdSpi {
 // 2.2 inch 186x220
 public:
-  cLcdIli9225b (const int rotate);
+  cLcdIli9225b (const int rotate = 0);
   virtual ~cLcdIli9225b() {}
   virtual bool initialise();
   };
@@ -174,8 +174,9 @@ public:
 class cLcdIli9320 : public cLcdSpi {
 // 2.8 inch 1240x320 HY28A
 public:
-  cLcdIli9320 (const int rotate);
+  cLcdIli9320 (const int rotate = 0);
   virtual ~cLcdIli9320() {}
+
   virtual bool initialise();
   };
 //}}}
