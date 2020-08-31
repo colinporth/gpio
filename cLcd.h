@@ -154,6 +154,7 @@ private:
 //}}}
 //{{{
 class cLcdSt7735r : public cLcdSpi {
+// 1.8 inch 128x160
 public:
   cLcdSt7735r (const int rotate);
   virtual ~cLcdSt7735r() {}
@@ -161,18 +162,20 @@ public:
   };
 //}}}
 //{{{
-class cLcdIli9320 : public cLcdSpi {
+class cLcdIli9225b : public cLcdSpi {
+// 2.2 inch 186x220
 public:
-  cLcdIli9320 (const int rotate);
-  virtual ~cLcdIli9320() {}
+  cLcdIli9225b (const int rotate);
+  virtual ~cLcdIli9225b() {}
   virtual bool initialise();
   };
 //}}}
 //{{{
-class cLcdIli9225b : public cLcdSpi {
+class cLcdIli9320 : public cLcdSpi {
+// 2.8 inch 1240x320 HY28A
 public:
-  cLcdIli9225b (const int rotate);
-  virtual ~cLcdIli9225b() {}
+  cLcdIli9320 (const int rotate);
+  virtual ~cLcdIli9320() {}
   virtual bool initialise();
   };
 //}}}
