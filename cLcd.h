@@ -180,7 +180,7 @@ protected:
 //}}}
 //{{{
 class cLcdIli9320 : public cLcdSpiHeaderSelect {
-// 2.8 inch 1240x320 HY28A
+// 2.8 inch 1240x320 - HY28A
 public:
   cLcdIli9320 (const int rotate = 0);
   virtual ~cLcdIli9320() {}
