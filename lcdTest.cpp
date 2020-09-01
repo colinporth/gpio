@@ -84,7 +84,7 @@ int main (int numArgs, char* args[]) {
     }
   //}}}
 
-  cScreen screen (lcd->getWidth(), lcd->getHeight());
+  cScreen screen (lcd->getHeight(), lcd->getWidth());
   lcd->clear (kOrange);
 
   int i = 0;
@@ -110,7 +110,7 @@ int main (int numArgs, char* args[]) {
       diffSpans = screen.merge (16);
       //{{{  show post merge in green
       while (diffSpans) {
-        int x = 320 - diffSpans->endY;
+        int x = screen.getHeight() - diffSpans->endY;
         int y = diffSpans->x;
         int xlen = diffSpans->endY - diffSpans->y + 1;
         int ylen = diffSpans->endX - diffSpans->x + 1;
@@ -118,7 +118,7 @@ int main (int numArgs, char* args[]) {
         diffSpans = diffSpans->next;
         }
       //}}}
-      lcd->text (kWhite, 0,0, 22, dec(i++) +
+      lcd->text (kWhite, 0,0, 20, dec(i++) +
                                   " " + dec(lcd->getUpdateUs(),5) +
                                   " " + dec(screen.getNumDiffSpans(),5) +
                                   " " + dec((screen.getNumDiffPixels() * 100) / screen.getNumPixels(),3) +

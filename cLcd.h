@@ -166,8 +166,9 @@ public:
 class cLcdSpiHeaderSelect : public cLcd {
 public:
   cLcdSpiHeaderSelect (const uint16_t width, const uint16_t height, const int rotate) : cLcd (width, height, rotate) {}
-
   virtual ~cLcdSpiHeaderSelect();
+
+  virtual void copyRotate (const uint16_t* fromPtr, const int xlen, const int ylen);
 
 protected:
   virtual void writeCommand (const uint8_t command);

@@ -786,8 +786,17 @@ cLcdSpiHeaderSelect::~cLcdSpiHeaderSelect() {
   }
 //}}}
 //{{{
+void cLcdSpiHeaderSelect::copyRotate (const uint16_t* fromPtr, const int xlen, const int ylen) {
+
+  for (int y = 0; y < ylen; y++)
+    for (int x = 0; x < xlen; x++)
+      mFrameBuf[(x * getWidth()) + (getWidth() - y)] = bswap_16 (fromPtr[(y*xlen) + x]);
+  }
+//}}}
+//{{{
 void cLcdSpiHeaderSelect::writeCommand (const uint8_t command) {
 
+  // we manage the ce0, send command header and command
   uint8_t commandSequence[3] = { 0x70, 0, command };
   gpioWrite (kSpiCe0Gpio, 0);
   spiWrite (mSpiHandle, (char*)commandSequence, 3);
@@ -799,6 +808,7 @@ void cLcdSpiHeaderSelect::writeCommandData (const uint8_t command, const uint16_
 
   writeCommand (command);
 
+  // we manage the ce0, send data header and data
   uint8_t dataSequence[3] = { 0x72, uint8_t(data >> 8), uint8_t(data & 0xff) };
   gpioWrite (kSpiCe0Gpio, 0);
   spiWrite (mSpiHandle, (char*)dataSequence, 3);
@@ -810,7 +820,7 @@ void cLcdSpiHeaderSelect::writeCommandMultiData (const uint8_t command, const ui
 
   writeCommand (command);
 
-  // we manage the ce, send data start
+  // we manage the ce0, send data header and data
   uint8_t dataSequenceStart = 0x72;
   gpioWrite (kSpiCe0Gpio, 0);
   spiWrite (mSpiHandle, (char*)(&dataSequenceStart), 1);
