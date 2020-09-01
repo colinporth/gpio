@@ -548,12 +548,12 @@ bool cLcdSsd1289::initialise() {
   }
 //}}}
 
-// cLcdSpiRegisterSelect - uses bigEndian frameBuf using registerSelect gpio
+// cLcdSpiRegisterSelect - uses bigEndian frameBuf, gpio registerSelect, spi manages ce0
 //{{{  spi J8 header pins, gpio, constexpr
-//      3.3v - 17  18 - gpio24 - registerSelect/backlight
-// spi0 mosi - 19  20 - 0v
-// spi0 miso - 20  22 - gpio25 - reset
-// spi0 sck -  23  24 - spi0 Ce0 - gpio8 - cs
+//      3.3v 17  18 gpio24   - registerSelect/backlight
+// spi0 mosi 19  20 0v
+// spi0 miso 20  22 gpio25   - reset
+// spi0 sck -23  24 spi0 Ce0 - gpio8 - cs
 constexpr uint8_t kSpiCe0Gpio = 8;
 constexpr uint8_t kSpiRegisterSelectGpio  = 24;
 constexpr uint8_t kBacklightGpio = 24;
@@ -612,7 +612,7 @@ bool cLcdSt7735r::initialise() {
     gpioSetMode (kSpiRegisterSelectGpio, PI_OUTPUT);
     gpioWrite (kSpiRegisterSelectGpio, 1);
 
-    // mode 0, spi manages ce0
+    // mode 0, spi manages ce0 active lo
     mSpiHandle = spiOpen (0, kSpiClock7735, 0);
 
     //{{{  command constexpr
@@ -712,7 +712,7 @@ bool cLcdIli9225b::initialise() {
     gpioSetMode (kSpiRegisterSelectGpio, PI_OUTPUT);
     gpioWrite (kSpiRegisterSelectGpio, 1);
 
-    // mode 0, spi manages ce0
+    // mode 0, spi manages ce0 active lo
     mSpiHandle = spiOpen (0, kSpiClock9225b, 0);
 
     writeCommandData (0x01, 0x011C); // set SS and NL bit
@@ -779,7 +779,7 @@ bool cLcdIli9225b::initialise() {
   }
 //}}}
 
-// cLcdSpiHeaderSelect - uses bigEndian frameBuf using header for command data select
+// cLcdSpiHeaderSelect - uses bigEndian frameBuf, header register select, we manage ce0
 //{{{
 cLcdSpiHeaderSelect::~cLcdSpiHeaderSelect() {
   spiClose (mSpiHandle);
@@ -840,19 +840,13 @@ bool cLcdIli9320::initialise() {
   if (initResources()) {
     reset();
 
-    // cs - software
-    gpioSetMode (kSpiCe0Gpio, PI_OUTPUT);
-    gpioWrite (kSpiCe0Gpio, 1);
-
-    // rs
-    gpioSetMode (kSpiRegisterSelectGpio, PI_OUTPUT);
-    gpioWrite (kSpiRegisterSelectGpio, 1);
-
-    // back
+    // backlight on
     gpioSetMode (kBacklightGpio, PI_OUTPUT);
     gpioWrite (kBacklightGpio, 1);
 
-    // mode 3, we manage ce0
+    // mode 3, we manage ce0 active lo
+    gpioSetMode (kSpiCe0Gpio, PI_OUTPUT);
+    gpioWrite (kSpiCe0Gpio, 1);
     mSpiHandle = spiOpen (0, kSpiClock9320, 3 | 0x40);
 
     writeCommandData (0xE5, 0x8000); // Set the Vcore voltage
