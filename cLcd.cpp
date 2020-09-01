@@ -181,7 +181,7 @@ bool cLcd::initResources() {
   }
 //}}}
 //{{{
-void cLcd::initResetPin() {
+void cLcd::reset() {
 
   gpioSetMode (kResetGpio, PI_OUTPUT);
 
@@ -354,7 +354,7 @@ cLcdTa7601::cLcdTa7601 (const int rotate) : cLcd16(kWidthTa7601, kHeightTa7601, 
 
 bool cLcdTa7601::initialise() {
   if (initResources()) {
-    initResetPin();
+    reset();
 
     // wr
     gpioSetMode (k16WriteGpio, PI_OUTPUT);
@@ -453,7 +453,7 @@ cLcdSsd1289::cLcdSsd1289 (const int rotate) : cLcd16(kWidth1289, kHeight1289, ro
 
 bool cLcdSsd1289::initialise() {
   if (initResources()) {
-    initResetPin();
+    reset();
 
     // wr
     gpioSetMode (k16WriteGpio, PI_OUTPUT);
@@ -548,7 +548,7 @@ bool cLcdSsd1289::initialise() {
   }
 //}}}
 
-// cLcdSpi - uses bigEndian frameBuf
+// cLcdSpiRegisterSelect - uses bigEndian frameBuf using registerSelect gpio
 //{{{  spi J8 header pins, gpio, constexpr
 //      3.3v - 17  18 - gpio24 - registerSelect/backlight
 // spi0 mosi - 19  20 - 0v
@@ -559,65 +559,31 @@ constexpr uint8_t kSpiRegisterSelectGpio  = 24;
 constexpr uint8_t kBacklightGpio = 24;
 //}}}
 //{{{
-cLcdSpi::~cLcdSpi() {
+cLcdSpiRegisterSelect::~cLcdSpiRegisterSelect() {
   spiClose (mSpiHandle);
   }
 //}}}
 //{{{
-void cLcdSpi::initSpi() {
-// if mChipEnableGpio then disable autoSpiCe0
-// - can't send multi SPI's without pulsing CE screwing up dataSequence
+void cLcdSpiRegisterSelect::writeCommand (const uint8_t command) {
 
-  mSpiHandle = spiOpen (0, mSpiClock, (mSpiMode0 ? 0 : 3) | ((mChipEnableGpio == 0xFF) ? 0x00 : 0x40));
+  gpioWrite (kSpiRegisterSelectGpio, 0);
+  spiWrite (mSpiHandle, (char*)(&command), 1);
+  gpioWrite (kSpiRegisterSelectGpio, 1);
   }
 //}}}
 //{{{
-void cLcdSpi::writeCommand (const uint8_t command) {
-
-  if (mUseSequence) {
-    uint8_t commandSequence[3] = { 0x70, 0, command };
-    gpioWrite (mChipEnableGpio, 0);
-    spiWrite (mSpiHandle, (char*)commandSequence, 3);
-    gpioWrite (mChipEnableGpio, 1);
-    }
-
-  else {
-    gpioWrite (kSpiRegisterSelectGpio, 0);
-    spiWrite (mSpiHandle, (char*)(&command), 1);
-    gpioWrite (kSpiRegisterSelectGpio, 1);
-    }
-
-  }
-//}}}
-//{{{
-void cLcdSpi::writeCommandData (const uint8_t command, const uint16_t data) {
+void cLcdSpiRegisterSelect::writeCommandData (const uint8_t command, const uint16_t data) {
 
   writeCommand (command);
 
-  if (mUseSequence) {
-    uint8_t dataSequence[3] = { 0x72, uint8_t(data >> 8), uint8_t(data & 0xff) };
-    gpioWrite (mChipEnableGpio, 0);
-    spiWrite (mSpiHandle, (char*)dataSequence, 3);
-    gpioWrite (mChipEnableGpio, 1);
-    }
-
-  else {
-    uint8_t dataBytes[2] = { uint8_t(data >> 8), uint8_t(data & 0xff) };
-    spiWrite (mSpiHandle, (char*)dataBytes, 2);
-    }
+  uint8_t dataBytes[2] = { uint8_t(data >> 8), uint8_t(data & 0xff) };
+  spiWrite (mSpiHandle, (char*)dataBytes, 2);
   }
 //}}}
 //{{{
-void cLcdSpi::writeCommandMultiData (const uint8_t command, const uint8_t* dataPtr, const int len) {
+void cLcdSpiRegisterSelect::writeCommandMultiData (const uint8_t command, const uint8_t* dataPtr, const int len) {
 
   writeCommand (command);
-
-  if (mUseSequence) {
-    // we manage the ce, send data start
-    uint8_t dataSequenceStart = 0x72;
-    gpioWrite (mChipEnableGpio, 0);
-    spiWrite (mSpiHandle, (char*)(&dataSequenceStart), 1);
-    }
 
   // send data
   int bytesLeft = len;
@@ -628,9 +594,6 @@ void cLcdSpi::writeCommandMultiData (const uint8_t command, const uint8_t* dataP
     ptr += sendBytes;
     bytesLeft -= sendBytes;
     }
-
-  if (mUseSequence)
-    gpioWrite (mChipEnableGpio, 1);
   }
 //}}}
 
@@ -639,17 +602,18 @@ constexpr uint16_t kWidth7735 = 128;
 constexpr uint16_t kHeight7735 = 160;
 constexpr int kSpiClock7735 = 24000000;
 
-cLcdSt7735r::cLcdSt7735r (const int rotate) : cLcdSpi (kWidth7735, kHeight7735, rotate, kSpiClock7735, true, 0xFF, false) {}
+cLcdSt7735r::cLcdSt7735r (const int rotate) : cLcdSpiRegisterSelect (kWidth7735, kHeight7735, rotate) {}
 
 bool cLcdSt7735r::initialise() {
   if (initResources()) {
-    initResetPin();
+    reset();
 
     // rs
     gpioSetMode (kSpiRegisterSelectGpio, PI_OUTPUT);
     gpioWrite (kSpiRegisterSelectGpio, 1);
 
-    initSpi();
+    // mode 0, spi manages ce0
+    mSpiHandle = spiOpen (0, kSpiClock7735, 0);
 
     //{{{  command constexpr
     constexpr uint8_t k7335_SLPOUT  = 0x11; // no data
@@ -738,17 +702,18 @@ constexpr uint16_t kWidth9225b = 176;
 constexpr uint16_t kHeight9225b = 220;
 constexpr int kSpiClock9225b = 16000000;
 
-cLcdIli9225b::cLcdIli9225b (const int rotate) : cLcdSpi(kWidth9225b, kHeight9225b, rotate, kSpiClock9225b, true, kSpiCe0Gpio, true) {}
+cLcdIli9225b::cLcdIli9225b (const int rotate) : cLcdSpiRegisterSelect(kWidth9225b, kHeight9225b, rotate) {}
 
 bool cLcdIli9225b::initialise() {
   if (initResources()) {
-    initResetPin();
+    reset();
 
     // rs
     gpioSetMode (kSpiRegisterSelectGpio, PI_OUTPUT);
     gpioWrite (kSpiRegisterSelectGpio, 1);
 
-    initSpi();
+    // mode 0, spi manages ce0
+    mSpiHandle = spiOpen (0, kSpiClock9225b, 0);
 
     writeCommandData (0x01, 0x011C); // set SS and NL bit
 
@@ -813,21 +778,71 @@ bool cLcdIli9225b::initialise() {
   return false;
   }
 //}}}
+
+// cLcdSpiHeaderSelect - uses bigEndian frameBuf using header for command data select
+//{{{
+cLcdSpiHeaderSelect::~cLcdSpiHeaderSelect() {
+  spiClose (mSpiHandle);
+  }
+//}}}
+//{{{
+void cLcdSpiHeaderSelect::writeCommand (const uint8_t command) {
+
+  uint8_t commandSequence[3] = { 0x70, 0, command };
+  gpioWrite (kSpiCe0Gpio, 0);
+  spiWrite (mSpiHandle, (char*)commandSequence, 3);
+  gpioWrite (kSpiCe0Gpio, 1);
+  }
+//}}}
+//{{{
+void cLcdSpiHeaderSelect::writeCommandData (const uint8_t command, const uint16_t data) {
+
+  writeCommand (command);
+
+  uint8_t dataSequence[3] = { 0x72, uint8_t(data >> 8), uint8_t(data & 0xff) };
+  gpioWrite (kSpiCe0Gpio, 0);
+  spiWrite (mSpiHandle, (char*)dataSequence, 3);
+  gpioWrite (kSpiCe0Gpio, 1);
+  }
+//}}}
+//{{{
+void cLcdSpiHeaderSelect::writeCommandMultiData (const uint8_t command, const uint8_t* dataPtr, const int len) {
+
+  writeCommand (command);
+
+  // we manage the ce, send data start
+  uint8_t dataSequenceStart = 0x72;
+  gpioWrite (kSpiCe0Gpio, 0);
+  spiWrite (mSpiHandle, (char*)(&dataSequenceStart), 1);
+
+  // send data
+  int bytesLeft = len;
+  auto ptr = (char*)dataPtr;
+  while (bytesLeft > 0) {
+   int sendBytes = (bytesLeft > 0xFFFF) ? 0xFFFF : bytesLeft;
+    spiWrite (mSpiHandle, ptr, sendBytes);
+    ptr += sendBytes;
+    bytesLeft -= sendBytes;
+    }
+
+  gpioWrite (kSpiCe0Gpio, 1);
+  }
+//}}}
+
 //{{{  cLcdIli9320
 constexpr uint16_t kWidth9320 = 240;
 constexpr uint16_t kHeight9320 = 320;
 constexpr int kSpiClock9320 = 24000000;
 
-cLcdIli9320::cLcdIli9320 (const int rotate)
-    : cLcdSpi(kWidth9320, kHeight9320, rotate, kSpiClock9320, false, kSpiCe0Gpio, false) {}
+cLcdIli9320::cLcdIli9320 (const int rotate) : cLcdSpiHeaderSelect(kWidth9320, kHeight9320, rotate) {}
 
 bool cLcdIli9320::initialise() {
   if (initResources()) {
-    initResetPin();
+    reset();
 
     // cs - software
-    gpioSetMode (mChipEnableGpio, PI_OUTPUT);
-    gpioWrite (mChipEnableGpio, 1);
+    gpioSetMode (kSpiCe0Gpio, PI_OUTPUT);
+    gpioWrite (kSpiCe0Gpio, 1);
 
     // rs
     gpioSetMode (kSpiRegisterSelectGpio, PI_OUTPUT);
@@ -837,7 +852,8 @@ bool cLcdIli9320::initialise() {
     gpioSetMode (kBacklightGpio, PI_OUTPUT);
     gpioWrite (kBacklightGpio, 1);
 
-    initSpi();
+    // mode 3, we manage ce0
+    mSpiHandle = spiOpen (0, kSpiClock9320, 3 | 0x40);
 
     writeCommandData (0xE5, 0x8000); // Set the Vcore voltage
     writeCommandData (0x00, 0x0000); // start oscillation - stopped?

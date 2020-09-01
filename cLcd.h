@@ -28,8 +28,8 @@ constexpr uint16_t kWhite       =  0xFFFF;  // 255, 255, 255
 
 class cLcd {
 public:
-  cLcd (const uint16_t width, const uint16_t height, const int rotate, const uint8_t chipEnableGpio, const bool useSequence)
-    : mRotate(rotate), mChipEnableGpio(chipEnableGpio), mUseSequence(useSequence),
+  cLcd (const uint16_t width, const uint16_t height, const int rotate)
+    : mRotate(rotate),
       mWidth(((rotate == 90) || (rotate == 270)) ? height : width),
       mHeight(((rotate == 90) || (rotate == 270)) ? width : height) {}
   virtual ~cLcd();
@@ -61,7 +61,7 @@ public:
 //{{{
 protected:
   bool initResources();
-  void initResetPin();
+  void reset();
   void initChipEnablePin();
 
   virtual void writeCommand (const uint8_t command) = 0;
@@ -71,8 +71,6 @@ protected:
   void launchUpdateThread (const uint8_t command);
 
   int mRotate = 0;
-  const uint8_t mChipEnableGpio;
-  const bool mUseSequence;
 
   bool mChanged = false;
   uint16_t* mFrameBuf = nullptr;  // uint16 colour pixels
@@ -96,9 +94,7 @@ private:
 //{{{
 class cLcd16 : public cLcd {
 public:
-  cLcd16 (const uint16_t width, const uint16_t height, const int rotate)
-    : cLcd (width, height, rotate, 0xFF, false) {}
-
+  cLcd16 (const uint16_t width, const uint16_t height, const int rotate) : cLcd (width, height, rotate) {}
   virtual ~cLcd16() {}
 
 protected:
@@ -131,38 +127,33 @@ public:
 //}}}
 
 //{{{
-class cLcdSpi : public cLcd {
+class cLcdSpiRegisterSelect : public cLcd {
 public:
-  cLcdSpi (const uint16_t width, const uint16_t height, const int rotate,
-           const int spiClock, const bool spiMode0, const uint8_t chipEnableGpio, const bool useSequence)
-    : cLcd (width, height, rotate, chipEnableGpio, useSequence), mSpiClock(spiClock), mSpiMode0(spiMode0) {}
+  cLcdSpiRegisterSelect (const uint16_t width, const uint16_t height, const int rotate) : cLcd (width, height, rotate) {}
 
-  virtual ~cLcdSpi();
+  virtual ~cLcdSpiRegisterSelect();
 
 protected:
-  void initSpi();
-
   virtual void writeCommand (const uint8_t command);
   virtual void writeCommandData (const uint8_t command, const uint16_t data);
   virtual void writeCommandMultiData (const uint8_t command, const uint8_t* dataPtr, const int len);
 
-private:
-  const int mSpiClock;
-  const bool mSpiMode0;
   int mSpiHandle = 0;
+  uint8_t mChipEnable = 0xFF;
   };
 //}}}
 //{{{
-class cLcdSt7735r : public cLcdSpi {
+class cLcdSt7735r : public cLcdSpiRegisterSelect {
 // 1.8 inch 128x160
 public:
   cLcdSt7735r (const int rotate = 0);
   virtual ~cLcdSt7735r() {}
+
   virtual bool initialise();
   };
 //}}}
 //{{{
-class cLcdIli9225b : public cLcdSpi {
+class cLcdIli9225b : public cLcdSpiRegisterSelect {
 // 2.2 inch 186x220
 public:
   cLcdIli9225b (const int rotate = 0);
@@ -170,8 +161,25 @@ public:
   virtual bool initialise();
   };
 //}}}
+
 //{{{
-class cLcdIli9320 : public cLcdSpi {
+class cLcdSpiHeaderSelect : public cLcd {
+public:
+  cLcdSpiHeaderSelect (const uint16_t width, const uint16_t height, const int rotate) : cLcd (width, height, rotate) {}
+
+  virtual ~cLcdSpiHeaderSelect();
+
+protected:
+  virtual void writeCommand (const uint8_t command);
+  virtual void writeCommandData (const uint8_t command, const uint16_t data);
+  virtual void writeCommandMultiData (const uint8_t command, const uint8_t* dataPtr, const int len);
+
+  int mSpiHandle = 0;
+  uint8_t mChipEnable = 0xFF;
+  };
+//}}}
+//{{{
+class cLcdIli9320 : public cLcdSpiHeaderSelect {
 // 2.8 inch 1240x320 HY28A
 public:
   cLcdIli9320 (const int rotate = 0);

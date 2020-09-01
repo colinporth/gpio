@@ -27,7 +27,7 @@ int main (int numArgs, char* args[]) {
   cLog::init (LOGINFO, false, "", "gpio");
 
   int rotate = argStrings.empty() ? 0 : stoi (argStrings[0]);
-  cLcd* lcd = new cLcdIli9225b (rotate);
+  cLcd* lcd = new cLcdSt7735r (rotate);
   lcd->initialise();
 
   //{{{  fb0
@@ -84,7 +84,7 @@ int main (int numArgs, char* args[]) {
     }
   //}}}
 
-  cScreen screen (240,320);
+  cScreen screen (lcd->getWidth(), lcd->getHeight());
   lcd->clear (kOrange);
 
   int i = 0;
