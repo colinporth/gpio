@@ -10,7 +10,6 @@
 #include <sys/mman.h>
 
 #include "cLcd.h"
-#include "cScreen.h"
 
 #include "../shared/utils/utils.h"
 #include "../shared/utils/cLog.h"
@@ -84,19 +83,18 @@ int main (int numArgs, char* args[]) {
     }
   //}}}
 
-  cScreen screen (lcd->getWidth(), lcd->getHeight());
   lcd->clear (kOrange);
 
   int i = 0;
   while (true) {
-    screen.snap();
+    lcd->snap();
 
     double startTime = lcd->time();
-    cScreen::sDiffSpan* spans = screen.diffCoarse();
+    cLcd::sDiffSpan* spans = lcd->diffCoarse();
     if (spans) {
       int diffTook = int((lcd->time() - startTime) * 10000000);
 
-      lcd->copy (screen.getBuf(), screen.getSize());
+      lcd->copy (lcd->getBuf(), lcd->getSize());
       //{{{  show pre merge in red
       //while (spans) {
         //int x = screen.getHeight() - spans->endY;
@@ -107,8 +105,8 @@ int main (int numArgs, char* args[]) {
         //spans = spans
         //}
       //}}}
-      spans = screen.merge (16);
-      //{{{  show post merge in green
+      spans = lcd->merge (16);
+      //{{{  show post merge in yellow
       while (spans) {
         lcd->rect (kYellow, 0x60, cRect(spans->x,spans->y, spans->endX,spans->endY));
         spans = spans->next;
@@ -116,8 +114,8 @@ int main (int numArgs, char* args[]) {
       //}}}
       lcd->text (kWhite, cPoint(0,0), 20, dec(i++) +
                                   " " + dec(lcd->getUpdateUs(),5) +
-                                  " " + dec(screen.getNumDiffSpans(),5) +
-                                  " " + dec((screen.getNumDiffPixels() * 100) / screen.getNumPixels(),3) +
+                                  " " + dec(lcd->getNumDiffSpans(),5) +
+                                  " " + dec((lcd->getNumDiffPixels() * 100) / lcd->getNumPixels(),3) +
                                   " " + dec(diffTook,5));
       lcd->update();
       }

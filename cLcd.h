@@ -3,6 +3,8 @@
 //{{{  includes
 #include <cstdint>
 #include <string>
+
+#include <bcm_host.h>
 //}}}
 
 //{{{
@@ -178,6 +180,21 @@ constexpr uint16_t kWhite       =  0xFFFF;  // 255, 255, 255
 
 class cLcd {
 public:
+  //{{{
+  struct sDiffSpan {
+    sDiffSpan* next;   // linked skip list in array for fast pruning
+
+    uint16_t x;
+    uint16_t endX;
+    uint16_t y;
+    uint16_t endY;
+
+    // box of width [x, endX[ * [y, endY[, scanline endY-1 can be partial, ends in lastScanEndX.
+    uint32_t size;
+    uint16_t lastScanEndX;
+    };
+  //}}}
+
   cLcd (const int16_t width, const int16_t height, const int rotate);
   virtual ~cLcd();
 
@@ -186,6 +203,7 @@ public:
   constexpr int16_t getWidth() { return mWidth; }
   constexpr int16_t getHeight() { return mHeight; }
   const cPoint getSize() { return cPoint(mWidth, mHeight); }
+  const int getNumPixels() { return mWidth * mHeight; }
   const int getUpdateUs() { return mUpdateUs; }
 
   virtual void rect (const uint16_t colour, const cRect& r) = 0;
@@ -204,6 +222,17 @@ public:
   void delayUs (const int us);
   double time();
 
+  // main display screen copy
+  const uint16_t* getBuf() { return mBuf; }
+  const int getNumDiffSpans() { return mNumDiffSpans; }
+  const int getNumDiffPixels();
+
+  void snap();
+  sDiffSpan* diffSingle();
+  sDiffSpan* diffCoarse();
+  sDiffSpan* diffExact();
+  sDiffSpan* merge (int pixelThreshold);
+
 //{{{
 protected:
   bool initResources();
@@ -218,11 +247,15 @@ protected:
   int mRotate = 0;
 
   bool mChanged = false;
+
   uint16_t* mFrameBuf = nullptr;  // uint16 colour pixels
 //}}}
 //{{{
 private:
   void setFont (const uint8_t* font, const int fontSize);
+
+  static int coarseLinearDiff (uint16_t* frameBuf, uint16_t* prevFrameBuf, uint16_t* frameBufEnd);
+  static int coarseLinearDiffBack (uint16_t* frameBuf, uint16_t* prevFrameBuf, uint16_t* frameBufEnd);
 
   const int16_t mWidth;
   const int16_t mHeight;
@@ -233,6 +266,21 @@ private:
 
   bool mExit = false;
   bool mExited = false;
+
+  // main display screen buffers
+  uint16_t* mBuf;
+  uint16_t* mPrevBuf;
+
+  // dispmanx
+  DISPMANX_DISPLAY_HANDLE_T mDisplay;
+  DISPMANX_MODEINFO_T mModeInfo;
+  DISPMANX_RESOURCE_HANDLE_T mScreenGrab;
+  uint32_t mImagePrt;
+  VC_RECT_T mVcRect;
+
+  // diff spans
+  sDiffSpan* mDiffSpans;
+  int mNumDiffSpans;
 //}}}
   };
 
