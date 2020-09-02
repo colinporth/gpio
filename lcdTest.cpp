@@ -63,6 +63,10 @@ int main (int numArgs, char* args[]) {
   //close (fbfd);
   //}}}
 
+  lcd->clear (kBlack);
+  lcd->update();
+  lcd->delayUs (100000);
+
   while (true)
     if (lcd->snap()) // log
       cLog::log (LOGINFO, "upd:" + dec(lcd->getUpdateUs()) +

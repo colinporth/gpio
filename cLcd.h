@@ -172,16 +172,16 @@ public:
   const int getNumPixels() { return mWidth * mHeight; }
   const int getUpdateUs() { return mUpdateUs; }
 
-  virtual void rect (const uint16_t colour, const cRect& r) = 0;
-  virtual void pixel (const uint16_t colour, const cPoint& p) = 0;
-  virtual void blendPixel (const uint16_t colour, const uint8_t alpha, const cPoint& p) = 0;
-  virtual void copy (const uint16_t* src, const cRect& srcRect, const cPoint& dstPoint) = 0;
-  virtual void copy (const uint16_t* src) = 0;
+  virtual void rect (const uint16_t colour, const cRect& r);
+  virtual void pixel (const uint16_t colour, const cPoint& p);
+  virtual void blendPixel (const uint16_t colour, const uint8_t alpha, const cPoint& p);
+  virtual void copy (const uint16_t* src, const cRect& srcRect, const cPoint& dstPoint);
+  virtual void copy (const uint16_t* src);
 
   int text (const uint16_t colour, const cPoint& p, const int height, const std::string& str);
   void rect (const uint16_t colour, const uint8_t alpha, const cRect& r);
-  void clear (const uint16_t colour) { rect (colour, cRect(0,0, getWidth(), getHeight())); }
   void rectOutline (const uint16_t colour, const cRect& r);
+  void clear (const uint16_t colour) { rect (colour, cRect(0,0, getWidth(), getHeight())); }
 
   void update() { mUpdate = true; }
   void setAutoUpdate() { mAutoUpdate = true; }
@@ -256,13 +256,6 @@ public:
   virtual ~cLcd16() {}
 
 protected:
-  virtual void rect (const uint16_t colour, const cRect& r);
-  virtual void pixel (const uint16_t colour, const cPoint& p);
-  virtual void blendPixel (const uint16_t colour, const uint8_t alpha, const cPoint& p);
-
-  virtual void copy (const uint16_t* src);
-  virtual void copy (const uint16_t* src, const cRect& srcRect, const cPoint& dstPoint);
-
   virtual void writeCommand (const uint8_t command);
   virtual void writeCommandData (const uint8_t command, const uint16_t data);
   virtual void writeCommandMultiData (const uint8_t command, const uint8_t* data, const int len);
@@ -275,12 +268,6 @@ public:
   virtual ~cLcdSpi();
 
 protected:
-  virtual void rect (const uint16_t colour, const cRect& r);
-  virtual void pixel (const uint16_t colour, const cPoint& p);
-  virtual void blendPixel (const uint16_t colour, const uint8_t alpha, const cPoint& p);
-  virtual void copy (const uint16_t* src);
-  virtual void copy (const uint16_t* src, const cRect& srcRect, const cPoint& dstPoint);
-
   int mSpiHandle = 0;
   };
 //}}}

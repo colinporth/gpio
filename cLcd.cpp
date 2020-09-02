@@ -39,7 +39,7 @@ struct sSpan {
   };
 //}}}
 
-//{{{  cLcd public
+// cLcd public
 //{{{
 cLcd::cLcd (const int16_t width, const int16_t height, const int rotate)
     : mRotate(rotate),
@@ -98,6 +98,76 @@ void cLcd::setFont (const uint8_t* font, const int fontSize)  {
   }
 //}}}
 
+//{{{
+void cLcd::rect (const uint16_t colour, const cRect& r) {
+
+  int16_t xmax = min (r.right, getWidth());
+  int16_t ymax = min (r.bottom, getHeight());
+
+  for (int y = r.top; y < ymax; y++) {
+    uint16_t* ptr = mFrameBuf + y*getWidth() + r.left;
+    for (int x = r.left; x < xmax; x++)
+      *ptr++ = colour;
+      }
+
+  mChanged = true;
+  }
+//}}}
+//{{{
+void cLcd::pixel (const uint16_t colour, const cPoint& p) {
+
+  mFrameBuf[(p.y*getWidth()) + p.x] = colour;
+  mChanged = true;
+  }
+//}}}
+//{{{
+void cLcd::blendPixel (const uint16_t colour, const uint8_t alpha, const cPoint& p) {
+// magical rgb565 alpha composite
+// - linear interp background * (1.0 - alpha) + foreground * alpha
+//   - factorized into: result = background + (foreground - background) * alpha
+//   - alpha is in Q1.5 format, so 0.0 is represented by 0, and 1.0 is represented by 32
+// - Converts  0000000000000000rrrrrggggggbbbbb
+// -     into  00000gggggg00000rrrrr000000bbbbb
+
+  if ((alpha >= 0) && (p.x >= 0) && (p.y > 0) && (p.x < getWidth()) && (p.y < getHeight())) {
+    // clip opaque and offscreen
+    if (alpha == 0xFF)
+      // simple case - set bigEndianColour frameBuf pixel to littleEndian colour
+      mFrameBuf[(p.y*getWidth()) + p.x] = colour;
+    else {
+      // get bigEndianColour frame buffer into littleEndian background
+      uint32_t background = mFrameBuf[(p.y*getWidth()) + p.x];
+
+      // composite littleEndian colour
+      uint32_t foreground = colour;
+      foreground = (foreground | (foreground << 16)) & 0x07e0f81f;
+      background = (background | (background << 16)) & 0x07e0f81f;
+      background += (((foreground - background) * ((alpha + 4) >> 3)) >> 5) & 0x07e0f81f;
+
+      // set bigEndianColour frameBuf pixel to littleEndian background result
+      mFrameBuf[(p.y*getWidth()) + p.x] = background | (background >> 16);
+      }
+
+    mChanged = true;
+    }
+  }
+//}}}
+//{{{
+void cLcd::copy (const uint16_t* src) {
+// whole screen copy from src of same size, single mempy
+
+  memcpy (mFrameBuf, src, getNumPixels() * 2);
+  }
+//}}}
+//{{{
+void cLcd::copy (const uint16_t* src, const cRect& srcRect, const cPoint& dstPoint) {
+
+  for (int y = 0; y < srcRect.getHeight(); y++)
+    memcpy (mFrameBuf + ((dstPoint.y + y) * getWidth()) + dstPoint.x,
+            src + ((srcRect.top + y) * srcRect.getWidth()) + srcRect.left,
+            srcRect.getWidth() * 2);
+  }
+//}}}
 //{{{
 void cLcd::rect (const uint16_t colour, const uint8_t alpha, const cRect& r) {
 
@@ -194,8 +264,8 @@ bool cLcd::snap() {
   return false;
   }
 //}}}
-//}}}
-//{{{  cLcd protected
+
+// cLcd protected
 //{{{
 bool cLcd::initialise() {
 
@@ -221,7 +291,6 @@ bool cLcd::initialise() {
   return false;
   }
 //}}}
-
 //{{{
 void cLcd::launchUpdateThread() {
 // write frameBuffer to lcd ram thread if changed
@@ -242,7 +311,7 @@ void cLcd::launchUpdateThread() {
     } ).detach();
   }
 //}}}
-//}}}
+
 //{{{  cLcd private
 #define SPAN_MERGE_THRESHOLD 8
 #define SWAPU32(x, y) { uint32_t tmp = x; x = y; y = tmp; }
@@ -772,78 +841,6 @@ constexpr uint32_t k16WriteClrMask = k16WriteMask | k16DataMask;
 //}}}
 
 //{{{
-void cLcd16::rect (const uint16_t colour, const cRect& r) {
-
-  int16_t xmax = min (r.right, getWidth());
-  int16_t ymax = min (r.bottom, getHeight());
-
-  for (int y = r.top; y < ymax; y++) {
-    uint16_t* ptr = mFrameBuf + y*getWidth() + r.left;
-    for (int x = r.left; x < xmax; x++)
-      *ptr++ = colour;
-      }
-
-  mChanged = true;
-  }
-//}}}
-//{{{
-void cLcd16::pixel (const uint16_t colour, const cPoint& p) {
-
-  mFrameBuf[(p.y*getWidth()) + p.x] = colour;
-  mChanged = true;
-  }
-//}}}
-//{{{
-void cLcd16::blendPixel (const uint16_t colour, const uint8_t alpha, const cPoint& p) {
-// magical rgb565 alpha composite
-// - linear interp background * (1.0 - alpha) + foreground * alpha
-//   - factorized into: result = background + (foreground - background) * alpha
-//   - alpha is in Q1.5 format, so 0.0 is represented by 0, and 1.0 is represented by 32
-// - Converts  0000000000000000rrrrrggggggbbbbb
-// -     into  00000gggggg00000rrrrr000000bbbbb
-
-  if ((alpha >= 0) && (p.x >= 0) && (p.y > 0) && (p.x < getWidth()) && (p.y < getHeight())) {
-    // clip opaque and offscreen
-    if (alpha == 0xFF)
-      // simple case - set bigEndianColour frameBuf pixel to littleEndian colour
-      mFrameBuf[(p.y*getWidth()) + p.x] = colour;
-    else {
-      // get bigEndianColour frame buffer into littleEndian background
-      uint32_t background = mFrameBuf[(p.y*getWidth()) + p.x];
-
-      // composite littleEndian colour
-      uint32_t foreground = colour;
-      foreground = (foreground | (foreground << 16)) & 0x07e0f81f;
-      background = (background | (background << 16)) & 0x07e0f81f;
-      background += (((foreground - background) * ((alpha + 4) >> 3)) >> 5) & 0x07e0f81f;
-
-      // set bigEndianColour frameBuf pixel to littleEndian background result
-      mFrameBuf[(p.y*getWidth()) + p.x] = background | (background >> 16);
-      }
-
-    mChanged = true;
-    }
-  }
-//}}}
-
-//{{{
-void cLcd16::copy (const uint16_t* src) {
-// whole screen copy from src of same size, single mempy
-
-  memcpy (mFrameBuf, src, getNumPixels() * 2);
-  }
-//}}}
-//{{{
-void cLcd16::copy (const uint16_t* src, const cRect& srcRect, const cPoint& dstPoint) {
-
-  for (int y = 0; y < srcRect.getHeight(); y++)
-    memcpy (mFrameBuf + ((dstPoint.y + y) * getWidth()) + dstPoint.x,
-            src + ((srcRect.top + y) * srcRect.getWidth()) + srcRect.left,
-            srcRect.getWidth() * 2);
-  }
-//}}}
-
-//{{{
 void cLcd16::writeCommand (const uint8_t command) {
 
   gpioWrite (k16RegisterSelectGpio, 0);
@@ -902,82 +899,6 @@ constexpr uint8_t kBacklightGpio = 24;
 //{{{
 cLcdSpi::~cLcdSpi() {
   spiClose (mSpiHandle);
-  }
-//}}}
-
-//{{{
-void cLcdSpi::rect (const uint16_t colour, const cRect& r) {
-
-  uint16_t bigEndianColour = bswap_16 (colour);
-
-  uint16_t xmax = min (r.right, getWidth());
-  uint16_t ymax = min (r.bottom, getHeight());
-
-  for (int y = r.top; y < ymax; y++) {
-    uint16_t* ptr = mFrameBuf + y*getWidth() + r.left;
-    for (int x = r.left; x < xmax; x++)
-      *ptr++ = bigEndianColour;
-    }
-
-  mChanged = true;
-  }
-//}}}
-//{{{
-void cLcdSpi::pixel (const uint16_t colour, const cPoint& p) {
-
-  mFrameBuf[(p.y*getWidth()) + p.x] = bswap_16 (colour);
-  mChanged = true;
-  }
-//}}}
-//{{{
-void cLcdSpi::blendPixel (const uint16_t colour, const uint8_t alpha, const cPoint& p) {
-// magical rgb565 alpha composite
-// - linear interp background * (1.0 - alpha) + foreground * alpha
-//   - factorized into: result = background + (foreground - background) * alpha
-//   - alpha is in Q1.5 format, so 0.0 is represented by 0, and 1.0 is represented by 32
-// - Converts  0000000000000000rrrrrggggggbbbbb
-// -     into  00000gggggg00000rrrrr000000bbbbb
-
-  if ((alpha >= 0) && (p.x >= 0) && (p.y > 0) && (p.x < getWidth()) && (p.y < getHeight())) {
-    // clip opaque and offscreen
-    if (alpha == 0xFF)
-      // simple case - set bigEndianColour frameBuf pixel to littleEndian colour
-      mFrameBuf[(p.y*getWidth()) + p.x] = bswap_16 (colour);
-    else {
-      // get bigEndianColour frame buffer into littleEndian background
-      uint32_t background = bswap_16 (mFrameBuf[(p.y*getWidth()) + p.x]);
-
-      // composite littleEndian colour
-      uint32_t foreground = colour;
-      foreground = (foreground | (foreground << 16)) & 0x07e0f81f;
-      background = (background | (background << 16)) & 0x07e0f81f;
-      background += (((foreground - background) * ((alpha + 4) >> 3)) >> 5) & 0x07e0f81f;
-
-      // set bigEndianColour frameBuf pixel to littleEndian background result
-      mFrameBuf[(p.y*getWidth()) + p.x] = bswap_16 (background | (background >> 16));
-      }
-
-    mChanged = true;
-    }
-  }
-//}}}
-
-//{{{
-void cLcdSpi::copy (const uint16_t* src) {
-// whole screen copy of src as same size as frameBuf
-
-  for (int y = 0; y < getHeight(); y++)
-    for (int x = 0; x <  getWidth(); x++)
-      mFrameBuf[(y * getWidth()) + x] = bswap_16 (src[(y * getWidth()) + x]);
-  }
-//}}}
-//{{{
-void cLcdSpi::copy (const uint16_t* src, const cRect& srcRect, const cPoint& dstPoint) {
-
-  for (int y = srcRect.top; y < srcRect.bottom; y++)
-    for (int x = srcRect.left; x < srcRect.right; x++)
-      mFrameBuf[(y * getWidth()) + x] =
-        bswap_16 (src[((dstPoint.y + y - srcRect.top) * getWidth()) + dstPoint.x + x - srcRect.left]);
   }
 //}}}
 //}}}
@@ -1390,12 +1311,13 @@ void cLcdIli9320::updateLcd (const uint16_t* buf, const cRect& r) {
   constexpr uint8_t kCommand20[3] = { 0x70, 0, 0x20 };  // GDRAM vert addr command
   constexpr uint8_t kCommand21[3] = { 0x70, 0, 0x21 };  // GDRAMWR horiz addr command
   constexpr uint8_t kCommand22[3] = { 0x70, 0, 0x22 };  // GDRAMWR command
-  uint8_t dataHeader[3] = { 0x72, 0, 0 };   // data header
+  uint8_t dataHeader[(480*2) + 1];
 
   double startTime = time();
 
   uint16_t xstart = 0;
   uint16_t ystart = 0;
+  dataHeader[0] = 0x72;
   for (int y = r.top; y < r.bottom; y++) {
     //{{{  set xstart, ystart
     switch (mRotate) {
@@ -1452,9 +1374,16 @@ void cLcdIli9320::updateLcd (const uint16_t* buf, const cRect& r) {
     gpioWrite (kSpiCe0Gpio, 1);
 
     // - data
+    uint16_t* src = buf + (y * getWidth()) + r.left;
+    uint8_t* dst = dataHeader + 1;
+    for (int i = 0; i < r.getWidth(); i++) {
+      *dst++ = src >> 8;
+      *dst++ = src & 0xFF;
+      src++;
+      }
+
     gpioWrite (kSpiCe0Gpio, 0);
-    spiWrite (mSpiHandle, (char*)(dataHeader), 1);
-    spiWrite (mSpiHandle, (char*)(buf + (y * getWidth()) + r.left), r.getWidth() * 2);
+    spiWrite (mSpiHandle, (char*)datheader, (r.getWidth() * 2) + 1);
     gpioWrite (kSpiCe0Gpio, 1);
     }
 
