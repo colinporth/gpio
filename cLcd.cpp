@@ -148,20 +148,33 @@ void cLcd::blendPixel (const uint16_t colour, const uint8_t alpha, const cPoint&
     }
   }
 //}}}
+
 //{{{
 void cLcd::copy (const uint16_t* src) {
-// whole screen copy from src of same size, single mempy
+// copy all of src of same width,height
 
   memcpy (mFrameBuf, src, getNumPixels() * 2);
   }
 //}}}
 //{{{
 void cLcd::copy (const uint16_t* src, const cRect& srcRect, const cPoint& dstPoint) {
+// copy rect from src of same width,height
 
   for (int y = 0; y < srcRect.getHeight(); y++)
     memcpy (mFrameBuf + ((dstPoint.y + y) * getWidth()) + dstPoint.x,
             src + ((srcRect.top + y) * getWidth()) + srcRect.left,
             srcRect.getWidth() * 2);
+  }
+//}}}
+
+//{{{
+void cLcd::rectOutline (const uint16_t colour, const cRect& r) {
+
+  rect (colour, cRect (r.left, r.top, r.right, r.top+1));
+  rect (colour, cRect (r.left, r.bottom-1, r.right, r.bottom));
+
+  rect (colour, cRect (r.left, r.top, r.left+1, r.bottom));
+  rect (colour, cRect (r.right, r.top, r.right-11, r.bottom));
   }
 //}}}
 //{{{
@@ -201,16 +214,6 @@ int cLcd::text (const uint16_t colour, const cPoint& p, const int height, const 
     }
 
   return curX;
-  }
-//}}}
-//{{{
-void cLcd::rectOutline (const uint16_t colour, const cRect& r) {
-
-  rect (colour, cRect (r.left, r.top, r.right, r.top+1));
-  rect (colour, cRect (r.left, r.bottom-1, r.right, r.bottom));
-
-  rect (colour, cRect (r.left, r.top, r.left+1, r.bottom));
-  rect (colour, cRect (r.right, r.top, r.right-11, r.bottom));
   }
 //}}}
 
@@ -1292,7 +1295,7 @@ void cLcdIli9320::updateLcd (const uint16_t* buf, const cRect& r) {
 
   uint8_t dataHeader[3] = { 0x72, 0,0 };
 
-  uint16_t dataHeaderBuf [481];
+  uint16_t dataHeaderBuf [320+1];
   dataHeaderBuf[0] = 0x7272;
 
   double startTime = time();
