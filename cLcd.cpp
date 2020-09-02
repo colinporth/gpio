@@ -619,14 +619,14 @@ sSpan* cLcd::merge (int pixelThreshold) {
         break;
 
       // Merge the spans i and j, and figure out the wastage of doing so
-      int left = std::min (i->r.left, j->r.left);
-      int top = std::min (i->r.top, j->r.top);
-      int right = std::max (i->r.right, j->r.right);
-      int bottom = std::max (i->r.bottom, j->r.bottom);
+      int left = min (i->r.left, j->r.left);
+      int top = min (i->r.top, j->r.top);
+      int right = max (i->r.right, j->r.right);
+      int bottom = max (i->r.bottom, j->r.bottom);
 
-      int lastScanRight = (bottom > i->r.bottom) ?
-                           j->lastScanRight : ((bottom > j->r.bottom) ?
-                             i->lastScanRight : std::max (i->lastScanRight, j->lastScanRight));
+      int lastScanRight = bottom > i->r.bottom ?
+                            j->lastScanRight : (bottom > j->r.bottom ?
+                              i->lastScanRight : max (i->lastScanRight, j->lastScanRight));
 
       int newSize = (right - left) * (bottom - top - 1) + (lastScanRight - left);
 
@@ -1609,12 +1609,12 @@ bool cLcdIli9320::initialise() {
 void cLcdIli9320::updateLcd (const uint16_t* buf, const cRect& r) {
 // command,data sequences expanded inline
 
-  double startTime = time();
+  constexpr uint8_t kCommand20[3] = { 0x70, 0, 0x20 };  // GDRAM vert addr command
+  constexpr uint8_t kCommand21[3] = { 0x70, 0, 0x21 };  // GDRAMWR horiz addr command
+  constexpr uint8_t kCommand22[3] = { 0x70, 0, 0x22 };  // GDRAMWR command
+  uint8_t dataHeader[3] = { 0x72, 0, 0 };   // data header
 
-  uint8_t commandSequence20[3] = { 0x70, 0, 0x20 };  // GDRAM vert addr command
-  uint8_t commandSequence21[3] = { 0x70, 0, 0x21 };  // GDRAMWR horiz addr command
-  uint8_t commandSequence22[3] = { 0x70, 0, 0x22 };  // GDRAMWR command
-  uint8_t dataSequence[3]      = { 0x72, 0, 0 };     // data header
+  double startTime = time();
 
   uint16_t xstart = 0;
   uint16_t ystart = 0;
@@ -1646,36 +1646,36 @@ void cLcdIli9320::updateLcd (const uint16_t* buf, const cRect& r) {
 
     // send GDRAM vert addr command
     gpioWrite (kSpiCe0Gpio, 0);
-    spiWrite (mSpiHandle, (char*)commandSequence20, 3);
+    spiWrite (mSpiHandle, (char*)kCommand20, 3);
     gpioWrite (kSpiCe0Gpio, 1);
 
     // - data
-    dataSequence[1] = ystart >> 8;
-    dataSequence[2] = ystart & 0xff;
+    dataHeader[1] = ystart >> 8;
+    dataHeader[2] = ystart & 0xff;
     gpioWrite (kSpiCe0Gpio, 0);
-    spiWrite (mSpiHandle, (char*)dataSequence, 3);
+    spiWrite (mSpiHandle, (char*)dataHeader, 3);
     gpioWrite (kSpiCe0Gpio, 1);
 
     // send GDRAMWR horiz addr command
     gpioWrite (kSpiCe0Gpio, 0);
-    spiWrite (mSpiHandle, (char*)commandSequence21, 3);
+    spiWrite (mSpiHandle, (char*)kCommand21, 3);
     gpioWrite (kSpiCe0Gpio, 1);
 
     // - data
-    dataSequence[1] = xstart >> 8;
-    dataSequence[2] = xstart & 0xff;
+    dataHeader[1] = xstart >> 8;
+    dataHeader[2] = xstart & 0xff;
     gpioWrite (kSpiCe0Gpio, 0);
-    spiWrite (mSpiHandle, (char*)dataSequence, 3);
+    spiWrite (mSpiHandle, (char*)dataHeader, 3);
     gpioWrite (kSpiCe0Gpio, 1);
 
     // send GDRAMWR
     gpioWrite (kSpiCe0Gpio, 0);
-    spiWrite (mSpiHandle, (char*)commandSequence22, 3);
+    spiWrite (mSpiHandle, (char*)kCommand22, 3);
     gpioWrite (kSpiCe0Gpio, 1);
 
     // - data
     gpioWrite (kSpiCe0Gpio, 0);
-    spiWrite (mSpiHandle, (char*)(dataSequence), 1);
+    spiWrite (mSpiHandle, (char*)(dataHeader), 1);
     spiWrite (mSpiHandle, (char*)(buf + (y * getWidth()) + r.left), r.getWidth() * 2);
     gpioWrite (kSpiCe0Gpio, 1);
     }
