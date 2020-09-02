@@ -192,7 +192,7 @@ public:
   // main display screen copy
   const uint16_t* getBuf() { return mBuf; }
   const int getDiffUs() { return mDiffUs; }
-  const int getNumDiffPixels();
+  const int getNumSpans() { return mNumDiffSpans; }
   bool snap();
 
 //{{{
