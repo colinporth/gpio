@@ -261,9 +261,10 @@ bool cLcd::snap() {
 
     auto it = spans;
     while (it) {
-      copy (mBuf, it->r, it->r.getTL());
+      updateLcd (mBuf, it->r);
+      //copy (mBuf, it->r, it->r.getTL());
       //rect (kYellow, 0x60, it->r);
-      updateLcd (mFrameBuf, it->r);
+      //updateLcd (mFrameBuf, it->r);
       it = it->next;
       }
 
