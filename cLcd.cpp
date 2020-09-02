@@ -32,7 +32,7 @@ constexpr bool kCoarseDiff = true;
 struct sSpan {
   cRect r;
 
-  uint16_t lastScanRight; // scanline Bottom-1 can be partial, ends in lastScanRight.
+  uint16_t lastScanRight; // scanline bottom-1 can be partial, ends in lastScanRight.
   uint32_t size;
 
   sSpan* next;   // linked skip list in array for fast pruning
@@ -90,21 +90,6 @@ cLcd::~cLcd() {
   }
 //}}}
 
-//{{{
-const int cLcd::getNumDiffPixels() {
-// count number of diff pixels
-
-  int numDiffPixels = 0;
-
-  sSpan* diffSpan = mDiffSpans;
-  while (diffSpan) {
-    numDiffPixels += diffSpan->size;
-    diffSpan = diffSpan->next;
-    }
-
-  return numDiffPixels;
-  }
-//}}}
 //{{{
 void cLcd::setFont (const uint8_t* font, const int fontSize)  {
 
@@ -1079,7 +1064,7 @@ void cLcdSpiRegisterSelect::writeCommandMultiData (const uint8_t command, const 
 //}}}
 //}}}
 
-//  parallel 16 screens
+// parallel 16bit screens
 //{{{  cLcdTa7601 : cLcd16
 constexpr int16_t kWidthTa7601 = 320;
 constexpr int16_t kHeightTa7601 = 480;
@@ -1300,6 +1285,183 @@ void cLcdSsd1289::updateLcd (const uint16_t* buf, const cRect& r) {
 //}}}
 
 // spi screens
+//{{{  cLcdIli9320 : cLcdSpiHeaderSelect
+constexpr int16_t kWidth9320 = 240;
+constexpr int16_t kHeight9320 = 320;
+constexpr int kSpiClock9320 = 24000000;
+
+cLcdIli9320::cLcdIli9320 (const int rotate) : cLcdSpiHeaderSelect(kWidth9320, kHeight9320, rotate) {}
+
+//{{{
+bool cLcdIli9320::initialise() {
+
+  if (cLcd::initialise()) {
+    // backlight on - active hi
+    gpioSetMode (kBacklightGpio, PI_OUTPUT);
+    gpioWrite (kBacklightGpio, 1);
+
+    // spi mode 3, we manage ce0 - active lo
+    gpioSetMode (kSpiCe0Gpio, PI_OUTPUT);
+    gpioWrite (kSpiCe0Gpio, 1);
+    mSpiHandle = spiOpen (0, kSpiClock9320, 3 | 0x40);
+
+    writeCommandData (0xE5, 0x8000); // Set the Vcore voltage
+    writeCommandData (0x00, 0x0000); // start oscillation - stopped?
+    writeCommandData (0x01, 0x0100); // Driver Output Control 1 - SS=1 and SM=0
+    writeCommandData (0x02, 0x0700); // LCD Driving Control - set line inversion
+    writeCommandData (0x04, 0x0000); // Resize Control
+    writeCommandData (0x08, 0x0202); // Display Control 2
+    writeCommandData (0x09, 0x0000); // Display Control 3
+    writeCommandData (0x0a, 0x0000); // Display Control 4 - frame marker
+    writeCommandData (0x0c, 0x0001); // RGB Display Interface Control 1
+    writeCommandData (0x0d, 0x0000); // Frame Marker Position
+    writeCommandData (0x0f, 0x0000); // RGB Display Interface Control 2
+    delayUs (40000);
+
+    writeCommandData (0x07, 0x0101); // Display Control 1
+    delayUs (40000);
+
+    //{{{  power control
+    writeCommandData (0x10, 0x10C0); // Power Control 1
+    writeCommandData (0x11, 0x0007); // Power Control 2
+    writeCommandData (0x12, 0x0110); // Power Control 3
+    writeCommandData (0x13, 0x0b00); // Power Control 4
+    writeCommandData (0x29, 0x0000); // Power Control 7
+    //}}}
+    writeCommandData (0x2b, 0x4010); // Frame Rate and Color Control
+    writeCommandData (0x60, 0x2700); // Driver Output Control 2
+    writeCommandData (0x61, 0x0001); // Base Image Display Control
+    writeCommandData (0x6a, 0x0000); // Vertical Scroll Control
+    //{{{  partial image
+    writeCommandData (0x80, 0x0000); // Partial Image 1 Display Position
+    writeCommandData (0x81, 0x0000); // Partial Image 1 Area Start Line
+    writeCommandData (0x82, 0x0000); // Partial Image 1 Area End Line
+    writeCommandData (0x83, 0x0000); // Partial Image 2 Display Position
+    writeCommandData (0x84, 0x0000); // Partial Image 2 Area Start Line
+    writeCommandData (0x85, 0x0000); // Partial Image 2 Area End Line
+    //}}}
+    //{{{  panel interface
+    writeCommandData (0x90, 0x0010); // Panel Interface Control 1
+    writeCommandData (0x92, 0x0000); // Panel Interface Control 2
+    writeCommandData (0x93, 0x0001); // Panel Interface Control 3
+    writeCommandData (0x95, 0x0110); // Panel Interface Control 4
+    writeCommandData (0x97, 0x0000); // Panel Interface Control 5
+    writeCommandData (0x98, 0x0000); // Panel Interface Control 6
+    //}}}
+
+    writeCommandData (0x07, 0x0133); // Display Control 1
+    delayUs (40000);
+
+    writeCommandData (0x0050, 0x0000); // Horizontal GRAM Start Address
+    writeCommandData (0x0051, kWidth9320-1); // Horizontal GRAM End Address
+    writeCommandData (0x0052, 0x0000); // Vertical GRAM Start Address
+    writeCommandData (0x0053, kHeight9320-1); // Vertical GRAM Start Address
+
+    switch (mRotate) {
+      case 0:
+        writeCommandData (0x03, 0x1030); // Entry Mode - BGR, HV inc, vert write,
+        break;
+      case 90:
+        writeCommandData (0x03, 0x1018); // Entry Mode - BGR, HV inc, vert write,
+        break;
+      case 180:
+        writeCommandData (0x03, 0x1000); // Entry Mode - BGR, HV inc, vert write,
+        break;
+      case 270:
+        writeCommandData (0x03, 0x1028); // Entry Mode - BGR, HV inc, vert write,
+        break;
+      default:
+        cLog::log (LOGERROR, "unkown rotate " + dec (mRotate));
+        break;
+      }
+
+    launchUpdateThread();
+    return true;
+    }
+
+  return false;
+  }
+//}}}
+
+//{{{
+void cLcdIli9320::updateLcd (const uint16_t* buf, const cRect& r) {
+// command,data sequences expanded inline
+
+  constexpr uint8_t kCommand20[3] = { 0x70, 0, 0x20 };  // GDRAM vert addr command
+  constexpr uint8_t kCommand21[3] = { 0x70, 0, 0x21 };  // GDRAMWR horiz addr command
+  constexpr uint8_t kCommand22[3] = { 0x70, 0, 0x22 };  // GDRAMWR command
+  uint8_t dataHeader[3] = { 0x72, 0, 0 };   // data header
+
+  double startTime = time();
+
+  uint16_t xstart = 0;
+  uint16_t ystart = 0;
+  for (int y = r.top; y < r.bottom; y++) {
+    //{{{  set xstart, ystart
+    switch (mRotate) {
+      default:
+      case 0:
+        xstart = r.left;
+        ystart = y;
+        break;
+
+      case 90:
+        xstart = kHeight9320-1 - r.left;
+        ystart = y;
+        break;
+
+      case 180:
+        xstart = kWidth9320-1 - r.left;
+        ystart = kHeight9320-1 - y;
+        break;
+
+      case 270:
+        xstart = r.left;
+        ystart = kWidth9320-1 - y;
+        break;
+      }
+    //}}}
+
+    // send GDRAM vert addr command
+    gpioWrite (kSpiCe0Gpio, 0);
+    spiWrite (mSpiHandle, (char*)kCommand20, 3);
+    gpioWrite (kSpiCe0Gpio, 1);
+
+    // - data
+    dataHeader[1] = ystart >> 8;
+    dataHeader[2] = ystart & 0xff;
+    gpioWrite (kSpiCe0Gpio, 0);
+    spiWrite (mSpiHandle, (char*)dataHeader, 3);
+    gpioWrite (kSpiCe0Gpio, 1);
+
+    // send GDRAMWR horiz addr command
+    gpioWrite (kSpiCe0Gpio, 0);
+    spiWrite (mSpiHandle, (char*)kCommand21, 3);
+    gpioWrite (kSpiCe0Gpio, 1);
+
+    // - data
+    dataHeader[1] = xstart >> 8;
+    dataHeader[2] = xstart & 0xff;
+    gpioWrite (kSpiCe0Gpio, 0);
+    spiWrite (mSpiHandle, (char*)dataHeader, 3);
+    gpioWrite (kSpiCe0Gpio, 1);
+
+    // send GDRAMWR
+    gpioWrite (kSpiCe0Gpio, 0);
+    spiWrite (mSpiHandle, (char*)kCommand22, 3);
+    gpioWrite (kSpiCe0Gpio, 1);
+
+    // - data
+    gpioWrite (kSpiCe0Gpio, 0);
+    spiWrite (mSpiHandle, (char*)(dataHeader), 1);
+    spiWrite (mSpiHandle, (char*)(buf + (y * getWidth()) + r.left), r.getWidth() * 2);
+    gpioWrite (kSpiCe0Gpio, 1);
+    }
+
+  mUpdateUs = (int)((time() - startTime) * 1000000.0);
+  }
+//}}}
+//}}}
 //{{{  cLcdSt7735r : cLcdSpiRegisterSelect
 constexpr int16_t kWidth7735 = 128;
 constexpr int16_t kHeight7735 = 160;
@@ -1495,183 +1657,6 @@ void cLcdIli9225b::updateLcd (const uint16_t* buf, const cRect& r) {
   double startTime = time_time();
   writeCommandMultiData (0x22, (const uint8_t*)buf, r.getNumPixels() * 2);
   mUpdateUs = (int)((time_time() - startTime) * 1000000.0);
-  }
-//}}}
-//}}}
-//{{{  cLcdIli9320 : cLcdSpiHeaderSelect
-constexpr int16_t kWidth9320 = 240;
-constexpr int16_t kHeight9320 = 320;
-constexpr int kSpiClock9320 = 24000000;
-
-cLcdIli9320::cLcdIli9320 (const int rotate) : cLcdSpiHeaderSelect(kWidth9320, kHeight9320, rotate) {}
-
-//{{{
-bool cLcdIli9320::initialise() {
-
-  if (cLcd::initialise()) {
-    // backlight on - active hi
-    gpioSetMode (kBacklightGpio, PI_OUTPUT);
-    gpioWrite (kBacklightGpio, 1);
-
-    // spi mode 3, we manage ce0 - active lo
-    gpioSetMode (kSpiCe0Gpio, PI_OUTPUT);
-    gpioWrite (kSpiCe0Gpio, 1);
-    mSpiHandle = spiOpen (0, kSpiClock9320, 3 | 0x40);
-
-    writeCommandData (0xE5, 0x8000); // Set the Vcore voltage
-    writeCommandData (0x00, 0x0000); // start oscillation - stopped?
-    writeCommandData (0x01, 0x0100); // Driver Output Control 1 - SS=1 and SM=0
-    writeCommandData (0x02, 0x0700); // LCD Driving Control - set line inversion
-    writeCommandData (0x04, 0x0000); // Resize Control
-    writeCommandData (0x08, 0x0202); // Display Control 2
-    writeCommandData (0x09, 0x0000); // Display Control 3
-    writeCommandData (0x0a, 0x0000); // Display Control 4 - frame marker
-    writeCommandData (0x0c, 0x0001); // RGB Display Interface Control 1
-    writeCommandData (0x0d, 0x0000); // Frame Marker Position
-    writeCommandData (0x0f, 0x0000); // RGB Display Interface Control 2
-    delayUs (40000);
-
-    writeCommandData (0x07, 0x0101); // Display Control 1
-    delayUs (40000);
-
-    //{{{  power control
-    writeCommandData (0x10, 0x10C0); // Power Control 1
-    writeCommandData (0x11, 0x0007); // Power Control 2
-    writeCommandData (0x12, 0x0110); // Power Control 3
-    writeCommandData (0x13, 0x0b00); // Power Control 4
-    writeCommandData (0x29, 0x0000); // Power Control 7
-    //}}}
-    writeCommandData (0x2b, 0x4010); // Frame Rate and Color Control
-    writeCommandData (0x60, 0x2700); // Driver Output Control 2
-    writeCommandData (0x61, 0x0001); // Base Image Display Control
-    writeCommandData (0x6a, 0x0000); // Vertical Scroll Control
-    //{{{  partial image
-    writeCommandData (0x80, 0x0000); // Partial Image 1 Display Position
-    writeCommandData (0x81, 0x0000); // Partial Image 1 Area Start Line
-    writeCommandData (0x82, 0x0000); // Partial Image 1 Area End Line
-    writeCommandData (0x83, 0x0000); // Partial Image 2 Display Position
-    writeCommandData (0x84, 0x0000); // Partial Image 2 Area Start Line
-    writeCommandData (0x85, 0x0000); // Partial Image 2 Area End Line
-    //}}}
-    //{{{  panel interface
-    writeCommandData (0x90, 0x0010); // Panel Interface Control 1
-    writeCommandData (0x92, 0x0000); // Panel Interface Control 2
-    writeCommandData (0x93, 0x0001); // Panel Interface Control 3
-    writeCommandData (0x95, 0x0110); // Panel Interface Control 4
-    writeCommandData (0x97, 0x0000); // Panel Interface Control 5
-    writeCommandData (0x98, 0x0000); // Panel Interface Control 6
-    //}}}
-
-    writeCommandData (0x07, 0x0133); // Display Control 1
-    delayUs (40000);
-
-    writeCommandData (0x0050, 0x0000); // Horizontal GRAM Start Address
-    writeCommandData (0x0051, kWidth9320-1); // Horizontal GRAM End Address
-    writeCommandData (0x0052, 0x0000); // Vertical GRAM Start Address
-    writeCommandData (0x0053, kHeight9320-1); // Vertical GRAM Start Address
-
-    switch (mRotate) {
-      case 0:
-        writeCommandData (0x03, 0x1030); // Entry Mode - BGR, HV inc, vert write,
-        break;
-      case 90:
-        writeCommandData (0x03, 0x1018); // Entry Mode - BGR, HV inc, vert write,
-        break;
-      case 180:
-        writeCommandData (0x03, 0x1000); // Entry Mode - BGR, HV inc, vert write,
-        break;
-      case 270:
-        writeCommandData (0x03, 0x1028); // Entry Mode - BGR, HV inc, vert write,
-        break;
-      default:
-        cLog::log (LOGERROR, "unkown rotate " + dec (mRotate));
-        break;
-      }
-
-    launchUpdateThread();
-    return true;
-    }
-
-  return false;
-  }
-//}}}
-
-//{{{
-void cLcdIli9320::updateLcd (const uint16_t* buf, const cRect& r) {
-// command,data sequences expanded inline
-
-  constexpr uint8_t kCommand20[3] = { 0x70, 0, 0x20 };  // GDRAM vert addr command
-  constexpr uint8_t kCommand21[3] = { 0x70, 0, 0x21 };  // GDRAMWR horiz addr command
-  constexpr uint8_t kCommand22[3] = { 0x70, 0, 0x22 };  // GDRAMWR command
-  uint8_t dataHeader[3] = { 0x72, 0, 0 };   // data header
-
-  double startTime = time();
-
-  uint16_t xstart = 0;
-  uint16_t ystart = 0;
-  for (int y = r.top; y < r.bottom; y++) {
-    //{{{  set xstart, ystart
-    switch (mRotate) {
-      default:
-      case 0:
-        xstart = r.left;
-        ystart = y;
-        break;
-
-      case 90:
-        xstart = kHeight9320-1 - r.left;
-        ystart = y;
-        break;
-
-      case 180:
-        xstart = kWidth9320-1 - r.left;
-        ystart = kHeight9320-1 - y;
-        break;
-
-      case 270:
-        xstart = r.left;
-        ystart = kWidth9320-1 - y;
-        break;
-      }
-    //}}}
-
-    // send GDRAM vert addr command
-    gpioWrite (kSpiCe0Gpio, 0);
-    spiWrite (mSpiHandle, (char*)kCommand20, 3);
-    gpioWrite (kSpiCe0Gpio, 1);
-
-    // - data
-    dataHeader[1] = ystart >> 8;
-    dataHeader[2] = ystart & 0xff;
-    gpioWrite (kSpiCe0Gpio, 0);
-    spiWrite (mSpiHandle, (char*)dataHeader, 3);
-    gpioWrite (kSpiCe0Gpio, 1);
-
-    // send GDRAMWR horiz addr command
-    gpioWrite (kSpiCe0Gpio, 0);
-    spiWrite (mSpiHandle, (char*)kCommand21, 3);
-    gpioWrite (kSpiCe0Gpio, 1);
-
-    // - data
-    dataHeader[1] = xstart >> 8;
-    dataHeader[2] = xstart & 0xff;
-    gpioWrite (kSpiCe0Gpio, 0);
-    spiWrite (mSpiHandle, (char*)dataHeader, 3);
-    gpioWrite (kSpiCe0Gpio, 1);
-
-    // send GDRAMWR
-    gpioWrite (kSpiCe0Gpio, 0);
-    spiWrite (mSpiHandle, (char*)kCommand22, 3);
-    gpioWrite (kSpiCe0Gpio, 1);
-
-    // - data
-    gpioWrite (kSpiCe0Gpio, 0);
-    spiWrite (mSpiHandle, (char*)(dataHeader), 1);
-    spiWrite (mSpiHandle, (char*)(buf + (y * getWidth()) + r.left), r.getWidth() * 2);
-    gpioWrite (kSpiCe0Gpio, 1);
-    }
-
-  mUpdateUs = (int)((time() - startTime) * 1000000.0);
   }
 //}}}
 //}}}

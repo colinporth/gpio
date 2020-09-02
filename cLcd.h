@@ -191,7 +191,6 @@ public:
 
   // main display screen copy
   const uint16_t* getBuf() { return mBuf; }
-  const int getNumDiffSpans() { return mNumDiffSpans; }
   const int getDiffUs() { return mDiffUs; }
   const int getNumDiffPixels();
   bool snap();
@@ -313,7 +312,7 @@ protected:
   };
 //}}}
 
-// screens
+// parallel 16bit screens
 //{{{
 class cLcdTa7601 : public cLcd16 {
 public:
@@ -334,6 +333,8 @@ public:
   virtual void updateLcd (const uint16_t* buf, const cRect& r);
   };
 //}}}
+
+// spi screens
 //{{{
 class cLcdIli9320 : public cLcdSpiHeaderSelect {
 // 2.8 inch 1240x320 - HY28A

@@ -66,9 +66,8 @@ int main (int numArgs, char* args[]) {
   while (true)
     if (lcd->snap())
       cLog::log (LOGINFO, "upd:" + dec(lcd->getUpdateUs()) +
-                          " spans:" + dec(lcd->getNumDiffSpans()) +
-                          " " + dec((lcd->getNumDiffPixels() * 100) / lcd->getNumPixels()) +
-                          "% diffTook: " + dec(lcd->getDiffUs()));
+                          "us diff: " + dec(lcd->getDiffUs()) +
+                          "us spans:" + dec(lcd->getNumDiffSpans()));
     else // wait if no change
       lcd->delayUs (10000);
 
@@ -100,9 +99,8 @@ int main (int numArgs, char* args[]) {
     if (lcd->snap()) {
       lcd->text (kWhite, cPoint(0,0), 20, dec(i++) +
                                   " " + dec(lcd->getUpdateUs()) +
-                                  " " + dec(lcd->getNumDiffSpans()) +
-                                  " " + dec((lcd->getNumDiffPixels() * 100) / lcd->getNumPixels()) +
-                                  " " + dec(lcd->getDiffUs()));
+                                  " " + dec(lcd->getDiffUs()) +;
+                                  " " + dec(lcd->getNumDiffSpans()));
       lcd->update();
       }
 
