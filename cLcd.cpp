@@ -29,10 +29,17 @@ constexpr uint8_t kResetGpio = 25;
 
 // cLcd - public
 //{{{
+cLcd::cLcd (const int16_t width, const int16_t height, const int rotate)
+    : mRotate(rotate),
+      mWidth(((rotate == 90) || (rotate == 270)) ? height : width),
+      mHeight(((rotate == 90) || (rotate == 270)) ? width : height) {}
+//}}}
+//{{{
 cLcd::~cLcd() {
   gpioTerminate();
   }
 //}}}
+
 //{{{
 void cLcd::setFont (const uint8_t* font, const int fontSize)  {
 
@@ -41,24 +48,6 @@ void cLcd::setFont (const uint8_t* font, const int fontSize)  {
   }
 //}}}
 
-// bigEndian frameBuf
-//{{{
-void cLcd::rect (const uint16_t colour, const cRect& r) {
-
-  uint16_t bigEndianColour = bswap_16 (colour);
-
-  uint16_t xmax = min (r.right, getWidth());
-  uint16_t ymax = min (r.bottom, getHeight());
-
-  for (int y = r.top; y < ymax; y++) {
-    uint16_t* ptr = mFrameBuf + y*getWidth() + r.left;
-    for (int x = r.left; x < xmax; x++)
-      *ptr++ = bigEndianColour;
-    }
-
-  mChanged = true;
-  }
-//}}}
 //{{{
 void cLcd::rect (const uint16_t colour, const uint8_t alpha, const cRect& r) {
 
@@ -70,45 +59,6 @@ void cLcd::rect (const uint16_t colour, const uint8_t alpha, const cRect& r) {
       blendPixel (colour, alpha, cPoint(x, y));
 
   mChanged = true;
-  }
-//}}}
-//{{{
-void cLcd::pixel (const uint16_t colour, const cPoint& p) {
-
-  mFrameBuf[(p.y*getWidth()) + p.x] = bswap_16 (colour);
-  mChanged = true;
-  }
-//}}}
-//{{{
-void cLcd::blendPixel (const uint16_t colour, const uint8_t alpha, const cPoint& p) {
-// magical rgb565 alpha composite
-// - linear interp background * (1.0 - alpha) + foreground * alpha
-//   - factorized into: result = background + (foreground - background) * alpha
-//   - alpha is in Q1.5 format, so 0.0 is represented by 0, and 1.0 is represented by 32
-// - Converts  0000000000000000rrrrrggggggbbbbb
-// -     into  00000gggggg00000rrrrr000000bbbbb
-
-  if ((alpha >= 0) && (p.x >= 0) && (p.y > 0) && (p.x < getWidth()) && (p.y < getHeight())) {
-    // clip opaque and offscreen
-    if (alpha == 0xFF)
-      // simple case - set bigEndianColour frameBuf pixel to littleEndian colour
-      mFrameBuf[(p.y*getWidth()) + p.x] = bswap_16 (colour);
-    else {
-      // get bigEndianColour frame buffer into littleEndian background
-      uint32_t background = bswap_16 (mFrameBuf[(p.y*getWidth()) + p.x]);
-
-      // composite littleEndian colour
-      uint32_t foreground = colour;
-      foreground = (foreground | (foreground << 16)) & 0x07e0f81f;
-      background = (background | (background << 16)) & 0x07e0f81f;
-      background += (((foreground - background) * ((alpha + 4) >> 3)) >> 5) & 0x07e0f81f;
-
-      // set bigEndianColour frameBuf pixel to littleEndian background result
-      mFrameBuf[(p.y*getWidth()) + p.x] = bswap_16 (background | (background >> 16));
-      }
-
-    mChanged = true;
-    }
   }
 //}}}
 //{{{
@@ -137,7 +87,6 @@ int cLcd::text (const uint16_t colour, const cPoint& p, const int height, const 
   return curX;
   }
 //}}}
-
 //{{{
 void cLcd::rectOutline (const uint16_t colour, const cRect& r) {
 
@@ -146,22 +95,6 @@ void cLcd::rectOutline (const uint16_t colour, const cRect& r) {
 
   rect (colour, cRect (r.left, r.top, r.left+1, r.bottom));
   rect (colour, cRect (r.right, r.top, r.right-11, r.bottom));
-  }
-//}}}
-
-//{{{
-void cLcd::copy (const uint16_t* src, const cPoint& p) {
-
-  for (int y = 0; y < p.y; y++)
-    memcpy (mFrameBuf + (y*getWidth()), (src + y*p.x), p.x*2);
-  }
-//}}}
-//{{{
-void cLcd::copyRotate (const uint16_t* src, const cPoint& p) {
-
-  for (int y = 0; y < p.y; y++)
-    for (int x = 0; x < p.x; x++)
-      mFrameBuf[(x * getWidth()) + (getWidth() - y)] = src[(y*p.x) + x];
   }
 //}}}
 
@@ -318,6 +251,13 @@ void cLcd16::blendPixel (const uint16_t colour, const uint8_t alpha, const cPoin
   }
 //}}}
 //{{{
+void cLcd16::copy (const uint16_t* src, const cPoint& p) {
+
+  for (int y = 0; y < p.y; y++)
+    memcpy (mFrameBuf + (y*getWidth()), (src + y*p.x), p.x*2);
+  }
+//}}}
+//{{{
 void cLcd16::writeCommand (const uint8_t command) {
 
   gpioWrite (k16RegisterSelectGpio, 0);
@@ -360,10 +300,9 @@ void cLcd16::writeCommandMultiData (const uint8_t command, const uint8_t* dataPt
     }
   }
 //}}}
-
 //{{{  cLcdTa7601
-constexpr uint16_t kWidthTa7601 = 320;
-constexpr uint16_t kHeightTa7601 = 480;
+constexpr int16_t kWidthTa7601 = 320;
+constexpr int16_t kHeightTa7601 = 480;
 cLcdTa7601::cLcdTa7601 (const int rotate) : cLcd16(kWidthTa7601, kHeightTa7601, rotate) {}
 
 bool cLcdTa7601::initialise() {
@@ -461,8 +400,8 @@ bool cLcdTa7601::initialise() {
   }
 //}}}
 //{{{  cLcdSsd1289
-constexpr uint16_t kWidth1289 = 240;
-constexpr uint16_t kHeight1289 = 320;
+constexpr int16_t kWidth1289 = 240;
+constexpr int16_t kHeight1289 = 320;
 cLcdSsd1289::cLcdSsd1289 (const int rotate) : cLcd16(kWidth1289, kHeight1289, rotate) {}
 
 bool cLcdSsd1289::initialise() {
@@ -562,7 +501,7 @@ bool cLcdSsd1289::initialise() {
   }
 //}}}
 
-// cLcdSpiRegisterSelect - uses bigEndian frameBuf, gpio registerSelect, spi manages ce0
+// cLcdSpi - uses bigEndian frameBuf
 //{{{  spi J8 header pins, gpio, constexpr
 //      3.3v 17  18 gpio24   - registerSelect/backlight
 // spi0 mosi 19  20 0v
@@ -573,10 +512,76 @@ constexpr uint8_t kSpiRegisterSelectGpio  = 24;
 constexpr uint8_t kBacklightGpio = 24;
 //}}}
 //{{{
-cLcdSpiRegisterSelect::~cLcdSpiRegisterSelect() {
+cLcdSpi::~cLcdSpi() {
   spiClose (mSpiHandle);
   }
 //}}}
+//{{{
+void cLcdSpi::rect (const uint16_t colour, const cRect& r) {
+
+  uint16_t bigEndianColour = bswap_16 (colour);
+
+  uint16_t xmax = min (r.right, getWidth());
+  uint16_t ymax = min (r.bottom, getHeight());
+
+  for (int y = r.top; y < ymax; y++) {
+    uint16_t* ptr = mFrameBuf + y*getWidth() + r.left;
+    for (int x = r.left; x < xmax; x++)
+      *ptr++ = bigEndianColour;
+    }
+
+  mChanged = true;
+  }
+//}}}
+//{{{
+void cLcdSpi::pixel (const uint16_t colour, const cPoint& p) {
+
+  mFrameBuf[(p.y*getWidth()) + p.x] = bswap_16 (colour);
+  mChanged = true;
+  }
+//}}}
+//{{{
+void cLcdSpi::blendPixel (const uint16_t colour, const uint8_t alpha, const cPoint& p) {
+// magical rgb565 alpha composite
+// - linear interp background * (1.0 - alpha) + foreground * alpha
+//   - factorized into: result = background + (foreground - background) * alpha
+//   - alpha is in Q1.5 format, so 0.0 is represented by 0, and 1.0 is represented by 32
+// - Converts  0000000000000000rrrrrggggggbbbbb
+// -     into  00000gggggg00000rrrrr000000bbbbb
+
+  if ((alpha >= 0) && (p.x >= 0) && (p.y > 0) && (p.x < getWidth()) && (p.y < getHeight())) {
+    // clip opaque and offscreen
+    if (alpha == 0xFF)
+      // simple case - set bigEndianColour frameBuf pixel to littleEndian colour
+      mFrameBuf[(p.y*getWidth()) + p.x] = bswap_16 (colour);
+    else {
+      // get bigEndianColour frame buffer into littleEndian background
+      uint32_t background = bswap_16 (mFrameBuf[(p.y*getWidth()) + p.x]);
+
+      // composite littleEndian colour
+      uint32_t foreground = colour;
+      foreground = (foreground | (foreground << 16)) & 0x07e0f81f;
+      background = (background | (background << 16)) & 0x07e0f81f;
+      background += (((foreground - background) * ((alpha + 4) >> 3)) >> 5) & 0x07e0f81f;
+
+      // set bigEndianColour frameBuf pixel to littleEndian background result
+      mFrameBuf[(p.y*getWidth()) + p.x] = bswap_16 (background | (background >> 16));
+      }
+
+    mChanged = true;
+    }
+  }
+//}}}
+//{{{
+void cLcdSpi::copy (const uint16_t* src, const cPoint& p) {
+
+  for (int y = 0; y < p.y; y++)
+    for (int x = 0; x < p.x; x++)
+      mFrameBuf[(y * getWidth()) + x] = bswap_16 (src[(y * getWidth()) + x]);
+  }
+//}}}
+
+// cLcdSpiRegisterSelect - gpio registerSelect, spi manages ce0
 //{{{
 void cLcdSpiRegisterSelect::writeCommand (const uint8_t command) {
 
@@ -610,10 +615,9 @@ void cLcdSpiRegisterSelect::writeCommandMultiData (const uint8_t command, const 
     }
   }
 //}}}
-
 //{{{  cLcdSt7735r
-constexpr uint16_t kWidth7735 = 128;
-constexpr uint16_t kHeight7735 = 160;
+constexpr int16_t kWidth7735 = 128;
+constexpr int16_t kHeight7735 = 160;
 constexpr int kSpiClock7735 = 24000000;
 
 cLcdSt7735r::cLcdSt7735r (const int rotate) : cLcdSpiRegisterSelect (kWidth7735, kHeight7735, rotate) {}
@@ -712,8 +716,8 @@ bool cLcdSt7735r::initialise() {
   }
 //}}}
 //{{{  cLcdIli9225b
-constexpr uint16_t kWidth9225b = 176;
-constexpr uint16_t kHeight9225b = 220;
+constexpr int16_t kWidth9225b = 176;
+constexpr int16_t kHeight9225b = 220;
 constexpr int kSpiClock9225b = 16000000;
 
 cLcdIli9225b::cLcdIli9225b (const int rotate) : cLcdSpiRegisterSelect(kWidth9225b, kHeight9225b, rotate) {}
@@ -793,20 +797,7 @@ bool cLcdIli9225b::initialise() {
   }
 //}}}
 
-// cLcdSpiHeaderSelect - uses bigEndian frameBuf, header register select, we manage ce0
-//{{{
-cLcdSpiHeaderSelect::~cLcdSpiHeaderSelect() {
-  spiClose (mSpiHandle);
-  }
-//}}}
-//{{{
-void cLcdSpiHeaderSelect::copyRotate (const uint16_t* src, const cPoint& p) {
-
-  for (int y = 0; y < p.y; y++)
-    for (int x = 0; x < p.x; x++)
-      mFrameBuf[(x * getWidth()) + (getWidth() - y)] = bswap_16 (src[(y*p.x) + x]);
-  }
-//}}}
+// cLcdSpiHeaderSelect - header register select, we manage ce0
 //{{{
 void cLcdSpiHeaderSelect::writeCommand (const uint8_t command) {
 
@@ -852,10 +843,9 @@ void cLcdSpiHeaderSelect::writeCommandMultiData (const uint8_t command, const ui
   gpioWrite (kSpiCe0Gpio, 1);
   }
 //}}}
-
 //{{{  cLcdIli9320
-constexpr uint16_t kWidth9320 = 240;
-constexpr uint16_t kHeight9320 = 320;
+constexpr int16_t kWidth9320 = 240;
+constexpr int16_t kHeight9320 = 320;
 constexpr int kSpiClock9320 = 24000000;
 
 cLcdIli9320::cLcdIli9320 (const int rotate) : cLcdSpiHeaderSelect(kWidth9320, kHeight9320, rotate) {}
@@ -864,11 +854,11 @@ bool cLcdIli9320::initialise() {
   if (initResources()) {
     reset();
 
-    // backlight on
+    // backlight on - active hi
     gpioSetMode (kBacklightGpio, PI_OUTPUT);
     gpioWrite (kBacklightGpio, 1);
 
-    // mode 3, we manage ce0 active lo
+    // spi mode 3, we manage ce0 - active lo
     gpioSetMode (kSpiCe0Gpio, PI_OUTPUT);
     gpioWrite (kSpiCe0Gpio, 1);
     mSpiHandle = spiOpen (0, kSpiClock9320, 3 | 0x40);
@@ -877,7 +867,6 @@ bool cLcdIli9320::initialise() {
     writeCommandData (0x00, 0x0000); // start oscillation - stopped?
     writeCommandData (0x01, 0x0100); // Driver Output Control 1 - SS=1 and SM=0
     writeCommandData (0x02, 0x0700); // LCD Driving Control - set line inversion
-    writeCommandData (0x03, 0x1030); // Entry Mode - BGR, HV inc, vert write,
     writeCommandData (0x04, 0x0000); // Resize Control
     writeCommandData (0x08, 0x0202); // Display Control 2
     writeCommandData (0x09, 0x0000); // Display Control 3
@@ -890,43 +879,69 @@ bool cLcdIli9320::initialise() {
     writeCommandData (0x07, 0x0101); // Display Control 1
     delayUs (40000);
 
+    //{{{  power control
     writeCommandData (0x10, 0x10C0); // Power Control 1
     writeCommandData (0x11, 0x0007); // Power Control 2
     writeCommandData (0x12, 0x0110); // Power Control 3
     writeCommandData (0x13, 0x0b00); // Power Control 4
     writeCommandData (0x29, 0x0000); // Power Control 7
+    //}}}
     writeCommandData (0x2b, 0x4010); // Frame Rate and Color Control
-
-    // 0x30 - 0x3d gamma
     writeCommandData (0x60, 0x2700); // Driver Output Control 2
     writeCommandData (0x61, 0x0001); // Base Image Display Control
     writeCommandData (0x6a, 0x0000); // Vertical Scroll Control
-
+    //{{{  partial image
     writeCommandData (0x80, 0x0000); // Partial Image 1 Display Position
     writeCommandData (0x81, 0x0000); // Partial Image 1 Area Start Line
     writeCommandData (0x82, 0x0000); // Partial Image 1 Area End Line
     writeCommandData (0x83, 0x0000); // Partial Image 2 Display Position
     writeCommandData (0x84, 0x0000); // Partial Image 2 Area Start Line
     writeCommandData (0x85, 0x0000); // Partial Image 2 Area End Line
-
+    //}}}
+    //{{{  panel interface
     writeCommandData (0x90, 0x0010); // Panel Interface Control 1
     writeCommandData (0x92, 0x0000); // Panel Interface Control 2
     writeCommandData (0x93, 0x0001); // Panel Interface Control 3
     writeCommandData (0x95, 0x0110); // Panel Interface Control 4
     writeCommandData (0x97, 0x0000); // Panel Interface Control 5
     writeCommandData (0x98, 0x0000); // Panel Interface Control 6
+    //}}}
 
     writeCommandData (0x07, 0x0133); // Display Control 1
     delayUs (40000);
 
-    writeCommandData (0x50, 0); // Horizontal Start Position
-    writeCommandData (0x51, getWidth()-1); // Horizontal End Position
+    writeCommandData (0x0050, 0x0000); // Horizontal GRAM Start Address
+    writeCommandData (0x0051, kWidth9320-1); // Horizontal GRAM End Address
+    writeCommandData (0x0052, 0x0000); // Vertical GRAM Start Address
+    writeCommandData (0x0053, kHeight9320-1); // Vertical GRAM Start Address
 
-    writeCommandData (0x52, 0); // Vertical Start Position
-    writeCommandData (0x53, getHeight()-1); // Vertical End Position
-
-    writeCommandData (0x20, 0); // Horizontal GRAM Address Set
-    writeCommandData (0x21, 0); // Vertical GRAM Address Set
+    int xs = 0;
+    int ys = 0;
+    switch (mRotate) {
+      case 0:
+        writeCommandData (0x03, 0x1030); // Entry Mode - BGR, HV inc, vert write,
+        writeCommandData (0x20, xs);
+        writeCommandData (0x21, ys);
+        break;
+      case 90:
+        writeCommandData (0x03, 0x1018); // Entry Mode - BGR, HV inc, vert write,
+        writeCommandData (0x20, ys);
+        writeCommandData (0x21, kHeight9320-1 - xs);
+        break;
+      case 180:
+        writeCommandData (0x03, 0x1000); // Entry Mode - BGR, HV inc, vert write,
+        writeCommandData (0x20, kWidth9320- 1 - xs);
+        writeCommandData (0x21, kHeight9320-1 - ys);
+        break;
+      case 270:
+        writeCommandData (0x03, 0x1028); // Entry Mode - BGR, HV inc, vert write,
+        writeCommandData (0x20, kWidth9320-1 - ys);
+        writeCommandData (0x21, xs);
+        break;
+      default:
+        cLog::log (LOGERROR, "unkown rotate " + dec (mRotate));
+        break;
+      }
 
     launchUpdateThread (0x22);
     return true;

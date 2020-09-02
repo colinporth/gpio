@@ -178,32 +178,29 @@ constexpr uint16_t kWhite       =  0xFFFF;  // 255, 255, 255
 
 class cLcd {
 public:
-  cLcd (const uint16_t width, const uint16_t height, const int rotate)
-    : mRotate(rotate),
-      mWidth(((rotate == 90) || (rotate == 270)) ? height : width),
-      mHeight(((rotate == 90) || (rotate == 270)) ? width : height) {}
+  cLcd (const int16_t width, const int16_t height, const int rotate);
   virtual ~cLcd();
 
   virtual bool initialise() = 0;
 
   constexpr int16_t getWidth() { return mWidth; }
   constexpr int16_t getHeight() { return mHeight; }
+  const cPoint getSize() { return cPoint(mWidth, mHeight); }
   const int getUpdateUs() { return mUpdateUs; }
 
-  virtual void rect (const uint16_t colour, const cRect& r);
-  virtual void pixel (const uint16_t colour, const cPoint& p);
-  virtual void blendPixel (const uint16_t colour, const uint8_t alpha, const cPoint& p);
+  virtual void rect (const uint16_t colour, const cRect& r) = 0;
+  virtual void pixel (const uint16_t colour, const cPoint& p) = 0;
+  virtual void blendPixel (const uint16_t colour, const uint8_t alpha, const cPoint& p) = 0;
+  virtual void copy (const uint16_t* src, const cPoint& p) = 0;
 
   int text (const uint16_t colour, const cPoint& p, const int height, const std::string& str);
   void rect (const uint16_t colour, const uint8_t alpha, const cRect& r);
   void clear (const uint16_t colour) { rect (colour, cRect(0,0, getWidth(), getHeight())); }
   void rectOutline (const uint16_t colour, const cRect& r);
 
-  virtual void copy (const uint16_t* src, const cPoint& p);
-  virtual void copyRotate (const uint16_t* src, const cPoint& p);
-
   void update() { mUpdate = true; }
   void setAutoUpdate() { mAutoUpdate = true; }
+
   void delayUs (const int us);
   double time();
 
@@ -211,7 +208,6 @@ public:
 protected:
   bool initResources();
   void reset();
-  void initChipEnablePin();
 
   virtual void writeCommand (const uint8_t command) = 0;
   virtual void writeCommandData (const uint8_t command, const uint16_t data) = 0;
@@ -243,13 +239,14 @@ private:
 //{{{
 class cLcd16 : public cLcd {
 public:
-  cLcd16 (const uint16_t width, const uint16_t height, const int rotate) : cLcd (width, height, rotate) {}
+  cLcd16 (const int16_t width, const int16_t height, const int rotate) : cLcd (width, height, rotate) {}
   virtual ~cLcd16() {}
 
 protected:
   virtual void rect (const uint16_t colour, const cRect& r);
   virtual void pixel (const uint16_t colour, const cPoint& p);
   virtual void blendPixel (const uint16_t colour, const uint8_t alpha, const cPoint& p);
+  virtual void copy (const uint16_t* src, const cPoint& p);
 
   virtual void writeCommand (const uint8_t command);
   virtual void writeCommandData (const uint8_t command, const uint16_t data);
@@ -276,18 +273,32 @@ public:
 //}}}
 
 //{{{
-class cLcdSpiRegisterSelect : public cLcd {
+class cLcdSpi : public cLcd {
 public:
-  cLcdSpiRegisterSelect (const uint16_t width, const uint16_t height, const int rotate) : cLcd (width, height, rotate) {}
+  cLcdSpi (const int16_t width, const int16_t height, const int rotate) : cLcd (width, height, rotate) {}
+  virtual ~cLcdSpi();
 
-  virtual ~cLcdSpiRegisterSelect();
+protected:
+  virtual void rect (const uint16_t colour, const cRect& r);
+  virtual void pixel (const uint16_t colour, const cPoint& p);
+  virtual void blendPixel (const uint16_t colour, const uint8_t alpha, const cPoint& p);
+  virtual void copy (const uint16_t* src, const cPoint& p);
+
+  int mSpiHandle = 0;
+  };
+//}}}
+//{{{
+class cLcdSpiRegisterSelect : public cLcdSpi {
+public:
+  cLcdSpiRegisterSelect (const int16_t width, const int16_t height, const int rotate)
+    : cLcdSpi (width, height, rotate) {}
+
+  virtual ~cLcdSpiRegisterSelect() {}
 
 protected:
   virtual void writeCommand (const uint8_t command);
   virtual void writeCommandData (const uint8_t command, const uint16_t data);
   virtual void writeCommandMultiData (const uint8_t command, const uint8_t* dataPtr, const int len);
-
-  int mSpiHandle = 0;
   };
 //}}}
 //{{{
@@ -311,19 +322,16 @@ public:
 //}}}
 
 //{{{
-class cLcdSpiHeaderSelect : public cLcd {
+class cLcdSpiHeaderSelect : public cLcdSpi {
 public:
-  cLcdSpiHeaderSelect (const uint16_t width, const uint16_t height, const int rotate) : cLcd (width, height, rotate) {}
-  virtual ~cLcdSpiHeaderSelect();
-
-  virtual void copyRotate (const uint16_t* src, const cPoint& p);
+  cLcdSpiHeaderSelect (const int16_t width, const int16_t height, const int rotate)
+    : cLcdSpi (width, height, rotate) {}
+  virtual ~cLcdSpiHeaderSelect() {}
 
 protected:
   virtual void writeCommand (const uint8_t command);
   virtual void writeCommandData (const uint8_t command, const uint16_t data);
   virtual void writeCommandMultiData (const uint8_t command, const uint8_t* dataPtr, const int len);
-
-  int mSpiHandle = 0;
   };
 //}}}
 //{{{

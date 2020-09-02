@@ -26,7 +26,7 @@ int main (int numArgs, char* args[]) {
 
   cLog::init (LOGINFO, false, "", "gpio");
 
-  int rotate = argStrings.empty() ? 0 : stoi (argStrings[0]);
+  int rotate = argStrings.empty() ? 270 : stoi (argStrings[0]);
   cLcd* lcd = new cLcdIli9320 (rotate);
   lcd->initialise();
 
@@ -84,7 +84,7 @@ int main (int numArgs, char* args[]) {
     }
   //}}}
 
-  cScreen screen (lcd->getHeight(), lcd->getWidth());
+  cScreen screen (lcd->getWidth(), lcd->getHeight());
   lcd->clear (kOrange);
 
   int i = 0;
@@ -96,7 +96,7 @@ int main (int numArgs, char* args[]) {
     if (spans) {
       int diffTook = int((lcd->time() - startTime) * 10000000);
 
-      lcd->copyRotate (screen.getBuf(), screen.getSize());
+      lcd->copy (screen.getBuf(), screen.getSize());
       //{{{  show pre merge in red
       //while (spans) {
         //int x = screen.getHeight() - spans->endY;
@@ -110,11 +110,7 @@ int main (int numArgs, char* args[]) {
       spans = screen.merge (16);
       //{{{  show post merge in green
       while (spans) {
-        int x = screen.getHeight() - spans->endY;
-        int y = spans->x;
-        int xlen = spans->endY - spans->y + 1;
-        int ylen = spans->endX - spans->x + 1;
-        lcd->rect (kYellow, 0x60, cRect(x,y, xlen,ylen));
+        lcd->rect (kYellow, 0x60, cRect(spans->x,spans->y, spans->endX,spans->endY));
         spans = spans->next;
         }
       //}}}
