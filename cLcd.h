@@ -8,18 +8,12 @@
 //}}}
 
 //{{{
-class cPoint {
+struct cPoint {
 public:
   //{{{
   cPoint()  {
     x = 0;
     y = 0;
-    }
-  //}}}
-  //{{{
-  cPoint (const int16_t value) {
-    this->x = value;
-    this->y = value;
     }
   //}}}
   //{{{
@@ -82,7 +76,7 @@ public:
   };
 //}}}
 //{{{
-class cRect {
+struct cRect {
 public:
   //{{{
   cRect() {
@@ -129,6 +123,7 @@ public:
   cPoint getCentre() const { return cPoint(getCentreX(), getCentreY()); }
   int16_t getCentreX() const { return (left + right)/2; }
   int16_t getCentreY() const { return (top + bottom)/2; }
+
   //{{{
   bool inside (const cPoint& pos) const {
   // return pos inside rect
