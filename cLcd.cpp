@@ -910,11 +910,9 @@ cLcdSpi::~cLcdSpi() {
 //{{{
 void cLcdSpiHeaderSelect::writeCommand (const uint8_t command) {
 
-  // we manage the ce0, send command header and command
-  uint8_t commandSequence[3] = { 0x70, 0, command };
-  gpioWrite (kSpiCe0Gpio, 0);
-  spiWrite (mSpiHandle, (char*)commandSequence, 3);
-  gpioWrite (kSpiCe0Gpio, 1);
+  // send command
+  const uint8_t kCommandHeader[3] = { 0x70, 0, command };
+  spiWrite (mSpiHandle, (char*)kCommandHeader, 3);
   }
 //}}}
 //{{{
@@ -922,34 +920,9 @@ void cLcdSpiHeaderSelect::writeCommandData (const uint8_t command, const uint16_
 
   writeCommand (command);
 
-  // we manage the ce0, send data header and data
-  uint8_t dataSequence[3] = { 0x72, uint8_t(data >> 8), uint8_t(data & 0xff) };
-  gpioWrite (kSpiCe0Gpio, 0);
-  spiWrite (mSpiHandle, (char*)dataSequence, 3);
-  gpioWrite (kSpiCe0Gpio, 1);
-  }
-//}}}
-//{{{
-void cLcdSpiHeaderSelect::writeCommandMultiData (const uint8_t command, const uint8_t* dataPtr, const int len) {
-
-  writeCommand (command);
-
-  // we manage the ce0, send data header and data
-  uint8_t dataSequenceStart = 0x72;
-  gpioWrite (kSpiCe0Gpio, 0);
-  spiWrite (mSpiHandle, (char*)(&dataSequenceStart), 1);
-
   // send data
-  int bytesLeft = len;
-  auto ptr = (char*)dataPtr;
-  while (bytesLeft > 0) {
-   int sendBytes = (bytesLeft > 0xFFFF) ? 0xFFFF : bytesLeft;
-    spiWrite (mSpiHandle, ptr, sendBytes);
-    ptr += sendBytes;
-    bytesLeft -= sendBytes;
-    }
-
-  gpioWrite (kSpiCe0Gpio, 1);
+  const uint8_t kDataHeader[3] = { 0x72, uint8_t(data >> 8), uint8_t(data & 0xff) };
+  spiWrite (mSpiHandle, (char*)kDataHeader, 3);
   }
 //}}}
 //}}}
@@ -1316,8 +1289,11 @@ void cLcdIli9320::updateLcd (const uint16_t* buf, const cRect& r) {
   constexpr uint8_t kCommand20[3] = { 0x70, 0, 0x20 };  // GDRAM vert addr command
   constexpr uint8_t kCommand21[3] = { 0x70, 0, 0x21 };  // GDRAMWR horiz addr command
   constexpr uint8_t kCommand22[3] = { 0x70, 0, 0x22 };  // GDRAMWR command
+
   uint8_t dataHeader[3] = { 0x72, 0,0 };
-  uint16_t dataHeader1 [481];
+
+  uint16_t dataHeaderBuf [481];
+  dataHeaderBuf[0] = 0x7272;
 
   double startTime = time();
 
@@ -1350,44 +1326,32 @@ void cLcdIli9320::updateLcd (const uint16_t* buf, const cRect& r) {
     //}}}
 
     // send GDRAM vert addr command
-    gpioWrite (kSpiCe0Gpio, 0);
     spiWrite (mSpiHandle, (char*)kCommand20, 3);
-    gpioWrite (kSpiCe0Gpio, 1);
 
     // - data
     dataHeader[1] = ystart >> 8;
     dataHeader[2] = ystart & 0xff;
-    gpioWrite (kSpiCe0Gpio, 0);
     spiWrite (mSpiHandle, (char*)dataHeader, 3);
-    gpioWrite (kSpiCe0Gpio, 1);
 
     // send GDRAMWR horiz addr command
-    gpioWrite (kSpiCe0Gpio, 0);
     spiWrite (mSpiHandle, (char*)kCommand21, 3);
-    gpioWrite (kSpiCe0Gpio, 1);
 
     // - data
     dataHeader[1] = xstart >> 8;
     dataHeader[2] = xstart & 0xff;
-    gpioWrite (kSpiCe0Gpio, 0);
     spiWrite (mSpiHandle, (char*)dataHeader, 3);
-    gpioWrite (kSpiCe0Gpio, 1);
 
     // send GDRAMWR
-    gpioWrite (kSpiCe0Gpio, 0);
     spiWrite (mSpiHandle, (char*)kCommand22, 3);
-    gpioWrite (kSpiCe0Gpio, 1);
 
-    // - data
+    // - data, miss header bytes
     const uint16_t* src = buf + (y * getWidth()) + r.left;
-    uint16_t* dst = dataHeader1;
-    *dst++ = 0x7272;
+    uint16_t* dst = dataHeaderBuf + 1;
     for (int i = 0; i < r.getWidth(); i++)
       *dst++ = bswap_16 (*src++);
 
-    gpioWrite (kSpiCe0Gpio, 0);
-    spiWrite (mSpiHandle, ((char*)(dataHeader1))+1, (r.getWidth() * 2) + 1);
-    gpioWrite (kSpiCe0Gpio, 1);
+    // start from second byte of dataHeaderBuf
+    spiWrite (mSpiHandle, ((char*)(dataHeaderBuf))+1, (r.getWidth() * 2) + 1);
     }
 
   mUpdateUs = (int)((time() - startTime) * 1000000.0);
