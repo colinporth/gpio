@@ -64,7 +64,7 @@ int main (int numArgs, char* args[]) {
   //}}}
 
   while (true)
-    if (lcd->snap())
+    if (lcd->snap()) // log
       cLog::log (LOGINFO, "upd:" + dec(lcd->getUpdateUs()) +
                           "us diff: " + dec(lcd->getDiffUs()) +
                           "us spans:" + dec(lcd->getNumDiffSpans()));
