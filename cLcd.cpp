@@ -816,7 +816,7 @@ int cLcd::coarseLinearDiffBack (uint16_t* frameBuf, uint16_t* prevFrameBuf, uint
 //}}}
 //}}}
 
-//{{{  cLcd16 : cLcd - parallel 16bit - littleEndian frameBuf
+//{{{  cLcd16 : cLcd - parallel 16bit
 //{{{  16bit J8 header pins, gpio, constexpr
 //      3.3v led -  1  2  - 5v
 //     d2  gpio2 -  3  4  - 5v
@@ -895,7 +895,7 @@ void cLcd16::writeCommandMultiData (const uint8_t command, const uint8_t* dataPt
 //}}}
 //}}}
 
-//{{{  cLcdSpi : cLcd - spi - bigEndian frameBuf
+//{{{  cLcdSpi : cLcd - spi
 //{{{  spi J8 header pins, gpio, constexpr
 //      3.3v 17  18 gpio24   - registerSelect/backlight
 // spi0 mosi 19  20 0v
@@ -1303,32 +1303,37 @@ void cLcdIli9320::updateLcd (const uint16_t* buf, const cRect& r) {
 
   uint16_t xstart = 0;
   uint16_t ystart = 0;
+  uint16_t yinc = 0;
+  //{{{  set xstart, ystart, yinc
+  switch (mRotate) {
+    default:
+    case 0:
+      xstart = r.left;
+      ystart = r.top;
+      yinc = 1;
+      break;
+
+    case 90:
+      xstart = kHeight9320-1 - r.left;
+      ystart = y;
+      yinc = 1;
+      break;
+
+    case 180:
+      xstart = kWidth9320-1 - r.left;
+      ystart = kHeight9320-1 - r.top;
+      yinc = -1;
+      break;
+
+    case 270:
+      xstart = r.left;
+      ystart = kWidth9320-1 - r.top;
+      yinc = -1;
+      break;
+    }
+  //}}}
+
   for (int y = r.top; y < r.bottom; y++) {
-    //{{{  set xstart, ystart
-    switch (mRotate) {
-      default:
-      case 0:
-        xstart = r.left;
-        ystart = y;
-        break;
-
-      case 90:
-        xstart = kHeight9320-1 - r.left;
-        ystart = y;
-        break;
-
-      case 180:
-        xstart = kWidth9320-1 - r.left;
-        ystart = kHeight9320-1 - y;
-        break;
-
-      case 270:
-        xstart = r.left;
-        ystart = kWidth9320-1 - y;
-        break;
-      }
-    //}}}
-
     // send GDRAM vert addr command
     spiWrite (mSpiHandle, (char*)kCommand20, 3);
 
@@ -1348,14 +1353,16 @@ void cLcdIli9320::updateLcd (const uint16_t* buf, const cRect& r) {
     // send GDRAMWR
     spiWrite (mSpiHandle, (char*)kCommand22, 3);
 
-    // - data, miss header bytes
+    // - data, miss header bytes, alignment for bswap_16
     const uint16_t* src = buf + (y * getWidth()) + r.left;
     uint16_t* dst = dataHeaderBuf + 1;
     for (int i = 0; i < r.getWidth(); i++)
       *dst++ = bswap_16 (*src++);
 
-    // start from second byte of dataHeaderBuf
+    // send from second byte of dataHeaderBuf
     spiWrite (mSpiHandle, ((char*)(dataHeaderBuf))+1, (r.getWidth() * 2) + 1);
+
+    ystart += yinc;
     }
 
   mUpdateUs = (int)((time() - startTime) * 1000000.0);
