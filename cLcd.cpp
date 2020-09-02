@@ -1299,6 +1299,7 @@ void cLcdIli9320::updateLcd (const uint16_t* buf, const cRect& r) {
   uint16_t dataHeaderBuf [320+1];
   dataHeaderBuf[0] = 0x7272;
 
+  int pixels = 0;
   double startTime = time();
 
   uint16_t xstart = r.left;
@@ -1352,10 +1353,12 @@ void cLcdIli9320::updateLcd (const uint16_t* buf, const cRect& r) {
     // send from second byte of dataHeaderBuf
     spiWrite (mSpiHandle, ((char*)(dataHeaderBuf))+1, (r.getWidth() * 2) + 1);
 
+    pixels += r.getWidth();
     ystart += yinc;
     }
 
   mUpdateUs = (int)((time() - startTime) * 1000000.0);
+  mUpdatePixels = pixels;
   }
 //}}}
 //}}}

@@ -71,6 +71,7 @@ int main (int numArgs, char* args[]) {
     if (lcd->snap()) // log
       cLog::log (LOGINFO, "upd:" + dec(lcd->getUpdateUs()) +
                           "us diff:" + dec(lcd->getDiffUs()) +
+                          "us pixels:" + dec(lcd->getUpdatePixels()) +
                           "us spans:" + dec(lcd->getNumSpans()));
     else // wait if no change
       lcd->delayUs (10000);

@@ -171,6 +171,7 @@ public:
   const cPoint getSize() { return cPoint(mWidth, mHeight); }
   const int getNumPixels() { return mWidth * mHeight; }
   const int getUpdateUs() { return mUpdateUs; }
+  const int getUpdatePixels() { return mUpdatePixels; }
 
   virtual void rect (const uint16_t colour, const cRect& r);
   virtual void pixel (const uint16_t colour, const cPoint& p);
@@ -208,6 +209,7 @@ protected:
   int mRotate = 0;
   bool mChanged = false;
   int mUpdateUs = 0;
+  int mUpdatePixels = 0;
 
   uint16_t* mFrameBuf = nullptr;  // uint16 colour pixels
 //}}}
