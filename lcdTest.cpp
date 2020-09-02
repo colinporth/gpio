@@ -68,7 +68,9 @@ int main (int numArgs, char* args[]) {
   lcd->delayUs (100000);
 
   while (true)
-    if (lcd->snap()) {// log
+    if (lcd->snap()) {
+      lcd->setBacklightOn();
+      // log
       //cLog::log (LOGINFO, "upd:" + dec(lcd->getUpdateUs()) +
       //                    "us diff:" + dec(lcd->getDiffUs()) +
       //                    "us spans:" + dec(lcd->getNumSpans()) +

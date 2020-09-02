@@ -179,6 +179,9 @@ public:
   virtual void copy (const uint16_t* src, const cRect& srcRect, const cPoint& dstPoint);
   virtual void copy (const uint16_t* src);
 
+  virtual void setBacklightOn() {}
+  virtual void setBacklightOff() {}
+
   void rectOutline (const uint16_t colour, const cRect& r);
   void rect (const uint16_t colour, const uint8_t alpha, const cRect& r);
   int text (const uint16_t colour, const cPoint& p, const int height, const std::string& str);
@@ -331,6 +334,9 @@ class cLcdIli9320 : public cLcdSpiHeaderSelect {
 public:
   cLcdIli9320 (const int rotate = 0);
   virtual ~cLcdIli9320() {}
+
+  virtual void setBacklightOn();
+  virtual void setBacklightOff();
 
   virtual bool initialise();
   virtual void updateLcd (const uint16_t* buf, const cRect& r);

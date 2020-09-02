@@ -1195,10 +1195,21 @@ constexpr int kSpiClock9320 = 24000000;
 cLcdIli9320::cLcdIli9320 (const int rotate) : cLcdSpiHeaderSelect(kWidth9320, kHeight9320, rotate) {}
 
 //{{{
+void cLcdIli9320::setBacklightOn() {
+  gpioWrite (kBacklightGpio, 1);
+  }
+//}}}
+//{{{
+void cLcdIli9320::setBacklightOff() {
+  gpioWrite (kBacklightGpio, 0);
+  }
+//}}}
+
+//{{{
 bool cLcdIli9320::initialise() {
 
   if (cLcd::initialise()) {
-    // backlight on - active hi
+    // backlight off - active hi
     gpioSetMode (kBacklightGpio, PI_OUTPUT);
     gpioWrite (kBacklightGpio, 0);
 
@@ -1274,7 +1285,6 @@ bool cLcdIli9320::initialise() {
         cLog::log (LOGERROR, "unkown rotate " + dec (mRotate));
         break;
       }
-    gpioWrite (kBacklightGpio, 1);
 
     launchUpdateThread();
     return true;
