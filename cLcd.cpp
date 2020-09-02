@@ -212,7 +212,7 @@ bool cLcd::snap() {
 //}}}
 //{{{  cLcd protected
 //{{{
-bool cLcd::initResources() {
+bool cLcd::initialise() {
 
   unsigned version = gpioVersion();
   unsigned hardwareRevision = gpioHardwareRevision();
@@ -222,22 +222,18 @@ bool cLcd::initResources() {
   if (gpioInitialise() >= 0) {
     setFont (getFreeSansBold(), getFreeSansBoldSize());
     mFrameBuf = (uint16_t*)malloc (getWidth() * getHeight() * 2);
+
+    // reset lcd
+    gpioSetMode (kResetGpio, PI_OUTPUT);
+    gpioWrite (kResetGpio, 0);
+    gpioDelay (10000);
+    gpioWrite (kResetGpio, 1);
+    gpioDelay (120000);
+
     return true;
     }
 
   return false;
-  }
-//}}}
-//{{{
-void cLcd::reset() {
-
-  gpioSetMode (kResetGpio, PI_OUTPUT);
-
-  gpioWrite (kResetGpio, 0);
-  gpioDelay (10000);
-
-  gpioWrite (kResetGpio, 1);
-  gpioDelay (120000);
   }
 //}}}
 
@@ -756,7 +752,7 @@ int cLcd::coarseLinearDiffBack (uint16_t* frameBuf, uint16_t* prevFrameBuf, uint
 //}}}
 //}}}
 
-//{{{  cLcd16 : cLcd - littleEndian frameBuf
+//{{{  cLcd16 : cLcd - parallel 16bit - littleEndian frameBuf
 //{{{  16bit J8 header pins, gpio, constexpr
 //      3.3v led -  1  2  - 5v
 //     d2  gpio2 -  3  4  - 5v
@@ -907,7 +903,7 @@ void cLcd16::writeCommandMultiData (const uint8_t command, const uint8_t* dataPt
 //}}}
 //}}}
 
-//{{{  cLcdSpi : cLcd - bigEndian frameBuf for spi writes
+//{{{  cLcdSpi : cLcd - spi - bigEndian frameBuf
 //{{{  spi J8 header pins, gpio, constexpr
 //      3.3v 17  18 gpio24   - registerSelect/backlight
 // spi0 mosi 19  20 0v
@@ -1000,7 +996,7 @@ void cLcdSpi::copy (const uint16_t* src, const cRect& srcRect, const cPoint& dst
   }
 //}}}
 //}}}
-//{{{  cLcdSpiHeaderSelect : cLcdSpi- header register select, we manage ce0
+//{{{  cLcdSpiHeaderSelect : cLcdSpi - header register select, we manage ce0
 //{{{
 void cLcdSpiHeaderSelect::writeCommand (const uint8_t command) {
 
@@ -1091,9 +1087,8 @@ cLcdTa7601::cLcdTa7601 (const int rotate) : cLcd16(kWidthTa7601, kHeightTa7601, 
 
 //{{{
 bool cLcdTa7601::initialise() {
-  if (initResources()) {
-    reset();
 
+  if (cLcd::initialise()) {
     // wr
     gpioSetMode (k16WriteGpio, PI_OUTPUT);
     gpioWrite (k16WriteGpio, 1);
@@ -1200,9 +1195,8 @@ cLcdSsd1289::cLcdSsd1289 (const int rotate) : cLcd16(kWidth1289, kHeight1289, ro
 
 //{{{
 bool cLcdSsd1289::initialise() {
-  if (initResources()) {
-    reset();
 
+  if (cLcd::initialise()) {
     // wr
     gpioSetMode (k16WriteGpio, PI_OUTPUT);
     gpioWrite (k16WriteGpio, 1);
@@ -1315,9 +1309,8 @@ cLcdSt7735r::cLcdSt7735r (const int rotate) : cLcdSpiRegisterSelect (kWidth7735,
 
 //{{{
 bool cLcdSt7735r::initialise() {
-  if (initResources()) {
-    reset();
 
+  if (cLcd::initialise()) {
     // rs
     gpioSetMode (kSpiRegisterSelectGpio, PI_OUTPUT);
     gpioWrite (kSpiRegisterSelectGpio, 1);
@@ -1423,9 +1416,8 @@ cLcdIli9225b::cLcdIli9225b (const int rotate) : cLcdSpiRegisterSelect(kWidth9225
 
 //{{{
 bool cLcdIli9225b::initialise() {
-  if (initResources()) {
-    reset();
 
+  if (cLcd::initialise()) {
     // rs
     gpioSetMode (kSpiRegisterSelectGpio, PI_OUTPUT);
     gpioWrite (kSpiRegisterSelectGpio, 1);
@@ -1515,9 +1507,8 @@ cLcdIli9320::cLcdIli9320 (const int rotate) : cLcdSpiHeaderSelect(kWidth9320, kH
 
 //{{{
 bool cLcdIli9320::initialise() {
-  if (initResources()) {
-    reset();
 
+  if (cLcd::initialise()) {
     // backlight on - active hi
     gpioSetMode (kBacklightGpio, PI_OUTPUT);
     gpioWrite (kBacklightGpio, 1);

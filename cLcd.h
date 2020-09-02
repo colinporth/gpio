@@ -164,7 +164,7 @@ public:
   cLcd (const int16_t width, const int16_t height, const int rotate);
   virtual ~cLcd();
 
-  virtual bool initialise() = 0;
+  virtual bool initialise();
 
   constexpr int16_t getWidth() { return mWidth; }
   constexpr int16_t getHeight() { return mHeight; }
@@ -198,9 +198,6 @@ public:
 
 //{{{
 protected:
-  bool initResources();
-  void reset();
-
   virtual void writeCommand (const uint8_t command) = 0;
   virtual void writeCommandData (const uint8_t command, const uint16_t data) = 0;
   virtual void writeCommandMultiData (const uint8_t command, const uint8_t* dataPtr, const int len) = 0;
