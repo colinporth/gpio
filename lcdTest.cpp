@@ -69,6 +69,9 @@ int main (int numArgs, char* args[]) {
                           " spans:" + dec(lcd->getNumDiffSpans()) +
                           " " + dec((lcd->getNumDiffPixels() * 100) / lcd->getNumPixels(),3) +
                           "% diffTook: " + dec(lcd->getDiffUs(),5));
+    else // wait if no change
+      lcd->delayUs (10000);
+
   //{{{  display font
   int height = 8;
   while (height++ < 100) {

@@ -179,7 +179,7 @@ bool cLcd::snap() {
   double startTime = time();
   cLcd::sDiffSpan* spans = diffCoarse();
   if (spans) {
-    mDiffUs = int((time() - startTime) * 10000000);
+    mDiffUs = int((time() - startTime) * 1000000);
 
     //copy (getBuf());
 
@@ -242,6 +242,7 @@ void cLcd::reset() {
   gpioDelay (120000);
   }
 //}}}
+
 //{{{
 void cLcd::launchUpdateThread() {
 // write frameBuffer to lcd ram thread if changed
@@ -1603,10 +1604,10 @@ void cLcdIli9320::updateLcd (const uint16_t* buf, const cRect& r) {
 
   double startTime = time();
 
-  uint8_t commandSequence20[3] = { 0x70, 0, 0x20 };
-  uint8_t commandSequence21[3] = { 0x70, 0, 0x21 };
-  uint8_t commandSequence22[3] = { 0x70, 0, 0x22 };
-  uint8_t dataSequence[3]      = { 0x72, 0, 0 };
+  uint8_t commandSequence20[3] = { 0x70, 0, 0x20 };  // GDRAM vert addr command
+  uint8_t commandSequence21[3] = { 0x70, 0, 0x21 };  // GDRAMWR horiz addr command
+  uint8_t commandSequence22[3] = { 0x70, 0, 0x22 };  // GDRAMWR command
+  uint8_t dataSequence[3]      = { 0x72, 0, 0 };     // data header
 
   uint16_t xstart = 0;
   uint16_t ystart = 0;
