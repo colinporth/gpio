@@ -150,17 +150,125 @@ double cLcd::time() {
 
 // main display copy
 //{{{
-void cLcd::snap() {
+const int cLcd::getNumDiffPixels() {
+// count number of diff pixels
 
+  int numDiffPixels = 0;
+
+  sDiffSpan* diffSpan = mDiffSpans;
+  while (diffSpan) {
+    numDiffPixels += diffSpan->size;
+    diffSpan = diffSpan->next;
+    }
+
+  return numDiffPixels;
+  }
+//}}}
+//{{{
+bool cLcd::snap() {
+
+  // swap main display buffers
   auto temp = mPrevBuf;
   mPrevBuf = mBuf;
   mBuf = temp;
 
+  // snapshot and read to main display buffer
   vc_dispmanx_snapshot (mDisplay, mScreenGrab, DISPMANX_TRANSFORM_T(0));
   vc_dispmanx_resource_read_data (mScreenGrab, &mVcRect, mBuf, getWidth() * 2);
+
+  // calc diff spans list
+  double startTime = time();
+  cLcd::sDiffSpan* spans = diffCoarse();
+  if (spans) {
+    mDiffUs = int((time() - startTime) * 10000000);
+
+    // draw whole of main display buffer
+    //copy (getBuf(), getSize());
+
+    //{{{  show pre merge in red
+    //while (spans) {
+      //int x = screen.getHeight() - spans->endY;
+      //int y = spans->x;
+      //int xlen = spans->endY - spans->y + 1;
+      //int ylen = spans->endX - spans->x + 1;
+      //lcd->rectOutline (kRed, x,y,xlen,ylen);
+      //spans = spans
+      //}
+    //}}}
+    spans = merge (16);
+
+    auto copyIt = spans;
+    while (copyIt) {
+      copy (getBuf(), cRect(copyIt->x, copyIt->y, copyIt->endX, copyIt->endY), cPoint (copyIt->x, copyIt->y));
+      copyIt = copyIt->next;
+      }
+
+    // show post merge in yellow
+    auto mergeIt = spans;
+    while (mergeIt) {
+      rect (kYellow, 0x60, cRect(mergeIt->x, mergeIt->y, mergeIt->endX, mergeIt->endY));
+      mergeIt = mergeIt->next;
+      }
+    return true;
+    }
+
+  return false;
   }
 //}}}
 
+// cLcd - protected
+//{{{
+bool cLcd::initResources() {
+
+  unsigned version = gpioVersion();
+  unsigned hardwareRevision = gpioHardwareRevision();
+
+  cLog::log (LOGINFO, "pigpio hwRev:%x version:%d", hardwareRevision, version);
+
+  if (gpioInitialise() >= 0) {
+    setFont (getFreeSansBold(), getFreeSansBoldSize());
+    mFrameBuf = (uint16_t*)malloc (getWidth() * getHeight() * 2);
+    return true;
+    }
+
+  return false;
+  }
+//}}}
+//{{{
+void cLcd::reset() {
+
+  gpioSetMode (kResetGpio, PI_OUTPUT);
+
+  gpioWrite (kResetGpio, 0);
+  gpioDelay (10000);
+
+  gpioWrite (kResetGpio, 1);
+  gpioDelay (120000);
+  }
+//}}}
+//{{{
+void cLcd::launchUpdateThread() {
+// write frameBuffer to lcd ram thread if changed
+
+  thread ([=]() {
+    cLog::setThreadName ("upda");
+    while (!mExit) {
+      if (mUpdate || (mAutoUpdate && mChanged)) {
+        mUpdate = false;
+        mChanged = false;
+        updateLcd (cRect (0,0, getWidth(), getHeight()));
+        }
+
+      gpioDelay (16000);
+      }
+
+    mExited = true;
+    } ).detach();
+  }
+//}}}
+
+// cLcd - private
+//{{{  diffSpan
 #define SPAN_MERGE_THRESHOLD 8
 #define SWAPU32(x, y) { uint32_t tmp = x; x = y; y = tmp; }
 //{{{
@@ -540,77 +648,7 @@ cLcd::sDiffSpan* cLcd::merge (int pixelThreshold) {
   return mDiffSpans;
   }
 //}}}
-//{{{
-const int cLcd::getNumDiffPixels() {
-// count number of diff pixels
 
-  int numDiffPixels = 0;
-
-  sDiffSpan* diffSpan = mDiffSpans;
-  while (diffSpan) {
-    numDiffPixels += diffSpan->size;
-    diffSpan = diffSpan->next;
-    }
-
-  return numDiffPixels;
-  }
-//}}}
-
-// cLcd - protected
-//{{{
-bool cLcd::initResources() {
-
-  unsigned version = gpioVersion();
-  unsigned hardwareRevision = gpioHardwareRevision();
-
-  cLog::log (LOGINFO, "pigpio hwRev:%x version:%d", hardwareRevision, version);
-
-  if (gpioInitialise() >= 0) {
-    setFont (getFreeSansBold(), getFreeSansBoldSize());
-    mFrameBuf = (uint16_t*)malloc (getWidth() * getHeight() * 2);
-    return true;
-    }
-
-  return false;
-  }
-//}}}
-//{{{
-void cLcd::reset() {
-
-  gpioSetMode (kResetGpio, PI_OUTPUT);
-
-  gpioWrite (kResetGpio, 0);
-  gpioDelay (10000);
-
-  gpioWrite (kResetGpio, 1);
-  gpioDelay (120000);
-  }
-//}}}
-//{{{
-void cLcd::launchUpdateThread (const uint8_t command) {
-// write frameBuffer to lcd ram thread if changed
-
-  thread ([=]() {
-    cLog::setThreadName ("upda");
-    while (!mExit) {
-      if (mUpdate || (mAutoUpdate && mChanged)) {
-        mUpdate = false;
-        mChanged = false;
-
-        double startTime = time_time();
-        writeCommandMultiData (command, (const uint8_t*)mFrameBuf, getWidth() * getHeight() * 2);
-        mUpdateUs = (int)((time_time() - startTime) * 1000000.0);
-        }
-
-      gpioDelay (16000);
-      }
-
-    mExited = true;
-    } ).detach();
-  }
-//}}}
-
-// cLcd - private
 //{{{
 int cLcd::coarseLinearDiff (uint16_t* frameBuf, uint16_t* prevFrameBuf, uint16_t* frameBufEnd) {
 // Coarse diffing of two frameBufs with tight stride, 16 pixels at a time
@@ -713,9 +751,9 @@ int cLcd::coarseLinearDiffBack (uint16_t* frameBuf, uint16_t* prevFrameBuf, uint
   return endPtr - frameBuf;
   }
 //}}}
+//}}}
 
-
-// cLcd16 - littleEndian frameBuf
+//{{{  cLcd16 - littleEndian frameBuf
 //{{{  16bit J8 header pins, gpio, constexpr
 //      3.3v led -  1  2  - 5v
 //     d2  gpio2 -  3  4  - 5v
@@ -852,11 +890,13 @@ void cLcd16::writeCommandMultiData (const uint8_t command, const uint8_t* dataPt
     }
   }
 //}}}
+//}}}
 //{{{  cLcdTa7601
 constexpr int16_t kWidthTa7601 = 320;
 constexpr int16_t kHeightTa7601 = 480;
 cLcdTa7601::cLcdTa7601 (const int rotate) : cLcd16(kWidthTa7601, kHeightTa7601, rotate) {}
 
+//{{{
 bool cLcdTa7601::initialise() {
   if (initResources()) {
     reset();
@@ -943,19 +983,29 @@ bool cLcdTa7601::initialise() {
     writeCommandData (0x20, 0x0000);  // Y start address of GRAM
     writeCommandData (0x21, 0x0000);  // X start address of GRAM
 
-    // startup commands
-    launchUpdateThread (0x22);        // write data to GRAM
+    launchUpdateThread();
     return true;
     }
 
   return false;
   }
 //}}}
+
+//{{{
+void cLcdTa7601::updateLcd (const cRect& r) {
+
+  double startTime = time_time();
+  writeCommandMultiData (0x22, (const uint8_t*)mFrameBuf, r.getNumPixels() * 2);
+  mUpdateUs = (int)((time_time() - startTime) * 1000000.0);
+  }
+//}}}
+//}}}
 //{{{  cLcdSsd1289
 constexpr int16_t kWidth1289 = 240;
 constexpr int16_t kHeight1289 = 320;
 cLcdSsd1289::cLcdSsd1289 (const int rotate) : cLcd16(kWidth1289, kHeight1289, rotate) {}
 
+//{{{
 bool cLcdSsd1289::initialise() {
   if (initResources()) {
     reset();
@@ -1045,15 +1095,24 @@ bool cLcdSsd1289::initialise() {
         break;
       }
 
-    launchUpdateThread (0x22); // SSD1289_REG_GDDRAM_DATA
+    launchUpdateThread();
     return true;
     }
 
   return false;
   }
 //}}}
+//{{{
+void cLcdSsd1289::updateLcd (const cRect& r) {
 
-// cLcdSpi - bigEndian frameBuf for spi writes
+  double startTime = time_time();
+  writeCommandMultiData (0x22, (const uint8_t*)mFrameBuf, r.getNumPixels() * 2);
+  mUpdateUs = (int)((time_time() - startTime) * 1000000.0);
+  }
+//}}}
+//}}}
+
+//{{{  cLcdSpi - bigEndian frameBuf for spi writes
 //{{{  spi J8 header pins, gpio, constexpr
 //      3.3v 17  18 gpio24   - registerSelect/backlight
 // spi0 mosi 19  20 0v
@@ -1132,6 +1191,16 @@ void cLcdSpi::copy (const uint16_t* src, const cPoint& p) {
       mFrameBuf[(y * getWidth()) + x] = bswap_16 (src[(y * getWidth()) + x]);
   }
 //}}}
+//{{{
+void cLcdSpi::copy (const uint16_t* src, const cRect& srcRect, const cPoint& dstPoint) {
+
+  for (int y = srcRect.top; y < srcRect.bottom; y++)
+    for (int x = srcRect.left; x < srcRect.right; x++)
+      mFrameBuf[(y * getWidth()) + x] =
+        bswap_16 (src[((dstPoint.y + y - srcRect.top) * getWidth()) + dstPoint.x + x - srcRect.left]);
+  }
+//}}}
+//}}}
 
 // cLcdSpiRegisterSelect - gpio registerSelect, spi manages ce0
 //{{{
@@ -1174,6 +1243,7 @@ constexpr int kSpiClock7735 = 24000000;
 
 cLcdSt7735r::cLcdSt7735r (const int rotate) : cLcdSpiRegisterSelect (kWidth7735, kHeight7735, rotate) {}
 
+//{{{
 bool cLcdSt7735r::initialise() {
   if (initResources()) {
     reset();
@@ -1195,8 +1265,6 @@ bool cLcdSt7735r::initialise() {
 
     constexpr uint8_t k7335_RASET = 0x2B;
     constexpr uint8_t k7335_raSetData[4] = { 0, 0, 0, kHeight7735 - 1 };
-
-    constexpr uint8_t k7335_RAMWR = 0x2C; // followed by frameBuffer data
 
     constexpr uint8_t k7335_MADCTL = 0x36;
     constexpr uint8_t k7735_MADCTLData[1] = { 0xc0 };
@@ -1260,12 +1328,22 @@ bool cLcdSt7735r::initialise() {
 
     writeCommand (k7335_DISPON); // display ON
 
-    launchUpdateThread (k7335_RAMWR);
+    launchUpdateThread();
     return true;
     }
 
   return false;
   }
+//}}}
+
+//{{{
+void cLcdSt7735r::updateLcd (const cRect& r) {
+
+  double startTime = time_time();
+  writeCommandMultiData (0x2C, (const uint8_t*)mFrameBuf, r.getNumPixels() * 2); // RAMRW command
+  mUpdateUs = (int)((time_time() - startTime) * 1000000.0);
+  }
+//}}}
 //}}}
 //{{{  cLcdIli9225b
 constexpr int16_t kWidth9225b = 176;
@@ -1274,6 +1352,7 @@ constexpr int kSpiClock9225b = 16000000;
 
 cLcdIli9225b::cLcdIli9225b (const int rotate) : cLcdSpiRegisterSelect(kWidth9225b, kHeight9225b, rotate) {}
 
+//{{{
 bool cLcdIli9225b::initialise() {
   if (initResources()) {
     reset();
@@ -1342,11 +1421,21 @@ bool cLcdIli9225b::initialise() {
     writeCommandData (0x21, 0);
     //}}}
 
-    launchUpdateThread (0x22);
+    launchUpdateThread();
     return true;
     }
   return false;
   }
+//}}}
+
+//{{{
+void cLcdIli9225b::updateLcd (const cRect& r) {
+
+  double startTime = time_time();
+  writeCommandMultiData (0x22, (const uint8_t*)mFrameBuf, r.getNumPixels() * 2);
+  mUpdateUs = (int)((time_time() - startTime) * 1000000.0);
+  }
+//}}}
 //}}}
 
 // cLcdSpiHeaderSelect - header register select, we manage ce0
@@ -1402,6 +1491,7 @@ constexpr int kSpiClock9320 = 24000000;
 
 cLcdIli9320::cLcdIli9320 (const int rotate) : cLcdSpiHeaderSelect(kWidth9320, kHeight9320, rotate) {}
 
+//{{{
 bool cLcdIli9320::initialise() {
   if (initResources()) {
     reset();
@@ -1467,38 +1557,102 @@ bool cLcdIli9320::initialise() {
     writeCommandData (0x0052, 0x0000); // Vertical GRAM Start Address
     writeCommandData (0x0053, kHeight9320-1); // Vertical GRAM Start Address
 
-    int xs = 0;
-    int ys = 0;
     switch (mRotate) {
       case 0:
         writeCommandData (0x03, 0x1030); // Entry Mode - BGR, HV inc, vert write,
-        writeCommandData (0x20, xs);
-        writeCommandData (0x21, ys);
         break;
       case 90:
         writeCommandData (0x03, 0x1018); // Entry Mode - BGR, HV inc, vert write,
-        writeCommandData (0x20, ys);
-        writeCommandData (0x21, kHeight9320-1 - xs);
         break;
       case 180:
         writeCommandData (0x03, 0x1000); // Entry Mode - BGR, HV inc, vert write,
-        writeCommandData (0x20, kWidth9320- 1 - xs);
-        writeCommandData (0x21, kHeight9320-1 - ys);
         break;
       case 270:
         writeCommandData (0x03, 0x1028); // Entry Mode - BGR, HV inc, vert write,
-        writeCommandData (0x20, kWidth9320-1 - ys);
-        writeCommandData (0x21, xs);
         break;
       default:
         cLog::log (LOGERROR, "unkown rotate " + dec (mRotate));
         break;
       }
 
-    launchUpdateThread (0x22);
+    launchUpdateThread();
     return true;
     }
 
   return false;
   }
+//}}}
+
+//{{{
+void cLcdIli9320::updateLcd (const cRect& r) {
+// command data sequences inline
+
+  double startTime = time_time();
+
+  uint8_t commandSequence20[3] = { 0x70, 0, 0x20 };
+  uint8_t commandSequence21[3] = { 0x70, 0, 0x21 };
+  uint8_t commandSequence22[3] = { 0x70, 0, 0x22 };
+  uint8_t dataSequence[3]      = { 0x72, 0, 0 };
+
+  for (int y = r.top; y < r.bottom; y++) {
+    int xs = r.left;
+    int ys = y;
+    switch (mRotate) {
+      case 90:
+        xs = kHeight9320-1 - xs;
+        break;
+
+      case 180:
+        xs = kWidth9320-1 - xs;
+        ys = kHeight9320-1 - ys;
+        break;
+
+      case 270:
+        ys = kWidth9320-1 - ys;
+        break;
+      }
+
+    // send GDRAM vert addr command
+    gpioWrite (kSpiCe0Gpio, 0);
+    spiWrite (mSpiHandle, (char*)commandSequence20, 3);
+    gpioWrite (kSpiCe0Gpio, 1);
+
+    // - data
+    dataSequence[1] = uint8_t(ys >> 8);
+    dataSequence[2] = ys & 0xff;
+    gpioWrite (kSpiCe0Gpio, 0);
+    spiWrite (mSpiHandle, (char*)dataSequence, 3);
+    gpioWrite (kSpiCe0Gpio, 1);
+
+    // send GDRAMWR horiz addr command
+    gpioWrite (kSpiCe0Gpio, 0);
+    spiWrite (mSpiHandle, (char*)commandSequence21, 3);
+    gpioWrite (kSpiCe0Gpio, 1);
+
+    // - data
+    dataSequence[1] = uint8_t(xs >> 8);
+    dataSequence[2] = xs & 0xff;
+    gpioWrite (kSpiCe0Gpio, 0);
+    spiWrite (mSpiHandle, (char*)dataSequence, 3);
+    gpioWrite (kSpiCe0Gpio, 1);
+
+    // send GDRAMWR
+    gpioWrite (kSpiCe0Gpio, 0);
+    spiWrite (mSpiHandle, (char*)commandSequence22, 3);
+    gpioWrite (kSpiCe0Gpio, 1);
+
+    // - data
+    gpioWrite (kSpiCe0Gpio, 0);
+    spiWrite (mSpiHandle, (char*)(dataSequence), 1);
+
+    auto ptr = (char*)(mFrameBuf + (y * getWidth()) + r.left);
+    int sendBytes = r.getWidth() * 2;
+    spiWrite (mSpiHandle, ptr, sendBytes);
+
+    gpioWrite (kSpiCe0Gpio, 1);
+    }
+
+  mUpdateUs = (int)((time_time() - startTime) * 1000000.0);
+  }
+//}}}
 //}}}

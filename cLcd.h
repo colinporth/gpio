@@ -93,27 +93,11 @@ public:
     }
   //}}}
   //{{{
-  cRect (const int16_t sizeX, const int16_t sizeY)  {
-    left = 0;
-    top = 0;
-    right = sizeX;
-    bottom = sizeY;
-    }
-  //}}}
-  //{{{
   cRect (const int16_t l, const int16_t t, const int16_t r, const int16_t b)  {
     left = l;
     top = t;
     right = r;
     bottom = b;
-    }
-  //}}}
-  //{{{
-  cRect (const cPoint& size)  {
-    left = 0;
-    top = 0;
-    right = size.x;
-    bottom = size.y;
     }
   //}}}
   //{{{
@@ -133,6 +117,7 @@ public:
 
   int16_t getWidth() const { return right - left; }
   int16_t getHeight() const { return bottom - top; }
+  int getNumPixels() const { return getWidth() * getHeight(); }
 
   cPoint getTL() const { return cPoint(left, top); }
   cPoint getTL (int16_t offset) const { return cPoint(left+offset, top+offset); }
@@ -209,6 +194,7 @@ public:
   virtual void rect (const uint16_t colour, const cRect& r) = 0;
   virtual void pixel (const uint16_t colour, const cPoint& p) = 0;
   virtual void blendPixel (const uint16_t colour, const uint8_t alpha, const cPoint& p) = 0;
+  virtual void copy (const uint16_t* src, const cRect& srcRect, const cPoint& dstPoint) = 0;
   virtual void copy (const uint16_t* src, const cPoint& p) = 0;
 
   int text (const uint16_t colour, const cPoint& p, const int height, const std::string& str);
@@ -225,13 +211,9 @@ public:
   // main display screen copy
   const uint16_t* getBuf() { return mBuf; }
   const int getNumDiffSpans() { return mNumDiffSpans; }
+  const int getDiffUs() { return mDiffUs; }
   const int getNumDiffPixels();
-
-  void snap();
-  sDiffSpan* diffSingle();
-  sDiffSpan* diffCoarse();
-  sDiffSpan* diffExact();
-  sDiffSpan* merge (int pixelThreshold);
+  bool snap();
 
 //{{{
 protected:
@@ -241,18 +223,24 @@ protected:
   virtual void writeCommand (const uint8_t command) = 0;
   virtual void writeCommandData (const uint8_t command, const uint16_t data) = 0;
   virtual void writeCommandMultiData (const uint8_t command, const uint8_t* dataPtr, const int len) = 0;
+  virtual void updateLcd (const cRect& r) = 0;
 
-  void launchUpdateThread (const uint8_t command);
+  void launchUpdateThread();
 
   int mRotate = 0;
-
   bool mChanged = false;
+  int mUpdateUs = 0;
 
   uint16_t* mFrameBuf = nullptr;  // uint16 colour pixels
 //}}}
 //{{{
 private:
   void setFont (const uint8_t* font, const int fontSize);
+
+  sDiffSpan* diffSingle();
+  sDiffSpan* diffCoarse();
+  sDiffSpan* diffExact();
+  sDiffSpan* merge (int pixelThreshold);
 
   static int coarseLinearDiff (uint16_t* frameBuf, uint16_t* prevFrameBuf, uint16_t* frameBufEnd);
   static int coarseLinearDiffBack (uint16_t* frameBuf, uint16_t* prevFrameBuf, uint16_t* frameBufEnd);
@@ -262,7 +250,7 @@ private:
 
   bool mUpdate = false;
   bool mAutoUpdate = false;
-  int mUpdateUs = 0;
+  int mDiffUs = 0;
 
   bool mExit = false;
   bool mExited = false;
@@ -308,6 +296,7 @@ public:
   virtual ~cLcdTa7601() {}
 
   virtual bool initialise();
+  virtual void updateLcd (const cRect& r);
   };
 //}}}
 //{{{
@@ -317,6 +306,7 @@ public:
   virtual ~cLcdSsd1289() {}
 
   virtual bool initialise();
+  virtual void updateLcd (const cRect& r);
   };
 //}}}
 
@@ -331,6 +321,7 @@ protected:
   virtual void pixel (const uint16_t colour, const cPoint& p);
   virtual void blendPixel (const uint16_t colour, const uint8_t alpha, const cPoint& p);
   virtual void copy (const uint16_t* src, const cPoint& p);
+  virtual void copy (const uint16_t* src, const cRect& srcRect, const cPoint& dstPoint);
 
   int mSpiHandle = 0;
   };
@@ -357,6 +348,7 @@ public:
   virtual ~cLcdSt7735r() {}
 
   virtual bool initialise();
+  virtual void updateLcd (const cRect& r);
   };
 //}}}
 //{{{
@@ -365,7 +357,9 @@ class cLcdIli9225b : public cLcdSpiRegisterSelect {
 public:
   cLcdIli9225b (const int rotate = 0);
   virtual ~cLcdIli9225b() {}
+
   virtual bool initialise();
+  virtual void updateLcd (const cRect& r);
   };
 //}}}
 
@@ -390,5 +384,6 @@ public:
   virtual ~cLcdIli9320() {}
 
   virtual bool initialise();
+  virtual void updateLcd (const cRect& r);
   };
 //}}}

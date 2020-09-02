@@ -87,36 +87,12 @@ int main (int numArgs, char* args[]) {
 
   int i = 0;
   while (true) {
-    lcd->snap();
-
-    double startTime = lcd->time();
-    cLcd::sDiffSpan* spans = lcd->diffCoarse();
-    if (spans) {
-      int diffTook = int((lcd->time() - startTime) * 10000000);
-
-      lcd->copy (lcd->getBuf(), lcd->getSize());
-      //{{{  show pre merge in red
-      //while (spans) {
-        //int x = screen.getHeight() - spans->endY;
-        //int y = spans->x;
-        //int xlen = spans->endY - spans->y + 1;
-        //int ylen = spans->endX - spans->x + 1;
-        //lcd->rectOutline (kRed, x,y,xlen,ylen);
-        //spans = spans
-        //}
-      //}}}
-      spans = lcd->merge (16);
-      //{{{  show post merge in yellow
-      while (spans) {
-        lcd->rect (kYellow, 0x60, cRect(spans->x,spans->y, spans->endX,spans->endY));
-        spans = spans->next;
-        }
-      //}}}
+    if (lcd->snap()) {
       lcd->text (kWhite, cPoint(0,0), 20, dec(i++) +
                                   " " + dec(lcd->getUpdateUs(),5) +
                                   " " + dec(lcd->getNumDiffSpans(),5) +
                                   " " + dec((lcd->getNumDiffPixels() * 100) / lcd->getNumPixels(),3) +
-                                  " " + dec(diffTook,5));
+                                  " " + dec(lcd->getDiffUs(),5));
       lcd->update();
       }
 
