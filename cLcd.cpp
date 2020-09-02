@@ -1301,22 +1301,13 @@ void cLcdIli9320::updateLcd (const uint16_t* buf, const cRect& r) {
 
   double startTime = time();
 
-  uint16_t xstart = 0;
-  uint16_t ystart = 0;
-  uint16_t yinc = 0;
+  uint16_t xstart = r.left;
+  uint16_t ystart = r.top;
+  uint16_t yinc = 1;
   //{{{  set xstart, ystart, yinc
   switch (mRotate) {
-    default:
-    case 0:
-      xstart = r.left;
-      ystart = r.top;
-      yinc = 1;
-      break;
-
     case 90:
       xstart = kHeight9320-1 - r.left;
-      ystart = y;
-      yinc = 1;
       break;
 
     case 180:
@@ -1326,7 +1317,6 @@ void cLcdIli9320::updateLcd (const uint16_t* buf, const cRect& r) {
       break;
 
     case 270:
-      xstart = r.left;
       ystart = kWidth9320-1 - r.top;
       yinc = -1;
       break;
