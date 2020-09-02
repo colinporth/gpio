@@ -43,31 +43,44 @@ void cLcd::setFont (const uint8_t* font, const int fontSize)  {
 
 // bigEndian frameBuf
 //{{{
-void cLcd::rect (const uint16_t colour, const int xorg, const int yorg, const int xlen, const int ylen) {
+void cLcd::rect (const uint16_t colour, const cRect& r) {
 
   uint16_t bigEndianColour = bswap_16 (colour);
 
-  int xmax = min (xorg+xlen, (int)getWidth());
-  int ymax = min (yorg+ylen, (int)getHeight());
+  uint16_t xmax = min (r.right, getWidth());
+  uint16_t ymax = min (r.bottom, getHeight());
 
-  for (int y = yorg; y < ymax; y++) {
-    uint16_t* ptr = mFrameBuf + y*getWidth() + xorg;
-    for (int x = xorg; x < xmax; x++)
+  for (int y = r.top; y < ymax; y++) {
+    uint16_t* ptr = mFrameBuf + y*getWidth() + r.left;
+    for (int x = r.left; x < xmax; x++)
       *ptr++ = bigEndianColour;
-      }
+    }
 
   mChanged = true;
   }
 //}}}
 //{{{
-void cLcd::pixel (const uint16_t colour, const int x, const int y) {
+void cLcd::rect (const uint16_t colour, const uint8_t alpha, const cRect& r) {
 
-  mFrameBuf[(y*getWidth()) + x] = bswap_16 (colour);
+  uint16_t xmax = min (r.right, getWidth());
+  uint16_t ymax = min (r.bottom, getHeight());
+
+  for (int y = r.top; y < ymax; y++)
+    for (int x = r.left; x < xmax; x++)
+      blendPixel (colour, alpha, cPoint(x, y));
+
   mChanged = true;
   }
 //}}}
 //{{{
-void cLcd::blendPixel (const uint16_t colour, const uint8_t alpha, const int x, const int y) {
+void cLcd::pixel (const uint16_t colour, const cPoint& p) {
+
+  mFrameBuf[(p.y*getWidth()) + p.x] = bswap_16 (colour);
+  mChanged = true;
+  }
+//}}}
+//{{{
+void cLcd::blendPixel (const uint16_t colour, const uint8_t alpha, const cPoint& p) {
 // magical rgb565 alpha composite
 // - linear interp background * (1.0 - alpha) + foreground * alpha
 //   - factorized into: result = background + (foreground - background) * alpha
@@ -75,14 +88,14 @@ void cLcd::blendPixel (const uint16_t colour, const uint8_t alpha, const int x, 
 // - Converts  0000000000000000rrrrrggggggbbbbb
 // -     into  00000gggggg00000rrrrr000000bbbbb
 
-  if ((alpha >= 0) && (x >= 0) && (y > 0) && (x < getWidth()) && (y < getHeight())) {
+  if ((alpha >= 0) && (p.x >= 0) && (p.y > 0) && (p.x < getWidth()) && (p.y < getHeight())) {
     // clip opaque and offscreen
     if (alpha == 0xFF)
       // simple case - set bigEndianColour frameBuf pixel to littleEndian colour
-      mFrameBuf[(y*getWidth()) + x] = bswap_16 (colour);
+      mFrameBuf[(p.y*getWidth()) + p.x] = bswap_16 (colour);
     else {
       // get bigEndianColour frame buffer into littleEndian background
-      uint32_t background = bswap_16 (mFrameBuf[(y*getWidth()) + x]);
+      uint32_t background = bswap_16 (mFrameBuf[(p.y*getWidth()) + p.x]);
 
       // composite littleEndian colour
       uint32_t foreground = colour;
@@ -91,7 +104,7 @@ void cLcd::blendPixel (const uint16_t colour, const uint8_t alpha, const int x, 
       background += (((foreground - background) * ((alpha + 4) >> 3)) >> 5) & 0x07e0f81f;
 
       // set bigEndianColour frameBuf pixel to littleEndian background result
-      mFrameBuf[(y*getWidth()) + x] = bswap_16 (background | (background >> 16));
+      mFrameBuf[(p.y*getWidth()) + p.x] = bswap_16 (background | (background >> 16));
       }
 
     mChanged = true;
@@ -99,23 +112,23 @@ void cLcd::blendPixel (const uint16_t colour, const uint8_t alpha, const int x, 
   }
 //}}}
 //{{{
-int cLcd::text (const uint16_t colour, const int strX, const int strY, const int height, const string& str) {
+int cLcd::text (const uint16_t colour, const cPoint& p, const int height, const string& str) {
 
   FT_Set_Pixel_Sizes (mFace, 0, height);
 
-  int curX = strX;
+  int curX = p.x;
   for (unsigned i = 0; (i < str.size()) && (curX < getWidth()); i++) {
     FT_Load_Char (mFace, str[i], FT_LOAD_RENDER);
     FT_GlyphSlot slot = mFace->glyph;
 
     int x = curX + slot->bitmap_left;
-    int y = strY + height - slot->bitmap_top;
+    int y = p.y + height - slot->bitmap_top;
 
     if (slot->bitmap.buffer) {
       for (unsigned bitmapY = 0; bitmapY < slot->bitmap.rows; bitmapY++) {
         auto bitmapPtr = slot->bitmap.buffer + (bitmapY * slot->bitmap.pitch);
         for (unsigned bitmapX = 0; bitmapX < slot->bitmap.width; bitmapX++)
-          blendPixel (colour, *bitmapPtr++, x + bitmapX, y + bitmapY);
+          blendPixel (colour, *bitmapPtr++, cPoint (x + bitmapX, y + bitmapY));
         }
       }
     curX += slot->advance.x / 64;
@@ -126,28 +139,29 @@ int cLcd::text (const uint16_t colour, const int strX, const int strY, const int
 //}}}
 
 //{{{
-void cLcd::rectOutline (const uint16_t colour, const int xorg, const int yorg, const int xlen, const int ylen) {
-  rect (colour, xorg, yorg, xlen, 1);
-  rect (colour, xorg, yorg+ylen, xlen, 1);
+void cLcd::rectOutline (const uint16_t colour, const cRect& r) {
 
-  rect (colour, xorg, yorg, 1, ylen);
-  rect (colour, xorg+xlen, yorg, 1, ylen);
+  rect (colour, cRect (r.left, r.top, r.right, r.top+1));
+  rect (colour, cRect (r.left, r.bottom-1, r.right, r.bottom));
+
+  rect (colour, cRect (r.left, r.top, r.left+1, r.bottom));
+  rect (colour, cRect (r.right, r.top, r.right-11, r.bottom));
   }
 //}}}
 
 //{{{
-void cLcd::copy (const uint16_t* fromPtr, const int xlen, const int ylen) {
+void cLcd::copy (const uint16_t* src, const cPoint& p) {
 
-  for (int y = 0; y < ylen; y++)
-    memcpy (mFrameBuf + (y*getWidth()), (fromPtr + y*xlen), xlen*2);
+  for (int y = 0; y < p.y; y++)
+    memcpy (mFrameBuf + (y*getWidth()), (src + y*p.x), p.x*2);
   }
 //}}}
 //{{{
-void cLcd::copyRotate (const uint16_t* fromPtr, const int xlen, const int ylen) {
+void cLcd::copyRotate (const uint16_t* src, const cPoint& p) {
 
-  for (int y = 0; y < ylen; y++)
-    for (int x = 0; x < xlen; x++)
-      mFrameBuf[(x * getWidth()) + (getWidth() - y)] = fromPtr[(y*xlen) + x];
+  for (int y = 0; y < p.y; y++)
+    for (int x = 0; x < p.x; x++)
+      mFrameBuf[(x * getWidth()) + (getWidth() - y)] = src[(y*p.x) + x];
   }
 //}}}
 
@@ -250,14 +264,14 @@ constexpr uint32_t k16WriteMask = 1 << k16WriteGpio;
 constexpr uint32_t k16WriteClrMask = k16WriteMask | k16DataMask;
 //}}}
 //{{{
-void cLcd16::rect (const uint16_t colour, const int xorg, const int yorg, const int xlen, const int ylen) {
+void cLcd16::rect (const uint16_t colour, const cRect& r) {
 
-  int xmax = min (xorg+xlen, (int)getWidth());
-  int ymax = min (yorg+ylen, (int)getHeight());
+  int16_t xmax = min (r.right, getWidth());
+  int16_t ymax = min (r.bottom, getHeight());
 
-  for (int y = yorg; y < ymax; y++) {
-    uint16_t* ptr = mFrameBuf + y*getWidth() + xorg;
-    for (int x = xorg; x < xmax; x++)
+  for (int y = r.top; y < ymax; y++) {
+    uint16_t* ptr = mFrameBuf + y*getWidth() + r.left;
+    for (int x = r.left; x < xmax; x++)
       *ptr++ = colour;
       }
 
@@ -265,14 +279,14 @@ void cLcd16::rect (const uint16_t colour, const int xorg, const int yorg, const 
   }
 //}}}
 //{{{
-void cLcd16::pixel (const uint16_t colour, const int x, const int y) {
+void cLcd16::pixel (const uint16_t colour, const cPoint& p) {
 
-  mFrameBuf[(y*getWidth()) + x] = colour;
+  mFrameBuf[(p.y*getWidth()) + p.x] = colour;
   mChanged = true;
   }
 //}}}
 //{{{
-void cLcd16::blendPixel (const uint16_t colour, const uint8_t alpha, const int x, const int y) {
+void cLcd16::blendPixel (const uint16_t colour, const uint8_t alpha, const cPoint& p) {
 // magical rgb565 alpha composite
 // - linear interp background * (1.0 - alpha) + foreground * alpha
 //   - factorized into: result = background + (foreground - background) * alpha
@@ -280,14 +294,14 @@ void cLcd16::blendPixel (const uint16_t colour, const uint8_t alpha, const int x
 // - Converts  0000000000000000rrrrrggggggbbbbb
 // -     into  00000gggggg00000rrrrr000000bbbbb
 
-  if ((alpha >= 0) && (x >= 0) && (y > 0) && (x < getWidth()) && (y < getHeight())) {
+  if ((alpha >= 0) && (p.x >= 0) && (p.y > 0) && (p.x < getWidth()) && (p.y < getHeight())) {
     // clip opaque and offscreen
     if (alpha == 0xFF)
       // simple case - set bigEndianColour frameBuf pixel to littleEndian colour
-      mFrameBuf[(y*getWidth()) + x] = colour;
+      mFrameBuf[(p.y*getWidth()) + p.x] = colour;
     else {
       // get bigEndianColour frame buffer into littleEndian background
-      uint32_t background = mFrameBuf[(y*getWidth()) + x];
+      uint32_t background = mFrameBuf[(p.y*getWidth()) + p.x];
 
       // composite littleEndian colour
       uint32_t foreground = colour;
@@ -296,7 +310,7 @@ void cLcd16::blendPixel (const uint16_t colour, const uint8_t alpha, const int x
       background += (((foreground - background) * ((alpha + 4) >> 3)) >> 5) & 0x07e0f81f;
 
       // set bigEndianColour frameBuf pixel to littleEndian background result
-      mFrameBuf[(y*getWidth()) + x] = background | (background >> 16);
+      mFrameBuf[(p.y*getWidth()) + p.x] = background | (background >> 16);
       }
 
     mChanged = true;
@@ -786,11 +800,11 @@ cLcdSpiHeaderSelect::~cLcdSpiHeaderSelect() {
   }
 //}}}
 //{{{
-void cLcdSpiHeaderSelect::copyRotate (const uint16_t* fromPtr, const int xlen, const int ylen) {
+void cLcdSpiHeaderSelect::copyRotate (const uint16_t* src, const cPoint& p) {
 
-  for (int y = 0; y < ylen; y++)
-    for (int x = 0; x < xlen; x++)
-      mFrameBuf[(x * getWidth()) + (getWidth() - y)] = bswap_16 (fromPtr[(y*xlen) + x]);
+  for (int y = 0; y < p.y; y++)
+    for (int x = 0; x < p.x; x++)
+      mFrameBuf[(x * getWidth()) + (getWidth() - y)] = bswap_16 (src[(y*p.x) + x]);
   }
 //}}}
 //{{{

@@ -70,7 +70,7 @@ int main (int numArgs, char* args[]) {
     int y = 0;
     lcd->clear (kMagenta);
     for (char ch = 'A'; ch < 0x7f; ch++) {
-      x = lcd->text (kWhite, x, y, height, string(1,ch));
+      x = lcd->text (kWhite, cPoint(x, y), height, string(1,ch));
       if (x > lcd->getWidth()) {
         x = 0;
         y += height;
@@ -78,7 +78,7 @@ int main (int numArgs, char* args[]) {
           break;
         }
       }
-    lcd->text (kYellow, 0,0, 20, "Hello Colin");
+    lcd->text (kYellow, cPoint(0,0), 20, "Hello Colin");
     lcd->update();
     lcd->delayUs (16000);
     }
@@ -92,38 +92,37 @@ int main (int numArgs, char* args[]) {
     screen.snap();
 
     double startTime = lcd->time();
-    cScreen::sDiffSpan* diffSpans = screen.diffCoarse();
-    if (diffSpans) {
+    cScreen::sDiffSpan* spans = screen.diffCoarse();
+    if (spans) {
       int diffTook = int((lcd->time() - startTime) * 10000000);
 
-      lcd->copyRotate (screen.getBuf(), screen.getWidth(), screen.getHeight());
+      lcd->copyRotate (screen.getBuf(), screen.getSize());
       //{{{  show pre merge in red
-      //while (diffSpans) {
-        //int x = 320 - diffSpans->endY;
-        //int y = diffSpans->x;
-        //int xlen = diffSpans->endY - diffSpans->y + 1;
-        //int ylen = diffSpans->endX - diffSpans->x + 1;
+      //while (spans) {
+        //int x = screen.getHeight() - spans->endY;
+        //int y = spans->x;
+        //int xlen = spans->endY - spans->y + 1;
+        //int ylen = spans->endX - spans->x + 1;
         //lcd->rectOutline (kRed, x,y,xlen,ylen);
-        //diffSpans = diffSpans->next;
+        //spans = spans
         //}
       //}}}
-      diffSpans = screen.merge (16);
+      spans = screen.merge (16);
       //{{{  show post merge in green
-      while (diffSpans) {
-        int x = screen.getHeight() - diffSpans->endY;
-        int y = diffSpans->x;
-        int xlen = diffSpans->endY - diffSpans->y + 1;
-        int ylen = diffSpans->endX - diffSpans->x + 1;
-        lcd->rectOutline (kGreen, x,y,xlen,ylen);
-        diffSpans = diffSpans->next;
+      while (spans) {
+        int x = screen.getHeight() - spans->endY;
+        int y = spans->x;
+        int xlen = spans->endY - spans->y + 1;
+        int ylen = spans->endX - spans->x + 1;
+        lcd->rect (kYellow, 0x60, cRect(x,y, xlen,ylen));
+        spans = spans->next;
         }
       //}}}
-      lcd->text (kWhite, 0,0, 20, dec(i++) +
+      lcd->text (kWhite, cPoint(0,0), 20, dec(i++) +
                                   " " + dec(lcd->getUpdateUs(),5) +
                                   " " + dec(screen.getNumDiffSpans(),5) +
                                   " " + dec((screen.getNumDiffPixels() * 100) / screen.getNumPixels(),3) +
                                   " " + dec(diffTook,5));
-
       lcd->update();
       }
 

@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <bcm_host.h>
 
+#include "cLcd.h"
+
 class cScreen {
 public:
   //{{{
@@ -26,6 +28,7 @@ public:
   constexpr int getWidth() { return mWidth; }
   constexpr int getHeight() { return mHeight; }
   constexpr int getNumPixels() { return mWidth * mHeight; }
+  const cPoint getSize() { return cPoint (mWidth, mHeight); }
 
   const uint16_t* getBuf() { return mBuf; }
 

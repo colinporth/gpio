@@ -5,6 +5,156 @@
 #include <string>
 //}}}
 
+//{{{
+class cPoint {
+public:
+  //{{{
+  cPoint()  {
+    x = 0;
+    y = 0;
+    }
+  //}}}
+  //{{{
+  cPoint (const int16_t value) {
+    this->x = value;
+    this->y = value;
+    }
+  //}}}
+  //{{{
+  cPoint (const int16_t x, const int16_t y) {
+    this->x = x;
+    this->y = y;
+    }
+  //}}}
+
+  //{{{
+  cPoint operator - (const cPoint& point) const {
+    return cPoint (x - point.x, y - point.y);
+    }
+  //}}}
+  //{{{
+  cPoint operator + (const cPoint& point) const {
+    return cPoint (x + point.x, y + point.y);
+    }
+  //}}}
+  //{{{
+  cPoint operator * (const int16_t f) const {
+    return cPoint (x * f, y * f);
+    }
+  //}}}
+  //{{{
+  cPoint operator * (const cPoint& point) const {
+    return cPoint (x * point.x, y * point.y);
+    }
+  //}}}
+  //{{{
+  cPoint operator / (const int16_t f) const {
+    return cPoint (x / f, y / f);
+    }
+  //}}}
+
+  //{{{
+  const cPoint& operator += (const cPoint& point)  {
+    x += point.x;
+    y += point.y;
+    return *this;
+    }
+  //}}}
+  //{{{
+  const cPoint& operator -= (const cPoint& point)  {
+    x -= point.x;
+    y -= point.y;
+    return *this;
+    }
+  //}}}
+
+  //{{{
+  bool inside (const cPoint& pos) const {
+  // return pos inside rect formed by us as size
+    return pos.x >= 0 && pos.x < x && pos.y >= 0 && pos.y < y;
+    }
+  //}}}
+
+  int16_t x;
+  int16_t y;
+  };
+//}}}
+//{{{
+class cRect {
+public:
+  //{{{
+  cRect() {
+    left = 0;
+    bottom = 0;
+    right = 0;
+    bottom = 0;
+    }
+  //}}}
+  //{{{
+  cRect (const int16_t sizeX, const int16_t sizeY)  {
+    left = 0;
+    top = 0;
+    right = sizeX;
+    bottom = sizeY;
+    }
+  //}}}
+  //{{{
+  cRect (const int16_t l, const int16_t t, const int16_t r, const int16_t b)  {
+    left = l;
+    top = t;
+    right = r;
+    bottom = b;
+    }
+  //}}}
+  //{{{
+  cRect (const cPoint& size)  {
+    left = 0;
+    top = 0;
+    right = size.x;
+    bottom = size.y;
+    }
+  //}}}
+  //{{{
+  cRect (const cPoint& topLeft, const cPoint& bottomRight)  {
+    left = topLeft.x;
+    top = topLeft.y;
+    right = bottomRight.x;
+    bottom = bottomRight.y;
+    }
+  //}}}
+
+  //{{{
+  cRect operator + (const cPoint& point) const {
+    return cRect (left + point.x, top + point.y, right + point.x, bottom + point.y);
+    }
+  //}}}
+
+  int16_t getWidth() const { return right - left; }
+  int16_t getHeight() const { return bottom - top; }
+
+  cPoint getTL() const { return cPoint(left, top); }
+  cPoint getTL (int16_t offset) const { return cPoint(left+offset, top+offset); }
+  cPoint getTR() const { return cPoint(right, top); }
+  cPoint getBL() const { return cPoint(left, bottom); }
+  cPoint getBR() const { return cPoint(right, bottom); }
+
+  cPoint getSize() const { return cPoint(right-left, bottom-top); }
+  cPoint getCentre() const { return cPoint(getCentreX(), getCentreY()); }
+  int16_t getCentreX() const { return (left + right)/2; }
+  int16_t getCentreY() const { return (top + bottom)/2; }
+  //{{{
+  bool inside (const cPoint& pos) const {
+  // return pos inside rect
+    return (pos.x >= left) && (pos.x < right) && (pos.y >= top) && (pos.y < bottom);
+    }
+  //}}}
+
+  int16_t left;
+  int16_t top;
+  int16_t right;
+  int16_t bottom;
+  };
+//}}}
 //{{{  colours - uint16 RGB565
 constexpr uint16_t kBlue        =  0x001F;  //   0,   0, 255
 constexpr uint16_t kNavy        =  0x000F;  //   0,   0, 128
@@ -36,22 +186,21 @@ public:
 
   virtual bool initialise() = 0;
 
-  constexpr uint16_t getWidth() { return mWidth; }
-  constexpr uint16_t getHeight() { return mHeight; }
+  constexpr int16_t getWidth() { return mWidth; }
+  constexpr int16_t getHeight() { return mHeight; }
   const int getUpdateUs() { return mUpdateUs; }
 
-  virtual void setRotate (int rotate) {}
+  virtual void rect (const uint16_t colour, const cRect& r);
+  virtual void pixel (const uint16_t colour, const cPoint& p);
+  virtual void blendPixel (const uint16_t colour, const uint8_t alpha, const cPoint& p);
 
-  virtual void rect (const uint16_t colour, const int xorg, const int yorg, const int xlen, const int ylen);
-  virtual void pixel (const uint16_t colour, const int x, const int y);
-  virtual void blendPixel (const uint16_t colour, const uint8_t alpha, const int x, const int y);
+  int text (const uint16_t colour, const cPoint& p, const int height, const std::string& str);
+  void rect (const uint16_t colour, const uint8_t alpha, const cRect& r);
+  void clear (const uint16_t colour) { rect (colour, cRect(0,0, getWidth(), getHeight())); }
+  void rectOutline (const uint16_t colour, const cRect& r);
 
-  int text (const uint16_t colour, const int strX, const int strY, const int height, const std::string& str);
-  void clear (const uint16_t colour) { rect (colour, 0,0, getWidth(), getHeight()); }
-  void rectOutline (const uint16_t colour, const int xorg, const int yorg, const int xlen, const int ylen);
-
-  virtual void copy (const uint16_t* fromPtr, const int xlen, const int ylen);
-  virtual void copyRotate (const uint16_t* fromPtr, const int xlen, const int ylen);
+  virtual void copy (const uint16_t* src, const cPoint& p);
+  virtual void copyRotate (const uint16_t* src, const cPoint& p);
 
   void update() { mUpdate = true; }
   void setAutoUpdate() { mAutoUpdate = true; }
@@ -79,8 +228,8 @@ protected:
 private:
   void setFont (const uint8_t* font, const int fontSize);
 
-  const uint16_t mWidth;
-  const uint16_t mHeight;
+  const int16_t mWidth;
+  const int16_t mHeight;
 
   bool mUpdate = false;
   bool mAutoUpdate = false;
@@ -98,9 +247,9 @@ public:
   virtual ~cLcd16() {}
 
 protected:
-  virtual void rect (const uint16_t colour, const int xorg, const int yorg, const int xlen, const int ylen);
-  virtual void pixel (const uint16_t colour, const int x, const int y);
-  virtual void blendPixel (const uint16_t colour, const uint8_t alpha, const int x, const int y);
+  virtual void rect (const uint16_t colour, const cRect& r);
+  virtual void pixel (const uint16_t colour, const cPoint& p);
+  virtual void blendPixel (const uint16_t colour, const uint8_t alpha, const cPoint& p);
 
   virtual void writeCommand (const uint8_t command);
   virtual void writeCommandData (const uint8_t command, const uint16_t data);
@@ -139,7 +288,6 @@ protected:
   virtual void writeCommandMultiData (const uint8_t command, const uint8_t* dataPtr, const int len);
 
   int mSpiHandle = 0;
-  uint8_t mChipEnable = 0xFF;
   };
 //}}}
 //{{{
@@ -168,7 +316,7 @@ public:
   cLcdSpiHeaderSelect (const uint16_t width, const uint16_t height, const int rotate) : cLcd (width, height, rotate) {}
   virtual ~cLcdSpiHeaderSelect();
 
-  virtual void copyRotate (const uint16_t* fromPtr, const int xlen, const int ylen);
+  virtual void copyRotate (const uint16_t* src, const cPoint& p);
 
 protected:
   virtual void writeCommand (const uint8_t command);
@@ -176,7 +324,6 @@ protected:
   virtual void writeCommandMultiData (const uint8_t command, const uint8_t* dataPtr, const int len);
 
   int mSpiHandle = 0;
-  uint8_t mChipEnable = 0xFF;
   };
 //}}}
 //{{{
