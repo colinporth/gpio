@@ -70,7 +70,7 @@ int main (int numArgs, char* args[]) {
   while (true)
     if (lcd->snap()) // log
       cLog::log (LOGINFO, "upd:" + dec(lcd->getUpdateUs()) +
-                          "us diff: " + dec(lcd->getDiffUs()) +
+                          "us diff:" + dec(lcd->getDiffUs()) +
                           "us spans:" + dec(lcd->getNumSpans()));
     else // wait if no change
       lcd->delayUs (10000);
