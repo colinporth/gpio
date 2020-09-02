@@ -200,6 +200,7 @@ protected:
   virtual void writeCommand (const uint8_t command) = 0;
   virtual void writeCommandData (const uint8_t command, const uint16_t data) = 0;
   virtual void writeCommandMultiData (const uint8_t command, const uint8_t* dataPtr, const int len) = 0;
+
   virtual void updateLcd (const uint16_t* buf, const cRect& r) = 0;
 
   void launchUpdateThread();

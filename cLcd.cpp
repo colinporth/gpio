@@ -81,8 +81,10 @@ cLcd::~cLcd() {
 
   vc_dispmanx_resource_delete (mScreenGrab);
   vc_dispmanx_display_close (mDisplay);
+
   free (mBuf);
   free (mPrevBuf);
+  free (mFrameBuf);
   }
 //}}}
 
@@ -283,7 +285,8 @@ bool cLcd::initialise() {
 
   if (gpioInitialise() >= 0) {
     setFont (getFreeSansBold(), getFreeSansBoldSize());
-    mFrameBuf = (uint16_t*)malloc (getWidth() * getHeight() * 2);
+
+    mFrameBuf = (uint16_t*)malloc (getNumPixels() * 2);
 
     // reset lcd
     gpioSetMode (kResetGpio, PI_OUTPUT);
@@ -928,6 +931,7 @@ void cLcdSpiHeaderSelect::writeCommandData (const uint8_t command, const uint16_
   spiWrite (mSpiHandle, (char*)kDataHeader, 3);
   }
 //}}}
+void cLcdSpiHeaderSelect::writeCommandMultiData (const uint8_t command, const uint8_t* dataPtr, const int len) {}
 //}}}
 //{{{  cLcdSpiRegisterSelect : cLcdSpi - gpio registerSelect, spi manages ce0
 //{{{
@@ -1201,10 +1205,7 @@ bool cLcdIli9320::initialise() {
     gpioSetMode (kBacklightGpio, PI_OUTPUT);
     gpioWrite (kBacklightGpio, 1);
 
-    // spi mode 3, we manage ce0 - active lo
-    //gpioSetMode (kSpiCe0Gpio, PI_OUTPUT);
-    //gpioWrite (kSpiCe0Gpio, 1);
-    //mSpiHandle = spiOpen (0, kSpiClock9320, 3 | 0x40);
+    // spi mode 3, spi manages ce0 active lo
     mSpiHandle = spiOpen (0, kSpiClock9320, 3);
 
     writeCommandData (0xE5, 0x8000); // Set the Vcore voltage
