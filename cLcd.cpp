@@ -28,6 +28,18 @@ static FT_Face mFace;
 constexpr uint8_t kResetGpio = 25;
 constexpr bool kCoarseDiff = true;
 
+//{{{
+struct sSpan {
+  sSpan* next;   // linked skip list in array for fast pruning
+
+  cRect r;
+
+  //  scanline endY-1 can be partial, ends in lastScanEndX.
+  uint16_t lastScanEndX;
+  uint32_t size;
+  };
+//}}}
+
 //{{{  cLcd public
 //{{{
 cLcd::cLcd (const int16_t width, const int16_t height, const int rotate)
@@ -40,7 +52,7 @@ cLcd::cLcd (const int16_t width, const int16_t height, const int rotate)
   mPrevBuf = (uint16_t*)aligned_alloc (getWidth() * getHeight() * 2, 32);
 
   // large possible max size
-  mDiffSpans = (sDiffSpan*)malloc ((getWidth() * getHeight() / 2) * sizeof(sDiffSpan));
+  mDiffSpans = (sSpan*)malloc ((getWidth() * getHeight() / 2) * sizeof(sSpan));
 
   bcm_host_init();
 
@@ -85,7 +97,7 @@ const int cLcd::getNumDiffPixels() {
 
   int numDiffPixels = 0;
 
-  sDiffSpan* diffSpan = mDiffSpans;
+  sSpan* diffSpan = mDiffSpans;
   while (diffSpan) {
     numDiffPixels += diffSpan->size;
     diffSpan = diffSpan->next;
@@ -177,7 +189,7 @@ bool cLcd::snap() {
 
   // calc diff spans list
   double startTime = time();
-  cLcd::sDiffSpan* spans = diffCoarse();
+  sSpan* spans = diffCoarse();
   if (spans) {
     mDiffUs = int((time() - startTime) * 1000000);
 
@@ -186,7 +198,7 @@ bool cLcd::snap() {
     // show pre merge in red
     // auto preMergeIt = spans;
     //while (preMergeIt) {
-      //rectOutline (kRed, cRect(preMergeIt->x, preMergeIt->y, preMergeIt->endX, preMergeIt->endY));
+      //rectOutline (kRed, preMergeIt->r);
       //preMergeIt = preMergeIt->next;
       //}
 
@@ -194,15 +206,15 @@ bool cLcd::snap() {
 
     auto copyIt = spans;
     while (copyIt) {
-      copy (getBuf(), cRect(copyIt->x, copyIt->y, copyIt->endX, copyIt->endY), cPoint (copyIt->x, copyIt->y));
-      updateLcd (mFrameBuf, cRect(copyIt->x, copyIt->y, copyIt->endX, copyIt->endY));
+      copy (getBuf(), copyIt->r, copyIt->r.getTL());
+      updateLcd (mFrameBuf, copyIt->r);
       copyIt = copyIt->next;
       }
 
     // show post merge in yellow
     //auto mergeIt = spans;
     //while (mergeIt) {
-    //  rect (kYellow, 0x60, cRect(mergeIt->x, mergeIt->y, mergeIt->endX, mergeIt->endY));
+    //  rect (kYellow, 0x60, mergeIt->r);
     //  mergeIt = mergeIt->next;
     //  }
     return true;
@@ -267,13 +279,14 @@ void cLcd::launchUpdateThread() {
 //{{{  cLcd private
 #define SPAN_MERGE_THRESHOLD 8
 #define SWAPU32(x, y) { uint32_t tmp = x; x = y; y = tmp; }
+
 //{{{
-cLcd::sDiffSpan* cLcd::diffSingle() {
+sSpan* cLcd::diffSingle() {
 
   int minY = 0;
   int minX = -1;
 
-  // Stride as uint16 elements.
+  // stride as uint16 elements.
   const int stride = getWidth();
   const int widthAligned4 = (uint32_t)getWidth() & ~3u;
 
@@ -425,22 +438,27 @@ cLcd::sDiffSpan* cLcd::diffSingle() {
   //}}}
 
   foundRight:
-  sDiffSpan* head = mDiffSpans;
+  sSpan* head = mDiffSpans;
 
-  head->x = leftX;
-  head->endX = rightX+1;
+  //head->x = leftX;
+  //head->endX = rightX+1;
+  //head->y = minY;
+  //head->endY = maxY+1;
+
+  head->r.left = leftX;
+  head->r.right = rightX+1;
+  head->r.top = minY;
+  head->r.bottom = maxY+1;
+
   head->lastScanEndX = lastScanEndX+1;
-  head->y = minY;
-  head->endY = maxY+1;
-
-  head->size = (head->endX-head->x) * (head->endY-head->y-1) + (head->lastScanEndX - head->x);
-  head->next = 0;
+  head->size = (head->r.right - head->r.left) * (head->r.bottom - head->r.top - 1) + (head->lastScanEndX - head->r.left);
+  head->next = nullptr;
 
   return mDiffSpans;
   }
 //}}}
 //{{{
-cLcd::sDiffSpan* cLcd::diffCoarse() {
+sSpan* cLcd::diffCoarse() {
 
   mNumDiffSpans = 0;
 
@@ -453,7 +471,7 @@ cLcd::sDiffSpan* cLcd::diffCoarse() {
   const int width64 = getWidth() >> 2;
   int scanlineInc = getWidth() >> 2;
 
-  sDiffSpan* span = mDiffSpans;
+  sSpan* span = mDiffSpans;
   while (y < getHeight()) {
     uint16_t* scanlineStart = (uint16_t*)scanline;
 
@@ -462,7 +480,7 @@ cLcd::sDiffSpan* cLcd::diffCoarse() {
         uint16_t* spanStart = (uint16_t*)(scanline + x) + (__builtin_ctzll (scanline[x] ^ prevFrameScanline[x]) >> 4);
         ++x;
 
-       //{{{  We've found a start of a span of different pixels on this scanline, now find where this span ends
+       //{{{  found a start of a span of different pixels on this scanline, now find where this span ends
        uint16_t* spanEnd;
        for (;;) {
          if (x < width64) {
@@ -484,12 +502,20 @@ cLcd::sDiffSpan* cLcd::diffCoarse() {
        //}}}
 
         // Submit the span update task
-        span->x = spanStart - scanlineStart;
-        span->endX = span->lastScanEndX = spanEnd - scanlineStart;
-        span->y = y;
-        span->endY = y+1;
+        //span->x = spanStart - scanlineStart;
+        //span->endX = spanEnd - scanlineStart;
+        //span->y = y;
+        //span->endY = y+1;
+
+        span->r.left = spanStart - scanlineStart;
+        span->r.right = spanEnd - scanlineStart;
+        span->r.top = y;
+        span->r.bottom = y+1;
+
+        span->lastScanEndX = span->r.right;
         span->size = spanEnd - spanStart;
         span->next = span+1;
+
         ++span;
         ++mNumDiffSpans;
         }
@@ -503,7 +529,7 @@ cLcd::sDiffSpan* cLcd::diffCoarse() {
     }
 
   if (mNumDiffSpans > 0) {
-    mDiffSpans[mNumDiffSpans-1].next = 0;
+    mDiffSpans[mNumDiffSpans-1].next = nullptr;
     return mDiffSpans;
     }
   else
@@ -511,7 +537,7 @@ cLcd::sDiffSpan* cLcd::diffCoarse() {
   }
 //}}}
 //{{{
-cLcd::sDiffSpan* cLcd::diffExact() {
+sSpan* cLcd::diffExact() {
 
   mNumDiffSpans = 0;
 
@@ -581,15 +607,25 @@ cLcd::sDiffSpan* cLcd::diffExact() {
        //}}}
 
       // Submit the span update task
-      sDiffSpan* span = mDiffSpans + mNumDiffSpans;
-      span->x = spanStart - scanlineStart;
-      span->endX = span->lastScanEndX = spanEnd - scanlineStart;
-      span->y = y;
-      span->endY = y+1;
+      sSpan* span = mDiffSpans + mNumDiffSpans;
+
+      //span->x = spanStart - scanlineStart;
+      //span->endX = span->lastScanEndX = spanEnd - scanlineStart;
+      //span->y = y;
+      //span->endY = y+1;
+
+      span->r.left = spanStart - scanlineStart;
+      span->r.right = span->lastScanEndX = spanEnd - scanlineStart;
+      span->r.top = y;
+      span->r.bottom = y+1;
+
+      span->lastScanEndX = span->r.right;
       span->size = spanEnd - spanStart;
+
       if (mNumDiffSpans > 0)
         span[-1].next = span;
-      span->next = 0;
+      span->next = nullptr;
+
       ++mNumDiffSpans;
       }
 
@@ -602,37 +638,44 @@ cLcd::sDiffSpan* cLcd::diffExact() {
   }
 //}}}
 //{{{
-cLcd::sDiffSpan* cLcd::merge (int pixelThreshold) {
+sSpan* cLcd::merge (int pixelThreshold) {
 
-  for (sDiffSpan* i = mDiffSpans; i; i = i->next) {
-    sDiffSpan* prev = i;
-    for (sDiffSpan* j = i->next; j; j = j->next) {
+  for (sSpan* i = mDiffSpans; i; i = i->next) {
+    sSpan* prev = i;
+    for (sSpan* j = i->next; j; j = j->next) {
       // If the spans i and j are vertically apart, don't attempt to merge span i any further
       // since all spans >= j will also be farther vertically apart.
       // (the list is nondecreasing with respect to Span::y)
-      if (j->y > i->endY)
+      if (j->r.top > i->r.bottom)
         break;
 
       // Merge the spans i and j, and figure out the wastage of doing so
-      int x = std::min (i->x, j->x);
-      int y = std::min (i->y, j->y);
-      int endX = std::max (i->endX, j->endX);
-      int endY = std::max (i->endY, j->endY);
+      int x = std::min (i->r.left, j->r.left);
+      int y = std::min (i->r.top, j->r.top);
+      int endX = std::max (i->r.right, j->r.right);
+      int endY = std::max (i->r.bottom, j->r.bottom);
 
-      int lastScanEndX = (endY > i->endY) ?
-                           j->lastScanEndX : ((endY > j->endY) ?
+      int lastScanEndX = (endY > i->r.bottom) ?
+                           j->lastScanEndX : ((endY > j->r.bottom) ?
                              i->lastScanEndX : std::max (i->lastScanEndX, j->lastScanEndX));
 
       int newSize = (endX - x) * (endY - y - 1) + (lastScanEndX - x);
 
       int wastedPixels = newSize - i->size - j->size;
       if (wastedPixels <= pixelThreshold) {
-        i->x = x;
-        i->y = y;
-        i->endX = endX;
-        i->endY = endY;
+        //i->x = x;
+        //i->y = y;
+        //i->endX = endX;
+        //i->endY = endY;
+
+        i->r.left = x;
+        i->r.top = y;
+        i->r.right = endX;
+        i->r.bottom = endY;
+
         i->lastScanEndX = lastScanEndX;
         i->size = newSize;
+
         prev->next = j->next;
         j = prev;
         }

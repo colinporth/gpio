@@ -158,23 +158,9 @@ constexpr uint16_t kDarkGrey    =  0x7BEF;  // 128, 128, 128
 constexpr uint16_t kWhite       =  0xFFFF;  // 255, 255, 255
 //}}}
 
+struct sSpan;
 class cLcd {
 public:
-  //{{{
-  struct sDiffSpan {
-    sDiffSpan* next;   // linked skip list in array for fast pruning
-
-    uint16_t x;
-    uint16_t endX;
-    uint16_t y;
-    uint16_t endY;
-
-    // box of width [x, endX[ * [y, endY[, scanline endY-1 can be partial, ends in lastScanEndX.
-    uint32_t size;
-    uint16_t lastScanEndX;
-    };
-  //}}}
-
   cLcd (const int16_t width, const int16_t height, const int rotate);
   virtual ~cLcd();
 
@@ -232,10 +218,10 @@ protected:
 private:
   void setFont (const uint8_t* font, const int fontSize);
 
-  sDiffSpan* diffSingle();
-  sDiffSpan* diffCoarse();
-  sDiffSpan* diffExact();
-  sDiffSpan* merge (int pixelThreshold);
+  sSpan* diffSingle();
+  sSpan* diffCoarse();
+  sSpan* diffExact();
+  sSpan* merge (int pixelThreshold);
 
   static int coarseLinearDiff (uint16_t* frameBuf, uint16_t* prevFrameBuf, uint16_t* frameBufEnd);
   static int coarseLinearDiffBack (uint16_t* frameBuf, uint16_t* prevFrameBuf, uint16_t* frameBufEnd);
@@ -262,7 +248,7 @@ private:
   VC_RECT_T mVcRect;
 
   // diff spans
-  sDiffSpan* mDiffSpans;
+  sSpan* mDiffSpans;
   int mNumDiffSpans;
 //}}}
   };
