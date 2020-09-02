@@ -99,7 +99,7 @@ int main (int numArgs, char* args[]) {
     if (lcd->snap()) {
       lcd->text (kWhite, cPoint(0,0), 20, dec(i++) +
                                   " " + dec(lcd->getUpdateUs()) +
-                                  " " + dec(lcd->getDiffUs()) +;
+                                  " " + dec(lcd->getDiffUs()) +
                                   " " + dec(lcd->getNumSpans()));
       lcd->update();
       }
