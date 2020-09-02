@@ -46,12 +46,8 @@ cLcd::cLcd (const int16_t width, const int16_t height, const int rotate)
       mWidth(((rotate == 90) || (rotate == 270)) ? height : width),
       mHeight(((rotate == 90) || (rotate == 270)) ? width : height) {
 
-  // main display copy init
-  mBuf = (uint16_t*)aligned_alloc (getWidth() * getHeight() * 2, 32);
-  mPrevBuf = (uint16_t*)aligned_alloc (getWidth() * getHeight() * 2, 32);
-
   // large possible max size
-  mDiffSpans = (sSpan*)malloc ((getWidth() * getHeight() / 2) * sizeof(sSpan));
+  mDiffSpans = (sSpan*)malloc ((getNumPixels() / 2) * sizeof(sSpan));
 
   bcm_host_init();
 
@@ -164,7 +160,7 @@ void cLcd::copy (const uint16_t* src, const cRect& srcRect, const cPoint& dstPoi
 
   for (int y = 0; y < srcRect.getHeight(); y++)
     memcpy (mFrameBuf + ((dstPoint.y + y) * getWidth()) + dstPoint.x,
-            src + ((srcRect.top + y) * srcRect.getWidth()) + srcRect.left,
+            src + ((srcRect.top + y) * getWidth()) + srcRect.left,
             srcRect.getWidth() * 2);
   }
 //}}}
@@ -233,9 +229,17 @@ double cLcd::time() {
 bool cLcd::snap() {
 
   // swap main display buffers
-  auto temp = mPrevBuf;
-  mPrevBuf = mBuf;
-  mBuf = temp;
+  if (mPrevBuf) {
+    auto temp = mPrevBuf;
+    mPrevBuf = mBuf;
+    mBuf = temp;
+    }
+  else {
+    mBuf = (uint16_t*)malloc (getNumPixels() * 2);
+    for (int i = 0; i < getNumPixels(); i++)
+      mBuf[i] = 0;
+    mPrevBuf = (uint16_t*)malloc (getNumPixels() * 2);
+    }
 
   // snapshot and read to main display buffer
   vc_dispmanx_snapshot (mDisplay, mScreenGrab, DISPMANX_TRANSFORM_T(0));
@@ -248,11 +252,11 @@ bool cLcd::snap() {
     spans = merge (16);
     mDiffUs = int((time() - startTime) * 1000000);
 
-    //copy (getBuf());
+    //copy (mBuf);
 
     auto it = spans;
     while (it) {
-      copy (getBuf(), it->r, it->r.getTL());
+      copy (mBuf, it->r, it->r.getTL());
       //rect (kYellow, 0x60, it->r);
       updateLcd (mFrameBuf, it->r);
       it = it->next;
@@ -1222,9 +1226,10 @@ bool cLcdIli9320::initialise() {
     gpioWrite (kBacklightGpio, 1);
 
     // spi mode 3, we manage ce0 - active lo
-    gpioSetMode (kSpiCe0Gpio, PI_OUTPUT);
-    gpioWrite (kSpiCe0Gpio, 1);
-    mSpiHandle = spiOpen (0, kSpiClock9320, 3 | 0x40);
+    //gpioSetMode (kSpiCe0Gpio, PI_OUTPUT);
+    //gpioWrite (kSpiCe0Gpio, 1);
+    //mSpiHandle = spiOpen (0, kSpiClock9320, 3 | 0x40);
+    mSpiHandle = spiOpen (0, kSpiClock9320, 3);
 
     writeCommandData (0xE5, 0x8000); // Set the Vcore voltage
     writeCommandData (0x00, 0x0000); // start oscillation - stopped?
@@ -1311,13 +1316,13 @@ void cLcdIli9320::updateLcd (const uint16_t* buf, const cRect& r) {
   constexpr uint8_t kCommand20[3] = { 0x70, 0, 0x20 };  // GDRAM vert addr command
   constexpr uint8_t kCommand21[3] = { 0x70, 0, 0x21 };  // GDRAMWR horiz addr command
   constexpr uint8_t kCommand22[3] = { 0x70, 0, 0x22 };  // GDRAMWR command
-  uint8_t dataHeader[(480*2) + 1];
+  uint8_t dataHeader[3] = { 0x72, 0,0 };
+  uint16_t dataHeader1 [481];
 
   double startTime = time();
 
   uint16_t xstart = 0;
   uint16_t ystart = 0;
-  dataHeader[0] = 0x72;
   for (int y = r.top; y < r.bottom; y++) {
     //{{{  set xstart, ystart
     switch (mRotate) {
@@ -1374,16 +1379,14 @@ void cLcdIli9320::updateLcd (const uint16_t* buf, const cRect& r) {
     gpioWrite (kSpiCe0Gpio, 1);
 
     // - data
-    uint16_t* src = buf + (y * getWidth()) + r.left;
-    uint8_t* dst = dataHeader + 1;
-    for (int i = 0; i < r.getWidth(); i++) {
-      *dst++ = src >> 8;
-      *dst++ = src & 0xFF;
-      src++;
-      }
+    const uint16_t* src = buf + (y * getWidth()) + r.left;
+    uint16_t* dst = dataHeader1;
+    *dst++ = 0x7272;
+    for (int i = 0; i < r.getWidth(); i++)
+      *dst++ = bswap_16 (*src++);
 
     gpioWrite (kSpiCe0Gpio, 0);
-    spiWrite (mSpiHandle, (char*)datheader, (r.getWidth() * 2) + 1);
+    spiWrite (mSpiHandle, ((char*)(dataHeader1))+1, (r.getWidth() * 2) + 1);
     gpioWrite (kSpiCe0Gpio, 1);
     }
 

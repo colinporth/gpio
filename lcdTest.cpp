@@ -97,7 +97,6 @@ int main (int numArgs, char* args[]) {
   //}}}
 
   lcd->clear (kOrange);
-
   int i = 0;
   while (true) {
     if (lcd->snap()) {

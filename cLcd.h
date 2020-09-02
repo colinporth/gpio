@@ -190,7 +190,6 @@ public:
   double time();
 
   // main display screen copy
-  const uint16_t* getBuf() { return mBuf; }
   const int getDiffUs() { return mDiffUs; }
   const int getNumSpans() { return mNumDiffSpans; }
   bool snap();
@@ -233,8 +232,8 @@ private:
   bool mExited = false;
 
   // main display screen buffers
-  uint16_t* mBuf;
-  uint16_t* mPrevBuf;
+  uint16_t* mBuf = nullptr;
+  uint16_t* mPrevBuf = nullptr;
 
   // dispmanx
   DISPMANX_DISPLAY_HANDLE_T mDisplay;
