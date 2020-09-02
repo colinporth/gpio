@@ -817,7 +817,7 @@ int cLcd::coarseLinearDiffBack (uint16_t* frameBuf, uint16_t* prevFrameBuf, uint
 //}}}
 
 //{{{  cLcd16 : cLcd - parallel 16bit
-//{{{  16bit J8 header pins, gpio, constexpr
+// 16bit J8 header pins, gpio, constexpr
 //      3.3v led -  1  2  - 5v
 //     d2  gpio2 -  3  4  - 5v
 //     d3  gpio3 -  5  6  - 0v
@@ -848,7 +848,6 @@ constexpr uint8_t k16BacklightGpio = 27;
 constexpr uint32_t k16DataMask =  0xFFFF;
 constexpr uint32_t k16WriteMask = 1 << k16WriteGpio;
 constexpr uint32_t k16WriteClrMask = k16WriteMask | k16DataMask;
-//}}}
 
 //{{{
 void cLcd16::writeCommand (const uint8_t command) {
@@ -894,9 +893,8 @@ void cLcd16::writeCommandMultiData (const uint8_t command, const uint8_t* dataPt
   }
 //}}}
 //}}}
-
 //{{{  cLcdSpi : cLcd - spi
-//{{{  spi J8 header pins, gpio, constexpr
+// spi J8 header pins, gpio, constexpr
 //      3.3v 17  18 gpio24   - registerSelect/backlight
 // spi0 mosi 19  20 0v
 // spi0 miso 20  22 gpio25   - reset
@@ -904,7 +902,6 @@ void cLcd16::writeCommandMultiData (const uint8_t command, const uint8_t* dataPt
 constexpr uint8_t kSpiCe0Gpio = 8;
 constexpr uint8_t kSpiRegisterSelectGpio  = 24;
 constexpr uint8_t kBacklightGpio = 24;
-//}}}
 
 //{{{
 cLcdSpi::~cLcdSpi() {
@@ -1203,7 +1200,7 @@ bool cLcdIli9320::initialise() {
   if (cLcd::initialise()) {
     // backlight on - active hi
     gpioSetMode (kBacklightGpio, PI_OUTPUT);
-    gpioWrite (kBacklightGpio, 1);
+    gpioWrite (kBacklightGpio, 0);
 
     // spi mode 3, spi manages ce0 active lo
     mSpiHandle = spiOpen (0, kSpiClock9320, 3);
@@ -1255,10 +1252,10 @@ bool cLcdIli9320::initialise() {
     writeCommandData (0x07, 0x0133); // Display Control 1
     delayUs (40000);
 
-    writeCommandData (0x0050, 0x0000); // Horizontal GRAM Start Address
-    writeCommandData (0x0051, kWidth9320-1); // Horizontal GRAM End Address
-    writeCommandData (0x0052, 0x0000); // Vertical GRAM Start Address
-    writeCommandData (0x0053, kHeight9320-1); // Vertical GRAM Start Address
+    writeCommandData (0x0050, 0x0000);        // H GRAM start address
+    writeCommandData (0x0051, kWidth9320-1);  // H GRAM end address
+    writeCommandData (0x0052, 0x0000);        // V GRAM start address
+    writeCommandData (0x0053, kHeight9320-1); // V GRAM end address
 
     switch (mRotate) {
       case 0:
@@ -1277,6 +1274,7 @@ bool cLcdIli9320::initialise() {
         cLog::log (LOGERROR, "unkown rotate " + dec (mRotate));
         break;
       }
+    gpioWrite (kBacklightGpio, 1);
 
     launchUpdateThread();
     return true;
@@ -1302,10 +1300,11 @@ void cLcdIli9320::updateLcd (const uint16_t* buf, const cRect& r) {
   int pixels = 0;
   double startTime = time();
 
+  //{{{  set xstart, ystart, yinc
   uint16_t xstart = r.left;
   uint16_t ystart = r.top;
   uint16_t yinc = 1;
-  //{{{  set xstart, ystart, yinc
+
   switch (mRotate) {
     case 90:
       xstart = kHeight9320-1 - r.left;
