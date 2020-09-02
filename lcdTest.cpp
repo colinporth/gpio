@@ -62,6 +62,13 @@ int main (int numArgs, char* args[]) {
   //munmap (fbp, finfo.smem_len);
   //close (fbfd);
   //}}}
+
+  while (true)
+    if (lcd->snap())
+      cLog::log (LOGINFO, "upd:" + dec(lcd->getUpdateUs()) +
+                          " spans:" + dec(lcd->getNumDiffSpans()) +
+                          " " + dec((lcd->getNumDiffPixels() * 100) / lcd->getNumPixels(),3) +
+                          "% diffTook: " + dec(lcd->getDiffUs(),5));
   //{{{  display font
   int height = 8;
   while (height++ < 100) {

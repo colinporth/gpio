@@ -195,7 +195,7 @@ public:
   virtual void pixel (const uint16_t colour, const cPoint& p) = 0;
   virtual void blendPixel (const uint16_t colour, const uint8_t alpha, const cPoint& p) = 0;
   virtual void copy (const uint16_t* src, const cRect& srcRect, const cPoint& dstPoint) = 0;
-  virtual void copy (const uint16_t* src, const cPoint& p) = 0;
+  virtual void copy (const uint16_t* src) = 0;
 
   int text (const uint16_t colour, const cPoint& p, const int height, const std::string& str);
   void rect (const uint16_t colour, const uint8_t alpha, const cRect& r);
@@ -223,7 +223,7 @@ protected:
   virtual void writeCommand (const uint8_t command) = 0;
   virtual void writeCommandData (const uint8_t command, const uint16_t data) = 0;
   virtual void writeCommandMultiData (const uint8_t command, const uint8_t* dataPtr, const int len) = 0;
-  virtual void updateLcd (const cRect& r) = 0;
+  virtual void updateLcd (const uint16_t* buf, const cRect& r) = 0;
 
   void launchUpdateThread();
 
@@ -282,34 +282,15 @@ protected:
   virtual void rect (const uint16_t colour, const cRect& r);
   virtual void pixel (const uint16_t colour, const cPoint& p);
   virtual void blendPixel (const uint16_t colour, const uint8_t alpha, const cPoint& p);
-  virtual void copy (const uint16_t* src, const cPoint& p);
+
+  virtual void copy (const uint16_t* src);
+  virtual void copy (const uint16_t* src, const cRect& srcRect, const cPoint& dstPoint);
 
   virtual void writeCommand (const uint8_t command);
   virtual void writeCommandData (const uint8_t command, const uint16_t data);
   virtual void writeCommandMultiData (const uint8_t command, const uint8_t* data, const int len);
   };
 //}}}
-//{{{
-class cLcdTa7601 : public cLcd16 {
-public:
-  cLcdTa7601 (const int rotate = 0);
-  virtual ~cLcdTa7601() {}
-
-  virtual bool initialise();
-  virtual void updateLcd (const cRect& r);
-  };
-//}}}
-//{{{
-class cLcdSsd1289 : public cLcd16 {
-public:
-  cLcdSsd1289 (const int rotate = 0);
-  virtual ~cLcdSsd1289() {}
-
-  virtual bool initialise();
-  virtual void updateLcd (const cRect& r);
-  };
-//}}}
-
 //{{{
 class cLcdSpi : public cLcd {
 public:
@@ -320,10 +301,23 @@ protected:
   virtual void rect (const uint16_t colour, const cRect& r);
   virtual void pixel (const uint16_t colour, const cPoint& p);
   virtual void blendPixel (const uint16_t colour, const uint8_t alpha, const cPoint& p);
-  virtual void copy (const uint16_t* src, const cPoint& p);
+  virtual void copy (const uint16_t* src);
   virtual void copy (const uint16_t* src, const cRect& srcRect, const cPoint& dstPoint);
 
   int mSpiHandle = 0;
+  };
+//}}}
+//{{{
+class cLcdSpiHeaderSelect : public cLcdSpi {
+public:
+  cLcdSpiHeaderSelect (const int16_t width, const int16_t height, const int rotate)
+    : cLcdSpi (width, height, rotate) {}
+  virtual ~cLcdSpiHeaderSelect() {}
+
+protected:
+  virtual void writeCommand (const uint8_t command);
+  virtual void writeCommandData (const uint8_t command, const uint16_t data);
+  virtual void writeCommandMultiData (const uint8_t command, const uint8_t* dataPtr, const int len);
   };
 //}}}
 //{{{
@@ -340,40 +334,26 @@ protected:
   virtual void writeCommandMultiData (const uint8_t command, const uint8_t* dataPtr, const int len);
   };
 //}}}
+
+// screens
 //{{{
-class cLcdSt7735r : public cLcdSpiRegisterSelect {
-// 1.8 inch 128x160
+class cLcdTa7601 : public cLcd16 {
 public:
-  cLcdSt7735r (const int rotate = 0);
-  virtual ~cLcdSt7735r() {}
+  cLcdTa7601 (const int rotate = 0);
+  virtual ~cLcdTa7601() {}
 
   virtual bool initialise();
-  virtual void updateLcd (const cRect& r);
+  virtual void updateLcd (const uint16_t* buf, const cRect& r);
   };
 //}}}
 //{{{
-class cLcdIli9225b : public cLcdSpiRegisterSelect {
-// 2.2 inch 186x220
+class cLcdSsd1289 : public cLcd16 {
 public:
-  cLcdIli9225b (const int rotate = 0);
-  virtual ~cLcdIli9225b() {}
+  cLcdSsd1289 (const int rotate = 0);
+  virtual ~cLcdSsd1289() {}
 
   virtual bool initialise();
-  virtual void updateLcd (const cRect& r);
-  };
-//}}}
-
-//{{{
-class cLcdSpiHeaderSelect : public cLcdSpi {
-public:
-  cLcdSpiHeaderSelect (const int16_t width, const int16_t height, const int rotate)
-    : cLcdSpi (width, height, rotate) {}
-  virtual ~cLcdSpiHeaderSelect() {}
-
-protected:
-  virtual void writeCommand (const uint8_t command);
-  virtual void writeCommandData (const uint8_t command, const uint16_t data);
-  virtual void writeCommandMultiData (const uint8_t command, const uint8_t* dataPtr, const int len);
+  virtual void updateLcd (const uint16_t* buf, const cRect& r);
   };
 //}}}
 //{{{
@@ -384,6 +364,28 @@ public:
   virtual ~cLcdIli9320() {}
 
   virtual bool initialise();
-  virtual void updateLcd (const cRect& r);
+  virtual void updateLcd (const uint16_t* buf, const cRect& r);
+  };
+//}}}
+//{{{
+class cLcdSt7735r : public cLcdSpiRegisterSelect {
+// 1.8 inch 128x160
+public:
+  cLcdSt7735r (const int rotate = 0);
+  virtual ~cLcdSt7735r() {}
+
+  virtual bool initialise();
+  virtual void updateLcd (const uint16_t* buf, const cRect& r);
+  };
+//}}}
+//{{{
+class cLcdIli9225b : public cLcdSpiRegisterSelect {
+// 2.2 inch 186x220
+public:
+  cLcdIli9225b (const int rotate = 0);
+  virtual ~cLcdIli9225b() {}
+
+  virtual bool initialise();
+  virtual void updateLcd (const uint16_t* buf, const cRect& r);
   };
 //}}}
