@@ -166,21 +166,26 @@ public:
 
   virtual bool initialise();
 
+  // dimensions
   constexpr int16_t getWidth() { return mWidth; }
   constexpr int16_t getHeight() { return mHeight; }
   const cPoint getSize() { return cPoint(mWidth, mHeight); }
   const int getNumPixels() { return mWidth * mHeight; }
+
+  // info
   const int getUpdateUs() { return mUpdateUs; }
   const int getUpdatePixels() { return mUpdatePixels; }
+  const int getDiffUs() { return mDiffUs; }
+  const int getNumSpans() { return mNumDiffSpans; }
+
+  virtual void setBacklightOn() {}
+  virtual void setBacklightOff() {}
 
   virtual void rect (const uint16_t colour, const cRect& r);
   virtual void pixel (const uint16_t colour, const cPoint& p);
   virtual void blendPixel (const uint16_t colour, const uint8_t alpha, const cPoint& p);
   virtual void copy (const uint16_t* src, const cRect& srcRect, const cPoint& dstPoint);
   virtual void copy (const uint16_t* src);
-
-  virtual void setBacklightOn() {}
-  virtual void setBacklightOff() {}
 
   void rectOutline (const uint16_t colour, const cRect& r);
   void rect (const uint16_t colour, const uint8_t alpha, const cRect& r);
@@ -194,9 +199,6 @@ public:
   void delayUs (const int us);
   double time();
 
-  // main display screen copy
-  const int getDiffUs() { return mDiffUs; }
-  const int getNumSpans() { return mNumDiffSpans; }
   bool snap();
 
 //{{{
