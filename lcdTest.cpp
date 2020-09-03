@@ -58,7 +58,7 @@ int main (int numArgs, char* args[]) {
   //}}}
 
   // font test
-  if (false) {
+  if (true) {
     lcd->setBacklightOn();
     //{{{  display font
     int height = 8;
