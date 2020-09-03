@@ -12,16 +12,16 @@ using namespace std;
 
 int main (int numArgs, char* args[]) {
 
+  cLog::init (LOGINFO, false, "", "gpio");
+
   vector <string> argStrings;
   for (int i = 1; i < numArgs; i++)
     argStrings.push_back (args[i]);
 
-  cLog::init (LOGINFO, false, "", "gpio");
-
-  int rotate = argStrings.empty() ? 270 : stoi (argStrings[0]);
-  //cLcd* lcd = new cLcdIli9320 (rotate);
-  cLcd* lcd = new cLcdTa7601 (rotate);
-  lcd->initialise();
+  //cLcd* lcd = new cLcdIli9320 (argStrings.empty() ? 270 : stoi (argStrings[0]));
+  cLcd* lcd = new cLcdTa7601 (argStrings.empty() ? 270 : stoi (argStrings[0]));
+  if (!lcd->initialise())
+    return 0;
 
   //{{{  fb0
   //int fbfd = open ("/dev/fb0", O_RDWR);
@@ -59,7 +59,6 @@ int main (int numArgs, char* args[]) {
 
   // font test
   if (true) {
-    lcd->setBacklightOn();
     //{{{  display font
     int height = 8;
 
@@ -78,8 +77,10 @@ int main (int numArgs, char* args[]) {
 
       lcd->text (kYellow, cPoint(), 20, "Hello Colin");
       lcd->present();
+      lcd->setBacklightOn();
+
       lcd->delayUs (16000);
-      height += 8;
+      height += 4;
       }
     //}}}
     lcd->setBacklightOff();

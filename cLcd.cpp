@@ -23,11 +23,8 @@ static FT_Library mLibrary;
 static FT_Face mFace;
 //}}}
 
-// gpio/pin common to spi/16bit
-constexpr uint8_t kResetGpio = 25;
-
 constexpr int kSpanMergeThreshold8 = 8;
-constexpr int kSpanMergeThreshold16 = 8;
+constexpr int kSpanMergeThreshold16 = 16;
 //{{{
 struct sSpan {
   cRect r;
@@ -39,7 +36,10 @@ struct sSpan {
   };
 //}}}
 
-// cLcd public
+// gpio/pin common to spi/16bit
+constexpr uint8_t kResetGpio = 25;
+
+// public
 //{{{
 cLcd::~cLcd() {
 
@@ -255,13 +255,12 @@ double cLcd::time() {
   }
 //}}}
 
-// cLcd protected
+// protected
 //{{{
 bool cLcd::initialise() {
 
   unsigned version = gpioVersion();
   unsigned hardwareRevision = gpioHardwareRevision();
-
   cLog::log (LOGINFO, "pigpio hwRev:%x version:%d", hardwareRevision, version);
 
   if (gpioInitialise() >= 0) {
@@ -333,7 +332,7 @@ bool cLcd::initialise() {
   }
 //}}}
 
-//{{{  cLcd private
+//{{{  private
 // faster asm coarse diff test
 constexpr bool kCoarseDiff = true;
 
