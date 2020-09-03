@@ -254,6 +254,7 @@ private:
 //}}}
   };
 
+// parallel 16bit screens
 //{{{
 class cLcd16 : public cLcd {
 public:
@@ -263,10 +264,39 @@ public:
 
 protected:
   virtual void writeCommand (const uint8_t command);
+  virtual void writeDataWord (const uint16_t data);
   virtual void writeCommandData (const uint8_t command, const uint16_t data);
   virtual void writeCommandMultiData (const uint8_t command, const uint8_t* data, const int len);
   };
 //}}}
+//{{{
+class cLcdTa7601 : public cLcd16 {
+public:
+  cLcdTa7601 (const int rotate = 0, const int info = 0);
+  virtual ~cLcdTa7601() {}
+
+  virtual bool initialise();
+  virtual int updateLcd();
+  virtual int updateLcd (sSpan* spans);
+
+protected:
+  virtual void writeCommand (const uint8_t command);
+  virtual void writeDataWord (const uint16_t data);
+  };
+//}}}
+//{{{
+class cLcdSsd1289 : public cLcd16 {
+public:
+  cLcdSsd1289 (const int rotate = 0, const int info = 0);
+  virtual ~cLcdSsd1289() {}
+
+  virtual bool initialise();
+  virtual int updateLcd();
+  virtual int updateLcd (sSpan* spans) { return 0; }
+  };
+//}}}
+
+// spi screens
 //{{{
 class cLcdSpi : public cLcd {
 public:
@@ -305,32 +335,6 @@ protected:
   virtual void writeCommandMultiData (const uint8_t command, const uint8_t* dataPtr, const int len);
   };
 //}}}
-
-// parallel 16bit screens
-//{{{
-class cLcdTa7601 : public cLcd16 {
-public:
-  cLcdTa7601 (const int rotate = 0, const int info = 0);
-  virtual ~cLcdTa7601() {}
-
-  virtual bool initialise();
-  virtual int updateLcd();
-  virtual int updateLcd (sSpan* spans) { return 0; }
-  };
-//}}}
-//{{{
-class cLcdSsd1289 : public cLcd16 {
-public:
-  cLcdSsd1289 (const int rotate = 0, const int info = 0);
-  virtual ~cLcdSsd1289() {}
-
-  virtual bool initialise();
-  virtual int updateLcd();
-  virtual int updateLcd (sSpan* spans) { return 0; }
-  };
-//}}}
-
-// spi screens
 //{{{
 class cLcdIli9320 : public cLcdSpiHeaderSelect {
 // 2.8 inch 1240x320 - HY28A

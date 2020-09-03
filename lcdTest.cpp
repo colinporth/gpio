@@ -26,7 +26,8 @@ int main (int numArgs, char* args[]) {
   cLog::init (LOGINFO, false, "", "gpio");
 
   int rotate = argStrings.empty() ? 270 : stoi (argStrings[0]);
-  cLcd* lcd = new cLcdIli9320 (rotate);
+  //cLcd* lcd = new cLcdIli9320 (rotate);
+  cLcd* lcd = new cLcdTa7601 (rotate);
   lcd->initialise();
 
   //{{{  fb0

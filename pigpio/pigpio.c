@@ -2976,6 +2976,7 @@ rawCbs_t * rawWaveCBAdr (int cbNum)
    return &dmaOVirt[page]->cb[slot];
 }
 //}}}
+
 //{{{
 static uint32_t waveCbPOadr (int pos)
 {
@@ -3362,6 +3363,7 @@ static void waveRxBit (int gpio, int level, uint32_t tick)
 }
 
 //}}}
+
 //{{{
 int rawWaveAddGeneric (unsigned numIn1, rawWave_t *in1)
 {
@@ -3504,889 +3506,139 @@ int rawWaveAddGeneric (unsigned numIn1, rawWave_t *in1)
 }
 //}}}
 //}}}
-//{{{  i2c
+//{{{  bit bang i2c
 //{{{
-int i2cWriteQuick(unsigned handle, unsigned bit)
+static int read_SDA (wfRx_t* w)
 {
-   int status;
-
-   DBG(DBG_USER, "handle=%d bit=%d", handle, bit);
-
-   CHECK_INITED;
-
-   if (handle >= PI_I2C_SLOTS)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if (i2cInfo[handle].state != PI_I2C_OPENED)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if ((i2cInfo[handle].funcs & PI_I2C_FUNC_SMBUS_QUICK) == 0)
-      SOFT_ERROR(PI_BAD_SMBUS_CMD, "SMBUS command not supported by driver");
-
-   if (bit > 1)
-      SOFT_ERROR(PI_BAD_PARAM, "bad bit (%d)", bit);
-
-   status = my_smbus_access (i2cInfo[handle].fd, bit, 0, PI_I2C_SMBUS_QUICK, NULL);
-
-   if (status < 0)
-   {
-      DBG(DBG_USER, "error=%d (%m)", status);
-      return PI_I2C_WRITE_FAILED;
-   }
-
-   return status;
+   myGpioSetMode(w->I.SDA, PI_INPUT);
+   return myGpioRead(w->I.SDA);
+}
+//}}}
+//{{{
+static void set_SDA (wfRx_t* w)
+{
+   myGpioSetMode(w->I.SDA, PI_INPUT);
+}
+//}}}
+//{{{
+static void clear_SDA (wfRx_t* w)
+{
+   myGpioSetMode(w->I.SDA, PI_OUTPUT);
+   myGpioWrite(w->I.SDA, 0);
+}
+//}}}
+//{{{
+static void clear_SCL (wfRx_t* w)
+{
+   myGpioSetMode(w->I.SCL, PI_OUTPUT);
+   myGpioWrite(w->I.SCL, 0);
 }
 //}}}
 
 //{{{
-int i2cReadByte(unsigned handle)
+static void I2C_delay (wfRx_t* w)
 {
-   union my_smbus_data data;
-   int status;
-
-   DBG(DBG_USER, "handle=%d", handle);
-
-   CHECK_INITED;
-
-   if (handle >= PI_I2C_SLOTS)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if (i2cInfo[handle].state != PI_I2C_OPENED)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if ((i2cInfo[handle].funcs & PI_I2C_FUNC_SMBUS_READ_BYTE) == 0)
-      SOFT_ERROR(PI_BAD_SMBUS_CMD, "SMBUS command not supported by driver");
-
-   status = my_smbus_access (i2cInfo[handle].fd, PI_I2C_SMBUS_READ, 0, PI_I2C_SMBUS_BYTE, &data);
-
-   if (status < 0)
-   {
-      DBG(DBG_USER, "error=%d (%m)", status);
-      return PI_I2C_READ_FAILED;
-   }
-
-   return 0xFF & data.byte;
+   myGpioDelay(w->I.delay);
 }
 //}}}
 //{{{
-int i2cWriteByte(unsigned handle, unsigned bVal)
+static void I2C_clock_stretch (wfRx_t* w)
 {
-   int status;
+   uint32_t now, max_stretch=100000;
 
-   DBG(DBG_USER, "handle=%d bVal=%d", handle, bVal);
-
-   CHECK_INITED;
-
-   if (handle >= PI_I2C_SLOTS)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if (i2cInfo[handle].state != PI_I2C_OPENED)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if ((i2cInfo[handle].funcs & PI_I2C_FUNC_SMBUS_WRITE_BYTE) == 0)
-      SOFT_ERROR(PI_BAD_SMBUS_CMD, "SMBUS command not supported by driver");
-
-   if (bVal > 0xFF)
-      SOFT_ERROR(PI_BAD_PARAM, "bad bVal (%d)", bVal);
-
-   status = my_smbus_access (i2cInfo[handle].fd, PI_I2C_SMBUS_WRITE, bVal, PI_I2C_SMBUS_BYTE, NULL);
-
-   if (status < 0)
-   {
-      DBG(DBG_USER, "error=%d (%m)", status);
-      return PI_I2C_WRITE_FAILED;
-   }
-
-   return status;
-}
-//}}}
-
-//{{{
-int i2cReadByteData(unsigned handle, unsigned reg)
-{
-   union my_smbus_data data;
-   int status;
-
-   DBG(DBG_USER, "handle=%d reg=%d", handle, reg);
-
-   CHECK_INITED;
-
-   if (handle >= PI_I2C_SLOTS)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if (i2cInfo[handle].state != PI_I2C_OPENED)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if ((i2cInfo[handle].funcs & PI_I2C_FUNC_SMBUS_READ_BYTE_DATA) == 0)
-      SOFT_ERROR(PI_BAD_SMBUS_CMD, "SMBUS command not supported by driver");
-
-   if (reg > 0xFF)
-      SOFT_ERROR(PI_BAD_PARAM, "bad reg (%d)", reg);
-
-   status = my_smbus_access(i2cInfo[handle].fd, PI_I2C_SMBUS_READ, reg, PI_I2C_SMBUS_BYTE_DATA, &data);
-
-   if (status < 0)
-   {
-      DBG(DBG_USER, "error=%d (%m)", status);
-      return PI_I2C_READ_FAILED;
-   }
-
-   return 0xFF & data.byte;
+   myGpioSetMode(w->I.SCL, PI_INPUT);
+   now = gpioTick();
+   while ((myGpioRead(w->I.SCL) == 0) && ((gpioTick()-now) < max_stretch));
 }
 //}}}
 //{{{
-int i2cWriteByteData(unsigned handle, unsigned reg, unsigned bVal)
+static void I2CStart (wfRx_t* w)
 {
-   union my_smbus_data data;
-
-   int status;
-
-   DBG(DBG_USER, "handle=%d reg=%d bVal=%d", handle, reg, bVal);
-
-   CHECK_INITED;
-
-   if (handle >= PI_I2C_SLOTS)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if (i2cInfo[handle].state != PI_I2C_OPENED)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if ((i2cInfo[handle].funcs & PI_I2C_FUNC_SMBUS_WRITE_BYTE_DATA) == 0)
-      SOFT_ERROR(PI_BAD_SMBUS_CMD, "SMBUS command not supported by driver");
-
-   if (reg > 0xFF)
-      SOFT_ERROR(PI_BAD_PARAM, "bad reg (%d)", reg);
-
-   if (bVal > 0xFF)
-      SOFT_ERROR(PI_BAD_PARAM, "bad bVal (%d)", bVal);
-
-   data.byte = bVal;
-
-   status = my_smbus_access( i2cInfo[handle].fd, PI_I2C_SMBUS_WRITE, reg, PI_I2C_SMBUS_BYTE_DATA, &data);
-
-   if (status < 0)
+   if (w->I.started)
    {
-      DBG(DBG_USER, "error=%d (%m)", status);
-      return PI_I2C_WRITE_FAILED;
+      set_SDA(w);
+      I2C_delay(w);
+      I2C_clock_stretch(w);
+      I2C_delay(w);
    }
 
-   return status;
-}
-//}}}
+   clear_SDA(w);
+   I2C_delay(w);
+   clear_SCL(w);
+   I2C_delay(w);
 
-//{{{
-int i2cReadWordData(unsigned handle, unsigned reg)
-{
-   union my_smbus_data data;
-   int status;
-
-   DBG(DBG_USER, "handle=%d reg=%d", handle, reg);
-
-   CHECK_INITED;
-
-   if (handle >= PI_I2C_SLOTS)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if (i2cInfo[handle].state != PI_I2C_OPENED)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if ((i2cInfo[handle].funcs & PI_I2C_FUNC_SMBUS_READ_WORD_DATA) == 0)
-      SOFT_ERROR(PI_BAD_SMBUS_CMD, "SMBUS command not supported by driver");
-
-   if (reg > 0xFF)
-      SOFT_ERROR(PI_BAD_PARAM, "bad reg (%d)", reg);
-
-   status = (my_smbus_access( i2cInfo[handle].fd, PI_I2C_SMBUS_READ, reg, PI_I2C_SMBUS_WORD_DATA, &data));
-
-   if (status < 0)
-   {
-      DBG(DBG_USER, "error=%d (%m)", status);
-      return PI_I2C_READ_FAILED;
-   }
-
-   return 0xFFFF & data.word;
+   w->I.started = 1;
 }
 //}}}
 //{{{
-int i2cWriteWordData(unsigned handle, unsigned reg, unsigned wVal)
+static void I2CStop( wfRx_t* w)
 {
-   union my_smbus_data data;
+   clear_SDA(w);
+   I2C_delay(w);
+   I2C_clock_stretch(w);
+   I2C_delay(w);
+   set_SDA(w);
+   I2C_delay(w);
 
-   int status;
-
-   DBG(DBG_USER, "handle=%d reg=%d wVal=%d", handle, reg, wVal);
-
-   CHECK_INITED;
-
-   if (handle >= PI_I2C_SLOTS)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if (i2cInfo[handle].state != PI_I2C_OPENED)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if ((i2cInfo[handle].funcs & PI_I2C_FUNC_SMBUS_WRITE_WORD_DATA) == 0)
-      SOFT_ERROR(PI_BAD_SMBUS_CMD, "SMBUS command not supported by driver");
-
-   if (reg > 0xFF)
-      SOFT_ERROR(PI_BAD_PARAM, "bad reg (%d)", reg);
-
-   if (wVal > 0xFFFF)
-      SOFT_ERROR(PI_BAD_PARAM, "bad wVal (%d)", wVal);
-
-   data.word = wVal;
-
-   status = my_smbus_access( i2cInfo[handle].fd, PI_I2C_SMBUS_WRITE, reg, PI_I2C_SMBUS_WORD_DATA, &data);
-
-   if (status < 0)
-   {
-      DBG(DBG_USER, "error=%d (%m)", status);
-      return PI_I2C_WRITE_FAILED;
-   }
-
-   return status;
-}
-//}}}
-
-//{{{
-int i2cProcessCall(unsigned handle, unsigned reg, unsigned wVal)
-{
-   union my_smbus_data data;
-   int status;
-
-   DBG(DBG_USER, "handle=%d reg=%d wVal=%d", handle, reg, wVal);
-
-   CHECK_INITED;
-
-   if (handle >= PI_I2C_SLOTS)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if (i2cInfo[handle].state != PI_I2C_OPENED)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if ((i2cInfo[handle].funcs & PI_I2C_FUNC_SMBUS_PROC_CALL) == 0)
-      SOFT_ERROR(PI_BAD_SMBUS_CMD, "SMBUS command not supported by driver");
-
-   if (reg > 0xFF)
-      SOFT_ERROR(PI_BAD_PARAM, "bad reg (%d)", reg);
-
-   if (wVal > 0xFFFF)
-      SOFT_ERROR(PI_BAD_PARAM, "bad wVal (%d)", wVal);
-
-   data.word = wVal;
-
-   status = (my_smbus_access( i2cInfo[handle].fd, PI_I2C_SMBUS_WRITE, reg, PI_I2C_SMBUS_PROC_CALL, &data));
-
-   if (status < 0)
-   {
-      DBG(DBG_USER, "error=%d (%m)", status);
-      return PI_I2C_READ_FAILED;
-   }
-
-   return 0xFFFF & data.word;
-}
-//}}}
-
-//{{{
-int i2cReadBlockData(unsigned handle, unsigned reg, char *buf)
-{
-   union my_smbus_data data;
-
-   int i, status;
-
-   DBG(DBG_USER, "handle=%d reg=%d buf=%08"PRIXPTR, handle, reg, (uintptr_t)buf);
-
-   CHECK_INITED;
-
-   if (handle >= PI_I2C_SLOTS)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if (i2cInfo[handle].state != PI_I2C_OPENED)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if ((i2cInfo[handle].funcs & PI_I2C_FUNC_SMBUS_READ_BLOCK_DATA) == 0)
-      SOFT_ERROR(PI_BAD_SMBUS_CMD, "SMBUS command not supported by driver");
-
-   if (reg > 0xFF)
-      SOFT_ERROR(PI_BAD_PARAM, "bad reg (%d)", reg);
-
-   status = (my_smbus_access( i2cInfo[handle].fd, PI_I2C_SMBUS_READ, reg, PI_I2C_SMBUS_BLOCK_DATA, &data));
-
-   if (status < 0)
-   {
-      DBG(DBG_USER, "error=%d (%m)", status);
-      return PI_I2C_READ_FAILED;
-   }
-   else
-   {
-      if (data.block[0] <= PI_I2C_SMBUS_BLOCK_MAX)
-      {
-         for (i=0; i<data.block[0]; i++) buf[i] = data.block[i+1];
-         return data.block[0];
-      }
-      else return PI_I2C_READ_FAILED;
-   }
+   w->I.started = 0;
 }
 //}}}
 //{{{
-int i2cWriteBlockData(
-   unsigned handle, unsigned reg, char *buf, unsigned count)
+static void I2CPutBit (wfRx_t* w, int bit)
 {
-   union my_smbus_data data;
+   if (bit) set_SDA(w);
+   else     clear_SDA(w);
 
-   int i, status;
-
-   DBG(DBG_USER, "handle=%d reg=%d count=%d [%s]",
-      handle, reg, count, myBuf2Str(count, buf));
-
-   CHECK_INITED;
-
-   if (handle >= PI_I2C_SLOTS)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if (i2cInfo[handle].state != PI_I2C_OPENED)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if ((i2cInfo[handle].funcs & PI_I2C_FUNC_SMBUS_WRITE_BLOCK_DATA) == 0)
-      SOFT_ERROR(PI_BAD_SMBUS_CMD, "SMBUS command not supported by driver");
-
-   if (reg > 0xFF)
-      SOFT_ERROR(PI_BAD_PARAM, "bad reg (%d)", reg);
-
-   if ((count < 1) || (count > 32))
-      SOFT_ERROR(PI_BAD_PARAM, "bad count (%d)", count);
-
-   for (i=1; i<=count; i++) data.block[i] = buf[i-1];
-   data.block[0] = count;
-
-   status = my_smbus_access( i2cInfo[handle].fd, PI_I2C_SMBUS_WRITE, reg, PI_I2C_SMBUS_BLOCK_DATA, &data);
-
-   if (status < 0)
-   {
-      DBG(DBG_USER, "error=%d (%m)", status);
-      return PI_I2C_WRITE_FAILED;
-   }
-
-   return status;
-}
-//}}}
-
-//{{{
-int i2cBlockProcessCall(
-   unsigned handle, unsigned reg, char *buf, unsigned count)
-{
-   union my_smbus_data data;
-
-   int i, status;
-
-   DBG(DBG_USER, "handle=%d reg=%d count=%d [%s]",
-      handle, reg, count, myBuf2Str(count, buf));
-
-   CHECK_INITED;
-
-   if (handle >= PI_I2C_SLOTS)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if (i2cInfo[handle].state != PI_I2C_OPENED)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if ((i2cInfo[handle].funcs & PI_I2C_FUNC_SMBUS_PROC_CALL) == 0)
-      SOFT_ERROR(PI_BAD_SMBUS_CMD, "SMBUS command not supported by driver");
-
-   if (reg > 0xFF)
-      SOFT_ERROR(PI_BAD_PARAM, "bad reg (%d)", reg);
-
-   if ((count < 1) || (count > 32))
-      SOFT_ERROR(PI_BAD_PARAM, "bad count (%d)", count);
-
-   for (i=1; i<=count; i++) data.block[i] = buf[i-1];
-   data.block[0] = count;
-
-   status = (my_smbus_access( i2cInfo[handle].fd, PI_I2C_SMBUS_WRITE, reg, PI_I2C_SMBUS_BLOCK_PROC_CALL, &data));
-
-   if (status < 0)
-   {
-      DBG(DBG_USER, "error=%d (%m)", status);
-      return PI_I2C_READ_FAILED;
-   }
-   else
-   {
-      if (data.block[0] <= PI_I2C_SMBUS_BLOCK_MAX)
-      {
-         for (i=0; i<data.block[0]; i++) buf[i] = data.block[i+1];
-         return data.block[0];
-      }
-      else return PI_I2C_READ_FAILED;
-   }
-}
-//}}}
-
-//{{{
-int i2cReadI2CBlockData(
-   unsigned handle, unsigned reg, char *buf, unsigned count)
-{
-   union my_smbus_data data;
-
-   int i, status;
-   uint32_t size;
-
-   DBG(DBG_USER, "handle=%d reg=%d count=%d buf=%08"PRIXPTR,
-      handle, reg, count, (uintptr_t)buf);
-
-   CHECK_INITED;
-
-   if (handle >= PI_I2C_SLOTS)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if (i2cInfo[handle].state != PI_I2C_OPENED)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if ((i2cInfo[handle].funcs & PI_I2C_FUNC_SMBUS_READ_I2C_BLOCK) == 0)
-      SOFT_ERROR(PI_BAD_SMBUS_CMD, "SMBUS command not supported by driver");
-
-   if (reg > 0xFF)
-      SOFT_ERROR(PI_BAD_PARAM, "bad reg (%d)", reg);
-
-   if ((count < 1) || (count > 32))
-      SOFT_ERROR(PI_BAD_PARAM, "bad count (%d)", count);
-
-   if (count == 32)
-      size = PI_I2C_SMBUS_I2C_BLOCK_BROKEN;
-   else
-      size = PI_I2C_SMBUS_I2C_BLOCK_DATA;
-
-   data.block[0] = count;
-
-   status = (my_smbus_access(i2cInfo[handle].fd, PI_I2C_SMBUS_READ, reg, size, &data));
-
-   if (status < 0)
-   {
-      DBG(DBG_USER, "error=%d (%m)", status);
-      return PI_I2C_READ_FAILED;
-   }
-   else
-   {
-      if (data.block[0] <= PI_I2C_SMBUS_I2C_BLOCK_MAX)
-      {
-         for (i=0; i<data.block[0]; i++) buf[i] = data.block[i+1];
-         return data.block[0];
-      }
-      else return PI_I2C_READ_FAILED;
-   }
+   I2C_delay(w);
+   I2C_clock_stretch(w);
+   I2C_delay(w);
+   clear_SCL(w);
 }
 //}}}
 //{{{
-int i2cWriteI2CBlockData(
-   unsigned handle, unsigned reg, char *buf, unsigned count)
+static int I2CGetBit (wfRx_t* w)
 {
-   union my_smbus_data data;
+   int bit;
 
-   int i, status;
+   set_SDA(w); /* let SDA float */
+   I2C_delay(w);
+   I2C_clock_stretch(w);
+   bit = read_SDA(w);
+   I2C_delay(w);
+   clear_SCL(w);
 
-   DBG(DBG_USER, "handle=%d reg=%d count=%d [%s]",
-      handle, reg, count, myBuf2Str(count, buf));
-
-   CHECK_INITED;
-
-   if (handle >= PI_I2C_SLOTS)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if (i2cInfo[handle].state != PI_I2C_OPENED)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if ((i2cInfo[handle].funcs & PI_I2C_FUNC_SMBUS_WRITE_I2C_BLOCK) == 0)
-      SOFT_ERROR(PI_BAD_SMBUS_CMD, "SMBUS command not supported by driver");
-
-   if (reg > 0xFF)
-      SOFT_ERROR(PI_BAD_PARAM, "bad reg (%d)", reg);
-
-   if ((count < 1) || (count > 32))
-      SOFT_ERROR(PI_BAD_PARAM, "bad count (%d)", count);
-
-   for (i=1; i<=count; i++) data.block[i] = buf[i-1];
-
-   data.block[0] = count;
-
-   status = my_smbus_access( i2cInfo[handle].fd, PI_I2C_SMBUS_WRITE, reg, PI_I2C_SMBUS_I2C_BLOCK_BROKEN, &data);
-
-   if (status < 0)
-   {
-      DBG(DBG_USER, "error=%d (%m)", status);
-      return PI_I2C_WRITE_FAILED;
-   }
-
-   return status;
-}
-//}}}
-
-//{{{
-int i2cWriteDevice(unsigned handle, char *buf, unsigned count)
-{
-   int bytes;
-
-   DBG(DBG_USER, "handle=%d count=%d [%s]",
-      handle, count, myBuf2Str(count, buf));
-
-   CHECK_INITED;
-
-   if (handle >= PI_I2C_SLOTS)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if (i2cInfo[handle].state != PI_I2C_OPENED)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if ((count < 1) || (count > PI_MAX_I2C_DEVICE_COUNT))
-      SOFT_ERROR(PI_BAD_PARAM, "bad count (%d)", count);
-
-   bytes = write(i2cInfo[handle].fd, buf, count);
-
-   if (bytes != count)
-   {
-      DBG(DBG_USER, "error=%d (%m)", bytes);
-      return PI_I2C_WRITE_FAILED;
-   }
-
-   return 0;
+   return bit;
 }
 //}}}
 //{{{
-int i2cReadDevice(unsigned handle, char *buf, unsigned count)
+static int I2CPutByte (wfRx_t* w, int byte)
 {
-   int bytes;
+   int bit, nack;
 
-   DBG(DBG_USER, "handle=%d count=%d buf=%08"PRIXPTR,
-      handle, count, (uintptr_t)buf);
-
-   CHECK_INITED;
-
-   if (handle >= PI_I2C_SLOTS)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if (i2cInfo[handle].state != PI_I2C_OPENED)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if ((count < 1) || (count > PI_MAX_I2C_DEVICE_COUNT))
-      SOFT_ERROR(PI_BAD_PARAM, "bad count (%d)", count);
-
-   bytes = read(i2cInfo[handle].fd, buf, count);
-
-   if (bytes != count)
+   for(bit=0; bit<8; bit++)
    {
-      DBG(DBG_USER, "error=%d (%m)", bytes);
-      return PI_I2C_READ_FAILED;
+      I2CPutBit(w, byte & 0x80);
+      byte <<= 1;
    }
 
-   return bytes;
-}
-//}}}
+   nack = I2CGetBit(w);
 
-//{{{
-int i2cOpen(unsigned i2cBus, unsigned i2cAddr, unsigned i2cFlags)
-{
-   static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-   char dev[32];
-   int i, slot, fd;
-   uint32_t funcs;
-
-   DBG(DBG_USER, "i2cBus=%d i2cAddr=%d flags=0x%X",
-      i2cBus, i2cAddr, i2cFlags);
-
-   CHECK_INITED;
-
-   if (i2cAddr > PI_MAX_I2C_ADDR)
-      SOFT_ERROR(PI_BAD_I2C_ADDR, "bad I2C address (%d)", i2cAddr);
-
-   if (i2cFlags)
-      SOFT_ERROR(PI_BAD_FLAGS, "bad flags (0x%X)", i2cFlags);
-
-   slot = -1;
-
-   pthread_mutex_lock(&mutex);
-
-   for (i=0; i<PI_I2C_SLOTS; i++)
-   {
-      if (i2cInfo[i].state == PI_I2C_CLOSED)
-      {
-         slot = i;
-         i2cInfo[slot].state = PI_I2C_RESERVED;
-         break;
-      }
-   }
-
-   pthread_mutex_unlock(&mutex);
-
-   if (slot < 0) SOFT_ERROR(PI_NO_HANDLE, "no I2C handles");
-
-   sprintf(dev, "/dev/i2c-%d", i2cBus);
-
-   if ((fd = open(dev, O_RDWR)) < 0)
-   {
-      /* try a modprobe */
-
-      if (system("/sbin/modprobe i2c_dev") == -1) { /* ignore errors */}
-      if (system("/sbin/modprobe i2c_bcm2835") == -1) { /* ignore errors */}
-
-      myGpioDelay(100000);
-
-      if ((fd = open(dev, O_RDWR)) < 0)
-      {
-         i2cInfo[slot].state = PI_I2C_CLOSED;
-         return PI_BAD_I2C_BUS;
-      }
-   }
-
-   if (ioctl(fd, PI_I2C_SLAVE, i2cAddr) < 0)
-   {
-      close(fd);
-      i2cInfo[slot].state = PI_I2C_CLOSED;
-      return PI_I2C_OPEN_FAILED;
-   }
-
-   if (ioctl(fd, PI_I2C_FUNCS, &funcs) < 0)
-   {
-      funcs = -1; /* assume all smbus commands allowed */
-   }
-
-   i2cInfo[slot].fd = fd;
-   i2cInfo[slot].addr = i2cAddr;
-   i2cInfo[slot].flags = i2cFlags;
-   i2cInfo[slot].funcs = funcs;
-   i2cInfo[i].state = PI_I2C_OPENED;
-
-   return slot;
+   return nack;
 }
 //}}}
 //{{{
-int i2cClose(unsigned handle)
+static uint8_t I2CGetByte (wfRx_t* w, int nack)
 {
-   DBG(DBG_USER, "handle=%d", handle);
+   int bit, byte=0;
 
-   CHECK_INITED;
-
-   if (handle >= PI_I2C_SLOTS)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if (i2cInfo[handle].state != PI_I2C_OPENED)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if (i2cInfo[handle].fd >= 0) close(i2cInfo[handle].fd);
-
-   i2cInfo[handle].fd = -1;
-   i2cInfo[handle].state = PI_I2C_CLOSED;
-
-   return 0;
-}
-//}}}
-
-//{{{
-void i2cSwitchCombined(int setting)
-{
-   int fd;
-
-   DBG(DBG_USER, "setting=%d", setting);
-
-   fd = open(PI_I2C_COMBINED, O_WRONLY);
-
-   if (fd >= 0)
+   for (bit=0; bit<8; bit++)
    {
-      if (setting)
-      {
-         if (write(fd, "1\n", 2) == -1) { /* ignore errors */ }
-      }
-      else
-      {
-         if (write(fd, "0\n", 2) == -1) { /* ignore errors */ }
-      }
-
-      close(fd);
-   }
-}
-//}}}
-//{{{
-int i2cSegments(unsigned handle, pi_i2c_msg_t *segs, unsigned numSegs)
-{
-   int retval;
-   my_i2c_rdwr_ioctl_data_t rdwr;
-
-   DBG(DBG_USER, "handle=%d", handle);
-
-   CHECK_INITED;
-
-   if (handle >= PI_I2C_SLOTS)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if (i2cInfo[handle].state != PI_I2C_OPENED)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if (segs == NULL)
-      SOFT_ERROR(PI_BAD_POINTER, "null segments");
-
-   if (numSegs > PI_I2C_RDRW_IOCTL_MAX_MSGS)
-      SOFT_ERROR(PI_TOO_MANY_SEGS, "too many segments (%d)", numSegs);
-
-   rdwr.msgs = segs;
-   rdwr.nmsgs = numSegs;
-
-   retval = ioctl(i2cInfo[handle].fd, PI_I2C_RDWR, &rdwr);
-
-   if (retval >= 0) return retval;
-   else             return PI_BAD_I2C_SEG;
-}
-//}}}
-//{{{
-int i2cZip(
-   unsigned handle,
-   char *inBuf, unsigned inLen, char *outBuf, unsigned outLen)
-{
-   int numSegs, inPos, outPos, status, bytes, flags, addr;
-   int esc, setesc;
-   pi_i2c_msg_t segs[PI_I2C_RDRW_IOCTL_MAX_MSGS];
-
-   DBG(DBG_USER, "handle=%d inBuf=%s outBuf=%08"PRIXPTR" len=%d",
-      handle, myBuf2Str(inLen, (char *)inBuf), (uintptr_t)outBuf, outLen);
-
-   CHECK_INITED;
-
-   if (handle >= PI_I2C_SLOTS)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if (i2cInfo[handle].state != PI_I2C_OPENED)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if (!inBuf || !inLen)
-      SOFT_ERROR(PI_BAD_POINTER, "input buffer can't be NULL");
-
-   if (!outBuf && outLen)
-      SOFT_ERROR(PI_BAD_POINTER, "output buffer can't be NULL");
-
-   numSegs = 0;
-
-   inPos = 0;
-   outPos = 0;
-   status = 0;
-
-   addr = i2cInfo[handle].addr;
-   flags = 0;
-   esc = 0;
-   setesc = 0;
-
-   while (!status && (inPos < inLen))
-   {
-      DBG(DBG_INTERNAL, "status=%d inpos=%d inlen=%d cmd=%d addr=%d flags=%x",
-         status, inPos, inLen, inBuf[inPos], addr, flags);
-
-      switch (inBuf[inPos++])
-      {
-         case PI_I2C_END:
-            status = 1;
-            break;
-
-         case PI_I2C_COMBINED_ON:
-            /* Run prior transactions before setting combined flag */
-            if (numSegs)
-            {
-               status = i2cSegments(handle, segs, numSegs);
-               if (status >= 0) status = 0; /* continue */
-               numSegs = 0;
-            }
-            i2cSwitchCombined(1);
-            break;
-
-         case PI_I2C_COMBINED_OFF:
-            /* Run prior transactions before clearing combined flag */
-            if (numSegs)
-            {
-               status = i2cSegments(handle, segs, numSegs);
-               if (status >= 0) status = 0; /* continue */
-               numSegs = 0;
-            }
-            i2cSwitchCombined(0);
-            break;
-
-         case PI_I2C_ADDR:
-            addr = myI2CGetPar(inBuf, &inPos, inLen, &esc);
-            if (addr < 0) status = PI_BAD_I2C_CMD;
-            break;
-
-         case PI_I2C_FLAGS:
-            /* cheat to force two byte flags */
-            esc = 1;
-            flags = myI2CGetPar(inBuf, &inPos, inLen, &esc);
-            if (flags < 0) status = PI_BAD_I2C_CMD;
-            break;
-
-         case PI_I2C_ESC:
-            setesc = 1;
-            break;
-
-         case PI_I2C_READ:
-
-            bytes = myI2CGetPar(inBuf, &inPos, inLen, &esc);
-
-            if (bytes >= 0)
-            {
-               if ((bytes + outPos) < outLen)
-               {
-                  segs[numSegs].addr = addr;
-                  segs[numSegs].flags = (flags|1);
-                  segs[numSegs].len = bytes;
-                  segs[numSegs].buf = (uint8_t *)(outBuf + outPos);
-                  outPos += bytes;
-                  numSegs++;
-                  if (numSegs >= PI_I2C_RDRW_IOCTL_MAX_MSGS)
-                  {
-                     status = i2cSegments(handle, segs, numSegs);
-                     if (status >= 0) status = 0; /* continue */
-                     numSegs = 0;
-                  }
-               }
-               else status = PI_BAD_I2C_RLEN;
-            }
-            else status = PI_BAD_I2C_RLEN;
-            break;
-
-         case PI_I2C_WRITE:
-
-            bytes = myI2CGetPar(inBuf, &inPos, inLen, &esc);
-
-            if (bytes >= 0)
-            {
-               if ((bytes + inPos) < inLen)
-               {
-                  segs[numSegs].addr = addr;
-                  segs[numSegs].flags = (flags&0xfffe);
-                  segs[numSegs].len = bytes;
-                  segs[numSegs].buf = (uint8_t *)(inBuf + inPos);
-                  inPos += bytes;
-                  numSegs++;
-                  if (numSegs >= PI_I2C_RDRW_IOCTL_MAX_MSGS)
-                  {
-                     status = i2cSegments(handle, segs, numSegs);
-                     if (status >= 0) status = 0; /* continue */
-                     numSegs = 0;
-                  }
-               }
-               else status = PI_BAD_I2C_WLEN;
-            }
-            else status = PI_BAD_I2C_WLEN;
-            break;
-
-         default:
-            status = PI_BAD_I2C_CMD;
-      }
-
-      if (setesc) esc = 1; else esc = 0;
-
-      setesc = 0;
+      byte = (byte << 1) | I2CGetBit(w);
    }
 
-   if (status >= 0)
-   {
-      if (numSegs) status = i2cSegments(handle, segs, numSegs);
-   }
+   I2CPutBit(w, nack);
 
-   if (status >= 0) status = outPos;
-
-   return status;
+   return byte;
 }
 //}}}
 //}}}
@@ -4791,418 +4043,147 @@ static void spiTerm (uint32_t flags)
 }
 //}}}
 
+//}}}
+//{{{  bitbang spi
 //{{{
-int spiOpen (unsigned spiChan, unsigned baud, unsigned spiFlags)
+static void set_CS (wfRx_t *w)
 {
-   static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-   int i, slot;
+   myGpioWrite(w->S.CS, PI_SPI_FLAGS_GET_CSPOL(w->S.spiFlags));
+}
+//}}}
+//{{{
+static void clear_CS (wfRx_t *w)
+{
+   myGpioWrite(w->S.CS, !PI_SPI_FLAGS_GET_CSPOL(w->S.spiFlags));
+}
+//}}}
+//{{{
+static void set_SCLK (wfRx_t *w)
+{
+   myGpioWrite(w->S.SCLK, !PI_SPI_FLAGS_GET_CPOL(w->S.spiFlags));
+}
+//}}}
+//{{{
+static void clear_SCLK (wfRx_t *w)
+{
+   myGpioWrite(w->S.SCLK, PI_SPI_FLAGS_GET_CPOL(w->S.spiFlags));
+}
+//}}}
+//{{{
+static void SPI_delay (wfRx_t *w)
+{
+   myGpioDelay(w->S.delay);
+}
+//}}}
+//{{{
+static void bbSPIStart (wfRx_t *w)
+{
+   clear_SCLK(w);
 
-   DBG(DBG_USER, "spiChan=%d baud=%d spiFlags=0x%X",
-      spiChan, baud, spiFlags);
+   SPI_delay(w);
 
-   CHECK_INITED;
+   set_CS(w);
 
-   if (PI_SPI_FLAGS_GET_AUX_SPI(spiFlags))
+   SPI_delay(w);
+}
+//}}}
+//{{{
+static void bbSPIStop (wfRx_t *w)
+{
+   SPI_delay(w);
+
+   clear_CS(w);
+
+   SPI_delay(w);
+
+   clear_SCLK(w);
+}
+//}}}
+//{{{
+static uint8_t bbSPIXferByte (wfRx_t *w, char txByte)
+{
+   uint8_t bit, rxByte=0;
+
+   if (PI_SPI_FLAGS_GET_CPHA(w->S.spiFlags))
    {
-      if (gpioHardwareRevision() < 16)
-         SOFT_ERROR(PI_NO_AUX_SPI, "no auxiliary SPI on Pi A or B");
+      /*
+      CPHA = 1
+      write on set clock
+      read on clear clock
+      */
 
-      i = PI_NUM_AUX_SPI_CHANNEL;
+      for (bit=0; bit<8; bit++)
+      {
+         set_SCLK(w);
+
+         if (PI_SPI_FLAGS_GET_TX_LSB(w->S.spiFlags))
+         {
+            myGpioWrite(w->S.MOSI, txByte & 0x01);
+            txByte >>= 1;
+         }
+         else
+         {
+            myGpioWrite(w->S.MOSI, txByte & 0x80);
+            txByte <<= 1;
+         }
+
+         SPI_delay(w);
+
+         clear_SCLK(w);
+
+         if (PI_SPI_FLAGS_GET_RX_LSB(w->S.spiFlags))
+         {
+            rxByte = (rxByte >> 1) | myGpioRead(w->S.MISO) << 7;
+         }
+         else
+         {
+            rxByte = (rxByte << 1) | myGpioRead(w->S.MISO);
+         }
+
+         SPI_delay(w);
+      }
    }
    else
-      i = PI_NUM_STD_SPI_CHANNEL;
-
-   if (spiChan >= i)
-      SOFT_ERROR(PI_BAD_SPI_CHANNEL, "bad spiChan (%d)", spiChan);
-
-   if ((baud < PI_SPI_MIN_BAUD) || (baud > PI_SPI_MAX_BAUD))
-      SOFT_ERROR(PI_BAD_SPI_SPEED, "bad baud (%d)", baud);
-
-   if (spiFlags > (1<<22))
-      SOFT_ERROR(PI_BAD_FLAGS, "bad spiFlags (0x%X)", spiFlags);
-
-   if (!spiAnyOpen(spiFlags)) /* initialise on first open */
    {
-      spiInit(spiFlags);
-      spiGo(baud, spiFlags, NULL, NULL, 0);
-   }
+      /*
+      CPHA = 0
+      read on set clock
+      write on clear clock
+      */
 
-   slot = -1;
-
-   pthread_mutex_lock(&mutex);
-
-   for (i=0; i<PI_SPI_SLOTS; i++)
-   {
-      if (spiInfo[i].state == PI_SPI_CLOSED)
+      for (bit=0; bit<8; bit++)
       {
-         slot = i;
-         spiInfo[slot].state = PI_SPI_RESERVED;
-         break;
+         if (PI_SPI_FLAGS_GET_TX_LSB(w->S.spiFlags))
+         {
+            myGpioWrite(w->S.MOSI, txByte & 0x01);
+            txByte >>= 1;
+         }
+         else
+         {
+            myGpioWrite(w->S.MOSI, txByte & 0x80);
+            txByte <<= 1;
+         }
+
+         SPI_delay(w);
+
+         set_SCLK(w);
+
+         if (PI_SPI_FLAGS_GET_RX_LSB(w->S.spiFlags))
+         {
+            rxByte = (rxByte >> 1) | myGpioRead(w->S.MISO) << 7;
+         }
+         else
+         {
+            rxByte = (rxByte << 1) | myGpioRead(w->S.MISO);
+         }
+
+         SPI_delay(w);
+
+         clear_SCLK(w);
       }
    }
 
-   pthread_mutex_unlock(&mutex);
-
-   if (slot < 0) SOFT_ERROR(PI_NO_HANDLE, "no SPI handles");
-
-   spiInfo[slot].speed = baud;
-   spiInfo[slot].flags = spiFlags | PI_SPI_FLAGS_CHANNEL(spiChan);
-   spiInfo[slot].state = PI_SPI_OPENED;
-
-   return slot;
-}
-//}}}
-//{{{
-int spiClose (unsigned handle)
-{
-   DBG(DBG_USER, "handle=%d", handle);
-
-   CHECK_INITED;
-
-   if (handle >= PI_SPI_SLOTS)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if (spiInfo[handle].state != PI_SPI_OPENED)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   spiInfo[handle].state = PI_SPI_CLOSED;
-
-   if (!spiAnyOpen(spiInfo[handle].flags))
-      spiTerm(spiInfo[handle].flags); /* terminate on last close */
-
-   return 0;
-}
-//}}}
-
-//{{{
-int spiRead (unsigned handle, char *buf, unsigned count)
-{
-   DBG(DBG_USER, "handle=%d count=%d [%s]",
-      handle, count, myBuf2Str(count, buf));
-
-   CHECK_INITED;
-
-   if (handle >= PI_SPI_SLOTS)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if (spiInfo[handle].state != PI_SPI_OPENED)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if (count > PI_MAX_SPI_DEVICE_COUNT)
-      SOFT_ERROR(PI_BAD_SPI_COUNT, "bad count (%d)", count);
-
-   spiGo(spiInfo[handle].speed, spiInfo[handle].flags, NULL, buf, count);
-
-   return count;
-}
-//}}}
-//{{{
-int spiWrite (unsigned handle, char *buf, unsigned count)
-{
-   DBG(DBG_USER, "handle=%d count=%d [%s]",
-      handle, count, myBuf2Str(count, buf));
-
-   CHECK_INITED;
-
-   if (handle >= PI_SPI_SLOTS)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if (spiInfo[handle].state != PI_SPI_OPENED)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if (count > PI_MAX_SPI_DEVICE_COUNT)
-      SOFT_ERROR(PI_BAD_SPI_COUNT, "bad count (%d)", count);
-
-   spiGo(spiInfo[handle].speed, spiInfo[handle].flags, buf, NULL, count);
-
-   return count;
-}
-//}}}
-
-//{{{
-int spiXfer (unsigned handle, char *txBuf, char *rxBuf, unsigned count)
-{
-   DBG(DBG_USER, "handle=%d count=%d [%s]",
-      handle, count, myBuf2Str(count, txBuf));
-
-   CHECK_INITED;
-
-   if (handle >= PI_SPI_SLOTS)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if (spiInfo[handle].state != PI_SPI_OPENED)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if (count > PI_MAX_SPI_DEVICE_COUNT)
-      SOFT_ERROR(PI_BAD_SPI_COUNT, "bad count (%d)", count);
-
-   spiGo(spiInfo[handle].speed, spiInfo[handle].flags, txBuf, rxBuf, count);
-
-   return count;
-}
-//}}}
-//}}}
-//{{{  ser
-//{{{
-int serOpen (char *tty, unsigned serBaud, unsigned serFlags)
-{
-   static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-   struct termios new;
-   int speed;
-   int fd;
-   int i, slot;
-
-   DBG(DBG_USER, "tty=%s serBaud=%d serFlags=0x%X", tty, serBaud, serFlags);
-
-   SER_CHECK_INITED;
-
-   if (strncmp("/dev/tty", tty, 8) && strncmp("/dev/serial", tty, 11))
-      SOFT_ERROR(PI_BAD_SER_DEVICE, "bad device (%s)", tty);
-
-   switch (serBaud)
-   {
-      case     50: speed =     B50; break;
-      case     75: speed =     B75; break;
-      case    110: speed =    B110; break;
-      case    134: speed =    B134; break;
-      case    150: speed =    B150; break;
-      case    200: speed =    B200; break;
-      case    300: speed =    B300; break;
-      case    600: speed =    B600; break;
-      case   1200: speed =   B1200; break;
-      case   1800: speed =   B1800; break;
-      case   2400: speed =   B2400; break;
-      case   4800: speed =   B4800; break;
-      case   9600: speed =   B9600; break;
-      case  19200: speed =  B19200; break;
-      case  38400: speed =  B38400; break;
-      case  57600: speed =  B57600; break;
-      case 115200: speed = B115200; break;
-      case 230400: speed = B230400; break;
-
-      default:
-         SOFT_ERROR(PI_BAD_SER_SPEED, "bad speed (%d)", serBaud);
-   }
-
-   if (serFlags)
-      SOFT_ERROR(PI_BAD_FLAGS, "bad flags (0x%X)", serFlags);
-
-   slot = -1;
-
-   pthread_mutex_lock(&mutex);
-
-   for (i=0; i<PI_SER_SLOTS; i++)
-   {
-      if (serInfo[i].state == PI_SER_CLOSED)
-      {
-         slot = i;
-         serInfo[slot].state = PI_SER_RESERVED;
-         break;
-      }
-   }
-
-   pthread_mutex_unlock(&mutex);
-
-   if (slot < 0) SOFT_ERROR(PI_NO_HANDLE, "no serial handles");
-
-   if ((fd = open(tty, O_RDWR | O_NOCTTY | O_NDELAY | O_NONBLOCK)) == -1)
-   {
-      serInfo[slot].state = PI_SER_CLOSED;
-      return PI_SER_OPEN_FAILED;
-   }
-
-   tcgetattr(fd, &new);
-
-   cfmakeraw(&new);
-
-   cfsetispeed(&new, speed);
-   cfsetospeed(&new, speed);
-
-   new.c_cc [VMIN]  = 0;
-   new.c_cc [VTIME] = 0;
-
-   tcflush(fd, TCIFLUSH);
-   tcsetattr(fd, TCSANOW, &new);
-
-   //fcntl(fd, F_SETFL, O_RDWR);
-
-   serInfo[slot].fd = fd;
-   serInfo[slot].flags = serFlags;
-   serInfo[slot].state = PI_SER_OPENED;
-
-   return slot;
-}
-//}}}
-//{{{
-int serClose (unsigned handle)
-{
-   DBG(DBG_USER, "handle=%d", handle);
-
-   SER_CHECK_INITED;
-
-   if (handle >= PI_SER_SLOTS)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if (serInfo[handle].state != PI_SER_OPENED)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if (serInfo[handle].fd >= 0) close(serInfo[handle].fd);
-
-   serInfo[handle].fd = -1;
-   serInfo[handle].state = PI_SER_CLOSED;
-
-   return 0;
-}
-//}}}
-
-//{{{
-int serWriteByte (unsigned handle, unsigned bVal)
-{
-   char c;
-
-   DBG(DBG_USER, "handle=%d bVal=%d", handle, bVal);
-
-   SER_CHECK_INITED;
-
-   if (handle >= PI_SER_SLOTS)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if (serInfo[handle].state != PI_SER_OPENED)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if (bVal > 0xFF)
-      SOFT_ERROR(PI_BAD_PARAM, "bad parameter (%d)", bVal);
-
-   c = bVal;
-
-   if (write(serInfo[handle].fd, &c, 1) != 1)
-      return PI_SER_WRITE_FAILED;
-   else
-      return 0;
-}
-//}}}
-//{{{
-int serReadByte (unsigned handle)
-{
-   int r;
-   char x;
-
-   DBG(DBG_USER, "handle=%d", handle);
-
-   SER_CHECK_INITED;
-
-   if (handle >= PI_SER_SLOTS)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if (serInfo[handle].state != PI_SER_OPENED)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   r = read(serInfo[handle].fd, &x, 1);
-
-   if (r == 1)
-      return ((int)x) & 0xFF;
-
-   else if (r == 0)
-      return PI_SER_READ_NO_DATA;
-
-   else if ((r == -1) && (errno == EAGAIN))
-      return PI_SER_READ_NO_DATA;
-
-   else
-      return PI_SER_READ_FAILED;
-}
-//}}}
-
-//{{{
-int serWrite (unsigned handle, char *buf, unsigned count)
-{
-   int written=0, wrote=0;
-
-   DBG(DBG_USER, "handle=%d count=%d [%s]",
-      handle, count, myBuf2Str(count, buf));
-
-   SER_CHECK_INITED;
-
-   if (handle >= PI_SER_SLOTS)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if (serInfo[handle].state != PI_SER_OPENED)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if (!count)
-      SOFT_ERROR(PI_BAD_PARAM, "bad count (%d)", count);
-
-   while ((written != count) && (wrote >= 0))
-   {
-      wrote = write(serInfo[handle].fd, buf+written, count-written);
-
-      if (wrote >= 0)
-      {
-         written += wrote;
-
-         if (written != count) time_sleep(0.05);
-      }
-   }
-
-   if (written != count)
-      return PI_SER_WRITE_FAILED;
-   else
-      return 0;
-}
-//}}}
-//{{{
-int serRead (unsigned handle, char *buf, unsigned count)
-{
-   int r;
-
-   DBG(DBG_USER, "handle=%d count=%d buf=0x%"PRIXPTR, handle, count, (uintptr_t)buf);
-
-   SER_CHECK_INITED;
-
-   if (handle >= PI_SER_SLOTS)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if (serInfo[handle].state != PI_SER_OPENED)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if (!count)
-      SOFT_ERROR(PI_BAD_PARAM, "bad count (%d)", count);
-
-   r = read(serInfo[handle].fd, buf, count);
-
-   if (r == -1)
-   {
-      if (errno == EAGAIN)
-         return PI_SER_READ_NO_DATA;
-      else
-         return PI_SER_READ_FAILED;
-   }
-   else
-   {
-      if (r < count) buf[r] = 0;
-      return r;
-   }
-}
-//}}}
-
-//{{{
-int serDataAvailable (unsigned handle)
-{
-   int result;
-
-   DBG(DBG_USER, "handle=%d", handle);
-
-   SER_CHECK_INITED;
-
-   if (handle >= PI_SER_SLOTS)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if (serInfo[handle].state != PI_SER_OPENED)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if (ioctl(serInfo[handle].fd, FIONREAD, &result) == -1) return 0;
-
-   return result;
+   return rxByte;
 }
 //}}}
 //}}}
@@ -10671,142 +9652,894 @@ int gpioWaveGetMaxCbs()
 }
 //}}}
 //}}}
-//{{{  bitBang i2c
-//{{{
-static int read_SDA (wfRx_t* w)
-{
-   myGpioSetMode(w->I.SDA, PI_INPUT);
-   return myGpioRead(w->I.SDA);
-}
-//}}}
-//{{{
-static void set_SDA (wfRx_t* w)
-{
-   myGpioSetMode(w->I.SDA, PI_INPUT);
-}
-//}}}
-//{{{
-static void clear_SDA (wfRx_t* w)
-{
-   myGpioSetMode(w->I.SDA, PI_OUTPUT);
-   myGpioWrite(w->I.SDA, 0);
-}
-//}}}
-//{{{
-static void clear_SCL (wfRx_t* w)
-{
-   myGpioSetMode(w->I.SCL, PI_OUTPUT);
-   myGpioWrite(w->I.SCL, 0);
-}
-//}}}
 
+//{{{  i2c
 //{{{
-static void I2C_delay (wfRx_t* w)
+int i2cWriteQuick(unsigned handle, unsigned bit)
 {
-   myGpioDelay(w->I.delay);
-}
-//}}}
-//{{{
-static void I2C_clock_stretch (wfRx_t* w)
-{
-   uint32_t now, max_stretch=100000;
+   int status;
 
-   myGpioSetMode(w->I.SCL, PI_INPUT);
-   now = gpioTick();
-   while ((myGpioRead(w->I.SCL) == 0) && ((gpioTick()-now) < max_stretch));
-}
-//}}}
-//{{{
-static void I2CStart (wfRx_t* w)
-{
-   if (w->I.started)
+   DBG(DBG_USER, "handle=%d bit=%d", handle, bit);
+
+   CHECK_INITED;
+
+   if (handle >= PI_I2C_SLOTS)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (i2cInfo[handle].state != PI_I2C_OPENED)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if ((i2cInfo[handle].funcs & PI_I2C_FUNC_SMBUS_QUICK) == 0)
+      SOFT_ERROR(PI_BAD_SMBUS_CMD, "SMBUS command not supported by driver");
+
+   if (bit > 1)
+      SOFT_ERROR(PI_BAD_PARAM, "bad bit (%d)", bit);
+
+   status = my_smbus_access (i2cInfo[handle].fd, bit, 0, PI_I2C_SMBUS_QUICK, NULL);
+
+   if (status < 0)
    {
-      set_SDA(w);
-      I2C_delay(w);
-      I2C_clock_stretch(w);
-      I2C_delay(w);
+      DBG(DBG_USER, "error=%d (%m)", status);
+      return PI_I2C_WRITE_FAILED;
    }
 
-   clear_SDA(w);
-   I2C_delay(w);
-   clear_SCL(w);
-   I2C_delay(w);
-
-   w->I.started = 1;
+   return status;
 }
 //}}}
+
 //{{{
-static void I2CStop( wfRx_t* w)
+int i2cReadByte(unsigned handle)
 {
-   clear_SDA(w);
-   I2C_delay(w);
-   I2C_clock_stretch(w);
-   I2C_delay(w);
-   set_SDA(w);
-   I2C_delay(w);
+   union my_smbus_data data;
+   int status;
 
-   w->I.started = 0;
-}
-//}}}
-//{{{
-static void I2CPutBit (wfRx_t* w, int bit)
-{
-   if (bit) set_SDA(w);
-   else     clear_SDA(w);
+   DBG(DBG_USER, "handle=%d", handle);
 
-   I2C_delay(w);
-   I2C_clock_stretch(w);
-   I2C_delay(w);
-   clear_SCL(w);
-}
-//}}}
-//{{{
-static int I2CGetBit (wfRx_t* w)
-{
-   int bit;
+   CHECK_INITED;
 
-   set_SDA(w); /* let SDA float */
-   I2C_delay(w);
-   I2C_clock_stretch(w);
-   bit = read_SDA(w);
-   I2C_delay(w);
-   clear_SCL(w);
+   if (handle >= PI_I2C_SLOTS)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
 
-   return bit;
-}
-//}}}
-//{{{
-static int I2CPutByte (wfRx_t* w, int byte)
-{
-   int bit, nack;
+   if (i2cInfo[handle].state != PI_I2C_OPENED)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
 
-   for(bit=0; bit<8; bit++)
+   if ((i2cInfo[handle].funcs & PI_I2C_FUNC_SMBUS_READ_BYTE) == 0)
+      SOFT_ERROR(PI_BAD_SMBUS_CMD, "SMBUS command not supported by driver");
+
+   status = my_smbus_access (i2cInfo[handle].fd, PI_I2C_SMBUS_READ, 0, PI_I2C_SMBUS_BYTE, &data);
+
+   if (status < 0)
    {
-      I2CPutBit(w, byte & 0x80);
-      byte <<= 1;
+      DBG(DBG_USER, "error=%d (%m)", status);
+      return PI_I2C_READ_FAILED;
    }
 
-   nack = I2CGetBit(w);
-
-   return nack;
+   return 0xFF & data.byte;
 }
 //}}}
 //{{{
-static uint8_t I2CGetByte (wfRx_t* w, int nack)
+int i2cWriteByte(unsigned handle, unsigned bVal)
 {
-   int bit, byte=0;
+   int status;
 
-   for (bit=0; bit<8; bit++)
+   DBG(DBG_USER, "handle=%d bVal=%d", handle, bVal);
+
+   CHECK_INITED;
+
+   if (handle >= PI_I2C_SLOTS)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (i2cInfo[handle].state != PI_I2C_OPENED)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if ((i2cInfo[handle].funcs & PI_I2C_FUNC_SMBUS_WRITE_BYTE) == 0)
+      SOFT_ERROR(PI_BAD_SMBUS_CMD, "SMBUS command not supported by driver");
+
+   if (bVal > 0xFF)
+      SOFT_ERROR(PI_BAD_PARAM, "bad bVal (%d)", bVal);
+
+   status = my_smbus_access (i2cInfo[handle].fd, PI_I2C_SMBUS_WRITE, bVal, PI_I2C_SMBUS_BYTE, NULL);
+
+   if (status < 0)
    {
-      byte = (byte << 1) | I2CGetBit(w);
+      DBG(DBG_USER, "error=%d (%m)", status);
+      return PI_I2C_WRITE_FAILED;
    }
 
-   I2CPutBit(w, nack);
-
-   return byte;
+   return status;
 }
 //}}}
 
+//{{{
+int i2cReadByteData(unsigned handle, unsigned reg)
+{
+   union my_smbus_data data;
+   int status;
+
+   DBG(DBG_USER, "handle=%d reg=%d", handle, reg);
+
+   CHECK_INITED;
+
+   if (handle >= PI_I2C_SLOTS)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (i2cInfo[handle].state != PI_I2C_OPENED)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if ((i2cInfo[handle].funcs & PI_I2C_FUNC_SMBUS_READ_BYTE_DATA) == 0)
+      SOFT_ERROR(PI_BAD_SMBUS_CMD, "SMBUS command not supported by driver");
+
+   if (reg > 0xFF)
+      SOFT_ERROR(PI_BAD_PARAM, "bad reg (%d)", reg);
+
+   status = my_smbus_access(i2cInfo[handle].fd, PI_I2C_SMBUS_READ, reg, PI_I2C_SMBUS_BYTE_DATA, &data);
+
+   if (status < 0)
+   {
+      DBG(DBG_USER, "error=%d (%m)", status);
+      return PI_I2C_READ_FAILED;
+   }
+
+   return 0xFF & data.byte;
+}
+//}}}
+//{{{
+int i2cWriteByteData(unsigned handle, unsigned reg, unsigned bVal)
+{
+   union my_smbus_data data;
+
+   int status;
+
+   DBG(DBG_USER, "handle=%d reg=%d bVal=%d", handle, reg, bVal);
+
+   CHECK_INITED;
+
+   if (handle >= PI_I2C_SLOTS)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (i2cInfo[handle].state != PI_I2C_OPENED)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if ((i2cInfo[handle].funcs & PI_I2C_FUNC_SMBUS_WRITE_BYTE_DATA) == 0)
+      SOFT_ERROR(PI_BAD_SMBUS_CMD, "SMBUS command not supported by driver");
+
+   if (reg > 0xFF)
+      SOFT_ERROR(PI_BAD_PARAM, "bad reg (%d)", reg);
+
+   if (bVal > 0xFF)
+      SOFT_ERROR(PI_BAD_PARAM, "bad bVal (%d)", bVal);
+
+   data.byte = bVal;
+
+   status = my_smbus_access( i2cInfo[handle].fd, PI_I2C_SMBUS_WRITE, reg, PI_I2C_SMBUS_BYTE_DATA, &data);
+
+   if (status < 0)
+   {
+      DBG(DBG_USER, "error=%d (%m)", status);
+      return PI_I2C_WRITE_FAILED;
+   }
+
+   return status;
+}
+//}}}
+
+//{{{
+int i2cReadWordData(unsigned handle, unsigned reg)
+{
+   union my_smbus_data data;
+   int status;
+
+   DBG(DBG_USER, "handle=%d reg=%d", handle, reg);
+
+   CHECK_INITED;
+
+   if (handle >= PI_I2C_SLOTS)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (i2cInfo[handle].state != PI_I2C_OPENED)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if ((i2cInfo[handle].funcs & PI_I2C_FUNC_SMBUS_READ_WORD_DATA) == 0)
+      SOFT_ERROR(PI_BAD_SMBUS_CMD, "SMBUS command not supported by driver");
+
+   if (reg > 0xFF)
+      SOFT_ERROR(PI_BAD_PARAM, "bad reg (%d)", reg);
+
+   status = (my_smbus_access( i2cInfo[handle].fd, PI_I2C_SMBUS_READ, reg, PI_I2C_SMBUS_WORD_DATA, &data));
+
+   if (status < 0)
+   {
+      DBG(DBG_USER, "error=%d (%m)", status);
+      return PI_I2C_READ_FAILED;
+   }
+
+   return 0xFFFF & data.word;
+}
+//}}}
+//{{{
+int i2cWriteWordData(unsigned handle, unsigned reg, unsigned wVal)
+{
+   union my_smbus_data data;
+
+   int status;
+
+   DBG(DBG_USER, "handle=%d reg=%d wVal=%d", handle, reg, wVal);
+
+   CHECK_INITED;
+
+   if (handle >= PI_I2C_SLOTS)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (i2cInfo[handle].state != PI_I2C_OPENED)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if ((i2cInfo[handle].funcs & PI_I2C_FUNC_SMBUS_WRITE_WORD_DATA) == 0)
+      SOFT_ERROR(PI_BAD_SMBUS_CMD, "SMBUS command not supported by driver");
+
+   if (reg > 0xFF)
+      SOFT_ERROR(PI_BAD_PARAM, "bad reg (%d)", reg);
+
+   if (wVal > 0xFFFF)
+      SOFT_ERROR(PI_BAD_PARAM, "bad wVal (%d)", wVal);
+
+   data.word = wVal;
+
+   status = my_smbus_access( i2cInfo[handle].fd, PI_I2C_SMBUS_WRITE, reg, PI_I2C_SMBUS_WORD_DATA, &data);
+
+   if (status < 0)
+   {
+      DBG(DBG_USER, "error=%d (%m)", status);
+      return PI_I2C_WRITE_FAILED;
+   }
+
+   return status;
+}
+//}}}
+
+//{{{
+int i2cProcessCall(unsigned handle, unsigned reg, unsigned wVal)
+{
+   union my_smbus_data data;
+   int status;
+
+   DBG(DBG_USER, "handle=%d reg=%d wVal=%d", handle, reg, wVal);
+
+   CHECK_INITED;
+
+   if (handle >= PI_I2C_SLOTS)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (i2cInfo[handle].state != PI_I2C_OPENED)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if ((i2cInfo[handle].funcs & PI_I2C_FUNC_SMBUS_PROC_CALL) == 0)
+      SOFT_ERROR(PI_BAD_SMBUS_CMD, "SMBUS command not supported by driver");
+
+   if (reg > 0xFF)
+      SOFT_ERROR(PI_BAD_PARAM, "bad reg (%d)", reg);
+
+   if (wVal > 0xFFFF)
+      SOFT_ERROR(PI_BAD_PARAM, "bad wVal (%d)", wVal);
+
+   data.word = wVal;
+
+   status = (my_smbus_access( i2cInfo[handle].fd, PI_I2C_SMBUS_WRITE, reg, PI_I2C_SMBUS_PROC_CALL, &data));
+
+   if (status < 0)
+   {
+      DBG(DBG_USER, "error=%d (%m)", status);
+      return PI_I2C_READ_FAILED;
+   }
+
+   return 0xFFFF & data.word;
+}
+//}}}
+
+//{{{
+int i2cReadBlockData(unsigned handle, unsigned reg, char *buf)
+{
+   union my_smbus_data data;
+
+   int i, status;
+
+   DBG(DBG_USER, "handle=%d reg=%d buf=%08"PRIXPTR, handle, reg, (uintptr_t)buf);
+
+   CHECK_INITED;
+
+   if (handle >= PI_I2C_SLOTS)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (i2cInfo[handle].state != PI_I2C_OPENED)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if ((i2cInfo[handle].funcs & PI_I2C_FUNC_SMBUS_READ_BLOCK_DATA) == 0)
+      SOFT_ERROR(PI_BAD_SMBUS_CMD, "SMBUS command not supported by driver");
+
+   if (reg > 0xFF)
+      SOFT_ERROR(PI_BAD_PARAM, "bad reg (%d)", reg);
+
+   status = (my_smbus_access( i2cInfo[handle].fd, PI_I2C_SMBUS_READ, reg, PI_I2C_SMBUS_BLOCK_DATA, &data));
+
+   if (status < 0)
+   {
+      DBG(DBG_USER, "error=%d (%m)", status);
+      return PI_I2C_READ_FAILED;
+   }
+   else
+   {
+      if (data.block[0] <= PI_I2C_SMBUS_BLOCK_MAX)
+      {
+         for (i=0; i<data.block[0]; i++) buf[i] = data.block[i+1];
+         return data.block[0];
+      }
+      else return PI_I2C_READ_FAILED;
+   }
+}
+//}}}
+//{{{
+int i2cWriteBlockData(
+   unsigned handle, unsigned reg, char *buf, unsigned count)
+{
+   union my_smbus_data data;
+
+   int i, status;
+
+   DBG(DBG_USER, "handle=%d reg=%d count=%d [%s]",
+      handle, reg, count, myBuf2Str(count, buf));
+
+   CHECK_INITED;
+
+   if (handle >= PI_I2C_SLOTS)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (i2cInfo[handle].state != PI_I2C_OPENED)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if ((i2cInfo[handle].funcs & PI_I2C_FUNC_SMBUS_WRITE_BLOCK_DATA) == 0)
+      SOFT_ERROR(PI_BAD_SMBUS_CMD, "SMBUS command not supported by driver");
+
+   if (reg > 0xFF)
+      SOFT_ERROR(PI_BAD_PARAM, "bad reg (%d)", reg);
+
+   if ((count < 1) || (count > 32))
+      SOFT_ERROR(PI_BAD_PARAM, "bad count (%d)", count);
+
+   for (i=1; i<=count; i++) data.block[i] = buf[i-1];
+   data.block[0] = count;
+
+   status = my_smbus_access( i2cInfo[handle].fd, PI_I2C_SMBUS_WRITE, reg, PI_I2C_SMBUS_BLOCK_DATA, &data);
+
+   if (status < 0)
+   {
+      DBG(DBG_USER, "error=%d (%m)", status);
+      return PI_I2C_WRITE_FAILED;
+   }
+
+   return status;
+}
+//}}}
+
+//{{{
+int i2cBlockProcessCall(
+   unsigned handle, unsigned reg, char *buf, unsigned count)
+{
+   union my_smbus_data data;
+
+   int i, status;
+
+   DBG(DBG_USER, "handle=%d reg=%d count=%d [%s]",
+      handle, reg, count, myBuf2Str(count, buf));
+
+   CHECK_INITED;
+
+   if (handle >= PI_I2C_SLOTS)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (i2cInfo[handle].state != PI_I2C_OPENED)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if ((i2cInfo[handle].funcs & PI_I2C_FUNC_SMBUS_PROC_CALL) == 0)
+      SOFT_ERROR(PI_BAD_SMBUS_CMD, "SMBUS command not supported by driver");
+
+   if (reg > 0xFF)
+      SOFT_ERROR(PI_BAD_PARAM, "bad reg (%d)", reg);
+
+   if ((count < 1) || (count > 32))
+      SOFT_ERROR(PI_BAD_PARAM, "bad count (%d)", count);
+
+   for (i=1; i<=count; i++) data.block[i] = buf[i-1];
+   data.block[0] = count;
+
+   status = (my_smbus_access( i2cInfo[handle].fd, PI_I2C_SMBUS_WRITE, reg, PI_I2C_SMBUS_BLOCK_PROC_CALL, &data));
+
+   if (status < 0)
+   {
+      DBG(DBG_USER, "error=%d (%m)", status);
+      return PI_I2C_READ_FAILED;
+   }
+   else
+   {
+      if (data.block[0] <= PI_I2C_SMBUS_BLOCK_MAX)
+      {
+         for (i=0; i<data.block[0]; i++) buf[i] = data.block[i+1];
+         return data.block[0];
+      }
+      else return PI_I2C_READ_FAILED;
+   }
+}
+//}}}
+
+//{{{
+int i2cReadI2CBlockData(
+   unsigned handle, unsigned reg, char *buf, unsigned count)
+{
+   union my_smbus_data data;
+
+   int i, status;
+   uint32_t size;
+
+   DBG(DBG_USER, "handle=%d reg=%d count=%d buf=%08"PRIXPTR,
+      handle, reg, count, (uintptr_t)buf);
+
+   CHECK_INITED;
+
+   if (handle >= PI_I2C_SLOTS)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (i2cInfo[handle].state != PI_I2C_OPENED)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if ((i2cInfo[handle].funcs & PI_I2C_FUNC_SMBUS_READ_I2C_BLOCK) == 0)
+      SOFT_ERROR(PI_BAD_SMBUS_CMD, "SMBUS command not supported by driver");
+
+   if (reg > 0xFF)
+      SOFT_ERROR(PI_BAD_PARAM, "bad reg (%d)", reg);
+
+   if ((count < 1) || (count > 32))
+      SOFT_ERROR(PI_BAD_PARAM, "bad count (%d)", count);
+
+   if (count == 32)
+      size = PI_I2C_SMBUS_I2C_BLOCK_BROKEN;
+   else
+      size = PI_I2C_SMBUS_I2C_BLOCK_DATA;
+
+   data.block[0] = count;
+
+   status = (my_smbus_access(i2cInfo[handle].fd, PI_I2C_SMBUS_READ, reg, size, &data));
+
+   if (status < 0)
+   {
+      DBG(DBG_USER, "error=%d (%m)", status);
+      return PI_I2C_READ_FAILED;
+   }
+   else
+   {
+      if (data.block[0] <= PI_I2C_SMBUS_I2C_BLOCK_MAX)
+      {
+         for (i=0; i<data.block[0]; i++) buf[i] = data.block[i+1];
+         return data.block[0];
+      }
+      else return PI_I2C_READ_FAILED;
+   }
+}
+//}}}
+//{{{
+int i2cWriteI2CBlockData(
+   unsigned handle, unsigned reg, char *buf, unsigned count)
+{
+   union my_smbus_data data;
+
+   int i, status;
+
+   DBG(DBG_USER, "handle=%d reg=%d count=%d [%s]",
+      handle, reg, count, myBuf2Str(count, buf));
+
+   CHECK_INITED;
+
+   if (handle >= PI_I2C_SLOTS)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (i2cInfo[handle].state != PI_I2C_OPENED)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if ((i2cInfo[handle].funcs & PI_I2C_FUNC_SMBUS_WRITE_I2C_BLOCK) == 0)
+      SOFT_ERROR(PI_BAD_SMBUS_CMD, "SMBUS command not supported by driver");
+
+   if (reg > 0xFF)
+      SOFT_ERROR(PI_BAD_PARAM, "bad reg (%d)", reg);
+
+   if ((count < 1) || (count > 32))
+      SOFT_ERROR(PI_BAD_PARAM, "bad count (%d)", count);
+
+   for (i=1; i<=count; i++) data.block[i] = buf[i-1];
+
+   data.block[0] = count;
+
+   status = my_smbus_access( i2cInfo[handle].fd, PI_I2C_SMBUS_WRITE, reg, PI_I2C_SMBUS_I2C_BLOCK_BROKEN, &data);
+
+   if (status < 0)
+   {
+      DBG(DBG_USER, "error=%d (%m)", status);
+      return PI_I2C_WRITE_FAILED;
+   }
+
+   return status;
+}
+//}}}
+
+//{{{
+int i2cWriteDevice(unsigned handle, char *buf, unsigned count)
+{
+   int bytes;
+
+   DBG(DBG_USER, "handle=%d count=%d [%s]",
+      handle, count, myBuf2Str(count, buf));
+
+   CHECK_INITED;
+
+   if (handle >= PI_I2C_SLOTS)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (i2cInfo[handle].state != PI_I2C_OPENED)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if ((count < 1) || (count > PI_MAX_I2C_DEVICE_COUNT))
+      SOFT_ERROR(PI_BAD_PARAM, "bad count (%d)", count);
+
+   bytes = write(i2cInfo[handle].fd, buf, count);
+
+   if (bytes != count)
+   {
+      DBG(DBG_USER, "error=%d (%m)", bytes);
+      return PI_I2C_WRITE_FAILED;
+   }
+
+   return 0;
+}
+//}}}
+//{{{
+int i2cReadDevice(unsigned handle, char *buf, unsigned count)
+{
+   int bytes;
+
+   DBG(DBG_USER, "handle=%d count=%d buf=%08"PRIXPTR,
+      handle, count, (uintptr_t)buf);
+
+   CHECK_INITED;
+
+   if (handle >= PI_I2C_SLOTS)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (i2cInfo[handle].state != PI_I2C_OPENED)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if ((count < 1) || (count > PI_MAX_I2C_DEVICE_COUNT))
+      SOFT_ERROR(PI_BAD_PARAM, "bad count (%d)", count);
+
+   bytes = read(i2cInfo[handle].fd, buf, count);
+
+   if (bytes != count)
+   {
+      DBG(DBG_USER, "error=%d (%m)", bytes);
+      return PI_I2C_READ_FAILED;
+   }
+
+   return bytes;
+}
+//}}}
+
+//{{{
+int i2cOpen(unsigned i2cBus, unsigned i2cAddr, unsigned i2cFlags)
+{
+   static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+   char dev[32];
+   int i, slot, fd;
+   uint32_t funcs;
+
+   DBG(DBG_USER, "i2cBus=%d i2cAddr=%d flags=0x%X",
+      i2cBus, i2cAddr, i2cFlags);
+
+   CHECK_INITED;
+
+   if (i2cAddr > PI_MAX_I2C_ADDR)
+      SOFT_ERROR(PI_BAD_I2C_ADDR, "bad I2C address (%d)", i2cAddr);
+
+   if (i2cFlags)
+      SOFT_ERROR(PI_BAD_FLAGS, "bad flags (0x%X)", i2cFlags);
+
+   slot = -1;
+
+   pthread_mutex_lock(&mutex);
+
+   for (i=0; i<PI_I2C_SLOTS; i++)
+   {
+      if (i2cInfo[i].state == PI_I2C_CLOSED)
+      {
+         slot = i;
+         i2cInfo[slot].state = PI_I2C_RESERVED;
+         break;
+      }
+   }
+
+   pthread_mutex_unlock(&mutex);
+
+   if (slot < 0) SOFT_ERROR(PI_NO_HANDLE, "no I2C handles");
+
+   sprintf(dev, "/dev/i2c-%d", i2cBus);
+
+   if ((fd = open(dev, O_RDWR)) < 0)
+   {
+      /* try a modprobe */
+
+      if (system("/sbin/modprobe i2c_dev") == -1) { /* ignore errors */}
+      if (system("/sbin/modprobe i2c_bcm2835") == -1) { /* ignore errors */}
+
+      myGpioDelay(100000);
+
+      if ((fd = open(dev, O_RDWR)) < 0)
+      {
+         i2cInfo[slot].state = PI_I2C_CLOSED;
+         return PI_BAD_I2C_BUS;
+      }
+   }
+
+   if (ioctl(fd, PI_I2C_SLAVE, i2cAddr) < 0)
+   {
+      close(fd);
+      i2cInfo[slot].state = PI_I2C_CLOSED;
+      return PI_I2C_OPEN_FAILED;
+   }
+
+   if (ioctl(fd, PI_I2C_FUNCS, &funcs) < 0)
+   {
+      funcs = -1; /* assume all smbus commands allowed */
+   }
+
+   i2cInfo[slot].fd = fd;
+   i2cInfo[slot].addr = i2cAddr;
+   i2cInfo[slot].flags = i2cFlags;
+   i2cInfo[slot].funcs = funcs;
+   i2cInfo[i].state = PI_I2C_OPENED;
+
+   return slot;
+}
+//}}}
+//{{{
+int i2cClose(unsigned handle)
+{
+   DBG(DBG_USER, "handle=%d", handle);
+
+   CHECK_INITED;
+
+   if (handle >= PI_I2C_SLOTS)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (i2cInfo[handle].state != PI_I2C_OPENED)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (i2cInfo[handle].fd >= 0) close(i2cInfo[handle].fd);
+
+   i2cInfo[handle].fd = -1;
+   i2cInfo[handle].state = PI_I2C_CLOSED;
+
+   return 0;
+}
+//}}}
+
+//{{{
+void i2cSwitchCombined(int setting)
+{
+   int fd;
+
+   DBG(DBG_USER, "setting=%d", setting);
+
+   fd = open(PI_I2C_COMBINED, O_WRONLY);
+
+   if (fd >= 0)
+   {
+      if (setting)
+      {
+         if (write(fd, "1\n", 2) == -1) { /* ignore errors */ }
+      }
+      else
+      {
+         if (write(fd, "0\n", 2) == -1) { /* ignore errors */ }
+      }
+
+      close(fd);
+   }
+}
+//}}}
+//{{{
+int i2cSegments(unsigned handle, pi_i2c_msg_t *segs, unsigned numSegs)
+{
+   int retval;
+   my_i2c_rdwr_ioctl_data_t rdwr;
+
+   DBG(DBG_USER, "handle=%d", handle);
+
+   CHECK_INITED;
+
+   if (handle >= PI_I2C_SLOTS)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (i2cInfo[handle].state != PI_I2C_OPENED)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (segs == NULL)
+      SOFT_ERROR(PI_BAD_POINTER, "null segments");
+
+   if (numSegs > PI_I2C_RDRW_IOCTL_MAX_MSGS)
+      SOFT_ERROR(PI_TOO_MANY_SEGS, "too many segments (%d)", numSegs);
+
+   rdwr.msgs = segs;
+   rdwr.nmsgs = numSegs;
+
+   retval = ioctl(i2cInfo[handle].fd, PI_I2C_RDWR, &rdwr);
+
+   if (retval >= 0) return retval;
+   else             return PI_BAD_I2C_SEG;
+}
+//}}}
+//{{{
+int i2cZip(
+   unsigned handle,
+   char *inBuf, unsigned inLen, char *outBuf, unsigned outLen)
+{
+   int numSegs, inPos, outPos, status, bytes, flags, addr;
+   int esc, setesc;
+   pi_i2c_msg_t segs[PI_I2C_RDRW_IOCTL_MAX_MSGS];
+
+   DBG(DBG_USER, "handle=%d inBuf=%s outBuf=%08"PRIXPTR" len=%d",
+      handle, myBuf2Str(inLen, (char *)inBuf), (uintptr_t)outBuf, outLen);
+
+   CHECK_INITED;
+
+   if (handle >= PI_I2C_SLOTS)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (i2cInfo[handle].state != PI_I2C_OPENED)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (!inBuf || !inLen)
+      SOFT_ERROR(PI_BAD_POINTER, "input buffer can't be NULL");
+
+   if (!outBuf && outLen)
+      SOFT_ERROR(PI_BAD_POINTER, "output buffer can't be NULL");
+
+   numSegs = 0;
+
+   inPos = 0;
+   outPos = 0;
+   status = 0;
+
+   addr = i2cInfo[handle].addr;
+   flags = 0;
+   esc = 0;
+   setesc = 0;
+
+   while (!status && (inPos < inLen))
+   {
+      DBG(DBG_INTERNAL, "status=%d inpos=%d inlen=%d cmd=%d addr=%d flags=%x",
+         status, inPos, inLen, inBuf[inPos], addr, flags);
+
+      switch (inBuf[inPos++])
+      {
+         case PI_I2C_END:
+            status = 1;
+            break;
+
+         case PI_I2C_COMBINED_ON:
+            /* Run prior transactions before setting combined flag */
+            if (numSegs)
+            {
+               status = i2cSegments(handle, segs, numSegs);
+               if (status >= 0) status = 0; /* continue */
+               numSegs = 0;
+            }
+            i2cSwitchCombined(1);
+            break;
+
+         case PI_I2C_COMBINED_OFF:
+            /* Run prior transactions before clearing combined flag */
+            if (numSegs)
+            {
+               status = i2cSegments(handle, segs, numSegs);
+               if (status >= 0) status = 0; /* continue */
+               numSegs = 0;
+            }
+            i2cSwitchCombined(0);
+            break;
+
+         case PI_I2C_ADDR:
+            addr = myI2CGetPar(inBuf, &inPos, inLen, &esc);
+            if (addr < 0) status = PI_BAD_I2C_CMD;
+            break;
+
+         case PI_I2C_FLAGS:
+            /* cheat to force two byte flags */
+            esc = 1;
+            flags = myI2CGetPar(inBuf, &inPos, inLen, &esc);
+            if (flags < 0) status = PI_BAD_I2C_CMD;
+            break;
+
+         case PI_I2C_ESC:
+            setesc = 1;
+            break;
+
+         case PI_I2C_READ:
+
+            bytes = myI2CGetPar(inBuf, &inPos, inLen, &esc);
+
+            if (bytes >= 0)
+            {
+               if ((bytes + outPos) < outLen)
+               {
+                  segs[numSegs].addr = addr;
+                  segs[numSegs].flags = (flags|1);
+                  segs[numSegs].len = bytes;
+                  segs[numSegs].buf = (uint8_t *)(outBuf + outPos);
+                  outPos += bytes;
+                  numSegs++;
+                  if (numSegs >= PI_I2C_RDRW_IOCTL_MAX_MSGS)
+                  {
+                     status = i2cSegments(handle, segs, numSegs);
+                     if (status >= 0) status = 0; /* continue */
+                     numSegs = 0;
+                  }
+               }
+               else status = PI_BAD_I2C_RLEN;
+            }
+            else status = PI_BAD_I2C_RLEN;
+            break;
+
+         case PI_I2C_WRITE:
+
+            bytes = myI2CGetPar(inBuf, &inPos, inLen, &esc);
+
+            if (bytes >= 0)
+            {
+               if ((bytes + inPos) < inLen)
+               {
+                  segs[numSegs].addr = addr;
+                  segs[numSegs].flags = (flags&0xfffe);
+                  segs[numSegs].len = bytes;
+                  segs[numSegs].buf = (uint8_t *)(inBuf + inPos);
+                  inPos += bytes;
+                  numSegs++;
+                  if (numSegs >= PI_I2C_RDRW_IOCTL_MAX_MSGS)
+                  {
+                     status = i2cSegments(handle, segs, numSegs);
+                     if (status >= 0) status = 0; /* continue */
+                     numSegs = 0;
+                  }
+               }
+               else status = PI_BAD_I2C_WLEN;
+            }
+            else status = PI_BAD_I2C_WLEN;
+            break;
+
+         default:
+            status = PI_BAD_I2C_CMD;
+      }
+
+      if (setesc) esc = 1; else esc = 0;
+
+      setesc = 0;
+   }
+
+   if (status >= 0)
+   {
+      if (numSegs) status = i2cSegments(handle, segs, numSegs);
+   }
+
+   if (status >= 0) status = outPos;
+
+   return status;
+}
+//}}}
+
+// bitBang i2c
 //{{{
 int bbI2COpen (unsigned SDA, unsigned SCL, unsigned baud)
 {
@@ -11021,7 +10754,6 @@ int bbI2CZip (unsigned SDA, char *inBuf, unsigned inLen, char *outBuf, unsigned 
    return status;
 }
 //}}}
-//}}}
 
 //{{{
 void bscInit (int mode)
@@ -11175,149 +10907,160 @@ int bscXfer (bsc_xfer_t* xfer)
    return (copied<<16) | bscFR;
 }
 //}}}
-//{{{  bitBang spi
-//{{{
-static void set_CS (wfRx_t *w)
-{
-   myGpioWrite(w->S.CS, PI_SPI_FLAGS_GET_CSPOL(w->S.spiFlags));
-}
 //}}}
+//{{{  spi
 //{{{
-static void clear_CS (wfRx_t *w)
+int spiOpen (unsigned spiChan, unsigned baud, unsigned spiFlags)
 {
-   myGpioWrite(w->S.CS, !PI_SPI_FLAGS_GET_CSPOL(w->S.spiFlags));
-}
-//}}}
-//{{{
-static void set_SCLK (wfRx_t *w)
-{
-   myGpioWrite(w->S.SCLK, !PI_SPI_FLAGS_GET_CPOL(w->S.spiFlags));
-}
-//}}}
-//{{{
-static void clear_SCLK (wfRx_t *w)
-{
-   myGpioWrite(w->S.SCLK, PI_SPI_FLAGS_GET_CPOL(w->S.spiFlags));
-}
-//}}}
-//{{{
-static void SPI_delay (wfRx_t *w)
-{
-   myGpioDelay(w->S.delay);
-}
-//}}}
-//{{{
-static void bbSPIStart (wfRx_t *w)
-{
-   clear_SCLK(w);
+   static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+   int i, slot;
 
-   SPI_delay(w);
+   DBG(DBG_USER, "spiChan=%d baud=%d spiFlags=0x%X",
+      spiChan, baud, spiFlags);
 
-   set_CS(w);
+   CHECK_INITED;
 
-   SPI_delay(w);
-}
-//}}}
-//{{{
-static void bbSPIStop (wfRx_t *w)
-{
-   SPI_delay(w);
-
-   clear_CS(w);
-
-   SPI_delay(w);
-
-   clear_SCLK(w);
-}
-//}}}
-//{{{
-static uint8_t bbSPIXferByte (wfRx_t *w, char txByte)
-{
-   uint8_t bit, rxByte=0;
-
-   if (PI_SPI_FLAGS_GET_CPHA(w->S.spiFlags))
+   if (PI_SPI_FLAGS_GET_AUX_SPI(spiFlags))
    {
-      /*
-      CPHA = 1
-      write on set clock
-      read on clear clock
-      */
+      if (gpioHardwareRevision() < 16)
+         SOFT_ERROR(PI_NO_AUX_SPI, "no auxiliary SPI on Pi A or B");
 
-      for (bit=0; bit<8; bit++)
-      {
-         set_SCLK(w);
-
-         if (PI_SPI_FLAGS_GET_TX_LSB(w->S.spiFlags))
-         {
-            myGpioWrite(w->S.MOSI, txByte & 0x01);
-            txByte >>= 1;
-         }
-         else
-         {
-            myGpioWrite(w->S.MOSI, txByte & 0x80);
-            txByte <<= 1;
-         }
-
-         SPI_delay(w);
-
-         clear_SCLK(w);
-
-         if (PI_SPI_FLAGS_GET_RX_LSB(w->S.spiFlags))
-         {
-            rxByte = (rxByte >> 1) | myGpioRead(w->S.MISO) << 7;
-         }
-         else
-         {
-            rxByte = (rxByte << 1) | myGpioRead(w->S.MISO);
-         }
-
-         SPI_delay(w);
-      }
+      i = PI_NUM_AUX_SPI_CHANNEL;
    }
    else
+      i = PI_NUM_STD_SPI_CHANNEL;
+
+   if (spiChan >= i)
+      SOFT_ERROR(PI_BAD_SPI_CHANNEL, "bad spiChan (%d)", spiChan);
+
+   if ((baud < PI_SPI_MIN_BAUD) || (baud > PI_SPI_MAX_BAUD))
+      SOFT_ERROR(PI_BAD_SPI_SPEED, "bad baud (%d)", baud);
+
+   if (spiFlags > (1<<22))
+      SOFT_ERROR(PI_BAD_FLAGS, "bad spiFlags (0x%X)", spiFlags);
+
+   if (!spiAnyOpen(spiFlags)) /* initialise on first open */
    {
-      /*
-      CPHA = 0
-      read on set clock
-      write on clear clock
-      */
+      spiInit(spiFlags);
+      spiGo(baud, spiFlags, NULL, NULL, 0);
+   }
 
-      for (bit=0; bit<8; bit++)
+   slot = -1;
+
+   pthread_mutex_lock(&mutex);
+
+   for (i=0; i<PI_SPI_SLOTS; i++)
+   {
+      if (spiInfo[i].state == PI_SPI_CLOSED)
       {
-         if (PI_SPI_FLAGS_GET_TX_LSB(w->S.spiFlags))
-         {
-            myGpioWrite(w->S.MOSI, txByte & 0x01);
-            txByte >>= 1;
-         }
-         else
-         {
-            myGpioWrite(w->S.MOSI, txByte & 0x80);
-            txByte <<= 1;
-         }
-
-         SPI_delay(w);
-
-         set_SCLK(w);
-
-         if (PI_SPI_FLAGS_GET_RX_LSB(w->S.spiFlags))
-         {
-            rxByte = (rxByte >> 1) | myGpioRead(w->S.MISO) << 7;
-         }
-         else
-         {
-            rxByte = (rxByte << 1) | myGpioRead(w->S.MISO);
-         }
-
-         SPI_delay(w);
-
-         clear_SCLK(w);
+         slot = i;
+         spiInfo[slot].state = PI_SPI_RESERVED;
+         break;
       }
    }
 
-   return rxByte;
+   pthread_mutex_unlock(&mutex);
+
+   if (slot < 0) SOFT_ERROR(PI_NO_HANDLE, "no SPI handles");
+
+   spiInfo[slot].speed = baud;
+   spiInfo[slot].flags = spiFlags | PI_SPI_FLAGS_CHANNEL(spiChan);
+   spiInfo[slot].state = PI_SPI_OPENED;
+
+   return slot;
+}
+//}}}
+//{{{
+int spiClose (unsigned handle)
+{
+   DBG(DBG_USER, "handle=%d", handle);
+
+   CHECK_INITED;
+
+   if (handle >= PI_SPI_SLOTS)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (spiInfo[handle].state != PI_SPI_OPENED)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   spiInfo[handle].state = PI_SPI_CLOSED;
+
+   if (!spiAnyOpen(spiInfo[handle].flags))
+      spiTerm(spiInfo[handle].flags); /* terminate on last close */
+
+   return 0;
 }
 //}}}
 
+//{{{
+int spiRead (unsigned handle, char *buf, unsigned count)
+{
+   DBG(DBG_USER, "handle=%d count=%d [%s]",
+      handle, count, myBuf2Str(count, buf));
+
+   CHECK_INITED;
+
+   if (handle >= PI_SPI_SLOTS)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (spiInfo[handle].state != PI_SPI_OPENED)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (count > PI_MAX_SPI_DEVICE_COUNT)
+      SOFT_ERROR(PI_BAD_SPI_COUNT, "bad count (%d)", count);
+
+   spiGo(spiInfo[handle].speed, spiInfo[handle].flags, NULL, buf, count);
+
+   return count;
+}
+//}}}
+//{{{
+int spiWrite (unsigned handle, char *buf, unsigned count)
+{
+   DBG(DBG_USER, "handle=%d count=%d [%s]",
+      handle, count, myBuf2Str(count, buf));
+
+   CHECK_INITED;
+
+   if (handle >= PI_SPI_SLOTS)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (spiInfo[handle].state != PI_SPI_OPENED)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (count > PI_MAX_SPI_DEVICE_COUNT)
+      SOFT_ERROR(PI_BAD_SPI_COUNT, "bad count (%d)", count);
+
+   spiGo(spiInfo[handle].speed, spiInfo[handle].flags, buf, NULL, count);
+
+   return count;
+}
+//}}}
+
+//{{{
+int spiXfer (unsigned handle, char *txBuf, char *rxBuf, unsigned count)
+{
+   DBG(DBG_USER, "handle=%d count=%d [%s]",
+      handle, count, myBuf2Str(count, txBuf));
+
+   CHECK_INITED;
+
+   if (handle >= PI_SPI_SLOTS)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (spiInfo[handle].state != PI_SPI_OPENED)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (count > PI_MAX_SPI_DEVICE_COUNT)
+      SOFT_ERROR(PI_BAD_SPI_COUNT, "bad count (%d)", count);
+
+   spiGo(spiInfo[handle].speed, spiInfo[handle].flags, txBuf, rxBuf, count);
+
+   return count;
+}
+//}}}
+
+// bitBang spi
 //{{{
 int bbSPIOpen  (unsigned CS, unsigned MISO, unsigned MOSI, unsigned SCLK, unsigned baud, unsigned spiFlags)
 {
@@ -11525,7 +11268,271 @@ int bbSPIXfer (unsigned CS, char *inBuf, char *outBuf, unsigned count)
 }
 //}}}
 //}}}
+//{{{  ser
+//{{{
+int serOpen (char *tty, unsigned serBaud, unsigned serFlags)
+{
+   static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+   struct termios new;
+   int speed;
+   int fd;
+   int i, slot;
 
+   DBG(DBG_USER, "tty=%s serBaud=%d serFlags=0x%X", tty, serBaud, serFlags);
+
+   SER_CHECK_INITED;
+
+   if (strncmp("/dev/tty", tty, 8) && strncmp("/dev/serial", tty, 11))
+      SOFT_ERROR(PI_BAD_SER_DEVICE, "bad device (%s)", tty);
+
+   switch (serBaud)
+   {
+      case     50: speed =     B50; break;
+      case     75: speed =     B75; break;
+      case    110: speed =    B110; break;
+      case    134: speed =    B134; break;
+      case    150: speed =    B150; break;
+      case    200: speed =    B200; break;
+      case    300: speed =    B300; break;
+      case    600: speed =    B600; break;
+      case   1200: speed =   B1200; break;
+      case   1800: speed =   B1800; break;
+      case   2400: speed =   B2400; break;
+      case   4800: speed =   B4800; break;
+      case   9600: speed =   B9600; break;
+      case  19200: speed =  B19200; break;
+      case  38400: speed =  B38400; break;
+      case  57600: speed =  B57600; break;
+      case 115200: speed = B115200; break;
+      case 230400: speed = B230400; break;
+
+      default:
+         SOFT_ERROR(PI_BAD_SER_SPEED, "bad speed (%d)", serBaud);
+   }
+
+   if (serFlags)
+      SOFT_ERROR(PI_BAD_FLAGS, "bad flags (0x%X)", serFlags);
+
+   slot = -1;
+
+   pthread_mutex_lock(&mutex);
+
+   for (i=0; i<PI_SER_SLOTS; i++)
+   {
+      if (serInfo[i].state == PI_SER_CLOSED)
+      {
+         slot = i;
+         serInfo[slot].state = PI_SER_RESERVED;
+         break;
+      }
+   }
+
+   pthread_mutex_unlock(&mutex);
+
+   if (slot < 0) SOFT_ERROR(PI_NO_HANDLE, "no serial handles");
+
+   if ((fd = open(tty, O_RDWR | O_NOCTTY | O_NDELAY | O_NONBLOCK)) == -1)
+   {
+      serInfo[slot].state = PI_SER_CLOSED;
+      return PI_SER_OPEN_FAILED;
+   }
+
+   tcgetattr(fd, &new);
+
+   cfmakeraw(&new);
+
+   cfsetispeed(&new, speed);
+   cfsetospeed(&new, speed);
+
+   new.c_cc [VMIN]  = 0;
+   new.c_cc [VTIME] = 0;
+
+   tcflush(fd, TCIFLUSH);
+   tcsetattr(fd, TCSANOW, &new);
+
+   //fcntl(fd, F_SETFL, O_RDWR);
+
+   serInfo[slot].fd = fd;
+   serInfo[slot].flags = serFlags;
+   serInfo[slot].state = PI_SER_OPENED;
+
+   return slot;
+}
+//}}}
+//{{{
+int serClose (unsigned handle)
+{
+   DBG(DBG_USER, "handle=%d", handle);
+
+   SER_CHECK_INITED;
+
+   if (handle >= PI_SER_SLOTS)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (serInfo[handle].state != PI_SER_OPENED)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (serInfo[handle].fd >= 0) close(serInfo[handle].fd);
+
+   serInfo[handle].fd = -1;
+   serInfo[handle].state = PI_SER_CLOSED;
+
+   return 0;
+}
+//}}}
+
+//{{{
+int serWriteByte (unsigned handle, unsigned bVal)
+{
+   char c;
+
+   DBG(DBG_USER, "handle=%d bVal=%d", handle, bVal);
+
+   SER_CHECK_INITED;
+
+   if (handle >= PI_SER_SLOTS)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (serInfo[handle].state != PI_SER_OPENED)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (bVal > 0xFF)
+      SOFT_ERROR(PI_BAD_PARAM, "bad parameter (%d)", bVal);
+
+   c = bVal;
+
+   if (write(serInfo[handle].fd, &c, 1) != 1)
+      return PI_SER_WRITE_FAILED;
+   else
+      return 0;
+}
+//}}}
+//{{{
+int serReadByte (unsigned handle)
+{
+   int r;
+   char x;
+
+   DBG(DBG_USER, "handle=%d", handle);
+
+   SER_CHECK_INITED;
+
+   if (handle >= PI_SER_SLOTS)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (serInfo[handle].state != PI_SER_OPENED)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   r = read(serInfo[handle].fd, &x, 1);
+
+   if (r == 1)
+      return ((int)x) & 0xFF;
+
+   else if (r == 0)
+      return PI_SER_READ_NO_DATA;
+
+   else if ((r == -1) && (errno == EAGAIN))
+      return PI_SER_READ_NO_DATA;
+
+   else
+      return PI_SER_READ_FAILED;
+}
+//}}}
+
+//{{{
+int serWrite (unsigned handle, char *buf, unsigned count)
+{
+   int written=0, wrote=0;
+
+   DBG(DBG_USER, "handle=%d count=%d [%s]",
+      handle, count, myBuf2Str(count, buf));
+
+   SER_CHECK_INITED;
+
+   if (handle >= PI_SER_SLOTS)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (serInfo[handle].state != PI_SER_OPENED)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (!count)
+      SOFT_ERROR(PI_BAD_PARAM, "bad count (%d)", count);
+
+   while ((written != count) && (wrote >= 0))
+   {
+      wrote = write(serInfo[handle].fd, buf+written, count-written);
+
+      if (wrote >= 0)
+      {
+         written += wrote;
+
+         if (written != count) time_sleep(0.05);
+      }
+   }
+
+   if (written != count)
+      return PI_SER_WRITE_FAILED;
+   else
+      return 0;
+}
+//}}}
+//{{{
+int serRead (unsigned handle, char *buf, unsigned count)
+{
+   int r;
+
+   DBG(DBG_USER, "handle=%d count=%d buf=0x%"PRIXPTR, handle, count, (uintptr_t)buf);
+
+   SER_CHECK_INITED;
+
+   if (handle >= PI_SER_SLOTS)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (serInfo[handle].state != PI_SER_OPENED)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (!count)
+      SOFT_ERROR(PI_BAD_PARAM, "bad count (%d)", count);
+
+   r = read(serInfo[handle].fd, buf, count);
+
+   if (r == -1)
+   {
+      if (errno == EAGAIN)
+         return PI_SER_READ_NO_DATA;
+      else
+         return PI_SER_READ_FAILED;
+   }
+   else
+   {
+      if (r < count) buf[r] = 0;
+      return r;
+   }
+}
+//}}}
+
+//{{{
+int serDataAvailable (unsigned handle)
+{
+   int result;
+
+   DBG(DBG_USER, "handle=%d", handle);
+
+   SER_CHECK_INITED;
+
+   if (handle >= PI_SER_SLOTS)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (serInfo[handle].state != PI_SER_OPENED)
+      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+   if (ioctl(serInfo[handle].fd, FIONREAD, &result) == -1) return 0;
+
+   return result;
+}
+//}}}
+
+// gpio ser
 //{{{
 int gpioSerialReadOpen (unsigned gpio, unsigned baud, unsigned data_bits)
 {
@@ -11700,6 +11707,7 @@ static int intEventSetFunc(
 
    return 0;
 }
+//}}}
 //}}}
 
 //{{{
