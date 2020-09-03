@@ -7,7 +7,6 @@
 #include <sys/fcntl.h>
 #include <sys/ioctl.h>
 #include <linux/fb.h>
-#include <sys/mman.h>
 
 #include "cLcd.h"
 

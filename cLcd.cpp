@@ -23,12 +23,10 @@ static FT_Library mLibrary;
 static FT_Face mFace;
 //}}}
 
-// faster asm coarse diff test
-constexpr bool kCoarseDiff = true;
-
 // gpio/pin common to spi/16bit
 constexpr uint8_t kResetGpio = 25;
 
+constexpr int kSpanMergeThreshold = 16;
 //{{{
 struct sSpan {
   cRect r;
@@ -154,7 +152,7 @@ bool cLcd::present() {
     return false;
 
   // merge diffSpans, uS time it
-  merge (mDiffSpans, 16);
+  merge (mDiffSpans, kSpanMergeThreshold);
   mDiffUs = int((time() - diffStartTime) * 1000000.);
 
   // update lcd with diffSpans, uS time it
@@ -345,8 +343,8 @@ bool cLcd::initialise() {
 //}}}
 
 //{{{  cLcd private
-#define SPAN_MERGE_THRESHOLD 8
-#define SWAPU32(x, y) { uint32_t tmp = x; x = y; y = tmp; }
+// faster asm coarse diff test
+constexpr bool kCoarseDiff = true;
 
 //{{{
 bool cLcd::diffSingle (sSpan* spans) {
@@ -469,8 +467,13 @@ bool cLcd::diffSingle (sSpan* spans) {
   prevFrameScanline = mPrevFrameBuf + minY*stride;
 
   int lastScanRight = maxX;
-  if (minX > maxX)
-    SWAPU32 (minX, maxX);
+  if (minX > maxX) {
+    //{{{  swap minX, maxX
+    uint32_t temp = minX;
+    minX = maxX;
+    maxX = temp;
+    }
+    //}}}
 
   int leftX = 0;
   while (leftX < minX) {
@@ -647,7 +650,7 @@ int cLcd::diffExact (sSpan* spans) {
             numConsecutiveUnchangedPixels = 0;
             }
           else {
-            if (++numConsecutiveUnchangedPixels > SPAN_MERGE_THRESHOLD)
+            if (++numConsecutiveUnchangedPixels > kSpanMergeThreshold)
               break;
             }
           }
