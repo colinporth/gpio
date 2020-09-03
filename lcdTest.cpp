@@ -1,14 +1,8 @@
 // lcdTest.cpp
 //{{{  includes
-//#include <cstdint>
-//#include <string>
-#include <vector>
-
-//#include <sys/fcntl.h>
-//#include <sys/ioctl.h>
-//#include <linux/fb.h>
-
 #include "cLcd.h"
+
+#include <vector>
 
 #include "../shared/utils/utils.h"
 #include "../shared/utils/cLog.h"
@@ -68,7 +62,8 @@ int main (int numArgs, char* args[]) {
     lcd->setBacklightOn();
     //{{{  display font
     int height = 8;
-    while (height++ < 100) {
+
+    while (height < 100) {
       cPoint point;
       lcd->clear (kMagenta);
       for (char ch = 'A'; ch < 0x7f; ch++) {
@@ -80,9 +75,11 @@ int main (int numArgs, char* args[]) {
             break;
           }
         }
+
       lcd->text (kYellow, cPoint(), 20, "Hello Colin");
       lcd->present();
       lcd->delayUs (16000);
+      height += 8;
       }
     //}}}
     lcd->setBacklightOff();
