@@ -161,7 +161,7 @@ constexpr uint16_t kWhite       =  0xFFFF;  // 255, 255, 255
 struct sSpan;
 class cLcd {
 public:
-  cLcd (const int16_t width, const int16_t height, const int rotate);
+  cLcd (const int16_t width, const int16_t height, const int rotate, const bool info);
   virtual ~cLcd();
 
   virtual bool initialise();
@@ -172,15 +172,13 @@ public:
   const cPoint getSize() { return cPoint(mWidth, mHeight); }
   const cRect getRect() { return cRect(0,0, mWidth,mHeight); }
   const int getNumPixels() { return mWidth * mHeight; }
+  const std::string getInfoString();
+  const std::string getPaddedInfoString();
 
-  // info
-  const int getUpdateUs() { return mUpdateUs; }
-  const int getUpdatePixels() { return mUpdatePixels; }
-  const int getDiffUs() { return mDiffUs; }
-  const int getNumSpans() { return mNumDiffSpans; }
-
-  virtual void setBacklightOn() {}
-  virtual void setBacklightOff() {}
+  virtual void setBacklight (bool on) {}
+  void setBacklightOn() { setBacklight (true); }
+  void setBacklightOff() { setBacklight (false); }
+  void setInfo (bool on) { mInfo = on; }
 
   void update() { mUpdate = true; }
   void setAutoUpdate() { mAutoUpdate = true; }
@@ -223,9 +221,13 @@ protected:
 //}}}
 //{{{
 private:
-  void setFont (const uint8_t* font, const int fontSize);
+  // info
+  const int getUpdateUs() { return mUpdateUs; }
+  const int getUpdatePixels() { return mUpdatePixels; }
+  const int getDiffUs() { return mDiffUs; }
+  const int getNumSpans() { return mNumDiffSpans; }
 
-  void swapBuffers();
+  void setFont (const uint8_t* font, const int fontSize);
 
   sSpan* diffSingle();
   sSpan* diffCoarse();
@@ -245,6 +247,7 @@ private:
   bool mExited = false;
 
   int mDiffUs = 0;
+  bool mInfo = false;
 
   // main display screen buffers
   uint16_t* mPrevFrameBuf = nullptr;
@@ -265,7 +268,8 @@ private:
 //{{{
 class cLcd16 : public cLcd {
 public:
-  cLcd16 (const int16_t width, const int16_t height, const int rotate) : cLcd (width, height, rotate) {}
+  cLcd16 (const int16_t width, const int16_t height, const int rotate, const bool info)
+    : cLcd (width, height, rotate, info) {}
   virtual ~cLcd16() {}
 
 protected:
@@ -277,7 +281,8 @@ protected:
 //{{{
 class cLcdSpi : public cLcd {
 public:
-  cLcdSpi (const int16_t width, const int16_t height, const int rotate) : cLcd (width, height, rotate) {}
+  cLcdSpi (const int16_t width, const int16_t height, const int rotate, const bool info)
+    : cLcd (width, height, rotate, info) {}
   virtual ~cLcdSpi();
 
 protected:
@@ -287,8 +292,8 @@ protected:
 //{{{
 class cLcdSpiHeaderSelect : public cLcdSpi {
 public:
-  cLcdSpiHeaderSelect (const int16_t width, const int16_t height, const int rotate)
-    : cLcdSpi (width, height, rotate) {}
+  cLcdSpiHeaderSelect (const int16_t width, const int16_t height, const int rotate, const bool info)
+    : cLcdSpi (width, height, rotate, info) {}
   virtual ~cLcdSpiHeaderSelect() {}
 
 protected:
@@ -300,8 +305,8 @@ protected:
 //{{{
 class cLcdSpiRegisterSelect : public cLcdSpi {
 public:
-  cLcdSpiRegisterSelect (const int16_t width, const int16_t height, const int rotate)
-    : cLcdSpi (width, height, rotate) {}
+  cLcdSpiRegisterSelect (const int16_t width, const int16_t height, const int rotate, const bool info)
+    : cLcdSpi (width, height, rotate, info) {}
 
   virtual ~cLcdSpiRegisterSelect() {}
 
@@ -316,7 +321,7 @@ protected:
 //{{{
 class cLcdTa7601 : public cLcd16 {
 public:
-  cLcdTa7601 (const int rotate = 0);
+  cLcdTa7601 (const int rotate = 0, const bool info = false);
   virtual ~cLcdTa7601() {}
 
   virtual bool initialise();
@@ -327,7 +332,7 @@ public:
 //{{{
 class cLcdSsd1289 : public cLcd16 {
 public:
-  cLcdSsd1289 (const int rotate = 0);
+  cLcdSsd1289 (const int rotate = 0, const bool info = false);
   virtual ~cLcdSsd1289() {}
 
   virtual bool initialise();
@@ -341,11 +346,10 @@ public:
 class cLcdIli9320 : public cLcdSpiHeaderSelect {
 // 2.8 inch 1240x320 - HY28A
 public:
-  cLcdIli9320 (const int rotate = 0);
+  cLcdIli9320 (const int rotate = 0, const bool info = false);
   virtual ~cLcdIli9320() {}
 
-  virtual void setBacklightOn();
-  virtual void setBacklightOff();
+  virtual void setBacklight (bool on);
 
   virtual bool initialise();
   virtual int updateLcd();
@@ -356,7 +360,7 @@ public:
 class cLcdSt7735r : public cLcdSpiRegisterSelect {
 // 1.8 inch 128x160
 public:
-  cLcdSt7735r (const int rotate = 0);
+  cLcdSt7735r (const int rotate = 0, const bool info = false);
   virtual ~cLcdSt7735r() {}
 
   virtual bool initialise();
@@ -368,7 +372,7 @@ public:
 class cLcdIli9225b : public cLcdSpiRegisterSelect {
 // 2.2 inch 186x220
 public:
-  cLcdIli9225b (const int rotate = 0);
+  cLcdIli9225b (const int rotate = 0, const bool info = false);
   virtual ~cLcdIli9225b() {}
 
   virtual bool initialise();

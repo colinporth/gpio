@@ -63,17 +63,13 @@ int main (int numArgs, char* args[]) {
   //close (fbfd);
   //}}}
 
-  int i = 0;
   while (true) {
     lcd->clearSnapshot();
-    lcd->text (kWhite, cPoint(0,0), 20, dec(i++) +
-                                        " " + dec(lcd->getUpdateUs()) +
-                                        " " + dec(lcd->getDiffUs(),5,'0') +
-                                        " " + dec(lcd->getUpdatePixels(),5,'0') +
-                                        " " + dec(lcd->getNumSpans(),4,'0'));
-    if (lcd->present())
+    if (lcd->present()) {
       lcd->setBacklightOn();
-    else 
+      cLog::log (LOGINFO, lcd->getInfoString());
+      }
+    else
       lcd->delayUs (10000);
     }
 

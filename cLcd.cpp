@@ -16,7 +16,6 @@
 using namespace std;
 //}}}
 //{{{  include freetype static library
-// !!! singleton assumed !|! saves exporting FREETYPE outside
 #include <ft2build.h>
 #include FT_FREETYPE_H
 
@@ -24,9 +23,11 @@ static FT_Library mLibrary;
 static FT_Face mFace;
 //}}}
 
+// faster asm coarse diff test
+constexpr bool kCoarseDiff = true;
+
 // gpio/pin common to spi/16bit
 constexpr uint8_t kResetGpio = 25;
-constexpr bool kCoarseDiff = true;
 
 //{{{
 struct sSpan {
@@ -41,10 +42,11 @@ struct sSpan {
 
 // cLcd public
 //{{{
-cLcd::cLcd (const int16_t width, const int16_t height, const int rotate)
+cLcd::cLcd (const int16_t width, const int16_t height, const int rotate, const bool info)
     : mRotate(rotate),
       mWidth(((rotate == 90) || (rotate == 270)) ? height : width),
-      mHeight(((rotate == 90) || (rotate == 270)) ? width : height) {
+      mHeight(((rotate == 90) || (rotate == 270)) ? width : height),
+      mInfo(info) {
 
   // large possible max size
   mDiffSpans = (sSpan*)malloc ((getNumPixels() / 2) * sizeof(sSpan));
@@ -88,6 +90,24 @@ cLcd::~cLcd() {
 //}}}
 
 //{{{
+const string cLcd::getInfoString() {
+  return
+    dec(getUpdateUs()) + "uS " +
+    dec(getDiffUs()) + "uS " +
+    dec(getUpdatePixels()) + "pix " +
+    dec(getNumSpans()) + "spans";
+  }
+//}}}
+//{{{
+const string cLcd::getPaddedInfoString() {
+  return
+    dec(getUpdateUs()) + " " +
+    dec(getDiffUs(),5,'0') + " " +
+    dec(getUpdatePixels(),5,'0') + " " +
+    dec(getNumSpans(),4,'0');
+  }
+//}}}
+//{{{
 void cLcd::setFont (const uint8_t* font, const int fontSize)  {
 
   FT_Init_FreeType (&mLibrary);
@@ -98,23 +118,18 @@ void cLcd::setFont (const uint8_t* font, const int fontSize)  {
 //{{{
 void cLcd::clear (const uint16_t colour) {
 
-  swapBuffers();
-
   uint64_t colour64 = colour;
   colour64 |= (colour64 << 48) | (colour64 << 32) | (colour64 << 16);
 
   uint64_t* ptr = (uint64_t*)mFrameBuf;
   for (int i = 0; i < getNumPixels()/4; i++)
     *ptr++ = colour64;
-
-  mChanged = true;
   }
 //}}}
 //{{{
 void cLcd::clearSnapshot() {
-// snapshot and read to main display buffer
+// snapshot and read to main frameBuffer
 
-  swapBuffers();
   vc_dispmanx_snapshot (mDisplay, mScreenGrab, DISPMANX_TRANSFORM_T(0));
   vc_dispmanx_resource_read_data (mScreenGrab, &mVcRect, mFrameBuf, getWidth() * 2);
   }
@@ -122,20 +137,27 @@ void cLcd::clearSnapshot() {
 //{{{
 bool cLcd::present() {
 
-  // calc diff spans list
+  if (mInfo)
+    text (kWhite, cPoint(0,0), 20, getPaddedInfoString());
+
   double startTime = time();
 
-  sSpan* spans = diffCoarse();
-  if (!spans) // nothing changed
+  // make diffSpans list
+  sSpan* diffSpans = diffCoarse();
+  if (!diffSpans) // nothing changed
     return false;
 
-  // merge
-  spans = merge (16);
-  mDiffUs = int((time() - startTime) * 1000000);
+  // merge diffSpans, uS time it
+  diffSpans = merge (16);
+  mDiffUs = int((time() - startTime) * 1000000.);
 
-  // update spans
-  mUpdatePixels = updateLcd (spans);
-  mUpdateUs = (int)((time() - startTime) * 1000000.0);
+  // update lcd with diffSpans, uS time it
+  mUpdatePixels = updateLcd (diffSpans);
+  mUpdateUs = (int)((time() - startTime) * 1000000.);
+
+  auto temp = mPrevFrameBuf;
+  mPrevFrameBuf = mFrameBuf;
+  mFrameBuf = temp;
 
   return true;
   }
@@ -201,6 +223,7 @@ void cLcd::copy (const uint16_t* src) {
 // copy all of src of same width,height
 
   memcpy (mFrameBuf, src, getNumPixels() * 2);
+  mChanged = true;
   }
 //}}}
 //{{{
@@ -211,6 +234,7 @@ void cLcd::copy (const uint16_t* src, const cRect& srcRect, const cPoint& dstPoi
     memcpy (mFrameBuf + ((dstPoint.y + y) * getWidth()) + dstPoint.x,
             src + ((srcRect.top + y) * getWidth()) + srcRect.left,
             srcRect.getWidth() * 2);
+  mChanged = true;
   }
 //}}}
 
@@ -219,9 +243,8 @@ void cLcd::rectOutline (const uint16_t colour, const cRect& r) {
 
   rect (colour, cRect (r.left, r.top, r.right, r.top+1));
   rect (colour, cRect (r.left, r.bottom-1, r.right, r.bottom));
-
   rect (colour, cRect (r.left, r.top, r.left+1, r.bottom));
-  rect (colour, cRect (r.right, r.top, r.right-11, r.bottom));
+  rect (colour, cRect (r.right-1, r.top, r.right, r.bottom));
   }
 //}}}
 //{{{
@@ -333,16 +356,6 @@ void cLcd::launchUpdateThread() {
 //{{{  cLcd private
 #define SPAN_MERGE_THRESHOLD 8
 #define SWAPU32(x, y) { uint32_t tmp = x; x = y; y = tmp; }
-
-//{{{
-void cLcd::swapBuffers() {
-// swap frameBuffers
-
-  auto temp = mPrevFrameBuf;
-  mPrevFrameBuf = mFrameBuf;
-  mFrameBuf = temp;
-  }
-//}}}
 
 //{{{
 sSpan* cLcd::diffSingle() {
@@ -988,7 +1001,8 @@ void cLcdSpiRegisterSelect::writeCommandMultiData (const uint8_t command, const 
 //{{{  cLcdTa7601 : cLcd16
 constexpr int16_t kWidthTa7601 = 320;
 constexpr int16_t kHeightTa7601 = 480;
-cLcdTa7601::cLcdTa7601 (const int rotate) : cLcd16(kWidthTa7601, kHeightTa7601, rotate) {}
+cLcdTa7601::cLcdTa7601 (const int rotate, const bool info)
+  : cLcd16(kWidthTa7601, kHeightTa7601, rotate, info) {}
 
 //{{{
 bool cLcdTa7601::initialise() {
@@ -1097,7 +1111,8 @@ int cLcdTa7601::updateLcd() {
 //{{{  cLcdSsd1289 : cLcd16
 constexpr int16_t kWidth1289 = 240;
 constexpr int16_t kHeight1289 = 320;
-cLcdSsd1289::cLcdSsd1289 (const int rotate) : cLcd16(kWidth1289, kHeight1289, rotate) {}
+cLcdSsd1289::cLcdSsd1289 (const int rotate, const bool info)
+  : cLcd16(kWidth1289, kHeight1289, rotate, info) {}
 
 //{{{
 bool cLcdSsd1289::initialise() {
@@ -1213,16 +1228,12 @@ constexpr int16_t kWidth9320 = 240;
 constexpr int16_t kHeight9320 = 320;
 constexpr int kSpiClock9320 = 24000000;
 
-cLcdIli9320::cLcdIli9320 (const int rotate) : cLcdSpiHeaderSelect(kWidth9320, kHeight9320, rotate) {}
+cLcdIli9320::cLcdIli9320 (const int rotate, const bool info)
+  : cLcdSpiHeaderSelect(kWidth9320, kHeight9320, rotate, info) {}
 
 //{{{
-void cLcdIli9320::setBacklightOn() {
-  gpioWrite (kBacklightGpio, 1);
-  }
-//}}}
-//{{{
-void cLcdIli9320::setBacklightOff() {
-  gpioWrite (kBacklightGpio, 0);
+void cLcdIli9320::setBacklight (bool on) {
+  gpioWrite (kBacklightGpio, on ? 1 : 0);
   }
 //}}}
 
@@ -1474,7 +1485,8 @@ constexpr int16_t kWidth7735 = 128;
 constexpr int16_t kHeight7735 = 160;
 constexpr int kSpiClock7735 = 24000000;
 
-cLcdSt7735r::cLcdSt7735r (const int rotate) : cLcdSpiRegisterSelect (kWidth7735, kHeight7735, rotate) {}
+cLcdSt7735r::cLcdSt7735r (const int rotate, const bool info)
+  : cLcdSpiRegisterSelect (kWidth7735, kHeight7735, rotate, info) {}
 
 //{{{
 bool cLcdSt7735r::initialise() {
@@ -1583,7 +1595,8 @@ constexpr int16_t kWidth9225b = 176;
 constexpr int16_t kHeight9225b = 220;
 constexpr int kSpiClock9225b = 16000000;
 
-cLcdIli9225b::cLcdIli9225b (const int rotate) : cLcdSpiRegisterSelect(kWidth9225b, kHeight9225b, rotate) {}
+cLcdIli9225b::cLcdIli9225b (const int rotate, const bool info)
+  : cLcdSpiRegisterSelect(kWidth9225b, kHeight9225b, rotate, info) {}
 
 //{{{
 bool cLcdIli9225b::initialise() {
