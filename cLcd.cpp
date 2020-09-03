@@ -26,7 +26,8 @@ static FT_Face mFace;
 // gpio/pin common to spi/16bit
 constexpr uint8_t kResetGpio = 25;
 
-constexpr int kSpanMergeThreshold = 16;
+constexpr int kSpanMergeThreshold8 = 8;
+constexpr int kSpanMergeThreshold16 = 8;
 //{{{
 struct sSpan {
   cRect r;
@@ -151,14 +152,14 @@ bool cLcd::present() {
   if (!mNumDiffSpans) // nothing changed
     return false;
 
-  // merge diffSpans, uS time it
-  merge (mDiffSpans, kSpanMergeThreshold);
+  // merge diffSpans
+  merge (mDiffSpans, kSpanMergeThreshold16);
   mDiffUs = int((time() - diffStartTime) * 1000000.);
 
-  // update lcd with diffSpans, uS time it
+  // update lcd with diffSpans
   double updateStartTime = time();
   mUpdatePixels = updateLcd (mDiffSpans);
-  mUpdateUs = (int)((time() - updateStartTime) * 1000000.);
+  mUpdateUs = int((time() - updateStartTime) * 1000000.);
 
   auto temp = mPrevFrameBuf;
   mPrevFrameBuf = mFrameBuf;
@@ -650,7 +651,7 @@ int cLcd::diffExact (sSpan* spans) {
             numConsecutiveUnchangedPixels = 0;
             }
           else {
-            if (++numConsecutiveUnchangedPixels > kSpanMergeThreshold)
+            if (++numConsecutiveUnchangedPixels > kSpanMergeThreshold8)
               break;
             }
           }
@@ -963,13 +964,16 @@ bool cLcdTa7601::initialise() {
     writeCommandData (0x0C, 0x0770); // source and gate timing control
     writeCommandData (0x0D, 0x0000); // gate scan position
     writeCommandData (0x0E, 0x0001); // tearing effect prevention
+
+    //{{{  power control
     writeCommandData (0x11, 0x0406); // power control
     writeCommandData (0x12, 0x000E); // power control
     writeCommandData (0x13, 0x0222); // power control
     writeCommandData (0x14, 0x0015); // power control
     writeCommandData (0x15, 0x4277); // power control
     writeCommandData (0x16, 0x0000); // power control
-
+    //}}}
+    //{{{  gamma
     writeCommandData (0x30, 0x6A50); // gamma
     writeCommandData (0x31, 0x00C9); // gamma
     writeCommandData (0x32, 0xC7BE); // gamma
@@ -992,11 +996,13 @@ bool cLcdTa7601::initialise() {
     writeCommandData (0x37, 0x0000); // gamma
     writeCommandData (0x38, 0x0000); // gamma
     delayUs (10000);
-
+    //}}}
+    //{{{  more power control
     writeCommandData (0x12, 0x200E);  // power control
     delayUs (10000);
     writeCommandData (0x12, 0x2003);  // power control
     delayUs (10000);
+    //}}}
 
     writeCommandData (0x07, 0x0012);  // partial, 8-color, display ON
     delayUs (10000);
@@ -1113,6 +1119,7 @@ int cLcdTa7601::updateLcd() {
       }
 
     case 90:
+      // !!! simplify the back step at aned of line !!!
       for (int x = 0; x < getWidth(); x++) {
         uint16_t* ptr = mFrameBuf + x;
         for (int y = 0; y < getHeight(); y++) {
@@ -1123,6 +1130,7 @@ int cLcdTa7601::updateLcd() {
       break;
 
     case 180:
+      // !!! simplify !!!
       for (int y = 0; y < getHeight(); y++) {
         uint16_t* ptr = mFrameBuf + ((getHeight()-1-y) * getWidth());
         for (int x = 0; x < getWidth(); x++) {
@@ -1133,6 +1141,7 @@ int cLcdTa7601::updateLcd() {
       break;
 
     case 270:
+      // !!! simplify the back step at aned of line !!!
       for (int x = 0; x < getWidth(); x++) {
         uint16_t* ptr = mFrameBuf + ((getHeight()-1) * getWidth()) + x;
         for (int y = 0; y < getHeight(); y++) {

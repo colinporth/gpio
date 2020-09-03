@@ -1,12 +1,12 @@
 // lcdTest.cpp
 //{{{  includes
-#include <cstdint>
-#include <string>
+//#include <cstdint>
+//#include <string>
 #include <vector>
 
-#include <sys/fcntl.h>
-#include <sys/ioctl.h>
-#include <linux/fb.h>
+//#include <sys/fcntl.h>
+//#include <sys/ioctl.h>
+//#include <linux/fb.h>
 
 #include "cLcd.h"
 
@@ -30,37 +30,37 @@ int main (int numArgs, char* args[]) {
   lcd->initialise();
 
   //{{{  fb0
-  int fbfd = open ("/dev/fb0", O_RDWR);
-  if (fbfd == -1) {
+  //int fbfd = open ("/dev/fb0", O_RDWR);
+  //if (fbfd == -1) {
     //{{{  error return
-    cLog::log (LOGERROR, "fb0 open failed");
-    return 0;
-    }
+    //cLog::log (LOGERROR, "fb0 open failed");
+    //return 0;
+    //}
     //}}}
 
-  struct fb_fix_screeninfo finfo;
-  if (ioctl (fbfd, FBIOGET_FSCREENINFO, &finfo)) {
+  //struct fb_fix_screeninfo finfo;
+  //if (ioctl (fbfd, FBIOGET_FSCREENINFO, &finfo)) {
     //{{{  error return
-    cLog::log (LOGERROR, "fb0 get fscreeninfo failed");
-    return 0;
-    }
+    //cLog::log (LOGERROR, "fb0 get fscreeninfo failed");
+    //return 0;
+    //}
     //}}}
 
-  struct fb_var_screeninfo vinfo;
-  if (ioctl (fbfd, FBIOGET_VSCREENINFO, &vinfo)) {
+  //struct fb_var_screeninfo vinfo;
+  //if (ioctl (fbfd, FBIOGET_VSCREENINFO, &vinfo)) {
     //{{{  error return
-    cLog::log (LOGERROR, "fb0 get vscreeninfo failed");
-    return 0;
-    }
+    //cLog::log (LOGERROR, "fb0 get vscreeninfo failed");
+    //return 0;
+    //}
     //}}}
 
-  cLog::log (LOGINFO, "fb0 %dx%d %dbps", vinfo.xres, vinfo.yres, vinfo.bits_per_pixel);
+  //cLog::log (LOGINFO, "fb0 %dx%d %dbps", vinfo.xres, vinfo.yres, vinfo.bits_per_pixel);
 
-  //char* fbp = (char*)mmap (0, finfo.smem_len, PROT_READ | PROT_WRITE, MAP_SHARED, fbfd, 0);
-  //if (fbp <= 0) {
-  //  return 0;
-  //munmap (fbp, finfo.smem_len);
-  //close (fbfd);
+  ////char* fbp = (char*)mmap (0, finfo.smem_len, PROT_READ | PROT_WRITE, MAP_SHARED, fbfd, 0);
+  ////if (fbp <= 0) {
+  ////  return 0;
+  ////munmap (fbp, finfo.smem_len);
+  ////close (fbfd);
   //}}}
 
   // font test
