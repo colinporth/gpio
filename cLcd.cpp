@@ -240,10 +240,10 @@ bool cLcd::snap() {
     mBuf = temp;
     }
   else {
-    mBuf = (uint16_t*)malloc (getNumPixels() * 2);
+    mBuf = (uint16_t*)aligned_alloc (getNumPixels() * 2, 32);
     for (int i = 0; i < getNumPixels(); i++)
       mBuf[i] = 0;
-    mPrevBuf = (uint16_t*)malloc (getNumPixels() * 2);
+    mPrevBuf = (uint16_t*)aligned_alloc  (getNumPixels() * 2, 32);
     }
 
   // snapshot and read to main display buffer
@@ -259,6 +259,7 @@ bool cLcd::snap() {
 
     //copy (mBuf);
 
+    double startTime = time();
     auto it = spans;
     while (it) {
       updateLcd (mBuf, it->r);
@@ -267,6 +268,7 @@ bool cLcd::snap() {
       //updateLcd (mFrameBuf, it->r);
       it = it->next;
       }
+    mUpdateUs = (int)((time() - startTime) * 1000000.0);
 
     return true;
     }
@@ -1308,9 +1310,7 @@ void cLcdIli9320::updateLcd (const uint16_t* buf, const cRect& r) {
   uint16_t dataHeaderBuf [320+1];
   dataHeaderBuf[0] = 0x7272;
 
-  int pixels = 0;
-  double startTime = time();
-
+  mUpdatePixels = 0;
   //{{{  set xstart, ystart, yinc
   uint16_t xstart = r.left;
   uint16_t ystart = r.top;
@@ -1363,12 +1363,9 @@ void cLcdIli9320::updateLcd (const uint16_t* buf, const cRect& r) {
     // send from second byte of dataHeaderBuf
     spiWrite (mSpiHandle, ((char*)(dataHeaderBuf))+1, (r.getWidth() * 2) + 1);
 
-    pixels += r.getWidth();
+    mUpdatePixels += r.getWidth();
     ystart += yinc;
     }
-
-  mUpdateUs = (int)((time() - startTime) * 1000000.0);
-  mUpdatePixels = pixels;
   }
 //}}}
 //}}}

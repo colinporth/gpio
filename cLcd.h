@@ -213,6 +213,7 @@ protected:
 
   int mRotate = 0;
   bool mChanged = false;
+
   int mUpdateUs = 0;
   int mUpdatePixels = 0;
 
@@ -235,10 +236,11 @@ private:
 
   bool mUpdate = false;
   bool mAutoUpdate = false;
-  int mDiffUs = 0;
 
   bool mExit = false;
   bool mExited = false;
+
+  int mDiffUs = 0;
 
   // main display screen buffers
   uint16_t* mBuf = nullptr;
