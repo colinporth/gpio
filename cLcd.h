@@ -248,7 +248,7 @@ private:
   // dispmanx
   DISPMANX_DISPLAY_HANDLE_T mDisplay;
   DISPMANX_MODEINFO_T mModeInfo;
-  DISPMANX_RESOURCE_HANDLE_T mScreenGrab;
+  DISPMANX_RESOURCE_HANDLE_T mSnapshot;
   uint32_t mImagePrt;
   VC_RECT_T mVcRect;
 

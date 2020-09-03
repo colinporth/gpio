@@ -45,7 +45,7 @@ cLcd::~cLcd() {
 
   gpioTerminate();
 
-  vc_dispmanx_resource_delete (mScreenGrab);
+  vc_dispmanx_resource_delete (mSnapshot);
   vc_dispmanx_display_close (mDisplay);
 
   free (mFrameBuf);
@@ -97,8 +97,8 @@ void cLcd::clear (const uint16_t colour) {
 void cLcd::clearSnapshot() {
 // start update, snapshot main display to frameBuffer
 
-  vc_dispmanx_snapshot (mDisplay, mScreenGrab, DISPMANX_TRANSFORM_T(0));
-  vc_dispmanx_resource_read_data (mScreenGrab, &mVcRect, mFrameBuf, getWidth() * 2);
+  vc_dispmanx_snapshot (mDisplay, mSnapshot, DISPMANX_TRANSFORM_T(0));
+  vc_dispmanx_resource_read_data (mSnapshot, &mVcRect, mFrameBuf, getWidth() * 2);
   }
 //}}}
 //{{{
@@ -263,72 +263,73 @@ bool cLcd::initialise() {
   unsigned hardwareRevision = gpioHardwareRevision();
   cLog::log (LOGINFO, "pigpio hwRev:%x version:%d", hardwareRevision, version);
 
-  if (gpioInitialise() >= 0) {
-    setFont (getFreeSansBold(), getFreeSansBoldSize());
+  if (gpioInitialise() <= 0) 
+    return false;
 
-    // allocate and clear both frameBuffers to black
-    mFrameBuf = (uint16_t*)aligned_alloc (getNumPixels() * 2, 32);
-    if (!mFrameBuf) {
-      //{{{  error return
-      cLog::log (LOGERROR, "frameBuf allocate");
-      return false;
-      }
-      //}}}
-    mPrevFrameBuf = (uint16_t*)aligned_alloc (getNumPixels() * 2, 32);
-    if (!mPrevFrameBuf) {
-      //{{{  error return
-      cLog::log (LOGERROR, "prevFrameBuf allocate");
-      return false;
-      }
-      //}}}
-    clear();
-    clear();
+  setFont (getFreeSansBold(), getFreeSansBoldSize());
 
-    // large possible max size, !!! do something better to bomb out > couple of thousand !!!
-    mDiffSpans = (sSpan*)malloc ((getNumPixels() / 2) * sizeof(sSpan));
-    if (!mDiffSpans) {
-      //{{{  error return
-      cLog::log (LOGERROR, "diffSpans allocate");
-      return false;
-      }
-      //}}}
-
-    // dispmanx init
-    bcm_host_init();
-    mDisplay = vc_dispmanx_display_open (0);
-    if (!mDisplay) {
-      //{{{  error return
-      cLog::log (LOGERROR, "vc_dispmanx_display_open failed");
-      return false;
-      }
-      //}}}
-    if (vc_dispmanx_display_get_info (mDisplay, &mModeInfo)) {
-      //{{{  error return
-      cLog::log (LOGERROR, "vc_dispmanx_display_get_info failed");
-      return false;
-      }
-      //}}}
-    cLog::log (LOGINFO, "Primary display is %d x %d", mModeInfo.width, mModeInfo.height);
-    mScreenGrab = vc_dispmanx_resource_create (VC_IMAGE_RGB565, getWidth(), getHeight(), &mImagePrt);
-    if (!mScreenGrab) {
-      //{{{  error return
-      cLog::log (LOGERROR, "vc_dispmanx_resource_create failed");
-      return false;
-      }
-      //}}}
-    vc_dispmanx_rect_set (&mVcRect, 0, 0, getWidth(), getHeight());
-
-    // reset lcd
-    gpioSetMode (kResetGpio, PI_OUTPUT);
-    gpioWrite (kResetGpio, 0);
-    gpioDelay (10000);
-    gpioWrite (kResetGpio, 1);
-    gpioDelay (120000);
-
-    return true;
+  // allocate and clear both frameBuffers to black
+  mFrameBuf = (uint16_t*)aligned_alloc (getNumPixels() * 2, 32);
+  if (!mFrameBuf) {
+    //{{{  error return
+    cLog::log (LOGERROR, "frameBuf allocate");
+    return false;
     }
+    //}}}
+  mPrevFrameBuf = (uint16_t*)aligned_alloc (getNumPixels() * 2, 32);
+  if (!mPrevFrameBuf) {
+    //{{{  error return
+    cLog::log (LOGERROR, "prevFrameBuf allocate");
+    return false;
+    }
+    //}}}
+  clear();
+  clear();
 
-  return false;
+  // allocate large possible size
+  // !!! do something better to bomb out > couple of thousand !!!
+  mDiffSpans = (sSpan*)malloc ((getNumPixels() / 2) * sizeof(sSpan));
+  if (!mDiffSpans) {
+    //{{{  error return
+    cLog::log (LOGERROR, "diffSpans allocate");
+    return false;
+    }
+    //}}}
+
+  // dispmanx init
+  bcm_host_init();
+  mDisplay = vc_dispmanx_display_open (0);
+  if (!mDisplay) {
+    //{{{  error return
+    cLog::log (LOGERROR, "vc_dispmanx_display_open failed");
+    return false;
+    }
+    //}}}
+  if (vc_dispmanx_display_get_info (mDisplay, &mModeInfo)) {
+    //{{{  error return
+    cLog::log (LOGERROR, "vc_dispmanx_display_get_info failed");
+    return false;
+    }
+    //}}}
+  mSnapshot = vc_dispmanx_resource_create (VC_IMAGE_RGB565, getWidth(), getHeight(), &mImagePrt);
+  if (!mSnapshot) {
+    //{{{  error return
+    cLog::log (LOGERROR, "vc_dispmanx_resource_create failed");
+    return false;
+    }
+    //}}}
+  vc_dispmanx_rect_set (&mVcRect, 0, 0, getWidth(), getHeight());
+
+  cLog::log (LOGINFO, "Dispmanx %dx%d", mModeInfo.width, mModeInfo.height);
+
+  // reset lcd
+  gpioSetMode (kResetGpio, PI_OUTPUT);
+  gpioWrite (kResetGpio, 0);
+  gpioDelay (10000);
+  gpioWrite (kResetGpio, 1);
+  gpioDelay (120000);
+
+  return true;
   }
 //}}}
 
