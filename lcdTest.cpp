@@ -63,6 +63,32 @@ int main (int numArgs, char* args[]) {
   //close (fbfd);
   //}}}
 
+  // font test
+  if (false) {
+    lcd->setBacklightOn();
+    //{{{  display font
+    int height = 8;
+    while (height++ < 100) {
+      cPoint point;
+      lcd->clear (kMagenta);
+      for (char ch = 'A'; ch < 0x7f; ch++) {
+        point.x = lcd->text (kWhite, point, height, string(1,ch));
+        if (point.x > lcd->getWidth()) {
+          point.x = 0;
+          point.y += height;
+          if (point.y > lcd->getHeight())
+            break;
+          }
+        }
+      lcd->text (kYellow, cPoint(), 20, "Hello Colin");
+      lcd->present();
+      lcd->delayUs (16000);
+      }
+    //}}}
+    lcd->setBacklightOff();
+    }
+
+  // snapshot test
   while (true) {
     lcd->clearSnapshot();
     if (lcd->present()) {
@@ -72,27 +98,6 @@ int main (int numArgs, char* args[]) {
     else
       lcd->delayUs (10000);
     }
-
-  //{{{  display font
-  int height = 8;
-  while (height++ < 100) {
-    int x = 0;
-    int y = 0;
-    lcd->clear (kMagenta);
-    for (char ch = 'A'; ch < 0x7f; ch++) {
-      x = lcd->text (kWhite, cPoint(x, y), height, string(1,ch));
-      if (x > lcd->getWidth()) {
-        x = 0;
-        y += height;
-        if (y > lcd->getHeight())
-          break;
-        }
-      }
-    lcd->text (kYellow, cPoint(0,0), 20, "Hello Colin");
-    lcd->update();
-    lcd->delayUs (16000);
-    }
-  //}}}
 
   return 0;
   }
