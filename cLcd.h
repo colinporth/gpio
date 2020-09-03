@@ -161,7 +161,13 @@ constexpr uint16_t kWhite       =  0xFFFF;  // 255, 255, 255
 struct sSpan;
 class cLcd {
 public:
-  cLcd (const int16_t width, const int16_t height, const int rotate, const int info);
+  //{{{
+  cLcd (const int16_t width, const int16_t height, const int rotate, const int info)
+      : mRotate(rotate),
+        mWidth(((rotate == 90) || (rotate == 270)) ? height : width),
+        mHeight(((rotate == 90) || (rotate == 270)) ? width : height),
+        mInfo(info) {}
+  //}}}
   virtual ~cLcd();
 
   virtual bool initialise();
@@ -188,7 +194,7 @@ public:
   void rect (const uint16_t colour, const cRect& r);
   void rect (const uint16_t colour, const uint8_t alpha, const cRect& r);
   void rectOutline (const uint16_t colour, const cRect& r);
-  void pixel (const uint16_t colour, const uint8_t alpha, const cPoint& p);
+  void pix (const uint16_t colour, const uint8_t alpha, const cPoint& p);
   void copy (const uint16_t* src);
   void copy (const uint16_t* src, const cRect& srcRect, const cPoint& dstPoint);
   int text (const uint16_t colour, const cPoint& p, const int height, const std::string& str);

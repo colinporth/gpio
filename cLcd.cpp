@@ -41,42 +41,6 @@ struct sSpan {
 
 // cLcd public
 //{{{
-cLcd::cLcd (const int16_t width, const int16_t height, const int rotate, const int info)
-    : mRotate(rotate),
-      mWidth(((rotate == 90) || (rotate == 270)) ? height : width),
-      mHeight(((rotate == 90) || (rotate == 270)) ? width : height),
-      mInfo(info) {
-
-  // large possible max size, !!! do something better to bomb out > couple of thousand !!!
-  mDiffSpans = (sSpan*)malloc ((getNumPixels() / 2) * sizeof(sSpan));
-
-  bcm_host_init();
-
-  mDisplay = vc_dispmanx_display_open (0);
-  if (!mDisplay) {
-    // error return
-    cLog::log (LOGERROR, "vc_dispmanx_display_open failed");
-    return;
-    }
-
-  if (vc_dispmanx_display_get_info (mDisplay, &mModeInfo)) {
-    // error return
-    cLog::log (LOGERROR, "vc_dispmanx_display_get_info failed");
-    return;
-    }
-  cLog::log (LOGINFO, "Primary display is %d x %d", mModeInfo.width, mModeInfo.height);
-
-  mScreenGrab = vc_dispmanx_resource_create (VC_IMAGE_RGB565, getWidth(), getHeight(), &mImagePrt);
-  if (!mScreenGrab) {
-    // error return
-    cLog::log (LOGERROR, "vc_dispmanx_resource_create failed");
-    return;
-    }
-
-  vc_dispmanx_rect_set (&mVcRect, 0, 0, getWidth(), getHeight());
-  }
-//}}}
-//{{{
 cLcd::~cLcd() {
 
   gpioTerminate();
@@ -189,7 +153,7 @@ void cLcd::rect (const uint16_t colour, const uint8_t alpha, const cRect& r) {
 
   for (int y = r.top; y < ymax; y++)
     for (int x = r.left; x < xmax; x++)
-      pixel (colour, alpha, cPoint(x, y));
+      pix (colour, alpha, cPoint(x, y));
   }
 //}}}
 //{{{
@@ -202,7 +166,7 @@ void cLcd::rectOutline (const uint16_t colour, const cRect& r) {
   }
 //}}}
 //{{{
-void cLcd::pixel (const uint16_t colour, const uint8_t alpha, const cPoint& p) {
+void cLcd::pix (const uint16_t colour, const uint8_t alpha, const cPoint& p) {
 // blend with clip
 // magical rgb565 alpha composite
 // - linear interp background * (1.0 - alpha) + foreground * alpha
@@ -266,7 +230,7 @@ int cLcd::text (const uint16_t colour, const cPoint& p, const int height, const 
       for (unsigned bitmapY = 0; bitmapY < slot->bitmap.rows; bitmapY++) {
         auto bitmapPtr = slot->bitmap.buffer + (bitmapY * slot->bitmap.pitch);
         for (unsigned bitmapX = 0; bitmapX < slot->bitmap.width; bitmapX++)
-          pixel (colour, *bitmapPtr++, cPoint (x + bitmapX, y + bitmapY));
+          pix (colour, *bitmapPtr++, cPoint (x + bitmapX, y + bitmapY));
         }
       }
     curX += slot->advance.x / 64;
@@ -305,9 +269,55 @@ bool cLcd::initialise() {
 
     // allocate and clear both frameBuffers to black
     mFrameBuf = (uint16_t*)aligned_alloc (getNumPixels() * 2, 32);
-    mPrevFrameBuf = (uint16_t*)aligned_alloc  (getNumPixels() * 2, 32);
+    if (!mFrameBuf) {
+      //{{{  error return
+      cLog::log (LOGERROR, "frameBuf allocate");
+      return false;
+      }
+      //}}}
+    mPrevFrameBuf = (uint16_t*)aligned_alloc (getNumPixels() * 2, 32);
+    if (!mPrevFrameBuf) {
+      //{{{  error return
+      cLog::log (LOGERROR, "prevFrameBuf allocate");
+      return false;
+      }
+      //}}}
     clear();
     clear();
+
+    // large possible max size, !!! do something better to bomb out > couple of thousand !!!
+    mDiffSpans = (sSpan*)malloc ((getNumPixels() / 2) * sizeof(sSpan));
+    if (!mDiffSpans) {
+      //{{{  error return
+      cLog::log (LOGERROR, "diffSpans allocate");
+      return false;
+      }
+      //}}}
+
+    // dispmanx init
+    bcm_host_init();
+    mDisplay = vc_dispmanx_display_open (0);
+    if (!mDisplay) {
+      //{{{  error return
+      cLog::log (LOGERROR, "vc_dispmanx_display_open failed");
+      return false;
+      }
+      //}}}
+    if (vc_dispmanx_display_get_info (mDisplay, &mModeInfo)) {
+      //{{{  error return
+      cLog::log (LOGERROR, "vc_dispmanx_display_get_info failed");
+      return false;
+      }
+      //}}}
+    cLog::log (LOGINFO, "Primary display is %d x %d", mModeInfo.width, mModeInfo.height);
+    mScreenGrab = vc_dispmanx_resource_create (VC_IMAGE_RGB565, getWidth(), getHeight(), &mImagePrt);
+    if (!mScreenGrab) {
+      //{{{  error return
+      cLog::log (LOGERROR, "vc_dispmanx_resource_create failed");
+      return false;
+      }
+      //}}}
+    vc_dispmanx_rect_set (&mVcRect, 0, 0, getWidth(), getHeight());
 
     // reset lcd
     gpioSetMode (kResetGpio, PI_OUTPUT);
