@@ -93,22 +93,20 @@ cLcd::~cLcd() {
 const string cLcd::getInfoString() {
 // return info string for log display
 
-  return
-    dec(getUpdatePixels()) + " pix took:" +
-    dec(getUpdateUs()) + "uS " +
-    dec(getNumSpans()) + " spans took:" +
-    dec(getDiffUs()) + "uS";
+  return dec(getUpdatePixels()) + "pix took:" +
+         dec(getUpdateUs()) + "uS " +
+         dec(getNumSpans()) + "spans took:" +
+         dec(getDiffUs()) + "uS";
   }
 //}}}
 //{{{
 const string cLcd::getPaddedInfoString() {
 // return info string with padded format for on screen display
 
-  return
-    dec(getUpdatePixels(),5,'0') + " " +
-    dec(getUpdateUs(),5,'0') + "uS " +
-    dec(getNumSpans(),4,'0') + " " +
-    dec(getDiffUs(),3,'0') + "uS";
+  return dec(getUpdatePixels(),5,'0') + " " +
+         dec(getUpdateUs(),5,'0') + "uS " +
+         dec(getNumSpans(),4,'0') + " " +
+         dec(getDiffUs(),3,'0') + "uS";
   }
 //}}}
 //{{{
@@ -843,7 +841,7 @@ int cLcd::coarseLinearDiffBack (uint16_t* frameBuf, uint16_t* prevFrameBuf, uint
 //}}}
 //}}}
 
-// parallel 16bit
+// 16bit parallel
 //{{{  cLcd16 : public cLcd -
 // 16bit J8 header pins, gpio, constexpr
 //      3.3v led -  1  2  - 5v
@@ -851,10 +849,10 @@ int cLcd::coarseLinearDiffBack (uint16_t* frameBuf, uint16_t* prevFrameBuf, uint
 //     d3  gpio3 -  5  6  - 0v
 //     d4  gpio4 -  7  8  - gpio14 d14
 //            0v -  9  10 - gpio15 d15
-//     rs gpio17 - 11  12 - gpio18 rd
-// unused gpio27 - 13  14 - 0v cs
-// unused gpio22 - 15  16 - gpio23 unused
-//          3.3v - 17  18 - gpio24 unused
+//     wr gpio17 - 11  12 - gpio18 unused
+//   back gpio27 - 13  14 - 0v cs
+//     rd gpio22 - 15  16 - gpio23 cs
+//          3.3v - 17  18 - gpio24 rs
 //    d10 gpio10 - 19  20 - 0v
 //     d9  gpio9 - 21  22 - gpio25 reset
 //    d11 gpio11 - 23  24 - gpio8  d8
@@ -868,12 +866,12 @@ int cLcd::coarseLinearDiffBack (uint16_t* frameBuf, uint16_t* prevFrameBuf, uint
 //            0v - 39  40 - gpio21 unused
 
 constexpr uint8_t k16WriteGpio = 17;
-constexpr uint8_t k16RegisterSelectGpio = 24;
 constexpr uint8_t k16ReadGpio = 22;
 constexpr uint8_t k16ChipSelectGpio = 23;
+constexpr uint8_t k16RegisterSelectGpio = 24;
 constexpr uint8_t k16BacklightGpio = 27;
 
-constexpr uint32_t k16DataMask =  0xFFFF;
+constexpr uint32_t k16DataMask = 0xFFFF;
 constexpr uint32_t k16WriteMask = 1 << k16WriteGpio;
 constexpr uint32_t k16WriteClrMask = k16WriteMask | k16DataMask;
 
@@ -1278,6 +1276,7 @@ int cLcdSsd1289::updateLcd() {
 // spi0 mosi 19  20 0v
 // spi0 miso 20  22 gpio25   - reset
 // spi0 sck -23  24 spi0 Ce0 - gpio8 - cs
+
 constexpr uint8_t kSpiCe0Gpio = 8;
 constexpr uint8_t kSpiRegisterSelectGpio  = 24;
 constexpr uint8_t kBacklightGpio = 24;
