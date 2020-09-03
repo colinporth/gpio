@@ -188,8 +188,7 @@ public:
   void rect (const uint16_t colour, const cRect& r);
   void rect (const uint16_t colour, const uint8_t alpha, const cRect& r);
   void rectOutline (const uint16_t colour, const cRect& r);
-  void pixel (const uint16_t colour, const cPoint& p);
-  void blendPixel (const uint16_t colour, const uint8_t alpha, const cPoint& p);
+  void pixel (const uint16_t colour, const uint8_t alpha, const cPoint& p);
   void copy (const uint16_t* src);
   void copy (const uint16_t* src, const cRect& srcRect, const cPoint& dstPoint);
   int text (const uint16_t colour, const cPoint& p, const int height, const std::string& str);
@@ -207,7 +206,6 @@ protected:
   virtual int updateLcd (sSpan* spans) = 0;
 
   int mRotate = 0;
-  bool mChanged = false;
 
   int mUpdateUs = 0;
   int mUpdatePixels = 0;

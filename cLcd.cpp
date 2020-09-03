@@ -179,8 +179,6 @@ void cLcd::rect (const uint16_t colour, const cRect& r) {
     for (int x = r.left; x < xmax; x++)
       *ptr++ = colour;
     }
-
-  mChanged = true;
   }
 //}}}
 //{{{
@@ -191,9 +189,7 @@ void cLcd::rect (const uint16_t colour, const uint8_t alpha, const cRect& r) {
 
   for (int y = r.top; y < ymax; y++)
     for (int x = r.left; x < xmax; x++)
-      blendPixel (colour, alpha, cPoint(x, y));
-
-  mChanged = true;
+      pixel (colour, alpha, cPoint(x, y));
   }
 //}}}
 //{{{
@@ -206,17 +202,7 @@ void cLcd::rectOutline (const uint16_t colour, const cRect& r) {
   }
 //}}}
 //{{{
-void cLcd::pixel (const uint16_t colour, const cPoint& p) {
-// pixel with clip
-
-  if ((p.x >= 0) && (p.y >= 0) && (p.x + 1 < getWidth()) && (p.y + 1 < getHeight())) {
-    mFrameBuf[(p.y*getWidth()) + p.x] = colour;
-    mChanged = true;
-    }
-  }
-//}}}
-//{{{
-void cLcd::blendPixel (const uint16_t colour, const uint8_t alpha, const cPoint& p) {
+void cLcd::pixel (const uint16_t colour, const uint8_t alpha, const cPoint& p) {
 // blend with clip
 // magical rgb565 alpha composite
 // - linear interp background * (1.0 - alpha) + foreground * alpha
@@ -243,8 +229,6 @@ void cLcd::blendPixel (const uint16_t colour, const uint8_t alpha, const cPoint&
       // set bigEndianColour frameBuf pixel to littleEndian background result
       mFrameBuf[(p.y*getWidth()) + p.x] = background | (background >> 16);
       }
-
-    mChanged = true;
     }
   }
 //}}}
@@ -253,7 +237,6 @@ void cLcd::copy (const uint16_t* src) {
 // copy all of src of same width,height
 
   memcpy (mFrameBuf, src, getNumPixels() * 2);
-  mChanged = true;
   }
 //}}}
 //{{{
@@ -264,7 +247,6 @@ void cLcd::copy (const uint16_t* src, const cRect& srcRect, const cPoint& dstPoi
     memcpy (mFrameBuf + ((dstPoint.y + y) * getWidth()) + dstPoint.x,
                   src + ((srcRect.top + y) * getWidth()) + srcRect.left,
             srcRect.getWidth() * 2);
-  mChanged = true;
   }
 //}}}
 //{{{
@@ -284,7 +266,7 @@ int cLcd::text (const uint16_t colour, const cPoint& p, const int height, const 
       for (unsigned bitmapY = 0; bitmapY < slot->bitmap.rows; bitmapY++) {
         auto bitmapPtr = slot->bitmap.buffer + (bitmapY * slot->bitmap.pitch);
         for (unsigned bitmapX = 0; bitmapX < slot->bitmap.width; bitmapX++)
-          blendPixel (colour, *bitmapPtr++, cPoint (x + bitmapX, y + bitmapY));
+          pixel (colour, *bitmapPtr++, cPoint (x + bitmapX, y + bitmapY));
         }
       }
     curX += slot->advance.x / 64;
