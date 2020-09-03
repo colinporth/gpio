@@ -63,21 +63,19 @@ int main (int numArgs, char* args[]) {
   //close (fbfd);
   //}}}
 
-  lcd->clear (kBlack);
-  lcd->update();
-  lcd->delayUs (100000);
-
-  while (true)
-    if (lcd->snap()) {
+  int i = 0;
+  while (true) {
+    lcd->clearSnapshot();
+    lcd->text (kWhite, cPoint(0,0), 20, dec(i++) +
+                                        " " + dec(lcd->getUpdateUs()) +
+                                        " " + dec(lcd->getDiffUs(),5,'0') +
+                                        " " + dec(lcd->getUpdatePixels(),5,'0') +
+                                        " " + dec(lcd->getNumSpans(),4,'0'));
+    if (lcd->present())
       lcd->setBacklightOn();
-      // log
-      //cLog::log (LOGINFO, "upd:" + dec(lcd->getUpdateUs()) +
-      //                    "us diff:" + dec(lcd->getDiffUs()) +
-      //                    "us spans:" + dec(lcd->getNumSpans()) +
-      //                    " pixels:" + dec(lcd->getUpdatePixels()));
-      }
-    else // wait if no change
+    else 
       lcd->delayUs (10000);
+    }
 
   //{{{  display font
   int height = 8;
@@ -99,20 +97,6 @@ int main (int numArgs, char* args[]) {
     lcd->delayUs (16000);
     }
   //}}}
-
-  lcd->clear (kOrange);
-  int i = 0;
-  while (true) {
-    if (lcd->snap()) {
-      lcd->text (kWhite, cPoint(0,0), 20, dec(i++) +
-                                  " " + dec(lcd->getUpdateUs()) +
-                                  " " + dec(lcd->getDiffUs()) +
-                                  " " + dec(lcd->getNumSpans()));
-      lcd->update();
-      }
-
-    lcd->delayUs (10000);
-    }
 
   return 0;
   }

@@ -170,6 +170,7 @@ public:
   constexpr int16_t getWidth() { return mWidth; }
   constexpr int16_t getHeight() { return mHeight; }
   const cPoint getSize() { return cPoint(mWidth, mHeight); }
+  const cRect getRect() { return cRect(0,0, mWidth,mHeight); }
   const int getNumPixels() { return mWidth * mHeight; }
 
   // info
@@ -181,6 +182,13 @@ public:
   virtual void setBacklightOn() {}
   virtual void setBacklightOff() {}
 
+  void update() { mUpdate = true; }
+  void setAutoUpdate() { mAutoUpdate = true; }
+
+  void clear (const uint16_t colour);
+  void clearSnapshot();
+  bool present();
+
   virtual void rect (const uint16_t colour, const cRect& r);
   virtual void pixel (const uint16_t colour, const cPoint& p);
   virtual void blendPixel (const uint16_t colour, const uint8_t alpha, const cPoint& p);
@@ -191,15 +199,8 @@ public:
   void rect (const uint16_t colour, const uint8_t alpha, const cRect& r);
   int text (const uint16_t colour, const cPoint& p, const int height, const std::string& str);
 
-  void clear (const uint16_t colour) { rect (colour, cRect(0,0, getWidth(), getHeight())); }
-
-  void update() { mUpdate = true; }
-  void setAutoUpdate() { mAutoUpdate = true; }
-
   void delayUs (const int us);
   double time();
-
-  bool snap();
 
 //{{{
 protected:
@@ -207,7 +208,8 @@ protected:
   virtual void writeCommandData (const uint8_t command, const uint16_t data) = 0;
   virtual void writeCommandMultiData (const uint8_t command, const uint8_t* dataPtr, const int len) = 0;
 
-  virtual void updateLcd (const uint16_t* buf, const cRect& r) = 0;
+  virtual int updateLcd() = 0;
+  virtual int updateLcd (sSpan* spans) = 0;
 
   void launchUpdateThread();
 
@@ -222,6 +224,8 @@ protected:
 //{{{
 private:
   void setFont (const uint8_t* font, const int fontSize);
+
+  void swapBuffers();
 
   sSpan* diffSingle();
   sSpan* diffCoarse();
@@ -243,8 +247,7 @@ private:
   int mDiffUs = 0;
 
   // main display screen buffers
-  uint16_t* mBuf = nullptr;
-  uint16_t* mPrevBuf = nullptr;
+  uint16_t* mPrevFrameBuf = nullptr;
 
   // dispmanx
   DISPMANX_DISPLAY_HANDLE_T mDisplay;
@@ -317,7 +320,8 @@ public:
   virtual ~cLcdTa7601() {}
 
   virtual bool initialise();
-  virtual void updateLcd (const uint16_t* buf, const cRect& r);
+  virtual int updateLcd();
+  virtual int updateLcd (sSpan* spans) { return 0; }
   };
 //}}}
 //{{{
@@ -327,7 +331,8 @@ public:
   virtual ~cLcdSsd1289() {}
 
   virtual bool initialise();
-  virtual void updateLcd (const uint16_t* buf, const cRect& r);
+  virtual int updateLcd();
+  virtual int updateLcd (sSpan* spans) { return 0; }
   };
 //}}}
 
@@ -343,7 +348,8 @@ public:
   virtual void setBacklightOff();
 
   virtual bool initialise();
-  virtual void updateLcd (const uint16_t* buf, const cRect& r);
+  virtual int updateLcd();
+  virtual int updateLcd (sSpan* spans);
   };
 //}}}
 //{{{
@@ -354,7 +360,8 @@ public:
   virtual ~cLcdSt7735r() {}
 
   virtual bool initialise();
-  virtual void updateLcd (const uint16_t* buf, const cRect& r);
+  virtual int updateLcd();
+  virtual int updateLcd (sSpan* spans) { return 0; }
   };
 //}}}
 //{{{
@@ -365,6 +372,7 @@ public:
   virtual ~cLcdIli9225b() {}
 
   virtual bool initialise();
-  virtual void updateLcd (const uint16_t* buf, const cRect& r);
+  virtual int updateLcd();
+  virtual int updateLcd (sSpan* spans) { return 0; }
   };
 //}}}

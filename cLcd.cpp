@@ -15,7 +15,7 @@
 
 using namespace std;
 //}}}
-//{{{  freetype library static include
+//{{{  include freetype static library
 // !!! singleton assumed !|! saves exporting FREETYPE outside
 #include <ft2build.h>
 #include FT_FREETYPE_H
@@ -82,9 +82,8 @@ cLcd::~cLcd() {
   vc_dispmanx_resource_delete (mScreenGrab);
   vc_dispmanx_display_close (mDisplay);
 
-  free (mBuf);
-  free (mPrevBuf);
   free (mFrameBuf);
+  free (mPrevFrameBuf);
   }
 //}}}
 
@@ -93,6 +92,52 @@ void cLcd::setFont (const uint8_t* font, const int fontSize)  {
 
   FT_Init_FreeType (&mLibrary);
   FT_New_Memory_Face (mLibrary, (FT_Byte*)font, fontSize, 0, &mFace);
+  }
+//}}}
+
+//{{{
+void cLcd::clear (const uint16_t colour) {
+
+  swapBuffers();
+
+  uint64_t colour64 = colour;
+  colour64 |= (colour64 << 48) | (colour64 << 32) | (colour64 << 16);
+
+  uint64_t* ptr = (uint64_t*)mFrameBuf;
+  for (int i = 0; i < getNumPixels()/4; i++)
+    *ptr++ = colour64;
+
+  mChanged = true;
+  }
+//}}}
+//{{{
+void cLcd::clearSnapshot() {
+// snapshot and read to main display buffer
+
+  swapBuffers();
+  vc_dispmanx_snapshot (mDisplay, mScreenGrab, DISPMANX_TRANSFORM_T(0));
+  vc_dispmanx_resource_read_data (mScreenGrab, &mVcRect, mFrameBuf, getWidth() * 2);
+  }
+//}}}
+//{{{
+bool cLcd::present() {
+
+  // calc diff spans list
+  double startTime = time();
+
+  sSpan* spans = diffCoarse();
+  if (!spans) // nothing changed
+    return false;
+
+  // merge
+  spans = merge (16);
+  mDiffUs = int((time() - startTime) * 1000000);
+
+  // update spans
+  mUpdatePixels = updateLcd (spans);
+  mUpdateUs = (int)((time() - startTime) * 1000000.0);
+
+  return true;
   }
 //}}}
 
@@ -106,7 +151,7 @@ void cLcd::rect (const uint16_t colour, const cRect& r) {
     uint16_t* ptr = mFrameBuf + y*getWidth() + r.left;
     for (int x = r.left; x < xmax; x++)
       *ptr++ = colour;
-      }
+    }
 
   mChanged = true;
   }
@@ -230,53 +275,6 @@ double cLcd::time() {
   }
 //}}}
 
-//{{{
-bool cLcd::snap() {
-
-  // swap main display buffers
-  if (mPrevBuf) {
-    auto temp = mPrevBuf;
-    mPrevBuf = mBuf;
-    mBuf = temp;
-    }
-  else {
-    mBuf = (uint16_t*)aligned_alloc (getNumPixels() * 2, 32);
-    for (int i = 0; i < getNumPixels(); i++)
-      mBuf[i] = 0;
-    mPrevBuf = (uint16_t*)aligned_alloc  (getNumPixels() * 2, 32);
-    }
-
-  // snapshot and read to main display buffer
-  vc_dispmanx_snapshot (mDisplay, mScreenGrab, DISPMANX_TRANSFORM_T(0));
-  vc_dispmanx_resource_read_data (mScreenGrab, &mVcRect, mBuf, getWidth() * 2);
-
-  // calc diff spans list
-  double startTime = time();
-  sSpan* spans = diffCoarse();
-  if (spans) {
-    spans = merge (16);
-    mDiffUs = int((time() - startTime) * 1000000);
-
-    //copy (mBuf);
-
-    double startTime = time();
-    auto it = spans;
-    while (it) {
-      updateLcd (mBuf, it->r);
-      //copy (mBuf, it->r, it->r.getTL());
-      //rect (kYellow, 0x60, it->r);
-      //updateLcd (mFrameBuf, it->r);
-      it = it->next;
-      }
-    mUpdateUs = (int)((time() - startTime) * 1000000.0);
-
-    return true;
-    }
-
-  return false;
-  }
-//}}}
-
 // cLcd protected
 //{{{
 bool cLcd::initialise() {
@@ -289,7 +287,11 @@ bool cLcd::initialise() {
   if (gpioInitialise() >= 0) {
     setFont (getFreeSansBold(), getFreeSansBoldSize());
 
-    mFrameBuf = (uint16_t*)malloc (getNumPixels() * 2);
+    // allocate and clear both frameBuffers to black
+    mFrameBuf = (uint16_t*)aligned_alloc (getNumPixels() * 2, 32);
+    mPrevFrameBuf = (uint16_t*)aligned_alloc  (getNumPixels() * 2, 32);
+    clear (kBlack);
+    clear (kBlack);
 
     // reset lcd
     gpioSetMode (kResetGpio, PI_OUTPUT);
@@ -308,13 +310,16 @@ bool cLcd::initialise() {
 void cLcd::launchUpdateThread() {
 // write frameBuffer to lcd ram thread if changed
 
+  // update lcd to black frameBuffer
+  updateLcd();
+
   thread ([=]() {
     cLog::setThreadName ("upda");
     while (!mExit) {
       if (mUpdate || (mAutoUpdate && mChanged)) {
         mUpdate = false;
         mChanged = false;
-        updateLcd (mFrameBuf, cRect (0,0, getWidth(), getHeight()));
+        mUpdatePixels = updateLcd();
         }
 
       gpioDelay (16000);
@@ -330,6 +335,16 @@ void cLcd::launchUpdateThread() {
 #define SWAPU32(x, y) { uint32_t tmp = x; x = y; y = tmp; }
 
 //{{{
+void cLcd::swapBuffers() {
+// swap frameBuffers
+
+  auto temp = mPrevFrameBuf;
+  mPrevFrameBuf = mFrameBuf;
+  mFrameBuf = temp;
+  }
+//}}}
+
+//{{{
 sSpan* cLcd::diffSingle() {
 
   int minY = 0;
@@ -339,8 +354,8 @@ sSpan* cLcd::diffSingle() {
   const int stride = getWidth();
   const int widthAligned4 = (uint32_t)getWidth() & ~3u;
 
-  uint16_t* scanline = mBuf;
-  uint16_t* prevFrameScanline = mPrevBuf;
+  uint16_t* scanline = mFrameBuf;
+  uint16_t* prevFrameScanline = mPrevFrameBuf;
 
   if (kCoarseDiff) {
     //{{{  coarse diff
@@ -348,12 +363,12 @@ sSpan* cLcd::diffSingle() {
     // returns the point to the 8-pixel aligned coordinate where the pixels began to differ.
 
     int numPixels = getWidth() * getHeight();
-    int firstDiff = coarseLinearDiff (mBuf, mPrevBuf, mBuf + numPixels);
+    int firstDiff = coarseLinearDiff (mFrameBuf, mPrevFrameBuf, mFrameBuf + numPixels);
     if (firstDiff == numPixels)
       return nullptr; // No pixels changed, nothing to do.
 
     // Compute the precise diff position here.
-    while (mBuf[firstDiff] == mPrevBuf[firstDiff])
+    while (mFrameBuf[firstDiff] == mPrevFrameBuf[firstDiff])
       ++firstDiff;
 
     minX = firstDiff % getWidth();
@@ -402,19 +417,19 @@ sSpan* cLcd::diffSingle() {
 
     // coarse diff computes a diff at 8 adjacent pixels at a time
     // returns the point to the 8-pixel aligned coordinate where the pixels began to differ.
-    int firstDiff = coarseLinearDiffBack (mBuf, mPrevBuf, mBuf + numPixels);
+    int firstDiff = coarseLinearDiffBack (mFrameBuf, mPrevFrameBuf, mFrameBuf + numPixels);
 
     // compute the precise diff position here.
-    while (firstDiff > 0 && mBuf[firstDiff] == mPrevBuf[firstDiff])
+    while (firstDiff > 0 && mFrameBuf[firstDiff] == mPrevFrameBuf[firstDiff])
       --firstDiff;
     maxX = firstDiff % getWidth();
     maxY = firstDiff / getWidth();
     }
 
   else {
-    scanline = mBuf + (getHeight() - 1)*stride;
+    scanline = mFrameBuf + (getHeight() - 1)*stride;
     // same scanline from previous frame, not preceding scanline
-    prevFrameScanline = mPrevBuf + (getHeight() - 1)*stride;
+    prevFrameScanline = mPrevFrameBuf + (getHeight() - 1)*stride;
 
     while (maxY >= minY) {
       int x = getWidth()-1;
@@ -445,8 +460,8 @@ sSpan* cLcd::diffSingle() {
 
   foundBottom:
   //{{{  found bottom
-  scanline = mBuf + minY*stride;
-  prevFrameScanline = mPrevBuf + minY*stride;
+  scanline = mFrameBuf + minY*stride;
+  prevFrameScanline = mPrevFrameBuf + minY*stride;
 
   int lastScanRight = maxX;
   if (minX > maxX)
@@ -509,8 +524,8 @@ sSpan* cLcd::diffCoarse() {
   int y =  0;
   int yInc = 1;
 
-  uint64_t* scanline = (uint64_t*)(mBuf + y * getWidth());
-  uint64_t* prevFrameScanline = (uint64_t*)(mPrevBuf + y * getWidth());
+  uint64_t* scanline = (uint64_t*)(mFrameBuf + y * getWidth());
+  uint64_t* prevFrameScanline = (uint64_t*)(mPrevFrameBuf + y * getWidth());
 
   const int width64 = getWidth() >> 2;
   int scanlineInc = getWidth() >> 2;
@@ -581,8 +596,8 @@ sSpan* cLcd::diffExact() {
   int y =  0;
   int yInc = 1;
 
-  uint16_t* scanline = mBuf + y * getWidth();
-  uint16_t* prevFrameScanline = mPrevBuf + y * getWidth();
+  uint16_t* scanline = mFrameBuf + y * getWidth();
+  uint16_t* prevFrameScanline = mPrevFrameBuf + y * getWidth();
 
   int scanlineInc = getWidth();
   int scanlineEndInc = scanlineInc - getWidth();
@@ -1070,11 +1085,12 @@ bool cLcdTa7601::initialise() {
 //}}}
 
 //{{{
-void cLcdTa7601::updateLcd (const uint16_t* buf, const cRect& r) {
+int cLcdTa7601::updateLcd() {
 
   double startTime = time_time();
-  writeCommandMultiData (0x22, (const uint8_t*)buf, r.getNumPixels() * 2);
+  writeCommandMultiData (0x22, (const uint8_t*)mFrameBuf, getNumPixels() * 2);
   mUpdateUs = (int)((time_time() - startTime) * 1000000.0);
+  return getNumPixels();
   }
 //}}}
 //}}}
@@ -1180,11 +1196,13 @@ bool cLcdSsd1289::initialise() {
   }
 //}}}
 //{{{
-void cLcdSsd1289::updateLcd (const uint16_t* buf, const cRect& r) {
+int cLcdSsd1289::updateLcd() {
 
   double startTime = time_time();
-  writeCommandMultiData (0x22, (const uint8_t*)buf, r.getNumPixels() * 2);
+  writeCommandMultiData (0x22, (const uint8_t*)mFrameBuf, getNumPixels() * 2);
   mUpdateUs = (int)((time_time() - startTime) * 1000000.0);
+
+  return getNumPixels();
   }
 //}}}
 //}}}
@@ -1298,7 +1316,7 @@ bool cLcdIli9320::initialise() {
 //}}}
 
 //{{{
-void cLcdIli9320::updateLcd (const uint16_t* buf, const cRect& r) {
+int cLcdIli9320::updateLcd (sSpan* spans) {
 // command,data sequences expanded inline
 
   constexpr uint8_t kCommand20[3] = { 0x70, 0, 0x20 };  // GDRAM vert addr command
@@ -1310,7 +1328,88 @@ void cLcdIli9320::updateLcd (const uint16_t* buf, const cRect& r) {
   uint16_t dataHeaderBuf [320+1];
   dataHeaderBuf[0] = 0x7272;
 
-  mUpdatePixels = 0;
+  int numPixels = 0;
+
+  auto it = spans;
+  while (it) {
+    cRect& r = it->r;
+    //{{{  set xstart, ystart, yinc
+    uint16_t xstart = r.left;
+    uint16_t ystart = r.top;
+    uint16_t yinc = 1;
+
+    switch (mRotate) {
+      case 90:
+        xstart = kHeight9320-1 - r.left;
+        break;
+
+      case 180:
+        xstart = kWidth9320-1 - r.left;
+        ystart = kHeight9320-1 - r.top;
+        yinc = -1;
+        break;
+
+      case 270:
+        ystart = kWidth9320-1 - r.top;
+        yinc = -1;
+        break;
+      }
+    //}}}
+    for (int y = r.top; y < r.bottom; y++) {
+      // send GDRAM vert addr command
+      spiWrite (mSpiHandle, (char*)kCommand20, 3);
+
+      // - data
+      dataHeader[1] = ystart >> 8;
+      dataHeader[2] = ystart & 0xff;
+      spiWrite (mSpiHandle, (char*)dataHeader, 3);
+
+      // send GDRAMWR horiz addr command
+      spiWrite (mSpiHandle, (char*)kCommand21, 3);
+
+      // - data
+      dataHeader[1] = xstart >> 8;
+      dataHeader[2] = xstart & 0xff;
+      spiWrite (mSpiHandle, (char*)dataHeader, 3);
+
+      // send GDRAMWR
+      spiWrite (mSpiHandle, (char*)kCommand22, 3);
+
+      // - data, miss header bytes, alignment for bswap_16
+      const uint16_t* src = mFrameBuf + (y * getWidth()) + r.left;
+      uint16_t* dst = dataHeaderBuf + 1;
+      for (int i = 0; i < r.getWidth(); i++)
+        *dst++ = bswap_16 (*src++);
+
+      // send from second byte of dataHeaderBuf
+      spiWrite (mSpiHandle, ((char*)(dataHeaderBuf))+1, (r.getWidth() * 2) + 1);
+
+      numPixels += r.getWidth();
+      ystart += yinc;
+      }
+
+    it = it->next;
+    }
+
+  return numPixels;
+  }
+//}}}
+//{{{
+int cLcdIli9320::updateLcd() {
+// command,data sequences expanded inline
+
+  constexpr uint8_t kCommand20[3] = { 0x70, 0, 0x20 };  // GDRAM vert addr command
+  constexpr uint8_t kCommand21[3] = { 0x70, 0, 0x21 };  // GDRAMWR horiz addr command
+  constexpr uint8_t kCommand22[3] = { 0x70, 0, 0x22 };  // GDRAMWR command
+
+  uint8_t dataHeader[3] = { 0x72, 0,0 };
+
+  uint16_t dataHeaderBuf [320+1];
+  dataHeaderBuf[0] = 0x7272;
+
+  cRect r = getRect();
+
+  int numPixels = 0;
   //{{{  set xstart, ystart, yinc
   uint16_t xstart = r.left;
   uint16_t ystart = r.top;
@@ -1333,7 +1432,6 @@ void cLcdIli9320::updateLcd (const uint16_t* buf, const cRect& r) {
       break;
     }
   //}}}
-
   for (int y = r.top; y < r.bottom; y++) {
     // send GDRAM vert addr command
     spiWrite (mSpiHandle, (char*)kCommand20, 3);
@@ -1355,7 +1453,7 @@ void cLcdIli9320::updateLcd (const uint16_t* buf, const cRect& r) {
     spiWrite (mSpiHandle, (char*)kCommand22, 3);
 
     // - data, miss header bytes, alignment for bswap_16
-    const uint16_t* src = buf + (y * getWidth()) + r.left;
+    const uint16_t* src = mFrameBuf + (y * getWidth()) + r.left;
     uint16_t* dst = dataHeaderBuf + 1;
     for (int i = 0; i < r.getWidth(); i++)
       *dst++ = bswap_16 (*src++);
@@ -1363,9 +1461,11 @@ void cLcdIli9320::updateLcd (const uint16_t* buf, const cRect& r) {
     // send from second byte of dataHeaderBuf
     spiWrite (mSpiHandle, ((char*)(dataHeaderBuf))+1, (r.getWidth() * 2) + 1);
 
-    mUpdatePixels += r.getWidth();
+    numPixels += r.getWidth();
     ystart += yinc;
     }
+
+  return numPixels;
   }
 //}}}
 //}}}
@@ -1468,11 +1568,13 @@ bool cLcdSt7735r::initialise() {
   }
 //}}}
 //{{{
-void cLcdSt7735r::updateLcd (const uint16_t* buf, const cRect& r) {
+int cLcdSt7735r::updateLcd() {
 
   double startTime = time_time();
-  writeCommandMultiData (0x2C, (const uint8_t*)buf, r.getNumPixels() * 2); // RAMRW command
+  writeCommandMultiData (0x2C, (const uint8_t*)mFrameBuf, getNumPixels() * 2); // RAMRW command
   mUpdateUs = (int)((time_time() - startTime) * 1000000.0);
+
+  return getNumPixels();
   }
 //}}}
 //}}}
@@ -1559,11 +1661,13 @@ bool cLcdIli9225b::initialise() {
 //}}}
 
 //{{{
-void cLcdIli9225b::updateLcd (const uint16_t* buf, const cRect& r) {
+int cLcdIli9225b::updateLcd() {
 
   double startTime = time_time();
-  writeCommandMultiData (0x22, (const uint8_t*)buf, r.getNumPixels() * 2);
+  writeCommandMultiData (0x22, (const uint8_t*)mFrameBuf, getNumPixels() * 2);
   mUpdateUs = (int)((time_time() - startTime) * 1000000.0);
+
+  return getNumPixels();
   }
 //}}}
 //}}}
