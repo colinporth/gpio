@@ -209,7 +209,6 @@ protected:
   virtual void writeCommandMultiData (const uint8_t command, const uint8_t* dataPtr, const int len) = 0;
 
   virtual int updateLcd (sSpan* spans) = 0;
-  int updateLcd ();
 
   int mRotate = 0;
 
@@ -280,7 +279,6 @@ public:
   virtual ~cLcdTa7601() {}
 
   virtual bool initialise();
-  virtual int updateLcd();
   virtual int updateLcd (sSpan* spans);
 
 protected:
@@ -295,8 +293,7 @@ public:
   virtual ~cLcdSsd1289() {}
 
   virtual bool initialise();
-  virtual int updateLcd();
-  virtual int updateLcd (sSpan* spans) { return 0; }
+  virtual int updateLcd (sSpan* spans);
   };
 //}}}
 
@@ -349,7 +346,6 @@ public:
   virtual void setBacklight (bool on);
 
   virtual bool initialise();
-  virtual int updateLcd();
   virtual int updateLcd (sSpan* spans);
   };
 //}}}
@@ -361,8 +357,7 @@ public:
   virtual ~cLcdSt7735r() {}
 
   virtual bool initialise();
-  virtual int updateLcd();
-  virtual int updateLcd (sSpan* spans) { return 0; }
+  virtual int updateLcd (sSpan* spans);
   };
 //}}}
 //{{{
@@ -373,7 +368,6 @@ public:
   virtual ~cLcdIli9225b() {}
 
   virtual bool initialise();
-  virtual int updateLcd();
-  virtual int updateLcd (sSpan* spans) { return 0; }
+  virtual int updateLcd (sSpan* spans);
   };
 //}}}

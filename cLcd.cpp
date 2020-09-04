@@ -331,12 +331,6 @@ bool cLcd::initialise() {
   return true;
   }
 //}}}
-//{{{
-int cLcd::updateLcd() {
-  sSpan span = { getRect(), getWidth(), getNumPixels(), nullptr };
-  return updateLcd (&span);
-  }
-//}}}
 
 //{{{  private
 // faster asm coarse diff test
@@ -997,7 +991,10 @@ bool cLcdTa7601::initialise() {
   writeCommandData (0x07, 0x0017);  // partial, 8-color, display ON
   delayUs (10000);
 
-  updateLcd ();
+  // update whole screen
+  sSpan span = { getRect(), getWidth(), getNumPixels(), nullptr };
+  updateLcd (&span);
+
   return true;
   }
 //}}}
@@ -1157,67 +1154,6 @@ int cLcdTa7601::updateLcd (sSpan* spans) {
     //}}}
   }
 //}}}
-//{{{
-int cLcdTa7601::updateLcd() {
-// no AM style inc GDRAM V rather H for landscape, have to do it yourself
-
-  writeCommandData (0x45, 0x0000);          // H start ram address window even = 0
-  writeCommandData (0x44, kWidthTa7601-1);  // H end ram address window even   = 320-1
-  writeCommandData (0x47, 0x0000);          // V start ram address window      = 0
-  writeCommandData (0x46, kHeightTa7601-1); // V end ram address window        = 480-1
-
-  writeCommandData (0x20, 0x0000);  // Y start address of GRAM
-  writeCommandData (0x21, 0x0000);  // X start address of GRAM
-
-  writeCommand (0x22);
-
-  // send data for whole frame
-  switch (mRotate) {
-    case 0: {
-      // simple case
-      uint16_t* ptr = mFrameBuf;
-      for (uint32_t i = 0; i < getNumPixels(); i++)
-        writeDataWord (*ptr++);
-      break;
-      }
-
-    case 90:
-      // !!! simplify the back step at end of line !!!
-      for (int x = 0; x < getWidth(); x++) {
-        uint16_t* ptr = mFrameBuf + x;
-        for (int y = 0; y < getHeight(); y++) {
-          writeDataWord (*ptr);
-          ptr += getWidth();
-          }
-        }
-      break;
-
-    case 180:
-      // !!! simplify, can i just reverse scan !!!
-      for (int y = 0; y < getHeight(); y++) {
-        uint16_t* ptr = mFrameBuf + ((getHeight()-1-y) * getWidth());
-        for (int x = 0; x < getWidth(); x++) {
-          writeDataWord (*ptr);
-          ptr--;
-          }
-        }
-      break;
-
-    case 270:
-      // !!! simplify the back step at aned of line !!!
-      for (int x = 0; x < getWidth(); x++) {
-        uint16_t* ptr = mFrameBuf + ((getHeight()-1) * getWidth()) + x;
-        for (int y = 0; y < getHeight(); y++) {
-          writeDataWord (*ptr);
-          ptr -= getWidth();
-          }
-        }
-      break;
-    }
-
-  return getNumPixels();
-  }
-//}}}
 //}}}
 //{{{  cLcdSsd1289 : public cLcd16
 constexpr int16_t kWidth1289 = 240;
@@ -1251,11 +1187,13 @@ bool cLcdSsd1289::initialise() {
 
   // startup commands
   writeCommandData (0x00, 0x0001); // SSD1289_REG_OSCILLATION
+  //{{{  power control
   writeCommandData (0x03, 0xA8A4); // SSD1289_REG_POWER_CTRL_1
   writeCommandData (0x0c, 0x0000); // SSD1289_REG_POWER_CTRL_2
   writeCommandData (0x0d, 0x080C); // SSD1289_REG_POWER_CTRL_3
   writeCommandData (0x0e, 0x2B00); // SSD1289_REG_POWER_CTRL_4
   writeCommandData (0x1e, 0x00B7); // SSD1289_REG_POWER_CTRL_5
+  //}}}
 
   //write_reg(0x01, (1 << 13) | (par->bgr << 11) | (1 << 9) | (HEIGHT - 1));
   writeCommandData (0x01, 0x2B3F); // SSD1289_REG_DRIVER_OUT_CTRL
@@ -1291,6 +1229,7 @@ bool cLcdSsd1289::initialise() {
   writeCommandData (0x44, ((kWidth1289-1) << 8) | 0); // SSD1289_REG_H_RAM_ADR_POS
   writeCommandData (0x45, 0x0000);                    // SSD1289_REG_V_RAM_ADR_START
   writeCommandData (0x46, kHeight1289-1);             // SSD1289_REG_V_RAM_ADR_END
+  writeCommandData (0x47, 0x0000);                    // SSD1289_REG_H_RAM_ADR_START
 
   int xstart = 0;
   int ystart = 0;
@@ -1319,18 +1258,18 @@ bool cLcdSsd1289::initialise() {
       break;
     }
 
-  updateLcd();
+  // update whole screen
+  sSpan span = { getRect(), getWidth(), getNumPixels(), nullptr };
+  updateLcd (&span);
+
   return true;
   }
 //}}}
 
 //{{{
-int cLcdSsd1289::updateLcd() {
+int cLcdSsd1289::updateLcd (sSpan* spans) {
 
-  double startTime = time_time();
   writeCommandMultiData (0x22, (const uint8_t*)mFrameBuf, getNumPixels() * 2);
-  mUpdateUs = (int)((time_time() - startTime) * 1000000.0);
-
   return getNumPixels();
   }
 //}}}
@@ -1507,7 +1446,10 @@ bool cLcdIli9320::initialise() {
       break;
     }
 
-  updateLcd();
+  // update whole screen
+  sSpan span = { getRect(), getWidth(), getNumPixels(), nullptr };
+  updateLcd (&span);
+
   return true;
   }
 //}}}
@@ -1586,80 +1528,6 @@ int cLcdIli9320::updateLcd (sSpan* spans) {
       }
 
     it = it->next;
-    }
-
-  return numPixels;
-  }
-//}}}
-//{{{
-int cLcdIli9320::updateLcd() {
-// command,data sequences expanded inline
-
-  constexpr uint8_t kCommand20[3] = { 0x70, 0, 0x20 };  // GDRAM vert addr command
-  constexpr uint8_t kCommand21[3] = { 0x70, 0, 0x21 };  // GDRAMWR horiz addr command
-  constexpr uint8_t kCommand22[3] = { 0x70, 0, 0x22 };  // GDRAMWR command
-
-  uint8_t dataHeader[3] = { 0x72, 0,0 };
-
-  uint16_t dataHeaderBuf [320+1];
-  dataHeaderBuf[0] = 0x7272;
-
-  cRect r = getRect();
-
-  int numPixels = 0;
-  //{{{  set xstart, ystart, yinc
-  uint16_t xstart = r.left;
-  uint16_t ystart = r.top;
-  uint16_t yinc = 1;
-
-  switch (mRotate) {
-    case 90:
-      xstart = kHeight9320-1 - r.left;
-      break;
-
-    case 180:
-      xstart = kWidth9320-1 - r.left;
-      ystart = kHeight9320-1 - r.top;
-      yinc = -1;
-      break;
-
-    case 270:
-      ystart = kWidth9320-1 - r.top;
-      yinc = -1;
-      break;
-    }
-  //}}}
-  for (int y = r.top; y < r.bottom; y++) {
-    // send GDRAM vert addr command
-    spiWrite (mSpiHandle, (char*)kCommand20, 3);
-
-    // - data
-    dataHeader[1] = ystart >> 8;
-    dataHeader[2] = ystart & 0xff;
-    spiWrite (mSpiHandle, (char*)dataHeader, 3);
-
-    // send GDRAMWR horiz addr command
-    spiWrite (mSpiHandle, (char*)kCommand21, 3);
-
-    // - data
-    dataHeader[1] = xstart >> 8;
-    dataHeader[2] = xstart & 0xff;
-    spiWrite (mSpiHandle, (char*)dataHeader, 3);
-
-    // send GDRAMWR
-    spiWrite (mSpiHandle, (char*)kCommand22, 3);
-
-    // - data, miss header bytes, alignment for bswap_16
-    const uint16_t* src = mFrameBuf + (y * getWidth()) + r.left;
-    uint16_t* dst = dataHeaderBuf + 1;
-    for (int i = 0; i < r.getWidth(); i++)
-      *dst++ = bswap_16 (*src++);
-
-    // send from second byte of dataHeaderBuf
-    spiWrite (mSpiHandle, ((char*)(dataHeaderBuf))+1, (r.getWidth() * 2) + 1);
-
-    numPixels += r.getWidth();
-    ystart += yinc;
     }
 
   return numPixels;
@@ -1760,18 +1628,18 @@ bool cLcdSt7735r::initialise() {
 
   writeCommand (k7335_DISPON); // display ON
 
-  updateLcd();
+  // update whole screen
+  sSpan span = { getRect(), getWidth(), getNumPixels(), nullptr };
+  updateLcd (&span);
+
   return true;
   }
 //}}}
 
 //{{{
-int cLcdSt7735r::updateLcd() {
+int cLcdSt7735r::updateLcd (sSpan* spans) {
 
-  double startTime = time_time();
   writeCommandMultiData (0x2C, (const uint8_t*)mFrameBuf, getNumPixels() * 2); // RAMRW command
-  mUpdateUs = (int)((time_time() - startTime) * 1000000.0);
-
   return getNumPixels();
   }
 //}}}
@@ -1854,18 +1722,18 @@ bool cLcdIli9225b::initialise() {
   writeCommandData (0x21, 0);
   //}}}
 
-  updateLcd();
+  // update whole screen
+  sSpan span = { getRect(), getWidth(), getNumPixels(), nullptr };
+  updateLcd (&span);
+
   return true;
   }
 //}}}
 
 //{{{
-int cLcdIli9225b::updateLcd() {
+int cLcdIli9225b::updateLcd (sSpan* spans) {
 
-  double startTime = time_time();
   writeCommandMultiData (0x22, (const uint8_t*)mFrameBuf, getNumPixels() * 2);
-  mUpdateUs = (int)((time_time() - startTime) * 1000000.0);
-
   return getNumPixels();
   }
 //}}}
