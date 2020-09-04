@@ -161,12 +161,14 @@ constexpr uint16_t kWhite       =  0xFFFF;  // 255, 255, 255
 struct sSpan;
 class cLcd {
 public:
+  enum eMode { eExact, eCoarse, eSingle, eAll };
+
   //{{{
-  cLcd (const int16_t width, const int16_t height, const int rotate, const int info)
+  cLcd (const int16_t width, const int16_t height, const eMode mode, const int rotate, const int info)
       : mRotate(rotate),
         mWidth(((rotate == 90) || (rotate == 270)) ? height : width),
         mHeight(((rotate == 90) || (rotate == 270)) ? width : height),
-        mInfo(info) {}
+        mMode(mode), mInfo(info) {}
   //}}}
   virtual ~cLcd();
 
@@ -238,6 +240,7 @@ private:
   const uint16_t mWidth;
   const uint16_t mHeight;
 
+  eMode mMode = eSingle;
   int mInfo = 0;
   int mDiffUs = 0;
 
@@ -261,8 +264,8 @@ private:
 //{{{
 class cLcd16 : public cLcd {
 public:
-  cLcd16 (const int16_t width, const int16_t height, const int rotate, const int info)
-    : cLcd (width, height, rotate, info) {}
+  cLcd16 (const int16_t width, const int16_t height, const eMode mode, const int rotate, const int info)
+    : cLcd (width, height, mode, rotate, info) {}
   virtual ~cLcd16() {}
 
 protected:
@@ -301,8 +304,8 @@ public:
 //{{{
 class cLcdSpi : public cLcd {
 public:
-  cLcdSpi (const int16_t width, const int16_t height, const int rotate, const int info)
-    : cLcd (width, height, rotate, info) {}
+  cLcdSpi (const int16_t width, const int16_t height, const eMode mode, const int rotate, const int info)
+    : cLcd (width, height, mode, rotate, info) {}
   virtual ~cLcdSpi();
 
 protected:
@@ -312,8 +315,8 @@ protected:
 //{{{
 class cLcdSpiHeaderSelect : public cLcdSpi {
 public:
-  cLcdSpiHeaderSelect (const int16_t width, const int16_t height, const int rotate, const int info)
-    : cLcdSpi (width, height, rotate, info) {}
+  cLcdSpiHeaderSelect (const int16_t width, const int16_t height, const eMode mode, const int rotate, const int info)
+    : cLcdSpi (width, height, mode, rotate, info) {}
   virtual ~cLcdSpiHeaderSelect() {}
 
 protected:
@@ -325,8 +328,8 @@ protected:
 //{{{
 class cLcdSpiRegisterSelect : public cLcdSpi {
 public:
-  cLcdSpiRegisterSelect (const int16_t width, const int16_t height, const int rotate, const int info)
-    : cLcdSpi (width, height, rotate, info) {}
+  cLcdSpiRegisterSelect (const int16_t width, const int16_t height, const eMode mode, const int rotate, const int info)
+    : cLcdSpi (width, height, mode, rotate, info) {}
 
   virtual ~cLcdSpiRegisterSelect() {}
 

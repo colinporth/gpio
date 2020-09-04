@@ -108,8 +108,29 @@ bool cLcd::present() {
 
   // make diffSpans list
   double diffStartTime = time();
-  //mNumDiffSpans = diffCoarse (mDiffSpans);
-  mNumDiffSpans = diffSingle (mDiffSpans);
+
+  switch (mMode) {
+    case eExact :
+      mNumDiffSpans = diffExact (mDiffSpans);
+      break;
+
+    case eCoarse :
+      mNumDiffSpans = diffCoarse (mDiffSpans);
+      break;
+
+    case eSingle :
+      mNumDiffSpans = diffSingle (mDiffSpans);
+      break;
+
+    case eAll :
+      mDiffSpans->r = getRect();
+      mDiffSpans->lastScanRight = getWidth();
+      mDiffSpans->size = getNumPixels();
+      mDiffSpans->next = nullptr;
+      mNumDiffSpans = 1;
+      break;
+    }
+
   if (!mNumDiffSpans) // nothing changed
     return false;
 
@@ -903,7 +924,7 @@ constexpr int16_t kWidthTa7601 = 320;
 constexpr int16_t kHeightTa7601 = 480;
 
 cLcdTa7601::cLcdTa7601 (const int rotate, const int info)
-  : cLcd16(kWidthTa7601, kHeightTa7601, rotate, info) {}
+  : cLcd16(kWidthTa7601, kHeightTa7601, eSingle, rotate, info) {}
 
 //{{{
 bool cLcdTa7601::initialise() {
@@ -1043,8 +1064,9 @@ int cLcdTa7601::updateLcd (sSpan* spans) {
   writeCommandData (0x46, kHeightTa7601-1); // V end ram address window          = 480-1
 
   if (mRotate == 0) {
-    //{{{  send spans list, others to do
-    int numPixels= 0;
+    //{{{  send spans list, !!! other rotate to do !!!
+    int numPixels = 0;
+
     sSpan* it = spans;
     while (it) {
       uint16_t xstart;
@@ -1160,7 +1182,7 @@ constexpr int16_t kWidth1289 = 240;
 constexpr int16_t kHeight1289 = 320;
 
 cLcdSsd1289::cLcdSsd1289 (const int rotate, const int info)
-  : cLcd16(kWidth1289, kHeight1289, rotate, info) {}
+  : cLcd16(kWidth1289, kHeight1289, eCoarse, rotate, info) {}
 
 //{{{
 bool cLcdSsd1289::initialise() {
@@ -1355,7 +1377,7 @@ constexpr int16_t kHeight9320 = 320;
 constexpr int kSpiClock9320 = 24000000;
 
 cLcdIli9320::cLcdIli9320 (const int rotate, const int info)
-  : cLcdSpiHeaderSelect(kWidth9320, kHeight9320, rotate, info) {}
+  : cLcdSpiHeaderSelect(kWidth9320, kHeight9320, eCoarse, rotate, info) {}
 
 //{{{
 void cLcdIli9320::setBacklight (bool on) {
@@ -1540,7 +1562,7 @@ constexpr int16_t kHeight7735 = 160;
 constexpr int kSpiClock7735 = 24000000;
 
 cLcdSt7735r::cLcdSt7735r (const int rotate, const int info)
-  : cLcdSpiRegisterSelect (kWidth7735, kHeight7735, rotate, info) {}
+  : cLcdSpiRegisterSelect (kWidth7735, kHeight7735, eCoarse, rotate, info) {}
 
 //{{{
 bool cLcdSt7735r::initialise() {
@@ -1650,7 +1672,7 @@ constexpr int16_t kHeight9225b = 220;
 constexpr int kSpiClock9225b = 16000000;
 
 cLcdIli9225b::cLcdIli9225b (const int rotate, const int info)
-  : cLcdSpiRegisterSelect(kWidth9225b, kHeight9225b, rotate, info) {}
+  : cLcdSpiRegisterSelect(kWidth9225b, kHeight9225b, eCoarse, rotate, info) {}
 
 //{{{
 bool cLcdIli9225b::initialise() {
