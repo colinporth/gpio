@@ -286,14 +286,20 @@ bool cLcd::initialise() {
                       " version " + dec (gpioVersion()) +
                       (mRotate == cLcd::e0 ? "" : dec (mRotate*90)) +
                       (mInfo == cLcd::eTiming ? " timing " : "") +
-                      (mMode == cLcd::eAll ? " all " :
+                      (mMode == cLcd::eAll ? " all" :
                          mMode == cLcd::eSingle ? " single" :
                            mMode == cLcd::eCoarse ? " coarse" : " exact"));
 
   if (gpioInitialise() <= 0)
     return false;
 
-  setFont (getFreeSansBold(), getFreeSansBoldSize());
+  // reset lcd
+  gpioSetMode (kResetGpio, PI_OUTPUT);
+  gpioWrite (kResetGpio, 0);
+  gpioDelay (1000);
+  gpioWrite (kResetGpio, 1);
+  // is rest of init long enough ???
+  gpioDelay (100000);
 
   // allocate and clear both frameBuffers to black
   mFrameBuf = (uint16_t*)aligned_alloc (getNumPixels() * 2, 32);
@@ -349,12 +355,7 @@ bool cLcd::initialise() {
 
   cLog::log (LOGINFO, "display %dx%d", mModeInfo.width, mModeInfo.height);
 
-  // reset lcd
-  gpioSetMode (kResetGpio, PI_OUTPUT);
-  gpioWrite (kResetGpio, 0);
-  gpioDelay (10000);
-  gpioWrite (kResetGpio, 1);
-  gpioDelay (120000);
+  setFont (getFreeSansBold(), getFreeSansBoldSize());
 
   return true;
   }
