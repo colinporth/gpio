@@ -36,10 +36,8 @@ struct sSpan {
   };
 //}}}
 
-// gpio/pin common to spi/16bit
-constexpr uint8_t kResetGpio = 25;
-
 // public
+constexpr uint8_t kResetGpio = 25;
 //{{{
 cLcd::~cLcd() {
 
@@ -263,7 +261,7 @@ bool cLcd::initialise() {
   unsigned hardwareRevision = gpioHardwareRevision();
   cLog::log (LOGINFO, "pigpio hwRev:%x version:%d", hardwareRevision, version);
 
-  if (gpioInitialise() <= 0) 
+  if (gpioInitialise() <= 0)
     return false;
 
   setFont (getFreeSansBold(), getFreeSansBoldSize());
@@ -918,97 +916,96 @@ cLcdTa7601::cLcdTa7601 (const int rotate, const int info)
 //{{{
 bool cLcdTa7601::initialise() {
 
-  if (cLcd::initialise()) {
-    // wr
-    gpioSetMode (k16WriteGpio, PI_OUTPUT);
-    gpioWrite (k16WriteGpio, 1);
+  if (!cLcd::initialise())
+    return false;
 
-    // rd unused
-    gpioSetMode (k16ReadGpio, PI_OUTPUT);
-    gpioWrite (k16ReadGpio, 1);
+  // wr
+  gpioSetMode (k16WriteGpio, PI_OUTPUT);
+  gpioWrite (k16WriteGpio, 1);
 
-    // rs
-    gpioSetMode (k16RegisterSelectGpio, PI_OUTPUT);
-    gpioWrite (k16RegisterSelectGpio, 1);
+  // rd - unused
+  gpioSetMode (k16ReadGpio, PI_OUTPUT);
+  gpioWrite (k16ReadGpio, 1);
 
-    // chipSelect
-    gpioSetMode (k16ChipSelectGpio, PI_OUTPUT);
-    gpioWrite (k16ChipSelectGpio, 0);
+  // rs
+  gpioSetMode (k16RegisterSelectGpio, PI_OUTPUT);
+  gpioWrite (k16RegisterSelectGpio, 1);
 
-    // backlight
-    gpioSetMode (k16BacklightGpio, PI_OUTPUT);
-    gpioWrite (k16BacklightGpio, 1);
+  // chipSelect
+  gpioSetMode (k16ChipSelectGpio, PI_OUTPUT);
+  gpioWrite (k16ChipSelectGpio, 0);
 
-    // 16 d0-d15
-    for (int i = 0; i < 16; i++)
-      gpioSetMode (i, PI_OUTPUT);
-    gpioWrite_Bits_0_31_Clear (k16DataMask);
+  // backlight
+  gpioSetMode (k16BacklightGpio, PI_OUTPUT);
+  gpioWrite (k16BacklightGpio, 1);
 
-    // portrait mode with (0,0) being the top left. top is the side opposite the LCD connector.
-    writeCommandData (0x01, 0x023C); // gate_scan & display boundary
-    writeCommandData (0x02, 0x0100); // inversion
-    writeCommandData (0x03, 0x1030); // GRAM access
-    writeCommandData (0x08, 0x0808); // Porch period
-    writeCommandData (0x0A, 0x0500); // osc control & clock number per 1H
-    writeCommandData (0x0B, 0x0000); // interface & display clock
-    writeCommandData (0x0C, 0x0770); // source and gate timing control
-    writeCommandData (0x0D, 0x0000); // gate scan position
-    writeCommandData (0x0E, 0x0001); // tearing effect prevention
+  // 16 d0-d15
+  for (int i = 0; i < 16; i++)
+    gpioSetMode (i, PI_OUTPUT);
+  gpioWrite_Bits_0_31_Clear (k16DataMask);
 
-    //{{{  power control
-    writeCommandData (0x11, 0x0406); // power control
-    writeCommandData (0x12, 0x000E); // power control
-    writeCommandData (0x13, 0x0222); // power control
-    writeCommandData (0x14, 0x0015); // power control
-    writeCommandData (0x15, 0x4277); // power control
-    writeCommandData (0x16, 0x0000); // power control
-    //}}}
-    //{{{  gamma
-    writeCommandData (0x30, 0x6A50); // gamma
-    writeCommandData (0x31, 0x00C9); // gamma
-    writeCommandData (0x32, 0xC7BE); // gamma
-    writeCommandData (0x33, 0x0003); // gamma
-    writeCommandData (0x36, 0x3443); // gamma
-    writeCommandData (0x3B, 0x0000); // gamma
-    writeCommandData (0x3C, 0x0000); // gamma
-    writeCommandData (0x2C, 0x6A50); // gamma
-    writeCommandData (0x2D, 0x00C9); // gamma
-    writeCommandData (0x2E, 0xC7BE); // gamma
-    writeCommandData (0x2F, 0x0003); // gamma
-    writeCommandData (0x35, 0x3443); // gamma
-    writeCommandData (0x39, 0x0000); // gamma
-    writeCommandData (0x3A, 0x0000); // gamma
-    writeCommandData (0x28, 0x6A50); // gamma
-    writeCommandData (0x29, 0x00C9); // gamma
-    writeCommandData (0x2A, 0xC7BE); // gamma
-    writeCommandData (0x2B, 0x0003); // gamma
-    writeCommandData (0x34, 0x3443); // gamma
-    writeCommandData (0x37, 0x0000); // gamma
-    writeCommandData (0x38, 0x0000); // gamma
-    delayUs (10000);
-    //}}}
-    //{{{  more power control
-    writeCommandData (0x12, 0x200E);  // power control
-    delayUs (10000);
-    writeCommandData (0x12, 0x2003);  // power control
-    delayUs (10000);
-    //}}}
+  // portrait mode with (0,0) being the top left. top is the side opposite the LCD connector.
+  writeCommandData (0x01, 0x023C); // gate_scan & display boundary
+  writeCommandData (0x02, 0x0100); // inversion
+  writeCommandData (0x03, 0x1030); // GRAM access
+  writeCommandData (0x08, 0x0808); // Porch period
+  writeCommandData (0x0A, 0x0500); // osc control & clock number per 1H
+  writeCommandData (0x0B, 0x0000); // interface & display clock
+  writeCommandData (0x0C, 0x0770); // source and gate timing control
+  writeCommandData (0x0D, 0x0000); // gate scan position
+  writeCommandData (0x0E, 0x0001); // tearing effect prevention
 
-    writeCommandData (0x07, 0x0012);  // partial, 8-color, display ON
-    delayUs (10000);
-    writeCommandData (0x07, 0x0017);  // partial, 8-color, display ON
-    delayUs (10000);
+  //{{{  power control
+  writeCommandData (0x11, 0x0406); // power control
+  writeCommandData (0x12, 0x000E); // power control
+  writeCommandData (0x13, 0x0222); // power control
+  writeCommandData (0x14, 0x0015); // power control
+  writeCommandData (0x15, 0x4277); // power control
+  writeCommandData (0x16, 0x0000); // power control
+  //}}}
+  //{{{  gamma
+  writeCommandData (0x30, 0x6A50); // gamma
+  writeCommandData (0x31, 0x00C9); // gamma
+  writeCommandData (0x32, 0xC7BE); // gamma
+  writeCommandData (0x33, 0x0003); // gamma
+  writeCommandData (0x36, 0x3443); // gamma
+  writeCommandData (0x3B, 0x0000); // gamma
+  writeCommandData (0x3C, 0x0000); // gamma
+  writeCommandData (0x2C, 0x6A50); // gamma
+  writeCommandData (0x2D, 0x00C9); // gamma
+  writeCommandData (0x2E, 0xC7BE); // gamma
+  writeCommandData (0x2F, 0x0003); // gamma
+  writeCommandData (0x35, 0x3443); // gamma
+  writeCommandData (0x39, 0x0000); // gamma
+  writeCommandData (0x3A, 0x0000); // gamma
+  writeCommandData (0x28, 0x6A50); // gamma
+  writeCommandData (0x29, 0x00C9); // gamma
+  writeCommandData (0x2A, 0xC7BE); // gamma
+  writeCommandData (0x2B, 0x0003); // gamma
+  writeCommandData (0x34, 0x3443); // gamma
+  writeCommandData (0x37, 0x0000); // gamma
+  writeCommandData (0x38, 0x0000); // gamma
+  delayUs (10000);
+  //}}}
+  //{{{  more power control
+  writeCommandData (0x12, 0x200E);  // power control
+  delayUs (10000);
+  writeCommandData (0x12, 0x2003);  // power control
+  delayUs (10000);
+  //}}}
 
-    writeCommandData (0x45, 0x0000);          // h start ram address window even = 0
-    writeCommandData (0x44, kWidthTa7601-1);  // h end ram address window even   = 320-1
-    writeCommandData (0x47, 0x0000);          // v start ram address window      = 0
-    writeCommandData (0x46, kHeightTa7601-1); // v end ram address window        = 480-1
+  writeCommandData (0x07, 0x0012);  // partial, 8-color, display ON
+  delayUs (10000);
+  writeCommandData (0x07, 0x0017);  // partial, 8-color, display ON
+  delayUs (10000);
 
-    updateLcd();
-    return true;
-    }
+  writeCommandData (0x45, 0x0000);          // h start ram address window even = 0
+  writeCommandData (0x44, kWidthTa7601-1);  // h end ram address window even   = 320-1
+  writeCommandData (0x47, 0x0000);          // v start ram address window      = 0
+  writeCommandData (0x46, kHeightTa7601-1); // v end ram address window        = 480-1
 
-  return false;
+  updateLcd();
+  return true;
   }
 //}}}
 
@@ -1156,99 +1153,101 @@ cLcdSsd1289::cLcdSsd1289 (const int rotate, const int info)
 //{{{
 bool cLcdSsd1289::initialise() {
 
-  if (cLcd::initialise()) {
-    // wr
-    gpioSetMode (k16WriteGpio, PI_OUTPUT);
-    gpioWrite (k16WriteGpio, 1);
+  if (!cLcd::initialise())
+    return false;
 
-    // rd unused
-    gpioSetMode (k16ReadGpio, PI_OUTPUT);
-    gpioWrite (k16ReadGpio, 1);
+  // wr
+  gpioSetMode (k16WriteGpio, PI_OUTPUT);
+  gpioWrite (k16WriteGpio, 1);
 
-    // rs
-    gpioSetMode (k16RegisterSelectGpio, PI_OUTPUT);
-    gpioWrite (k16RegisterSelectGpio, 1);
+  // rd - unused
+  gpioSetMode (k16ReadGpio, PI_OUTPUT);
+  gpioWrite (k16ReadGpio, 1);
 
-    // 16 d0-d15
-    for (int i = 0; i < 16; i++)
-      gpioSetMode (i, PI_OUTPUT);
-    gpioWrite_Bits_0_31_Clear (k16DataMask);
+  // rs
+  gpioSetMode (k16RegisterSelectGpio, PI_OUTPUT);
+  gpioWrite (k16RegisterSelectGpio, 1);
 
-    // startup commands
-    writeCommandData (0x00, 0x0001); // SSD1289_REG_OSCILLATION
-    writeCommandData (0x03, 0xA8A4); // SSD1289_REG_POWER_CTRL_1
-    writeCommandData (0x0c, 0x0000); // SSD1289_REG_POWER_CTRL_2
-    writeCommandData (0x0d, 0x080C); // SSD1289_REG_POWER_CTRL_3
-    writeCommandData (0x0e, 0x2B00); // SSD1289_REG_POWER_CTRL_4
-    writeCommandData (0x1e, 0x00B7); // SSD1289_REG_POWER_CTRL_5
+  // 16 d0-d15
+  for (int i = 0; i < 16; i++)
+    gpioSetMode (i, PI_OUTPUT);
+  gpioWrite_Bits_0_31_Clear (k16DataMask);
 
-    //write_reg(0x01, (1 << 13) | (par->bgr << 11) | (1 << 9) | (HEIGHT - 1));
-    writeCommandData (0x01, 0x2B3F); // SSD1289_REG_DRIVER_OUT_CTRL
-    writeCommandData (0x02, 0x0600); // SSD1289_REG_LCD_DRIVE_AC
-    writeCommandData (0x10, 0x0000); // SSD1289_REG_SLEEP_MODE
+  // startup commands
+  writeCommandData (0x00, 0x0001); // SSD1289_REG_OSCILLATION
+  writeCommandData (0x03, 0xA8A4); // SSD1289_REG_POWER_CTRL_1
+  writeCommandData (0x0c, 0x0000); // SSD1289_REG_POWER_CTRL_2
+  writeCommandData (0x0d, 0x080C); // SSD1289_REG_POWER_CTRL_3
+  writeCommandData (0x0e, 0x2B00); // SSD1289_REG_POWER_CTRL_4
+  writeCommandData (0x1e, 0x00B7); // SSD1289_REG_POWER_CTRL_5
 
-    writeCommandData (0x07, 0x0233); // SSD1289_REG_DISPLAY_CTRL
-    writeCommandData (0x0b, 0x0000); // SSD1289_REG_FRAME_CYCLE
-    writeCommandData (0x0f, 0x0000); // SSD1289_REG_GATE_SCAN_START
+  //write_reg(0x01, (1 << 13) | (par->bgr << 11) | (1 << 9) | (HEIGHT - 1));
+  writeCommandData (0x01, 0x2B3F); // SSD1289_REG_DRIVER_OUT_CTRL
+  writeCommandData (0x02, 0x0600); // SSD1289_REG_LCD_DRIVE_AC
+  writeCommandData (0x10, 0x0000); // SSD1289_REG_SLEEP_MODE
 
-    writeCommandData (0x23, 0x0000); // SSD1289_REG_WR_DATA_MASK_1
-    writeCommandData (0x24, 0x0000); // SSD1289_REG_WR_DATA_MASK_2
-    writeCommandData (0x25, 0x8000); // SSD1289_REG_FRAME_FREQUENCY
+  writeCommandData (0x07, 0x0233); // SSD1289_REG_DISPLAY_CTRL
+  writeCommandData (0x0b, 0x0000); // SSD1289_REG_FRAME_CYCLE
+  writeCommandData (0x0f, 0x0000); // SSD1289_REG_GATE_SCAN_START
 
-    writeCommandData (0x30, 0x0707); // SSD1289_REG_GAMMA_CTRL_1
-    writeCommandData (0x31, 0x0204); // SSD1289_REG_GAMMA_CTRL_2
-    writeCommandData (0x32, 0x0204); // SSD1289_REG_GAMMA_CTRL_3
-    writeCommandData (0x33, 0x0502); // SSD1289_REG_GAMMA_CTRL_4
-    writeCommandData (0x34, 0x0507); // SSD1289_REG_GAMMA_CTRL_5
-    writeCommandData (0x35, 0x0204); // SSD1289_REG_GAMMA_CTRL_6
-    writeCommandData (0x36, 0x0204); // SSD1289_REG_GAMMA_CTRL_7
-    writeCommandData (0x37, 0x0502); // SSD1289_REG_GAMMA_CTRL_8
-    writeCommandData (0x3a, 0x0302); // SSD1289_REG_GAMMA_CTRL_9
-    writeCommandData (0x3b, 0x0302); // SSD1289_REG_GAMMA_CTRL_10
+  writeCommandData (0x23, 0x0000); // SSD1289_REG_WR_DATA_MASK_1
+  writeCommandData (0x24, 0x0000); // SSD1289_REG_WR_DATA_MASK_2
+  writeCommandData (0x25, 0x8000); // SSD1289_REG_FRAME_FREQUENCY
 
-    writeCommandData (0x41, 0x0000); // SSD1289_REG_V_SCROLL_CTRL_1
-    //write_reg(0x42, 0x0000);
-    writeCommandData (0x48, 0x0000); // SSD1289_REG_FIRST_WIN_START
-    writeCommandData (0x49, 0x013F); // SSD1289_REG_FIRST_WIN_END
+  //{{{  gamma
+  writeCommandData (0x30, 0x0707); // SSD1289_REG_GAMMA_CTRL_1
+  writeCommandData (0x31, 0x0204); // SSD1289_REG_GAMMA_CTRL_2
+  writeCommandData (0x32, 0x0204); // SSD1289_REG_GAMMA_CTRL_3
+  writeCommandData (0x33, 0x0502); // SSD1289_REG_GAMMA_CTRL_4
+  writeCommandData (0x34, 0x0507); // SSD1289_REG_GAMMA_CTRL_5
+  writeCommandData (0x35, 0x0204); // SSD1289_REG_GAMMA_CTRL_6
+  writeCommandData (0x36, 0x0204); // SSD1289_REG_GAMMA_CTRL_7
+  writeCommandData (0x37, 0x0502); // SSD1289_REG_GAMMA_CTRL_8
+  writeCommandData (0x3a, 0x0302); // SSD1289_REG_GAMMA_CTRL_9
+  writeCommandData (0x3b, 0x0302); // SSD1289_REG_GAMMA_CTRL_10
+  //}}}
 
-    writeCommandData (0x44, ((kWidth1289-1) << 8) | 0); // SSD1289_REG_H_RAM_ADR_POS
-    writeCommandData (0x45, 0x0000);                    // SSD1289_REG_V_RAM_ADR_START
-    writeCommandData (0x46, kHeight1289-1);             // SSD1289_REG_V_RAM_ADR_END
+  writeCommandData (0x41, 0x0000); // SSD1289_REG_V_SCROLL_CTRL_1
+  //write_reg(0x42, 0x0000);
+  writeCommandData (0x48, 0x0000); // SSD1289_REG_FIRST_WIN_START
+  writeCommandData (0x49, 0x013F); // SSD1289_REG_FIRST_WIN_END
 
-    int xstart = 0;
-    int ystart = 0;
-    int xres = kWidth1289-1;
-    int yres = kHeight1289-1;
-    switch (mRotate) {
-      case 90:
-        writeCommandData (0x11, 0x6040 | 0b011000); // 0x11 REG_ENTRY_MODE
-        writeCommandData (0x4e, ystart);            // 0x4E GDDRAM X address counter
-        writeCommandData (0x4f, xres - xstart);     // 0x4F GDDRAM Y address counter
-        break;
-      case 180:
-        writeCommandData (0x11, 0x6040 | 0b000000); // 0x11 REG_ENTRY_MODE
-        writeCommandData (0x4e, xres - xstart);     // 0x4E GDDRAM X address counter
-        writeCommandData (0x4f, yres - ystart);     // 0x4F GDDRAM Y address counter
-        break;
-      case 270:
-        writeCommandData (0x11, 0x6040 | 0b101000); // 0x11 REG_ENTRY_MODE
-        writeCommandData (0x4e, yres - ystart);     // 0x4E GDDRAM X address counter
-        writeCommandData (0x4f, xstart);            // 0x4F GDDRAM Y address counter
-        break;
-      default:
-        writeCommandData (0x11, 0x6040 | 0b110000); // 0x11 REG_ENTRY_MODE
-        writeCommandData (0x4e, xstart);            // 0x4E GDDRAM X address counter
-        writeCommandData (0x4f, ystart);            // 0x4F GDDRAM Y address counter
-        break;
-      }
+  writeCommandData (0x44, ((kWidth1289-1) << 8) | 0); // SSD1289_REG_H_RAM_ADR_POS
+  writeCommandData (0x45, 0x0000);                    // SSD1289_REG_V_RAM_ADR_START
+  writeCommandData (0x46, kHeight1289-1);             // SSD1289_REG_V_RAM_ADR_END
 
-    updateLcd();
-    return true;
+  int xstart = 0;
+  int ystart = 0;
+  int xres = kWidth1289-1;
+  int yres = kHeight1289-1;
+  switch (mRotate) {
+    case 90:
+      writeCommandData (0x11, 0x6040 | 0b011000); // 0x11 REG_ENTRY_MODE
+      writeCommandData (0x4e, ystart);            // 0x4E GDDRAM X address counter
+      writeCommandData (0x4f, xres - xstart);     // 0x4F GDDRAM Y address counter
+      break;
+    case 180:
+      writeCommandData (0x11, 0x6040 | 0b000000); // 0x11 REG_ENTRY_MODE
+      writeCommandData (0x4e, xres - xstart);     // 0x4E GDDRAM X address counter
+      writeCommandData (0x4f, yres - ystart);     // 0x4F GDDRAM Y address counter
+      break;
+    case 270:
+      writeCommandData (0x11, 0x6040 | 0b101000); // 0x11 REG_ENTRY_MODE
+      writeCommandData (0x4e, yres - ystart);     // 0x4E GDDRAM X address counter
+      writeCommandData (0x4f, xstart);            // 0x4F GDDRAM Y address counter
+      break;
+    default:
+      writeCommandData (0x11, 0x6040 | 0b110000); // 0x11 REG_ENTRY_MODE
+      writeCommandData (0x4e, xstart);            // 0x4E GDDRAM X address counter
+      writeCommandData (0x4f, ystart);            // 0x4F GDDRAM Y address counter
+      break;
     }
 
-  return false;
+  updateLcd();
+  return true;
   }
 //}}}
+
 //{{{
 int cLcdSsd1289::updateLcd() {
 
@@ -1352,89 +1351,88 @@ void cLcdIli9320::setBacklight (bool on) {
 //{{{
 bool cLcdIli9320::initialise() {
 
-  if (cLcd::initialise()) {
-    // backlight off - active hi
-    gpioSetMode (kBacklightGpio, PI_OUTPUT);
-    gpioWrite (kBacklightGpio, 0);
+  if (cLcd::initialise())
+    return false;
 
-    // spi mode 3, spi manages ce0 active lo
-    mSpiHandle = spiOpen (0, kSpiClock9320, 3);
+  // backlight off - active hi
+  gpioSetMode (kBacklightGpio, PI_OUTPUT);
+  gpioWrite (kBacklightGpio, 0);
 
-    writeCommandData (0xE5, 0x8000); // Set the Vcore voltage
-    writeCommandData (0x00, 0x0000); // start oscillation - stopped?
-    writeCommandData (0x01, 0x0100); // Driver Output Control 1 - SS=1 and SM=0
-    writeCommandData (0x02, 0x0700); // LCD Driving Control - set line inversion
-    writeCommandData (0x04, 0x0000); // Resize Control
-    writeCommandData (0x08, 0x0202); // Display Control 2
-    writeCommandData (0x09, 0x0000); // Display Control 3
-    writeCommandData (0x0a, 0x0000); // Display Control 4 - frame marker
-    writeCommandData (0x0c, 0x0001); // RGB Display Interface Control 1
-    writeCommandData (0x0d, 0x0000); // Frame Marker Position
-    writeCommandData (0x0f, 0x0000); // RGB Display Interface Control 2
-    delayUs (40000);
+  // spi mode 3, spi manages ce0 active lo
+  mSpiHandle = spiOpen (0, kSpiClock9320, 3);
 
-    writeCommandData (0x07, 0x0101); // Display Control 1
-    delayUs (40000);
+  writeCommandData (0xE5, 0x8000); // Set the Vcore voltage
+  writeCommandData (0x00, 0x0000); // start oscillation - stopped?
+  writeCommandData (0x01, 0x0100); // Driver Output Control 1 - SS=1 and SM=0
+  writeCommandData (0x02, 0x0700); // LCD Driving Control - set line inversion
+  writeCommandData (0x04, 0x0000); // Resize Control
+  writeCommandData (0x08, 0x0202); // Display Control 2
+  writeCommandData (0x09, 0x0000); // Display Control 3
+  writeCommandData (0x0a, 0x0000); // Display Control 4 - frame marker
+  writeCommandData (0x0c, 0x0001); // RGB Display Interface Control 1
+  writeCommandData (0x0d, 0x0000); // Frame Marker Position
+  writeCommandData (0x0f, 0x0000); // RGB Display Interface Control 2
+  delayUs (40000);
 
-    //{{{  power control
-    writeCommandData (0x10, 0x10C0); // Power Control 1
-    writeCommandData (0x11, 0x0007); // Power Control 2
-    writeCommandData (0x12, 0x0110); // Power Control 3
-    writeCommandData (0x13, 0x0b00); // Power Control 4
-    writeCommandData (0x29, 0x0000); // Power Control 7
-    //}}}
-    writeCommandData (0x2b, 0x4010); // Frame Rate and Color Control
-    writeCommandData (0x60, 0x2700); // Driver Output Control 2
-    writeCommandData (0x61, 0x0001); // Base Image Display Control
-    writeCommandData (0x6a, 0x0000); // Vertical Scroll Control
-    //{{{  partial image
-    writeCommandData (0x80, 0x0000); // Partial Image 1 Display Position
-    writeCommandData (0x81, 0x0000); // Partial Image 1 Area Start Line
-    writeCommandData (0x82, 0x0000); // Partial Image 1 Area End Line
-    writeCommandData (0x83, 0x0000); // Partial Image 2 Display Position
-    writeCommandData (0x84, 0x0000); // Partial Image 2 Area Start Line
-    writeCommandData (0x85, 0x0000); // Partial Image 2 Area End Line
-    //}}}
-    //{{{  panel interface
-    writeCommandData (0x90, 0x0010); // Panel Interface Control 1
-    writeCommandData (0x92, 0x0000); // Panel Interface Control 2
-    writeCommandData (0x93, 0x0001); // Panel Interface Control 3
-    writeCommandData (0x95, 0x0110); // Panel Interface Control 4
-    writeCommandData (0x97, 0x0000); // Panel Interface Control 5
-    writeCommandData (0x98, 0x0000); // Panel Interface Control 6
-    //}}}
+  writeCommandData (0x07, 0x0101); // Display Control 1
+  delayUs (40000);
 
-    writeCommandData (0x07, 0x0133); // Display Control 1
-    delayUs (40000);
+  //{{{  power control
+  writeCommandData (0x10, 0x10C0); // Power Control 1
+  writeCommandData (0x11, 0x0007); // Power Control 2
+  writeCommandData (0x12, 0x0110); // Power Control 3
+  writeCommandData (0x13, 0x0b00); // Power Control 4
+  writeCommandData (0x29, 0x0000); // Power Control 7
+  //}}}
+  writeCommandData (0x2b, 0x4010); // Frame Rate and Color Control
+  writeCommandData (0x60, 0x2700); // Driver Output Control 2
+  writeCommandData (0x61, 0x0001); // Base Image Display Control
+  writeCommandData (0x6a, 0x0000); // Vertical Scroll Control
+  //{{{  partial image
+  writeCommandData (0x80, 0x0000); // Partial Image 1 Display Position
+  writeCommandData (0x81, 0x0000); // Partial Image 1 Area Start Line
+  writeCommandData (0x82, 0x0000); // Partial Image 1 Area End Line
+  writeCommandData (0x83, 0x0000); // Partial Image 2 Display Position
+  writeCommandData (0x84, 0x0000); // Partial Image 2 Area Start Line
+  writeCommandData (0x85, 0x0000); // Partial Image 2 Area End Line
+  //}}}
+  //{{{  panel interface
+  writeCommandData (0x90, 0x0010); // Panel Interface Control 1
+  writeCommandData (0x92, 0x0000); // Panel Interface Control 2
+  writeCommandData (0x93, 0x0001); // Panel Interface Control 3
+  writeCommandData (0x95, 0x0110); // Panel Interface Control 4
+  writeCommandData (0x97, 0x0000); // Panel Interface Control 5
+  writeCommandData (0x98, 0x0000); // Panel Interface Control 6
+  //}}}
 
-    writeCommandData (0x0050, 0x0000);        // H GRAM start address
-    writeCommandData (0x0051, kWidth9320-1);  // H GRAM end address
-    writeCommandData (0x0052, 0x0000);        // V GRAM start address
-    writeCommandData (0x0053, kHeight9320-1); // V GRAM end address
+  writeCommandData (0x07, 0x0133); // Display Control 1
+  delayUs (40000);
 
-    switch (mRotate) {
-      case 0:
-        writeCommandData (0x03, 0x1030); // Entry Mode - BGR, HV inc, vert write,
-        break;
-      case 90:
-        writeCommandData (0x03, 0x1018); // Entry Mode - BGR, HV inc, vert write,
-        break;
-      case 180:
-        writeCommandData (0x03, 0x1000); // Entry Mode - BGR, HV inc, vert write,
-        break;
-      case 270:
-        writeCommandData (0x03, 0x1028); // Entry Mode - BGR, HV inc, vert write,
-        break;
-      default:
-        cLog::log (LOGERROR, "unkown rotate " + dec (mRotate));
-        break;
-      }
+  writeCommandData (0x0050, 0x0000);        // H GRAM start address
+  writeCommandData (0x0051, kWidth9320-1);  // H GRAM end address
+  writeCommandData (0x0052, 0x0000);        // V GRAM start address
+  writeCommandData (0x0053, kHeight9320-1); // V GRAM end address
 
-    updateLcd();
-    return true;
+  switch (mRotate) {
+    case 0:
+      writeCommandData (0x03, 0x1030); // Entry Mode - BGR, HV inc, vert write,
+      break;
+    case 90:
+      writeCommandData (0x03, 0x1018); // Entry Mode - BGR, HV inc, vert write,
+      break;
+    case 180:
+      writeCommandData (0x03, 0x1000); // Entry Mode - BGR, HV inc, vert write,
+      break;
+    case 270:
+      writeCommandData (0x03, 0x1028); // Entry Mode - BGR, HV inc, vert write,
+      break;
+    default:
+      cLog::log (LOGERROR, "unkown rotate " + dec (mRotate));
+      break;
     }
 
-  return false;
+  updateLcd();
+  return true;
   }
 //}}}
 
@@ -1603,94 +1601,94 @@ cLcdSt7735r::cLcdSt7735r (const int rotate, const int info)
 //{{{
 bool cLcdSt7735r::initialise() {
 
-  if (cLcd::initialise()) {
-    // rs
-    gpioSetMode (kSpiRegisterSelectGpio, PI_OUTPUT);
-    gpioWrite (kSpiRegisterSelectGpio, 1);
+  if (!cLcd::initialise())
+    return false;
 
-    // mode 0, spi manages ce0 active lo
-    mSpiHandle = spiOpen (0, kSpiClock7735, 0);
+  // rs
+  gpioSetMode (kSpiRegisterSelectGpio, PI_OUTPUT);
+  gpioWrite (kSpiRegisterSelectGpio, 1);
 
-    //{{{  command constexpr
-    constexpr uint8_t k7335_SLPOUT  = 0x11; // no data
-    constexpr uint8_t k7335_DISPON  = 0x29; // no data
-    //constexpr uint8_t k7335_DISPOFF = 0x28; // no data
+  // mode 0, spi manages ce0 active lo
+  mSpiHandle = spiOpen (0, kSpiClock7735, 0);
 
-    constexpr uint8_t k7335_CASET = 0x2A;
-    constexpr uint8_t k7335_caSetData[4] = { 0, 0, 0, kWidth7735 - 1 };
+  //{{{  command constexpr
+  constexpr uint8_t k7335_SLPOUT  = 0x11; // no data
+  constexpr uint8_t k7335_DISPON  = 0x29; // no data
+  //constexpr uint8_t k7335_DISPOFF = 0x28; // no data
 
-    constexpr uint8_t k7335_RASET = 0x2B;
-    constexpr uint8_t k7335_raSetData[4] = { 0, 0, 0, kHeight7735 - 1 };
+  constexpr uint8_t k7335_CASET = 0x2A;
+  constexpr uint8_t k7335_caSetData[4] = { 0, 0, 0, kWidth7735 - 1 };
 
-    constexpr uint8_t k7335_MADCTL = 0x36;
-    constexpr uint8_t k7735_MADCTLData[1] = { 0xc0 };
+  constexpr uint8_t k7335_RASET = 0x2B;
+  constexpr uint8_t k7335_raSetData[4] = { 0, 0, 0, kHeight7735 - 1 };
 
-    constexpr uint8_t k7335_COLMOD  = 0x3A;
-    constexpr uint8_t k7335_COLMODData[1] = { 0x05 };
+  constexpr uint8_t k7335_MADCTL = 0x36;
+  constexpr uint8_t k7735_MADCTLData[1] = { 0xc0 };
 
-    constexpr uint8_t k7335_FRMCTR1 = 0xB1;
-    constexpr uint8_t k7335_FRMCTR2 = 0xB2;
-    constexpr uint8_t k7335_FRMCTR3 = 0xB3;
-    constexpr uint8_t k7335_FRMCTRData[6] = { 0x01, 0x2c, 0x2d, 0x01, 0x2c, 0x2d };
+  constexpr uint8_t k7335_COLMOD  = 0x3A;
+  constexpr uint8_t k7335_COLMODData[1] = { 0x05 };
 
-    constexpr uint8_t k7335_INVCTR  = 0xB4;
-    constexpr uint8_t k7335_INVCTRData[1] = { 0x07 };
+  constexpr uint8_t k7335_FRMCTR1 = 0xB1;
+  constexpr uint8_t k7335_FRMCTR2 = 0xB2;
+  constexpr uint8_t k7335_FRMCTR3 = 0xB3;
+  constexpr uint8_t k7335_FRMCTRData[6] = { 0x01, 0x2c, 0x2d, 0x01, 0x2c, 0x2d };
 
-    constexpr uint8_t k7335_PWCTR1  = 0xC0;
-    constexpr uint8_t k7335_PowerControlData1[3] = { 0xA2, 0x02 /* -4.6V */, 0x84 /* AUTO mode */ };
-    constexpr uint8_t k7335_PWCTR2  = 0xC1;
-    constexpr uint8_t k7335_PowerControlData2[1] = { 0xc5 }; // VGH25 = 2.4C VGSEL =-10 VGH = 3*AVDD
-    constexpr uint8_t k7335_PWCTR3  = 0xC2;
-    constexpr uint8_t k7335_PowerControlData3[2] = { 0x0A /* Opamp current small */, 0x00 /* Boost freq */ };
-    constexpr uint8_t k7335_PWCTR4  = 0xC3;
-    constexpr uint8_t k7335_PowerControlData4[2] = { 0x8A /* BCLK/2, Opamp current small/medium low */, 0x2A };
-    constexpr uint8_t k7335_PWCTR5  = 0xC4;
-    constexpr uint8_t k7335_PowerControlData5[2] = { 0x8A /* BCLK/2, Opamp current small/medium low */, 0xEE };
+  constexpr uint8_t k7335_INVCTR  = 0xB4;
+  constexpr uint8_t k7335_INVCTRData[1] = { 0x07 };
 
-    constexpr uint8_t k7335_VMCTR1  = 0xC5;
-    constexpr uint8_t k7335_VMCTR1Data[1] = { 0x0E };
+  constexpr uint8_t k7335_PWCTR1  = 0xC0;
+  constexpr uint8_t k7335_PowerControlData1[3] = { 0xA2, 0x02 /* -4.6V */, 0x84 /* AUTO mode */ };
+  constexpr uint8_t k7335_PWCTR2  = 0xC1;
+  constexpr uint8_t k7335_PowerControlData2[1] = { 0xc5 }; // VGH25 = 2.4C VGSEL =-10 VGH = 3*AVDD
+  constexpr uint8_t k7335_PWCTR3  = 0xC2;
+  constexpr uint8_t k7335_PowerControlData3[2] = { 0x0A /* Opamp current small */, 0x00 /* Boost freq */ };
+  constexpr uint8_t k7335_PWCTR4  = 0xC3;
+  constexpr uint8_t k7335_PowerControlData4[2] = { 0x8A /* BCLK/2, Opamp current small/medium low */, 0x2A };
+  constexpr uint8_t k7335_PWCTR5  = 0xC4;
+  constexpr uint8_t k7335_PowerControlData5[2] = { 0x8A /* BCLK/2, Opamp current small/medium low */, 0xEE };
 
-    constexpr uint8_t k7335_GMCTRP1 = 0xE0;
-    constexpr uint8_t k7335_GMCTRP1Data[16] = { 0x02, 0x1c, 0x07, 0x12, 0x37, 0x32, 0x29, 0x2d,
-                                                0x29, 0x25, 0x2B, 0x39, 0x00, 0x01, 0x03, 0x10 } ;
+  constexpr uint8_t k7335_VMCTR1  = 0xC5;
+  constexpr uint8_t k7335_VMCTR1Data[1] = { 0x0E };
 
-    constexpr uint8_t k7335_GMCTRN1 = 0xE1;
-    constexpr uint8_t k7335_GMCTRN1Data[16] = { 0x03, 0x1d, 0x07, 0x06, 0x2E, 0x2C, 0x29, 0x2D,
-                                                0x2E, 0x2E, 0x37, 0x3F, 0x00, 0x00, 0x02, 0x10 } ;
-    //}}}
-    writeCommand (k7335_SLPOUT);
-    delayUs (120000);
+  constexpr uint8_t k7335_GMCTRP1 = 0xE0;
+  constexpr uint8_t k7335_GMCTRP1Data[16] = { 0x02, 0x1c, 0x07, 0x12, 0x37, 0x32, 0x29, 0x2d,
+                                              0x29, 0x25, 0x2B, 0x39, 0x00, 0x01, 0x03, 0x10 } ;
 
-    writeCommandMultiData (k7335_FRMCTR1, k7335_FRMCTRData, 3); // frameRate normal mode
-    writeCommandMultiData (k7335_FRMCTR2, k7335_FRMCTRData, 3); // frameRate idle mode
-    writeCommandMultiData (k7335_FRMCTR3, k7335_FRMCTRData, 6); // frameRate partial mode
-    writeCommandMultiData (k7335_INVCTR, k7335_INVCTRData, sizeof(k7335_INVCTRData)); // Inverted mode off
+  constexpr uint8_t k7335_GMCTRN1 = 0xE1;
+  constexpr uint8_t k7335_GMCTRN1Data[16] = { 0x03, 0x1d, 0x07, 0x06, 0x2E, 0x2C, 0x29, 0x2D,
+                                              0x2E, 0x2E, 0x37, 0x3F, 0x00, 0x00, 0x02, 0x10 } ;
+  //}}}
+  writeCommand (k7335_SLPOUT);
+  delayUs (120000);
 
-    writeCommandMultiData (k7335_PWCTR1, k7335_PowerControlData1, sizeof(k7335_PowerControlData1)); // POWER CONTROL 1
-    writeCommandMultiData (k7335_PWCTR2, k7335_PowerControlData2, sizeof(k7335_PowerControlData2)); // POWER CONTROL 2
-    writeCommandMultiData (k7335_PWCTR3, k7335_PowerControlData3, sizeof(k7335_PowerControlData3)); // POWER CONTROL 3
-    writeCommandMultiData (k7335_PWCTR4, k7335_PowerControlData4, sizeof(k7335_PowerControlData4)); // POWER CONTROL 4
-    writeCommandMultiData (k7335_PWCTR5, k7335_PowerControlData5, sizeof(k7335_PowerControlData5)); // POWER CONTROL 5
+  writeCommandMultiData (k7335_FRMCTR1, k7335_FRMCTRData, 3); // frameRate normal mode
+  writeCommandMultiData (k7335_FRMCTR2, k7335_FRMCTRData, 3); // frameRate idle mode
+  writeCommandMultiData (k7335_FRMCTR3, k7335_FRMCTRData, 6); // frameRate partial mode
+  writeCommandMultiData (k7335_INVCTR, k7335_INVCTRData, sizeof(k7335_INVCTRData)); // Inverted mode off
 
-    writeCommandMultiData (k7335_VMCTR1, k7335_VMCTR1Data, sizeof(k7335_VMCTR1Data)); // POWER CONTROL 6
-    writeCommandMultiData (k7335_MADCTL, k7735_MADCTLData, sizeof(k7735_MADCTLData)); // ORIENTATION
-    writeCommandMultiData (k7335_COLMOD, k7335_COLMODData, sizeof(k7335_COLMODData)); // COLOR MODE - 16bit per pixel
+  writeCommandMultiData (k7335_PWCTR1, k7335_PowerControlData1, sizeof(k7335_PowerControlData1)); // POWER CONTROL 1
+  writeCommandMultiData (k7335_PWCTR2, k7335_PowerControlData2, sizeof(k7335_PowerControlData2)); // POWER CONTROL 2
+  writeCommandMultiData (k7335_PWCTR3, k7335_PowerControlData3, sizeof(k7335_PowerControlData3)); // POWER CONTROL 3
+  writeCommandMultiData (k7335_PWCTR4, k7335_PowerControlData4, sizeof(k7335_PowerControlData4)); // POWER CONTROL 4
+  writeCommandMultiData (k7335_PWCTR5, k7335_PowerControlData5, sizeof(k7335_PowerControlData5)); // POWER CONTROL 5
 
-    writeCommandMultiData (k7335_GMCTRP1, k7335_GMCTRP1Data, sizeof(k7335_GMCTRP1Data)); // gamma GMCTRP1
-    writeCommandMultiData (k7335_GMCTRN1, k7335_GMCTRN1Data, sizeof(k7335_GMCTRN1Data)); // Gamma GMCTRN1
+  writeCommandMultiData (k7335_VMCTR1, k7335_VMCTR1Data, sizeof(k7335_VMCTR1Data)); // POWER CONTROL 6
+  writeCommandMultiData (k7335_MADCTL, k7735_MADCTLData, sizeof(k7735_MADCTLData)); // ORIENTATION
+  writeCommandMultiData (k7335_COLMOD, k7335_COLMODData, sizeof(k7335_COLMODData)); // COLOR MODE - 16bit per pixel
 
-    writeCommandMultiData (k7335_CASET, k7335_caSetData, sizeof(k7335_caSetData));
-    writeCommandMultiData (k7335_RASET, k7335_raSetData, sizeof(k7335_raSetData));
+  writeCommandMultiData (k7335_GMCTRP1, k7335_GMCTRP1Data, sizeof(k7335_GMCTRP1Data)); // gamma GMCTRP1
+  writeCommandMultiData (k7335_GMCTRN1, k7335_GMCTRN1Data, sizeof(k7335_GMCTRN1Data)); // Gamma GMCTRN1
 
-    writeCommand (k7335_DISPON); // display ON
+  writeCommandMultiData (k7335_CASET, k7335_caSetData, sizeof(k7335_caSetData));
+  writeCommandMultiData (k7335_RASET, k7335_raSetData, sizeof(k7335_raSetData));
 
-    updateLcd();
-    return true;
-    }
+  writeCommand (k7335_DISPON); // display ON
 
-  return false;
+  updateLcd();
+  return true;
   }
 //}}}
+
 //{{{
 int cLcdSt7735r::updateLcd() {
 
@@ -1713,75 +1711,75 @@ cLcdIli9225b::cLcdIli9225b (const int rotate, const int info)
 //{{{
 bool cLcdIli9225b::initialise() {
 
-  if (cLcd::initialise()) {
-    // rs
-    gpioSetMode (kSpiRegisterSelectGpio, PI_OUTPUT);
-    gpioWrite (kSpiRegisterSelectGpio, 1);
+  if (cLcd::initialise())
+    return false;
 
-    // mode 0, spi manages ce0 active lo
-    mSpiHandle = spiOpen (0, kSpiClock9225b, 0);
+  // rs
+  gpioSetMode (kSpiRegisterSelectGpio, PI_OUTPUT);
+  gpioWrite (kSpiRegisterSelectGpio, 1);
 
-    writeCommandData (0x01, 0x011C); // set SS and NL bit
+  // mode 0, spi manages ce0 active lo
+  mSpiHandle = spiOpen (0, kSpiClock9225b, 0);
 
-    writeCommandData (0x02, 0x0100); // set 1 line inversion
-    writeCommandData (0x03, 0x1030); // set GRAM write direction and BGR=1
-    writeCommandData (0x08, 0x0808); // set BP and FP
-    writeCommandData (0x0C, 0x0000); // RGB interface setting R0Ch=0x0110 for RGB 18Bit and R0Ch=0111for RGB16
-    writeCommandData (0x0F, 0x0b01); // Set frame rate//0b01
+  writeCommandData (0x01, 0x011C); // set SS and NL bit
 
-    writeCommandData (0x20, 0x0000); // Set GRAM Address
-    writeCommandData (0x21, 0x0000); // Set GRAM Address
-    delayUs (50000);
+  writeCommandData (0x02, 0x0100); // set 1 line inversion
+  writeCommandData (0x03, 0x1030); // set GRAM write direction and BGR=1
+  writeCommandData (0x08, 0x0808); // set BP and FP
+  writeCommandData (0x0C, 0x0000); // RGB interface setting R0Ch=0x0110 for RGB 18Bit and R0Ch=0111for RGB16
+  writeCommandData (0x0F, 0x0b01); // Set frame rate//0b01
 
-    //{{{  power On sequence
-    writeCommandData (0x10,0x0a00); // Set SAP,DSTB,STB//0800
-    writeCommandData (0x11,0x1038); // Set APON,PON,AON,VCI1EN,VC
-    delayUs (50000);
-    //}}}
-    writeCommandData (0x12, 0x1121); // Internal reference voltage= Vci;
-    writeCommandData (0x13, 0x0063); // Set GVDD
-    writeCommandData (0x14, 0x4b44); // Set VCOMH/VCOML voltage//3944
+  writeCommandData (0x20, 0x0000); // Set GRAM Address
+  writeCommandData (0x21, 0x0000); // Set GRAM Address
+  delayUs (50000);
 
-    //{{{  set GRAM area
-    writeCommandData (0x30,0x0000);
-    writeCommandData (0x31,0x00DB);
-    writeCommandData (0x32,0x0000);
-    writeCommandData (0x33,0x0000);
-    writeCommandData (0x34,0x00DB);
-    writeCommandData (0x35,0x0000);
-    writeCommandData (0x36,0x00AF);
-    writeCommandData (0x37,0x0000);
-    writeCommandData (0x38,0x00DB);
-    writeCommandData (0x39,0x0000);
-    //}}}
-    //{{{  set Gamma Curve
-    writeCommandData (0x50,0x0003);
-    writeCommandData (0x51,0x0900);
-    writeCommandData (0x52,0x0d05);
-    writeCommandData (0x53,0x0900);
-    writeCommandData (0x54,0x0407);
-    writeCommandData (0x55,0x0502);
-    writeCommandData (0x56,0x0000);
-    writeCommandData (0x57,0x0005);
-    writeCommandData (0x58,0x1700);
-    writeCommandData (0x59,0x001F);
-    delayUs (50000);
-    //}}}
+  //{{{  power On sequence
+  writeCommandData (0x10,0x0a00); // Set SAP,DSTB,STB//0800
+  writeCommandData (0x11,0x1038); // Set APON,PON,AON,VCI1EN,VC
+  delayUs (50000);
+  //}}}
+  writeCommandData (0x12, 0x1121); // Internal reference voltage= Vci;
+  writeCommandData (0x13, 0x0063); // Set GVDD
+  writeCommandData (0x14, 0x4b44); // Set VCOMH/VCOML voltage//3944
 
-    writeCommandData (0x07, 0x1017);
-    //{{{  set ram area
-    writeCommandData (0x36, getWidth()-1);
-    writeCommandData (0x37, 0);
-    writeCommandData (0x38, getHeight()-1);
-    writeCommandData (0x39, 0);
-    writeCommandData (0x20, 0);
-    writeCommandData (0x21, 0);
-    //}}}
+  //{{{  set GRAM area
+  writeCommandData (0x30,0x0000);
+  writeCommandData (0x31,0x00DB);
+  writeCommandData (0x32,0x0000);
+  writeCommandData (0x33,0x0000);
+  writeCommandData (0x34,0x00DB);
+  writeCommandData (0x35,0x0000);
+  writeCommandData (0x36,0x00AF);
+  writeCommandData (0x37,0x0000);
+  writeCommandData (0x38,0x00DB);
+  writeCommandData (0x39,0x0000);
+  //}}}
+  //{{{  set Gamma Curve
+  writeCommandData (0x50,0x0003);
+  writeCommandData (0x51,0x0900);
+  writeCommandData (0x52,0x0d05);
+  writeCommandData (0x53,0x0900);
+  writeCommandData (0x54,0x0407);
+  writeCommandData (0x55,0x0502);
+  writeCommandData (0x56,0x0000);
+  writeCommandData (0x57,0x0005);
+  writeCommandData (0x58,0x1700);
+  writeCommandData (0x59,0x001F);
+  delayUs (50000);
+  //}}}
 
-    updateLcd();
-    return true;
-    }
-  return false;
+  writeCommandData (0x07, 0x1017);
+  //{{{  set ram area
+  writeCommandData (0x36, getWidth()-1);
+  writeCommandData (0x37, 0);
+  writeCommandData (0x38, getHeight()-1);
+  writeCommandData (0x39, 0);
+  writeCommandData (0x20, 0);
+  writeCommandData (0x21, 0);
+  //}}}
+
+  updateLcd();
+  return true;
   }
 //}}}
 

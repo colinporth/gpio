@@ -19,80 +19,41 @@ int main (int numArgs, char* args[]) {
     argStrings.push_back (args[i]);
 
   //cLcd* lcd = new cLcdIli9320 (argStrings.empty() ? 270 : stoi (argStrings[0]));
-  cLcd* lcd = new cLcdTa7601 (argStrings.empty() ? 270 : stoi (argStrings[0]));
+  cLcd* lcd = new cLcdTa7601 (argStrings.empty() ? 0 : stoi (argStrings[0]));
   if (!lcd->initialise())
     return 0;
 
-  //{{{  fb0
-  //int fbfd = open ("/dev/fb0", O_RDWR);
-  //if (fbfd == -1) {
-    //{{{  error return
-    //cLog::log (LOGERROR, "fb0 open failed");
-    //return 0;
-    //}
-    //}}}
-
-  //struct fb_fix_screeninfo finfo;
-  //if (ioctl (fbfd, FBIOGET_FSCREENINFO, &finfo)) {
-    //{{{  error return
-    //cLog::log (LOGERROR, "fb0 get fscreeninfo failed");
-    //return 0;
-    //}
-    //}}}
-
-  //struct fb_var_screeninfo vinfo;
-  //if (ioctl (fbfd, FBIOGET_VSCREENINFO, &vinfo)) {
-    //{{{  error return
-    //cLog::log (LOGERROR, "fb0 get vscreeninfo failed");
-    //return 0;
-    //}
-    //}}}
-
-  //cLog::log (LOGINFO, "fb0 %dx%d %dbps", vinfo.xres, vinfo.yres, vinfo.bits_per_pixel);
-
-  ////char* fbp = (char*)mmap (0, finfo.smem_len, PROT_READ | PROT_WRITE, MAP_SHARED, fbfd, 0);
-  ////if (fbp <= 0) {
-  ////  return 0;
-  ////munmap (fbp, finfo.smem_len);
-  ////close (fbfd);
-  //}}}
-
   // font test
-  if (true) {
-    //{{{  display font
-    int height = 8;
+  //{{{  display font
+  int height = 8;
 
-    while (height < 100) {
-      cPoint point;
-      lcd->clear (kMagenta);
-      for (char ch = 'A'; ch < 0x7f; ch++) {
-        point.x = lcd->text (kWhite, point, height, string(1,ch));
-        if (point.x > lcd->getWidth()) {
-          point.x = 0;
-          point.y += height;
-          if (point.y > lcd->getHeight())
-            break;
-          }
+  while (height < 100) {
+    cPoint point;
+    lcd->clear (kMagenta);
+    for (char ch = 'A'; ch < 0x7f; ch++) {
+      point.x = lcd->text (kWhite, point, height, string(1,ch));
+      if (point.x > lcd->getWidth()) {
+        point.x = 0;
+        point.y += height;
+        if (point.y > lcd->getHeight())
+          break;
         }
-
-      lcd->text (kYellow, cPoint(), 20, "Hello Colin");
-      lcd->present();
-      lcd->setBacklightOn();
-
-      lcd->delayUs (16000);
-      height += 4;
       }
-    //}}}
-    lcd->setBacklightOff();
+
+    lcd->text (kYellow, cPoint(), 20, "Hello Colin");
+    lcd->present();
+    lcd->setBacklightOn();
+
+    lcd->delayUs (16000);
+    height += 4;
     }
+  //}}}
 
   // snapshot test
   while (true) {
     lcd->clearSnapshot();
-    if (lcd->present()) {
-      lcd->setBacklightOn();
+    if (lcd->present())
       cLog::log (LOGINFO, lcd->getInfoString());
-      }
     else
       lcd->delayUs (10000);
     }
