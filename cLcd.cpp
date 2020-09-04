@@ -968,9 +968,9 @@ bool cLcdTa7601::initialise() {
   // portrait mode with (0,0) being the top left. top is the side opposite the LCD connector.
   writeCommandData (0x01, 0x023C); // gate_scan & display boundary
   writeCommandData (0x02, 0x0100); // inversion
-  writeCommandData (0x03, 0x1030); // GRAM access
+  writeCommandData (0x03, 0x1030); // GRAM access - BGR - MDT normal - HV inc
   writeCommandData (0x08, 0x0808); // Porch period
-  writeCommandData (0x0A, 0x0500); // osc control & clock number per 1H
+  writeCommandData (0x0A, 0x0200); // oscControl, clock number per 1H - 0x0500 = 70Hz, 0x200 = 100Hz 0x0000 = 120Hz
   writeCommandData (0x0B, 0x0000); // interface & display clock
   writeCommandData (0x0C, 0x0770); // source and gate timing control
   writeCommandData (0x0D, 0x0000); // gate scan position
