@@ -173,9 +173,9 @@ public:
   virtual bool initialise();
 
   // dimensions
-  constexpr int16_t getWidth() { return mWidth; }
-  constexpr int16_t getHeight() { return mHeight; }
-  constexpr int getNumPixels() { return mWidth * mHeight; }
+  constexpr uint16_t getWidth() { return mWidth; }
+  constexpr uint16_t getHeight() { return mHeight; }
+  constexpr uint32_t getNumPixels() { return mWidth * mHeight; }
   const cPoint getSize() { return cPoint(mWidth, mHeight); }
   const cRect getRect() { return cRect(0,0, mWidth,mHeight); }
 
@@ -208,8 +208,8 @@ protected:
   virtual void writeCommandData (const uint8_t command, const uint16_t data) = 0;
   virtual void writeCommandMultiData (const uint8_t command, const uint8_t* dataPtr, const int len) = 0;
 
-  virtual int updateLcd() = 0;
   virtual int updateLcd (sSpan* spans) = 0;
+  int updateLcd ();
 
   int mRotate = 0;
 
@@ -228,16 +228,16 @@ private:
 
   void setFont (const uint8_t* font, const int fontSize);
 
-  bool diffSingle (sSpan* spans);
-  int diffCoarse (sSpan* spans);
   int diffExact (sSpan* spans);
+  int diffCoarse (sSpan* spans);
+  int diffSingle (sSpan* spans);
   static sSpan* merge (sSpan* spans, int pixelThreshold);
 
   static int coarseLinearDiff (uint16_t* frameBuf, uint16_t* prevFrameBuf, uint16_t* frameBufEnd);
   static int coarseLinearDiffBack (uint16_t* frameBuf, uint16_t* prevFrameBuf, uint16_t* frameBufEnd);
 
-  const int16_t mWidth;
-  const int16_t mHeight;
+  const uint16_t mWidth;
+  const uint16_t mHeight;
 
   int mInfo = 0;
   int mDiffUs = 0;

@@ -55,9 +55,9 @@ cLcd::~cLcd() {
 const string cLcd::getInfoString() {
 // return info string for log display
 
-  return dec(getUpdatePixels()) + "pix took:" +
+  return dec(getUpdatePixels()) + "px took:" +
          dec(getUpdateUs()) + "uS " +
-         dec(getNumSpans()) + "spans took:" +
+         dec(getNumSpans()) + "spn took:" +
          dec(getDiffUs()) + "uS";
   }
 //}}}
@@ -87,7 +87,7 @@ void cLcd::clear (const uint16_t colour) {
   colour64 |= (colour64 << 48) | (colour64 << 32) | (colour64 << 16);
 
   uint64_t* ptr = (uint64_t*)mFrameBuf;
-  for (int i = 0; i < getNumPixels()/4; i++)
+  for (uint32_t i = 0; i < getNumPixels()/4; i++)
     *ptr++ = colour64;
   }
 //}}}
@@ -108,7 +108,8 @@ bool cLcd::present() {
 
   // make diffSpans list
   double diffStartTime = time();
-  mNumDiffSpans = diffCoarse (mDiffSpans);
+  //mNumDiffSpans = diffCoarse (mDiffSpans);
+  mNumDiffSpans = diffSingle (mDiffSpans);
   if (!mNumDiffSpans) // nothing changed
     return false;
 
@@ -133,12 +134,12 @@ bool cLcd::present() {
 void cLcd::rect (const uint16_t colour, const cRect& r) {
 // rect with right,bottom clip
 
-  int16_t xmax = min (r.right, getWidth());
-  int16_t ymax = min (r.bottom, getHeight());
+  int16_t xmax = min (r.right, (int16_t)getWidth());
+  int16_t ymax = min (r.bottom, (int16_t)getHeight());
 
-  for (int y = r.top; y < ymax; y++) {
+  for (int16_t y = r.top; y < ymax; y++) {
     uint16_t* ptr = mFrameBuf + y*getWidth() + r.left;
-    for (int x = r.left; x < xmax; x++)
+    for (int16_t x = r.left; x < xmax; x++)
       *ptr++ = colour;
     }
   }
@@ -146,11 +147,11 @@ void cLcd::rect (const uint16_t colour, const cRect& r) {
 //{{{
 void cLcd::rect (const uint16_t colour, const uint8_t alpha, const cRect& r) {
 
-  uint16_t xmax = min (r.right, getWidth());
-  uint16_t ymax = min (r.bottom, getHeight());
+  uint16_t xmax = min (r.right, (int16_t)getWidth());
+  uint16_t ymax = min (r.bottom, (int16_t)getHeight());
 
-  for (int y = r.top; y < ymax; y++)
-    for (int x = r.left; x < xmax; x++)
+  for (int16_t y = r.top; y < ymax; y++)
+    for (int16_t x = r.left; x < xmax; x++)
       pix (colour, alpha, cPoint(x, y));
   }
 //}}}
@@ -330,260 +331,17 @@ bool cLcd::initialise() {
   return true;
   }
 //}}}
+//{{{
+int cLcd::updateLcd() {
+  sSpan span = { getRect(), getWidth(), getNumPixels(), nullptr };
+  return updateLcd (&span);
+  }
+//}}}
 
 //{{{  private
 // faster asm coarse diff test
 constexpr bool kCoarseDiff = true;
 
-//{{{
-bool cLcd::diffSingle (sSpan* spans) {
-// return true with single bopunding span if differnet
-
-  int minY = 0;
-  int minX = -1;
-
-  // stride as uint16 elements.
-  const int stride = getWidth();
-  const int widthAligned4 = (uint32_t)getWidth() & ~3u;
-
-  uint16_t* scanline = mFrameBuf;
-  uint16_t* prevFrameScanline = mPrevFrameBuf;
-
-  if (kCoarseDiff) {
-    //{{{  coarse diff
-    // Coarse diff computes a diff at 8 adjacent pixels at a time
-    // returns the point to the 8-pixel aligned coordinate where the pixels began to differ.
-
-    int numPixels = getWidth() * getHeight();
-    int firstDiff = coarseLinearDiff (mFrameBuf, mPrevFrameBuf, mFrameBuf + numPixels);
-    if (firstDiff == numPixels)
-      return false;
-
-    // Compute the precise diff position here.
-    while (mFrameBuf[firstDiff] == mPrevFrameBuf[firstDiff])
-      ++firstDiff;
-
-    minX = firstDiff % getWidth();
-    minY = firstDiff / getWidth();
-    }
-    //}}}
-  else {
-    //{{{  fine diff
-    while (minY < getHeight()) {
-      int x = 0;
-      // diff 4 pixels at a time
-      for (; x < widthAligned4; x += 4) {
-        uint64_t diff = *(uint64_t*)(scanline+x) ^ *(uint64_t*)(prevFrameScanline+x);
-        if (diff) {
-          minX = x + (__builtin_ctzll (diff) >> 4);
-          goto foundTop;
-          }
-        }
-
-      // tail unaligned 0-3 pixels one by one
-      for (; x < getWidth(); ++x) {
-        uint16_t diff = *(scanline+x) ^ *(prevFrameScanline+x);
-        if (diff) {
-          minX = x;
-          goto foundTop;
-          }
-        }
-
-      scanline += stride;
-      prevFrameScanline += stride;
-      ++minY;
-      }
-
-    // No pixels changed, nothing to do.
-    return false;
-    }
-    //}}}
-
-  foundTop:
-  //{{{  found top
-  int maxX = -1;
-  int maxY = getHeight() - 1;
-
-  if (kCoarseDiff) {
-    int numPixels = getWidth() * getHeight();
-
-    // coarse diff computes a diff at 8 adjacent pixels at a time
-    // returns the point to the 8-pixel aligned coordinate where the pixels began to differ.
-    int firstDiff = coarseLinearDiffBack (mFrameBuf, mPrevFrameBuf, mFrameBuf + numPixels);
-
-    // compute the precise diff position here.
-    while (firstDiff > 0 && mFrameBuf[firstDiff] == mPrevFrameBuf[firstDiff])
-      --firstDiff;
-    maxX = firstDiff % getWidth();
-    maxY = firstDiff / getWidth();
-    }
-
-  else {
-    scanline = mFrameBuf + (getHeight() - 1)*stride;
-    // same scanline from previous frame, not preceding scanline
-    prevFrameScanline = mPrevFrameBuf + (getHeight() - 1)*stride;
-
-    while (maxY >= minY) {
-      int x = getWidth()-1;
-      // tail unaligned 0-3 pixels one by one
-      for (; x >= widthAligned4; --x) {
-        if (scanline[x] != prevFrameScanline[x]) {
-          maxX = x;
-          goto foundBottom;
-          }
-        }
-
-      // diff 4 pixels at a time
-      x = x & ~3u;
-      for (; x >= 0; x -= 4) {
-        uint64_t diff = *(uint64_t*)(scanline + x) ^ *(uint64_t*)(prevFrameScanline + x);
-        if (diff) {
-          maxX = x + 3 - (__builtin_clzll(diff) >> 4);
-          goto foundBottom;
-          }
-        }
-
-      scanline -= stride;
-      prevFrameScanline -= stride;
-      --maxY;
-      }
-    }
-  //}}}
-
-  foundBottom:
-  //{{{  found bottom
-  scanline = mFrameBuf + minY*stride;
-  prevFrameScanline = mPrevFrameBuf + minY*stride;
-
-  int lastScanRight = maxX;
-  if (minX > maxX) {
-    //{{{  swap minX, maxX
-    uint32_t temp = minX;
-    minX = maxX;
-    maxX = temp;
-    }
-    //}}}
-
-  int leftX = 0;
-  while (leftX < minX) {
-    uint16_t* s = scanline + leftX;
-    uint16_t* prevS = prevFrameScanline + leftX;
-    for (int y = minY; y <= maxY; ++y) {
-      if (*s != *prevS)
-        goto foundLeft;
-
-      s += stride;
-      prevS += stride;
-      }
-
-    ++leftX;
-    }
-  //}}}
-
-  foundLeft:
-  //{{{  found left
-  int rightX = getWidth()-1;
-  while (rightX > maxX) {
-    uint16_t* s = scanline + rightX;
-    uint16_t* prevS = prevFrameScanline + rightX;
-    for (int y = minY; y <= maxY; ++y) {
-      if (*s != *prevS)
-        goto foundRight;
-
-      s += stride;
-      prevS += stride;
-      }
-
-    --rightX;
-    }
-  //}}}
-
-  foundRight:
-  sSpan* head = spans;
-
-  head->r.left = leftX;
-  head->r.right = rightX+1;
-  head->r.top = minY;
-  head->r.bottom = maxY+1;
-
-  head->lastScanRight = lastScanRight+1;
-  head->size = (head->r.right - head->r.left) * (head->r.bottom - head->r.top - 1) + (head->lastScanRight - head->r.left);
-  head->next = nullptr;
-
-  return true;
-  }
-//}}}
-//{{{
-int cLcd::diffCoarse (sSpan* spans) {
-// return numDiffSpans
-
-  int numDiffSpans = 0;
-
-  int y =  0;
-  int yInc = 1;
-
-  uint64_t* scanline = (uint64_t*)(mFrameBuf + (y * getWidth()));
-  uint64_t* prevFrameScanline = (uint64_t*)(mPrevFrameBuf + (y * getWidth()));
-
-  const int width64 = getWidth() >> 2;
-  int scanlineInc = getWidth() >> 2;
-
-  sSpan* span = spans;
-  while (y < getHeight()) {
-    uint16_t* scanlineStart = (uint16_t*)scanline;
-
-    for (int x = 0; x < width64;) {
-      if (scanline[x] != prevFrameScanline[x]) {
-        uint16_t* spanStart = (uint16_t*)(scanline + x) + (__builtin_ctzll (scanline[x] ^ prevFrameScanline[x]) >> 4);
-        ++x;
-
-        // found start of a span of different pixels on this scanline, now find where this span ends
-        uint16_t* spanEnd;
-        for (;;) {
-          if (x < width64) {
-            if (scanline[x] != prevFrameScanline[x]) {
-              ++x;
-              continue;
-              }
-            else {
-              spanEnd = (uint16_t*)(scanline + x) + 1 - (__builtin_clzll(scanline[x-1] ^ prevFrameScanline[x-1]) >> 4);
-              ++x;
-              break;
-              }
-            }
-          else {
-            spanEnd = scanlineStart + getWidth();
-            break;
-            }
-          }
-
-        span->r.left = spanStart - scanlineStart;
-        span->r.right = spanEnd - scanlineStart;
-        span->r.top = y;
-        span->r.bottom = y+1;
-
-        span->lastScanRight = span->r.right;
-        span->size = spanEnd - spanStart;
-        span->next = span+1;
-
-        ++span;
-        ++numDiffSpans;
-        }
-      else
-        ++x;
-      }
-
-    y += yInc;
-    scanline += scanlineInc;
-    prevFrameScanline += scanlineInc;
-    }
-
-  if (numDiffSpans > 0)
-    spans[numDiffSpans-1].next = nullptr;
-
-  return numDiffSpans;
-  }
-//}}}
 //{{{
 int cLcd::diffExact (sSpan* spans) {
 // return numDiffSpans
@@ -595,18 +353,14 @@ int cLcd::diffExact (sSpan* spans) {
 
   uint16_t* scanline = mFrameBuf + y * getWidth();
   uint16_t* prevFrameScanline = mPrevFrameBuf + y * getWidth();
-
-  int scanlineInc = getWidth();
-  int scanlineEndInc = scanlineInc - getWidth();
-
   while (y < getHeight()) {
+
     uint16_t* scanlineStart = scanline;
     uint16_t* scanlineEnd = scanline + getWidth();
     while (scanline < scanlineEnd) {
       uint16_t* spanStart;
       uint16_t* spanEnd;
       int numConsecutiveUnchangedPixels = 0;
-
       if (scanline + 1 < scanlineEnd) {
         uint32_t diff = (*(uint32_t*)scanline) ^ (*(uint32_t*)prevFrameScanline);
         scanline += 2;
@@ -673,11 +427,256 @@ int cLcd::diffExact (sSpan* spans) {
       }
 
     y += yInc;
-    scanline += scanlineEndInc;
-    prevFrameScanline += scanlineEndInc;
     }
 
   return numDiffSpans;
+  }
+//}}}
+//{{{
+int cLcd::diffCoarse (sSpan* spans) {
+// return numDiffSpans
+
+  int numDiffSpans = 0;
+
+  int y =  0;
+  int yInc = 1;
+
+  const int width64 = getWidth() >> 2;
+  const int scanlineInc = getWidth() >> 2;
+
+  sSpan* span = spans;
+  uint64_t* scanline = (uint64_t*)(mFrameBuf + (y * getWidth()));
+  uint64_t* prevFrameScanline = (uint64_t*)(mPrevFrameBuf + (y * getWidth()));
+  while (y < getHeight()) {
+    uint16_t* scanlineStart = (uint16_t*)scanline;
+
+    for (int x = 0; x < width64;) {
+      if (scanline[x] != prevFrameScanline[x]) {
+        uint16_t* spanStart = (uint16_t*)(scanline + x) + (__builtin_ctzll (scanline[x] ^ prevFrameScanline[x]) >> 4);
+        ++x;
+
+        // found start of a span of different pixels on this scanline, now find where this span ends
+        uint16_t* spanEnd;
+        for (;;) {
+          if (x < width64) {
+            if (scanline[x] != prevFrameScanline[x]) {
+              ++x;
+              continue;
+              }
+            else {
+              spanEnd = (uint16_t*)(scanline + x) + 1 - (__builtin_clzll(scanline[x-1] ^ prevFrameScanline[x-1]) >> 4);
+              ++x;
+              break;
+              }
+            }
+          else {
+            spanEnd = scanlineStart + getWidth();
+            break;
+            }
+          }
+
+        span->r.left = spanStart - scanlineStart;
+        span->r.right = spanEnd - scanlineStart;
+        span->r.top = y;
+        span->r.bottom = y+1;
+
+        span->lastScanRight = span->r.right;
+        span->size = spanEnd - spanStart;
+        span->next = span+1;
+
+        ++span;
+        ++numDiffSpans;
+        }
+      else
+        ++x;
+      }
+
+    y += yInc;
+    scanline += scanlineInc;
+    prevFrameScanline += scanlineInc;
+    }
+
+  if (numDiffSpans > 0)
+    spans[numDiffSpans-1].next = nullptr;
+
+  return numDiffSpans;
+  }
+//}}}
+//{{{
+int cLcd::diffSingle (sSpan* spans) {
+// return 1, if single bounding span if different, else 0
+
+  int minY = 0;
+  int minX = -1;
+
+  // stride as uint16 elements.
+  const int stride = getWidth();
+  const int widthAligned4 = (uint32_t)getWidth() & ~3u;
+
+  uint16_t* scanline = mFrameBuf;
+  uint16_t* prevFrameScanline = mPrevFrameBuf;
+
+  if (kCoarseDiff) {
+    //{{{  coarse diff
+    // Coarse diff computes a diff at 8 adjacent pixels at a time
+    // returns the point to the 8-pixel aligned coordinate where the pixels began to differ.
+
+    int numPixels = getWidth() * getHeight();
+    int firstDiff = coarseLinearDiff (mFrameBuf, mPrevFrameBuf, mFrameBuf + numPixels);
+    if (firstDiff == numPixels)
+      return 0;
+
+    // Compute the precise diff position here.
+    while (mFrameBuf[firstDiff] == mPrevFrameBuf[firstDiff])
+      ++firstDiff;
+
+    minX = firstDiff % getWidth();
+    minY = firstDiff / getWidth();
+    }
+    //}}}
+  else {
+    //{{{  fine diff
+    while (minY < getHeight()) {
+      int x = 0;
+      // diff 4 pixels at a time
+      for (; x < widthAligned4; x += 4) {
+        uint64_t diff = *(uint64_t*)(scanline+x) ^ *(uint64_t*)(prevFrameScanline+x);
+        if (diff) {
+          minX = x + (__builtin_ctzll (diff) >> 4);
+          goto foundTop;
+          }
+        }
+
+      // tail unaligned 0-3 pixels one by one
+      for (; x < getWidth(); ++x) {
+        uint16_t diff = *(scanline+x) ^ *(prevFrameScanline+x);
+        if (diff) {
+          minX = x;
+          goto foundTop;
+          }
+        }
+
+      scanline += stride;
+      prevFrameScanline += stride;
+      ++minY;
+      }
+
+    // No pixels changed, nothing to do.
+    return 0;
+    }
+    //}}}
+
+foundTop:
+  //{{{  found top
+  int maxX = -1;
+  int maxY = getHeight() - 1;
+
+  if (kCoarseDiff) {
+    int numPixels = getWidth() * getHeight();
+
+    // coarse diff computes a diff at 8 adjacent pixels at a time
+    // returns the point to the 8-pixel aligned coordinate where the pixels began to differ.
+    int firstDiff = coarseLinearDiffBack (mFrameBuf, mPrevFrameBuf, mFrameBuf + numPixels);
+
+    // compute the precise diff position here.
+    while (firstDiff > 0 && mFrameBuf[firstDiff] == mPrevFrameBuf[firstDiff])
+      --firstDiff;
+    maxX = firstDiff % getWidth();
+    maxY = firstDiff / getWidth();
+    }
+
+  else {
+    scanline = mFrameBuf + (getHeight() - 1)*stride;
+    // same scanline from previous frame, not preceding scanline
+    prevFrameScanline = mPrevFrameBuf + (getHeight() - 1)*stride;
+
+    while (maxY >= minY) {
+      int x = getWidth()-1;
+      // tail unaligned 0-3 pixels one by one
+      for (; x >= widthAligned4; --x) {
+        if (scanline[x] != prevFrameScanline[x]) {
+          maxX = x;
+          goto foundBottom;
+          }
+        }
+
+      // diff 4 pixels at a time
+      x = x & ~3u;
+      for (; x >= 0; x -= 4) {
+        uint64_t diff = *(uint64_t*)(scanline + x) ^ *(uint64_t*)(prevFrameScanline + x);
+        if (diff) {
+          maxX = x + 3 - (__builtin_clzll(diff) >> 4);
+          goto foundBottom;
+          }
+        }
+
+      scanline -= stride;
+      prevFrameScanline -= stride;
+      --maxY;
+      }
+    }
+  //}}}
+
+foundBottom:
+  //{{{  found bottom
+  scanline = mFrameBuf + minY*stride;
+  prevFrameScanline = mPrevFrameBuf + minY*stride;
+
+  int lastScanRight = maxX;
+  if (minX > maxX) {
+    //{{{  swap minX, maxX
+    uint32_t temp = minX;
+    minX = maxX;
+    maxX = temp;
+    }
+    //}}}
+
+  int leftX = 0;
+  while (leftX < minX) {
+    uint16_t* s = scanline + leftX;
+    uint16_t* prevS = prevFrameScanline + leftX;
+    for (int y = minY; y <= maxY; ++y) {
+      if (*s != *prevS)
+        goto foundLeft;
+
+      s += stride;
+      prevS += stride;
+      }
+
+    ++leftX;
+    }
+  //}}}
+
+foundLeft:
+  //{{{  found left
+  int rightX = getWidth()-1;
+  while (rightX > maxX) {
+    uint16_t* s = scanline + rightX;
+    uint16_t* prevS = prevFrameScanline + rightX;
+    for (int y = minY; y <= maxY; ++y) {
+      if (*s != *prevS)
+        goto foundRight;
+
+      s += stride;
+      prevS += stride;
+      }
+
+    --rightX;
+    }
+  //}}}
+
+foundRight:
+  spans->r.left = leftX;
+  spans->r.right = rightX+1;
+  spans->r.top = minY;
+  spans->r.bottom = maxY+1;
+
+  spans->lastScanRight = lastScanRight+1;
+  spans->size = (spans->r.right - spans->r.left) * (spans->r.bottom - spans->r.top - 1) +
+                (spans->lastScanRight - spans->r.left);
+  spans->next = nullptr;
+
+  return 1;
   }
 //}}}
 
@@ -832,7 +831,7 @@ int cLcd::coarseLinearDiffBack (uint16_t* frameBuf, uint16_t* prevFrameBuf, uint
 //}}}
 
 // 16bit parallel
-//{{{  cLcd16 : public cLcd 
+//{{{  cLcd16 : public cLcd
 // 16bit J8 header pins, gpio, constexpr
 //      3.3v led -  1  2  - 5v
 //     d2  gpio2 -  3  4  - 5v
@@ -900,7 +899,6 @@ void cLcd16::writeCommandMultiData (const uint8_t command, const uint8_t* dataPt
   // send data
   uint16_t* ptr = (uint16_t*)dataPtr;
   uint16_t* ptrEnd = (uint16_t*)dataPtr + len/2;
-
   while (ptr < ptrEnd)
     writeDataWord (*ptr++);
   }
@@ -999,12 +997,7 @@ bool cLcdTa7601::initialise() {
   writeCommandData (0x07, 0x0017);  // partial, 8-color, display ON
   delayUs (10000);
 
-  writeCommandData (0x45, 0x0000);          // h start ram address window even = 0
-  writeCommandData (0x44, kWidthTa7601-1);  // h end ram address window even   = 320-1
-  writeCommandData (0x47, 0x0000);          // v start ram address window      = 0
-  writeCommandData (0x46, kHeightTa7601-1); // v end ram address window        = 480-1
-
-  updateLcd();
+  updateLcd ();
   return true;
   }
 //}}}
@@ -1016,8 +1009,13 @@ void cLcdTa7601::writeCommand (const uint8_t command) {
   gpioWrite (k16RegisterSelectGpio, 0);
 
   gpioWrite_Bits_0_31_Clear (~command & k16WriteClrMask); // clear lo data bits + k16WrGpio bit lo
+  gpioWrite_Bits_0_31_Clear (~command & k16WriteClrMask); // clear lo data bits + k16WrGpio bit lo
+  gpioWrite_Bits_0_31_Clear (~command & k16WriteClrMask); // clear lo data bits + k16WrGpio bit lo
   gpioWrite_Bits_0_31_Set (command);                      // set hi data bits
   gpioWrite_Bits_0_31_Set (command);                      // set hi data bits
+  gpioWrite_Bits_0_31_Set (command);                      // set hi data bits
+  gpioWrite_Bits_0_31_Set (k16WriteMask);                 // write on k16WrGpio rising edge
+  gpioWrite_Bits_0_31_Set (k16WriteMask);                 // write on k16WrGpio rising edge
   gpioWrite_Bits_0_31_Set (k16WriteMask);                 // write on k16WrGpio rising edge
 
   gpioWrite (k16RegisterSelectGpio, 1);
@@ -1028,9 +1026,12 @@ void cLcdTa7601::writeDataWord (const uint16_t data) {
 // slow down data write
 
   fastGpioWrite_Bits_0_31_Clear (~data & k16WriteClrMask); // clear lo data bits + k16WrGpio bit lo
+  fastGpioWrite_Bits_0_31_Clear (~data & k16WriteClrMask); // clear lo data bits + k16WrGpio bit lo
+  fastGpioWrite_Bits_0_31_Clear (~data & k16WriteClrMask); // clear lo data bits + k16WrGpio bit lo
   fastGpioWrite_Bits_0_31_Set (data);                      // set hi data bits
   fastGpioWrite_Bits_0_31_Set (data);                      // set hi data bits
   fastGpioWrite_Bits_0_31_Set (data);                      // set hi data bits
+  fastGpioWrite_Bits_0_31_Set (k16WriteMask);              // write on k16WrGpio rising edge
   fastGpioWrite_Bits_0_31_Set (k16WriteMask);              // write on k16WrGpio rising edge
   }
 //}}}
@@ -1039,78 +1040,143 @@ void cLcdTa7601::writeDataWord (const uint16_t data) {
 int cLcdTa7601::updateLcd (sSpan* spans) {
 // no AM style inc GDRAM V rather H for landscape, have to do it yourself
 
-  if (mRotate != 0) // other rotate cases still to do
-    return updateLcd();
+  writeCommandData (0x45, 0x0000);          // H start ram address window - even = 0
+  writeCommandData (0x44, kWidthTa7601-1);  // H end ram address window - even   = 320-1
+  writeCommandData (0x47, 0x0000);          // V start ram address window        = 0
+  writeCommandData (0x46, kHeightTa7601-1); // V end ram address window          = 480-1
 
-  // rotate == 0 works
-  int numPixels = 0;
+  if (mRotate == 0) {
+    //{{{  send spans list, others to do
+    int numPixels= 0;
+    sSpan* it = spans;
+    while (it) {
+      uint16_t xstart;
+      uint16_t ystart;
+      uint16_t yinc;
+      int width = it->r.right - it->r.left;
 
-  auto it = spans;
-  while (it) {
-    uint16_t xstart;
-    uint16_t ystart;
-    uint16_t yinc;
+      switch (mRotate) {
+        default:
+        case 0:
+          xstart = it->r.left;
+          ystart = it->r.top;
+          yinc = 1;
+          break;
+
+        case 90:
+          xstart = getWidth() - it->r.left;
+          ystart = it->r.top;
+          yinc = 1;
+          break;
+
+        case 180:
+          // !!! simplify, can i just reverse scan !!!
+          xstart = getWidth()-1 - it->r.left;
+          ystart = getHeight()-1 - it->r.top;
+          yinc = -1;
+          break;
+
+        case 270:
+          xstart = it->r.left;
+          ystart = getHeight()-1 - it->r.top;
+          yinc = -1;
+          break;
+        }
+
+      for (int y = it->r.top; y < it->r.bottom; y++) {
+        writeCommandData (0x20, ystart);  // Y start address of GRAM
+        writeCommandData (0x21, xstart);  // X start address of GRAM
+
+        writeCommand (0x22);              // write GRAM
+        uint16_t* ptr = mFrameBuf + (ystart * getWidth()) + xstart;
+        for (int i = 0; i < width; i++)
+          writeDataWord (*ptr++);
+
+        numPixels += width;
+        ystart += yinc;
+        }
+
+      it = it->next;
+      }
+
+    return numPixels;
+    }
+    //}}}
+  else {
+    //{{{  send whole frame
+    writeCommandData (0x20, 0x0000);  // Y start address of GRAM
+    writeCommandData (0x21, 0x0000);  // X start address of GRAM
+
+    writeCommand (0x22);
 
     switch (mRotate) {
-      default:
-      case 0:
-        xstart = it->r.left;
-        ystart = it->r.top;
-        yinc = 1;
+      case 0: {
+        // simple case
+        uint16_t* ptr = mFrameBuf;
+        for (uint32_t i = 0; i < getNumPixels(); i++)
+          writeDataWord (*ptr++);
         break;
+        }
 
       case 90:
-        xstart = getWidth() - it->r.left;
-        ystart = it->r.top;
-        yinc = 1;
+        // !!! simplify the back step at end of line !!!
+        for (int x = 0; x < getWidth(); x++) {
+          uint16_t* ptr = mFrameBuf + x;
+          for (int y = 0; y < getHeight(); y++) {
+            writeDataWord (*ptr);
+            ptr += getWidth();
+            }
+          }
         break;
 
       case 180:
-        xstart = getWidth()-1 - it->r.left;
-        ystart = getHeight()-1 - it->r.top;
-        yinc = -1;
+        // !!! simplify, can i just reverse scan !!!
+        for (int y = 0; y < getHeight(); y++) {
+          uint16_t* ptr = mFrameBuf + ((getHeight()-1-y) * getWidth());
+          for (int x = 0; x < getWidth(); x++) {
+            writeDataWord (*ptr);
+            ptr--;
+            }
+          }
         break;
 
       case 270:
-        xstart = it->r.left;
-        ystart = getHeight()-1 - it->r.top;
-        yinc = -1;
+        // !!! simplify the back step at aned of line !!!
+        for (int x = 0; x < getWidth(); x++) {
+          uint16_t* ptr = mFrameBuf + ((getHeight()-1) * getWidth()) + x;
+          for (int y = 0; y < getHeight(); y++) {
+            writeDataWord (*ptr);
+            ptr -= getWidth();
+            }
+          }
         break;
       }
 
-    for (int y = it->r.top; y < it->r.bottom; y++) {
-      writeCommandData (0x20, ystart);  // Y start address of GRAM
-      writeCommandData (0x21, xstart);  // X start address of GRAM
-
-      writeCommand (0x22);
-      uint16_t* ptr = mFrameBuf + (ystart * getWidth()) + xstart;
-      for (int i = 0; i < it->r.getWidth(); i++)
-        writeDataWord (*ptr++);
-
-      numPixels += it->r.getWidth();
-      ystart += yinc;
-      }
-
-    it = it->next;
+    return getNumPixels();
     }
-
-  return numPixels;
+    //}}}
   }
 //}}}
 //{{{
 int cLcdTa7601::updateLcd() {
 // no AM style inc GDRAM V rather H for landscape, have to do it yourself
 
+  writeCommandData (0x45, 0x0000);          // H start ram address window even = 0
+  writeCommandData (0x44, kWidthTa7601-1);  // H end ram address window even   = 320-1
+  writeCommandData (0x47, 0x0000);          // V start ram address window      = 0
+  writeCommandData (0x46, kHeightTa7601-1); // V end ram address window        = 480-1
+
   writeCommandData (0x20, 0x0000);  // Y start address of GRAM
   writeCommandData (0x21, 0x0000);  // X start address of GRAM
 
   writeCommand (0x22);
 
-  // send data
+  // send data for whole frame
   switch (mRotate) {
     case 0: {
+      // simple case
       uint16_t* ptr = mFrameBuf;
-      for (int i = 0; i < getNumPixels(); i++)
+      for (uint32_t i = 0; i < getNumPixels(); i++)
         writeDataWord (*ptr++);
       break;
       }
@@ -1127,7 +1193,7 @@ int cLcdTa7601::updateLcd() {
       break;
 
     case 180:
-      // !!! simplify !!!
+      // !!! simplify, can i just reverse scan !!!
       for (int y = 0; y < getHeight(); y++) {
         uint16_t* ptr = mFrameBuf + ((getHeight()-1-y) * getWidth());
         for (int x = 0; x < getWidth(); x++) {
@@ -1461,7 +1527,7 @@ int cLcdIli9320::updateLcd (sSpan* spans) {
 
   int numPixels = 0;
 
-  auto it = spans;
+  sSpan* it = spans;
   while (it) {
     cRect& r = it->r;
     //{{{  set xstart, ystart, yinc
