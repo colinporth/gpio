@@ -284,7 +284,8 @@ bool cLcd::initialise() {
 
   unsigned version = gpioVersion();
   unsigned hardwareRevision = gpioHardwareRevision();
-  cLog::log (LOGINFO, "pigpio hwRev:%x version:%d", hardwareRevision, version);
+  cLog::log (LOGINFO, "initialise hwRev:%x version:%d mode:%d rotate:%d",
+                      hardwareRevision, version, mMode, mRotate);
 
   if (gpioInitialise() <= 0)
     return false;
@@ -343,7 +344,7 @@ bool cLcd::initialise() {
     //}}}
   vc_dispmanx_rect_set (&mVcRect, 0, 0, getWidth(), getHeight());
 
-  cLog::log (LOGINFO, "Dispmanx %dx%d", mModeInfo.width, mModeInfo.height);
+  cLog::log (LOGINFO, "display %dx%d", mModeInfo.width, mModeInfo.height);
 
   // reset lcd
   gpioSetMode (kResetGpio, PI_OUTPUT);
