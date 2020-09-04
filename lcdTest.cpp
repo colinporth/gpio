@@ -18,8 +18,12 @@ int main (int numArgs, char* args[]) {
   for (int i = 1; i < numArgs; i++)
     argStrings.push_back (args[i]);
 
+  cLcd::eRotate rotate = argStrings.size() >= 1 ? cLcd::eRotate (stoi (argStrings[0])) : cLcd::e0;
+  cLcd::eInfo info = argStrings.size() >= 2 ? cLcd::eInfo (stoi (argStrings[1])) : cLcd::eNone;
+  cLcd::eMode mode = argStrings.size() >= 3 ? cLcd::eMode (stoi (argStrings[2])) : cLcd::eAll;
+
   //cLcd* lcd = new cLcdIli9320 (argStrings.empty() ? 270 : stoi (argStrings[0]));
-  cLcd* lcd = new cLcdTa7601 (argStrings.empty() ? 0 : stoi (argStrings[0]));
+  cLcd* lcd = new cLcdTa7601 (rotate, info, mode);
   if (!lcd->initialise())
     return 0;
 

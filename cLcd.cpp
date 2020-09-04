@@ -103,7 +103,7 @@ void cLcd::clearSnapshot() {
 bool cLcd::present() {
 // present update
 
-  if (mInfo)
+  if (mInfo == eTiming)
     text (kWhite, cPoint(0,0), 20, getPaddedInfoString());
 
   // make diffSpans list
@@ -282,10 +282,13 @@ double cLcd::time() {
 //{{{
 bool cLcd::initialise() {
 
-  unsigned version = gpioVersion();
-  unsigned hardwareRevision = gpioHardwareRevision();
-  cLog::log (LOGINFO, "initialise hwRev:%x version:%d mode:%d rotate:%d",
-                      hardwareRevision, version, mMode, mRotate);
+  cLog::log (LOGINFO, "initialise hwRev:" + hex (gpioHardwareRevision(),8) +
+                      " version " + dec (gpioVersion()) +
+                      (mRotate == cLcd::e0 ? "" : dec (mRotate*90)) +
+                      (mInfo == cLcd::eTiming ? " timing " : "") +
+                      (mMode == cLcd::eAll ? " all " :
+                         mMode == cLcd::eSingle ? " single" :
+                           mMode == cLcd::eCoarse ? " coarse" : " exact"));
 
   if (gpioInitialise() <= 0)
     return false;
@@ -927,8 +930,8 @@ void cLcd16::writeCommandMultiData (const uint8_t command, const uint8_t* dataPt
 constexpr int16_t kWidthTa7601 = 320;
 constexpr int16_t kHeightTa7601 = 480;
 
-cLcdTa7601::cLcdTa7601 (const int rotate, const int info)
-  : cLcd16(kWidthTa7601, kHeightTa7601, eAll, rotate, info) {}
+cLcdTa7601::cLcdTa7601 (const cLcd::eRotate rotate, const cLcd::eInfo info, const cLcd::eMode mode)
+  : cLcd16(kWidthTa7601, kHeightTa7601, rotate, info, mode) {}
 
 //{{{
 bool cLcdTa7601::initialise() {
@@ -1070,7 +1073,7 @@ int cLcdTa7601::updateLcd (sSpan* spans) {
   writeCommandData (0x47, 0x0000);          // V start ram address window        = 0
   writeCommandData (0x46, kHeightTa7601-1); // V end ram address window          = 480-1
 
-  if (mRotate == 0) {
+  if (mRotate == cLcd::e0) {
     //{{{  send spans list, !!! other rotates to do !!!
     // !!! getting stuff wrong,x out by 1 !!!
 
@@ -1085,26 +1088,26 @@ int cLcdTa7601::updateLcd (sSpan* spans) {
 
       switch (mRotate) {
         default:
-        case 0:
+        case e0:
           xstart = it->r.left;
           ystart = it->r.top;
           yinc = 1;
           break;
 
-        case 90:
+        case e90:
           xstart = getWidth() - it->r.left;
           ystart = it->r.top;
           yinc = 1;
           break;
 
-        case 180:
+        case e180:
           // !!! simplify, can i just reverse scan !!!
           xstart = getWidth()-1 - it->r.left;
           ystart = getHeight()-1 - it->r.top;
           yinc = -1;
           break;
 
-        case 270:
+        case e270:
           xstart = it->r.left;
           ystart = getHeight()-1 - it->r.top;
           yinc = -1;
@@ -1138,7 +1141,7 @@ int cLcdTa7601::updateLcd (sSpan* spans) {
     writeCommand (0x22);
 
     switch (mRotate) {
-      case 0: {
+      case e0: {
         // simple case
         uint16_t* ptr = mFrameBuf;
         for (uint32_t i = 0; i < getNumPixels(); i++)
@@ -1146,7 +1149,7 @@ int cLcdTa7601::updateLcd (sSpan* spans) {
         break;
         }
 
-      case 90:
+      case e90:
         // !!! simplify the back step at end of line !!!
         for (int x = 0; x < getWidth(); x++) {
           uint16_t* ptr = mFrameBuf + x;
@@ -1157,7 +1160,7 @@ int cLcdTa7601::updateLcd (sSpan* spans) {
           }
         break;
 
-      case 180:
+      case e180:
         // !!! simplify, can i just reverse scan !!!
         for (int y = 0; y < getHeight(); y++) {
           uint16_t* ptr = mFrameBuf + ((getHeight()-1-y) * getWidth());
@@ -1168,7 +1171,7 @@ int cLcdTa7601::updateLcd (sSpan* spans) {
           }
         break;
 
-      case 270:
+      case e270:
         // !!! simplify the back step at aned of line !!!
         for (int x = 0; x < getWidth(); x++) {
           uint16_t* ptr = mFrameBuf + ((getHeight()-1) * getWidth()) + x;
@@ -1190,8 +1193,8 @@ int cLcdTa7601::updateLcd (sSpan* spans) {
 constexpr int16_t kWidth1289 = 240;
 constexpr int16_t kHeight1289 = 320;
 
-cLcdSsd1289::cLcdSsd1289 (const int rotate, const int info)
-  : cLcd16(kWidth1289, kHeight1289, eCoarse, rotate, info) {}
+cLcdSsd1289::cLcdSsd1289 (const cLcd::eRotate rotate, const cLcd::eInfo info)
+  : cLcd16(kWidth1289, kHeight1289, rotate, info, eCoarse) {}
 
 //{{{
 bool cLcdSsd1289::initialise() {
@@ -1267,25 +1270,28 @@ bool cLcdSsd1289::initialise() {
   int xres = kWidth1289-1;
   int yres = kHeight1289-1;
   switch (mRotate) {
-    case 90:
+    case e0:
+      writeCommandData (0x11, 0x6040 | 0b110000); // 0x11 REG_ENTRY_MODE
+      writeCommandData (0x4e, xstart);            // 0x4E GDDRAM X address counter
+      writeCommandData (0x4f, ystart);            // 0x4F GDDRAM Y address counter
+      break;
+
+    case e90:
       writeCommandData (0x11, 0x6040 | 0b011000); // 0x11 REG_ENTRY_MODE
       writeCommandData (0x4e, ystart);            // 0x4E GDDRAM X address counter
       writeCommandData (0x4f, xres - xstart);     // 0x4F GDDRAM Y address counter
       break;
-    case 180:
+
+    case e180:
       writeCommandData (0x11, 0x6040 | 0b000000); // 0x11 REG_ENTRY_MODE
       writeCommandData (0x4e, xres - xstart);     // 0x4E GDDRAM X address counter
       writeCommandData (0x4f, yres - ystart);     // 0x4F GDDRAM Y address counter
       break;
-    case 270:
+
+    case e270:
       writeCommandData (0x11, 0x6040 | 0b101000); // 0x11 REG_ENTRY_MODE
       writeCommandData (0x4e, yres - ystart);     // 0x4E GDDRAM X address counter
       writeCommandData (0x4f, xstart);            // 0x4F GDDRAM Y address counter
-      break;
-    default:
-      writeCommandData (0x11, 0x6040 | 0b110000); // 0x11 REG_ENTRY_MODE
-      writeCommandData (0x4e, xstart);            // 0x4E GDDRAM X address counter
-      writeCommandData (0x4f, ystart);            // 0x4F GDDRAM Y address counter
       break;
     }
 
@@ -1385,8 +1391,8 @@ constexpr int16_t kWidth9320 = 240;
 constexpr int16_t kHeight9320 = 320;
 constexpr int kSpiClock9320 = 24000000;
 
-cLcdIli9320::cLcdIli9320 (const int rotate, const int info)
-  : cLcdSpiHeaderSelect(kWidth9320, kHeight9320, eCoarse, rotate, info) {}
+cLcdIli9320::cLcdIli9320 (const cLcd::eRotate rotate, const cLcd::eInfo info)
+  : cLcdSpiHeaderSelect(kWidth9320, kHeight9320, rotate, info, eCoarse) {}
 
 //{{{
 void cLcdIli9320::setBacklight (bool on) {
@@ -1460,20 +1466,17 @@ bool cLcdIli9320::initialise() {
   writeCommandData (0x0053, kHeight9320-1); // V GRAM end address
 
   switch (mRotate) {
-    case 0:
+    case e0:
       writeCommandData (0x03, 0x1030); // Entry Mode - BGR, HV inc, vert write,
       break;
-    case 90:
+    case e90:
       writeCommandData (0x03, 0x1018); // Entry Mode - BGR, HV inc, vert write,
       break;
-    case 180:
+    case e180:
       writeCommandData (0x03, 0x1000); // Entry Mode - BGR, HV inc, vert write,
       break;
-    case 270:
+    case e270:
       writeCommandData (0x03, 0x1028); // Entry Mode - BGR, HV inc, vert write,
-      break;
-    default:
-      cLog::log (LOGERROR, "unkown rotate " + dec (mRotate));
       break;
     }
 
@@ -1509,17 +1512,20 @@ int cLcdIli9320::updateLcd (sSpan* spans) {
     uint16_t yinc = 1;
 
     switch (mRotate) {
-      case 90:
+      case e0:
+        break;
+
+      case e90:
         xstart = kHeight9320-1 - r.left;
         break;
 
-      case 180:
+      case e180:
         xstart = kWidth9320-1 - r.left;
         ystart = kHeight9320-1 - r.top;
         yinc = -1;
         break;
 
-      case 270:
+      case e270:
         ystart = kWidth9320-1 - r.top;
         yinc = -1;
         break;
@@ -1570,8 +1576,8 @@ constexpr int16_t kWidth7735 = 128;
 constexpr int16_t kHeight7735 = 160;
 constexpr int kSpiClock7735 = 24000000;
 
-cLcdSt7735r::cLcdSt7735r (const int rotate, const int info)
-  : cLcdSpiRegisterSelect (kWidth7735, kHeight7735, eCoarse, rotate, info) {}
+cLcdSt7735r::cLcdSt7735r (const cLcd::eRotate rotate, const cLcd::eInfo info)
+  : cLcdSpiRegisterSelect (kWidth7735, kHeight7735, rotate, info, eCoarse) {}
 
 //{{{
 bool cLcdSt7735r::initialise() {
@@ -1680,8 +1686,8 @@ constexpr int16_t kWidth9225b = 176;
 constexpr int16_t kHeight9225b = 220;
 constexpr int kSpiClock9225b = 16000000;
 
-cLcdIli9225b::cLcdIli9225b (const int rotate, const int info)
-  : cLcdSpiRegisterSelect(kWidth9225b, kHeight9225b, eCoarse, rotate, info) {}
+cLcdIli9225b::cLcdIli9225b (const cLcd::eRotate rotate, const cLcd::eInfo info)
+  : cLcdSpiRegisterSelect(kWidth9225b, kHeight9225b, rotate, info, eCoarse) {}
 
 //{{{
 bool cLcdIli9225b::initialise() {
