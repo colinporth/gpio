@@ -52,10 +52,9 @@ int main (int numArgs, char* args[]) {
   // snapshot test
   while (true) {
     lcd->clearSnapshot();
-    if (lcd->present())
-      cLog::log (LOGINFO, lcd->getInfoString());
-    else
-      lcd->delayUs (10000);
+    lcd->present();
+    lcd->delayUs (1000);
+    // cLog::log (LOGINFO, lcd->getInfoString());
     }
 
   return 0;

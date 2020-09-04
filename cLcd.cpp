@@ -131,18 +131,21 @@ bool cLcd::present() {
       break;
     }
 
-  if (!mNumDiffSpans) // nothing changed
-    return false;
-
   // merge diffSpans
   merge (mDiffSpans, kSpanMergeThreshold16);
-  mDiffUs = int((time() - diffStartTime) * 1000000.);
+   mDiffUs = int((time() - diffStartTime) * 1000000.);
+
+  if (!mNumDiffSpans) {// nothing changed
+    mUpdateUs = 0;
+    return false;
+    }
 
   // update lcd with diffSpans
   double updateStartTime = time();
   mUpdatePixels = updateLcd (mDiffSpans);
   mUpdateUs = int((time() - updateStartTime) * 1000000.);
 
+  // swap buffers
   auto temp = mPrevFrameBuf;
   mPrevFrameBuf = mFrameBuf;
   mFrameBuf = temp;
@@ -924,7 +927,7 @@ constexpr int16_t kWidthTa7601 = 320;
 constexpr int16_t kHeightTa7601 = 480;
 
 cLcdTa7601::cLcdTa7601 (const int rotate, const int info)
-  : cLcd16(kWidthTa7601, kHeightTa7601, eSingle, rotate, info) {}
+  : cLcd16(kWidthTa7601, kHeightTa7601, eAll, rotate, info) {}
 
 //{{{
 bool cLcdTa7601::initialise() {
@@ -1022,17 +1025,18 @@ bool cLcdTa7601::initialise() {
 
 //{{{
 void cLcdTa7601::writeCommand (const uint8_t command) {
-// slow down a bit
+// slow down write
 
   gpioWrite (k16RegisterSelectGpio, 0);
 
   gpioWrite_Bits_0_31_Clear (~command & k16WriteClrMask); // clear lo data bits + k16WrGpio bit lo
   gpioWrite_Bits_0_31_Clear (~command & k16WriteClrMask); // clear lo data bits + k16WrGpio bit lo
   gpioWrite_Bits_0_31_Clear (~command & k16WriteClrMask); // clear lo data bits + k16WrGpio bit lo
+
   gpioWrite_Bits_0_31_Set (command);                      // set hi data bits
   gpioWrite_Bits_0_31_Set (command);                      // set hi data bits
   gpioWrite_Bits_0_31_Set (command);                      // set hi data bits
-  gpioWrite_Bits_0_31_Set (k16WriteMask);                 // write on k16WrGpio rising edge
+
   gpioWrite_Bits_0_31_Set (k16WriteMask);                 // write on k16WrGpio rising edge
   gpioWrite_Bits_0_31_Set (k16WriteMask);                 // write on k16WrGpio rising edge
 
@@ -1041,14 +1045,16 @@ void cLcdTa7601::writeCommand (const uint8_t command) {
 //}}}
 //{{{
 void cLcdTa7601::writeDataWord (const uint16_t data) {
-// slow down data write
+// slow down write
 
   fastGpioWrite_Bits_0_31_Clear (~data & k16WriteClrMask); // clear lo data bits + k16WrGpio bit lo
   fastGpioWrite_Bits_0_31_Clear (~data & k16WriteClrMask); // clear lo data bits + k16WrGpio bit lo
   fastGpioWrite_Bits_0_31_Clear (~data & k16WriteClrMask); // clear lo data bits + k16WrGpio bit lo
+
   fastGpioWrite_Bits_0_31_Set (data);                      // set hi data bits
   fastGpioWrite_Bits_0_31_Set (data);                      // set hi data bits
   fastGpioWrite_Bits_0_31_Set (data);                      // set hi data bits
+
   fastGpioWrite_Bits_0_31_Set (k16WriteMask);              // write on k16WrGpio rising edge
   fastGpioWrite_Bits_0_31_Set (k16WriteMask);              // write on k16WrGpio rising edge
   }
@@ -1064,7 +1070,9 @@ int cLcdTa7601::updateLcd (sSpan* spans) {
   writeCommandData (0x46, kHeightTa7601-1); // V end ram address window          = 480-1
 
   if (mRotate == 0) {
-    //{{{  send spans list, !!! other rotate to do !!!
+    //{{{  send spans list, !!! other rotates to do !!!
+    // !!! getting stuff wrong,x out by 1 !!!
+
     int numPixels = 0;
 
     sSpan* it = spans;
