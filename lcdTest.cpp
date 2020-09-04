@@ -27,10 +27,8 @@ int main (int numArgs, char* args[]) {
   if (!lcd->initialise())
     return 0;
 
-  // font test
-  //{{{  display font
+  //{{{  font test
   int height = 8;
-
   while (height < 100) {
     cPoint point;
     lcd->clear (kMagenta);
