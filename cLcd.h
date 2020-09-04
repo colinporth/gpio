@@ -234,8 +234,8 @@ private:
   int diffExact (sSpan* spans);
   int diffCoarse (sSpan* spans);
   int diffSingle (sSpan* spans);
-  static sSpan* merge (sSpan* spans, int pixelThreshold);
 
+  static sSpan* merge (sSpan* spans, int pixelThreshold);
   static int coarseLinearDiff (uint16_t* frameBuf, uint16_t* prevFrameBuf, uint16_t* frameBufEnd);
   static int coarseLinearDiffBack (uint16_t* frameBuf, uint16_t* prevFrameBuf, uint16_t* frameBufEnd);
 

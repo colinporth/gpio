@@ -40,26 +40,28 @@ int main (int numArgs, char* args[]) {
 
   if (fontTest) {
     //{{{  font test
-    int height = 8;
-    while (height < 100) {
-      cPoint point;
-      lcd->clear (kMagenta);
-      for (char ch = 'A'; ch < 0x7f; ch++) {
-        point.x = lcd->text (kWhite, point, height, string(1,ch));
-        if (point.x > lcd->getWidth()) {
-          point.x = 0;
-          point.y += height;
-          if (point.y > lcd->getHeight())
-            break;
+    while (true) {
+      int height = 8;
+      while (height < 100) {
+        cPoint point;
+        lcd->clear (kMagenta);
+        for (char ch = 'A'; ch < 0x7f; ch++) {
+          point.x = lcd->text (kWhite, point, height, string(1,ch));
+          if (point.x > lcd->getWidth()) {
+            point.x = 0;
+            point.y += height;
+            if (point.y > lcd->getHeight())
+              break;
+            }
           }
+
+        lcd->text (kYellow, cPoint(), 20, "Hello Colin");
+        lcd->present();
+        lcd->setBacklightOn();
+
+        lcd->delayUs (16000);
+        height += 4;
         }
-
-      lcd->text (kYellow, cPoint(), 20, "Hello Colin");
-      lcd->present();
-      lcd->setBacklightOn();
-
-      lcd->delayUs (16000);
-      height += 4;
       }
     }
     //}}}

@@ -748,7 +748,6 @@ sSpan* cLcd::merge (sSpan* spans, int pixelThreshold) {
   return spans;
   }
 //}}}
-
 //{{{
 int cLcd::coarseLinearDiff (uint16_t* frameBuf, uint16_t* prevFrameBuf, uint16_t* frameBufEnd) {
 // Coarse diffing of two frameBufs with tight stride, 16 pixels at a time
