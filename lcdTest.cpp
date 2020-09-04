@@ -18,9 +18,18 @@ int main (int numArgs, char* args[]) {
   for (int i = 1; i < numArgs; i++)
     argStrings.push_back (args[i]);
 
-  cLcd::eRotate rotate = argStrings.size() >= 1 ? cLcd::eRotate (stoi (argStrings[0])) : cLcd::e0;
-  cLcd::eInfo info = argStrings.size() >= 2 ? cLcd::eInfo (stoi (argStrings[1])) : cLcd::eNone;
-  cLcd::eMode mode = argStrings.size() >= 3 ? cLcd::eMode (stoi (argStrings[2])) : cLcd::eAll;
+  cLcd::eRotate rotate = cLcd::e0;
+  cLcd::eInfo info = cLcd::eNone;
+  cLcd::eMode mode = cLcd::eAll;
+
+  for (size_t i = 0; i < argStrings.size(); i++)
+    if (argStrings[i] == "90") rotate = cLcd::e90;
+    else if (argStrings[i] == "180") rotate = cLcd::e180;
+    else if (argStrings[i] == "270") rotate = cLcd::e270;
+    else if (argStrings[i] == "t") info = cLcd::eTiming;
+    else if (argStrings[i] == "a") mode = cLcd::eAll;
+    else if (argStrings[i] == "c") mode = cLcd::eCoarse;
+    else if (argStrings[i] == "e") mode = cLcd::eExact;
 
   //cLcd* lcd = new cLcdIli9320 (argStrings.empty() ? 270 : stoi (argStrings[0]));
   cLcd* lcd = new cLcdTa7601 (rotate, info, mode);
