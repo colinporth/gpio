@@ -55,8 +55,8 @@ int process() {
 
   syslog (LOG_INFO, "Second display is %d x %d %dbps\n", vinfo.xres, vinfo.yres, vinfo.bits_per_pixel);
 
-  uint32_t image_prt;
-  DISPMANX_RESOURCE_HANDLE_T screen_resource = vc_dispmanx_resource_create (VC_IMAGE_RGB565, vinfo.xres, vinfo.yres, &image_prt);
+  uint32_t imageHandle;
+  DISPMANX_RESOURCE_HANDLE_T screen_resource = vc_dispmanx_resource_create (VC_IMAGE_RGB565, vinfo.xres, vinfo.yres, &imageHandle);
   if (!screen_resource) {
     //{{{  error, log, return
     syslog (LOG_ERR, "Unable to create screen buffer");

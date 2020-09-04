@@ -24,40 +24,40 @@ public:
   //}}}
 
   //{{{
-  cPoint operator - (const cPoint& point) const {
+  cPoint operator - (const cPoint& point) {
     return cPoint (x - point.x, y - point.y);
     }
   //}}}
   //{{{
-  cPoint operator + (const cPoint& point) const {
+  cPoint operator + (const cPoint& point) {
     return cPoint (x + point.x, y + point.y);
     }
   //}}}
   //{{{
-  cPoint operator * (const int16_t f) const {
+  cPoint operator * (const int16_t f) {
     return cPoint (x * f, y * f);
     }
   //}}}
   //{{{
-  cPoint operator * (const cPoint& point) const {
+  cPoint operator * (const cPoint& point) {
     return cPoint (x * point.x, y * point.y);
     }
   //}}}
   //{{{
-  cPoint operator / (const int16_t f) const {
+  cPoint operator / (const int16_t f) {
     return cPoint (x / f, y / f);
     }
   //}}}
 
   //{{{
-  const cPoint& operator += (const cPoint& point)  {
+  cPoint& operator += (const cPoint& point)  {
     x += point.x;
     y += point.y;
     return *this;
     }
   //}}}
   //{{{
-  const cPoint& operator -= (const cPoint& point)  {
+  cPoint& operator -= (const cPoint& point)  {
     x -= point.x;
     y -= point.y;
     return *this;
@@ -65,7 +65,7 @@ public:
   //}}}
 
   //{{{
-  bool inside (const cPoint& pos) const {
+  bool inside (const cPoint& pos) {
   // return pos inside rect formed by us as size
     return pos.x >= 0 && pos.x < x && pos.y >= 0 && pos.y < y;
     }
@@ -104,28 +104,28 @@ public:
   //}}}
 
   //{{{
-  cRect operator + (const cPoint& point) const {
+  cRect operator + (const cPoint& point) {
     return cRect (left + point.x, top + point.y, right + point.x, bottom + point.y);
     }
   //}}}
 
-  int16_t getWidth() const { return right - left; }
-  int16_t getHeight() const { return bottom - top; }
-  int getNumPixels() const { return getWidth() * getHeight(); }
+  int16_t getWidth() { return right - left; }
+  int16_t getHeight() { return bottom - top; }
+  int getNumPixels() { return getWidth() * getHeight(); }
 
-  cPoint getTL() const { return cPoint(left, top); }
-  cPoint getTL (int16_t offset) const { return cPoint(left+offset, top+offset); }
-  cPoint getTR() const { return cPoint(right, top); }
-  cPoint getBL() const { return cPoint(left, bottom); }
-  cPoint getBR() const { return cPoint(right, bottom); }
+  cPoint getTL() { return cPoint(left, top); }
+  cPoint getTL (const int16_t offset) { return cPoint(left+offset, top+offset); }
+  cPoint getTR() { return cPoint(right, top); }
+  cPoint getBL() { return cPoint(left, bottom); }
+  cPoint getBR() { return cPoint(right, bottom); }
 
-  cPoint getSize() const { return cPoint(right-left, bottom-top); }
-  cPoint getCentre() const { return cPoint(getCentreX(), getCentreY()); }
-  int16_t getCentreX() const { return (left + right)/2; }
-  int16_t getCentreY() const { return (top + bottom)/2; }
+  cPoint getSize() { return cPoint(right-left, bottom-top); }
+  cPoint getCentre() { return cPoint(getCentreX(), getCentreY()); }
+  int16_t getCentreX() { return (left + right)/2; }
+  int16_t getCentreY() { return (top + bottom)/2; }
 
   //{{{
-  bool inside (const cPoint& pos) const {
+  bool inside (const cPoint& pos) {
   // return pos inside rect
     return (pos.x >= left) && (pos.x < right) && (pos.y >= top) && (pos.y < bottom);
     }
@@ -180,11 +180,11 @@ public:
   constexpr uint16_t getWidth() { return mWidth; }
   constexpr uint16_t getHeight() { return mHeight; }
   constexpr uint32_t getNumPixels() { return mWidth * mHeight; }
-  const cPoint getSize() { return cPoint(mWidth, mHeight); }
-  const cRect getRect() { return cRect(0,0, mWidth,mHeight); }
+  cPoint getSize() { return cPoint(mWidth, mHeight); }
+  cRect getRect() { return cRect(0,0, mWidth,mHeight); }
 
-  const std::string getInfoString();
-  const std::string getPaddedInfoString();
+  std::string getInfoString();
+  std::string getPaddedInfoString();
 
   virtual void setBacklight (bool on) {}
   void setBacklightOn() { setBacklight (true); }
@@ -200,7 +200,7 @@ public:
   void rectOutline (const uint16_t colour, const cRect& r);
   void pix (const uint16_t colour, const uint8_t alpha, const cPoint& p);
   void copy (const uint16_t* src);
-  void copy (const uint16_t* src, const cRect& srcRect, const cPoint& dstPoint);
+  void copy (const uint16_t* src, cRect& srcRect, const cPoint& dstPoint);
   int text (const uint16_t colour, const cPoint& p, const int height, const std::string& str);
 
   void delayUs (const int us);
@@ -224,10 +224,10 @@ protected:
 //{{{
 private:
   // info
-  const int getUpdateUs() { return mUpdateUs; }
-  const int getUpdatePixels() { return mUpdatePixels; }
-  const int getDiffUs() { return mDiffUs; }
-  const int getNumSpans() { return mNumDiffSpans; }
+  int getUpdateUs() { return mUpdateUs; }
+  int getUpdatePixels() { return mUpdatePixels; }
+  int getDiffUs() { return mDiffUs; }
+  int getNumSpans() { return mNumDiffSpans; }
 
   void setFont (const uint8_t* font, const int fontSize);
 

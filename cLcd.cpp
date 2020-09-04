@@ -52,7 +52,7 @@ cLcd::~cLcd() {
 //}}}
 
 //{{{
-const string cLcd::getInfoString() {
+string cLcd::getInfoString() {
 // return info string for log display
 
   return dec(getUpdatePixels()) + "px took:" +
@@ -62,7 +62,7 @@ const string cLcd::getInfoString() {
   }
 //}}}
 //{{{
-const string cLcd::getPaddedInfoString() {
+string cLcd::getPaddedInfoString() {
 // return info string with padded format for on screen display
 
   return dec(getUpdatePixels(),5,'0') + " " +
@@ -227,7 +227,7 @@ void cLcd::copy (const uint16_t* src) {
   }
 //}}}
 //{{{
-void cLcd::copy (const uint16_t* src, const cRect& srcRect, const cPoint& dstPoint) {
+void cLcd::copy (const uint16_t* src, cRect& srcRect, const cPoint& dstPoint) {
 // copy rect from src of same width,height
 
   for (int y = 0; y < srcRect.getHeight(); y++)
