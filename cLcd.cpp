@@ -832,7 +832,7 @@ int cLcd::coarseLinearDiffBack (uint16_t* frameBuf, uint16_t* prevFrameBuf, uint
 //}}}
 
 // 16bit parallel
-//{{{  cLcd16 : public cLcd -
+//{{{  cLcd16 : public cLcd 
 // 16bit J8 header pins, gpio, constexpr
 //      3.3v led -  1  2  - 5v
 //     d2  gpio2 -  3  4  - 5v
@@ -1037,6 +1037,7 @@ void cLcdTa7601::writeDataWord (const uint16_t data) {
 
 //{{{
 int cLcdTa7601::updateLcd (sSpan* spans) {
+// no AM style inc GDRAM V rather H for landscape, have to do it yourself
 
   if (mRotate != 0) // other rotate cases still to do
     return updateLcd();
@@ -1046,39 +1047,47 @@ int cLcdTa7601::updateLcd (sSpan* spans) {
 
   auto it = spans;
   while (it) {
-    cRect& r = it->r;
-
-    uint16_t xstart = r.left;
-    uint16_t ystart = r.top;
-    uint16_t yinc = 1;
+    uint16_t xstart;
+    uint16_t ystart;
+    uint16_t yinc;
 
     switch (mRotate) {
+      default:
+      case 0:
+        xstart = it->r.left;
+        ystart = it->r.top;
+        yinc = 1;
+        break;
+
       case 90:
-        xstart = getWidth() - r.left;
+        xstart = getWidth() - it->r.left;
+        ystart = it->r.top;
+        yinc = 1;
         break;
 
       case 180:
-        xstart = getWidth()-1 - r.left;
-        ystart = getHeight()-1 - r.top;
+        xstart = getWidth()-1 - it->r.left;
+        ystart = getHeight()-1 - it->r.top;
         yinc = -1;
         break;
 
       case 270:
-        ystart = getHeight()-1 - r.top;
+        xstart = it->r.left;
+        ystart = getHeight()-1 - it->r.top;
         yinc = -1;
         break;
       }
 
-    for (int y = r.top; y < r.bottom; y++) {
+    for (int y = it->r.top; y < it->r.bottom; y++) {
       writeCommandData (0x20, ystart);  // Y start address of GRAM
       writeCommandData (0x21, xstart);  // X start address of GRAM
 
       writeCommand (0x22);
       uint16_t* ptr = mFrameBuf + (ystart * getWidth()) + xstart;
-      for (int i = 0; i < r.getWidth(); i++)
+      for (int i = 0; i < it->r.getWidth(); i++)
         writeDataWord (*ptr++);
 
-      numPixels += r.getWidth();
+      numPixels += it->r.getWidth();
       ystart += yinc;
       }
 
@@ -1090,6 +1099,7 @@ int cLcdTa7601::updateLcd (sSpan* spans) {
 //}}}
 //{{{
 int cLcdTa7601::updateLcd() {
+// no AM style inc GDRAM V rather H for landscape, have to do it yourself
 
   writeCommandData (0x20, 0x0000);  // Y start address of GRAM
   writeCommandData (0x21, 0x0000);  // X start address of GRAM
@@ -1106,7 +1116,7 @@ int cLcdTa7601::updateLcd() {
       }
 
     case 90:
-      // !!! simplify the back step at aned of line !!!
+      // !!! simplify the back step at end of line !!!
       for (int x = 0; x < getWidth(); x++) {
         uint16_t* ptr = mFrameBuf + x;
         for (int y = 0; y < getHeight(); y++) {
