@@ -302,23 +302,26 @@ bool cLcd::initialise() {
   gpioWrite (kResetGpio, 1);
   gpioDelay (120000);
 
-  // allocate and clear both frameBuffers to black
-  mFrameBuf = (uint16_t*)aligned_alloc (getNumPixels() * 2, 32);
+  mFrameBuf = (uint16_t*)calloc (getNumPixels(), 2);
   if (!mFrameBuf) {
     //{{{  error return
     cLog::log (LOGERROR, "frameBuf allocate");
     return false;
     }
     //}}}
-  mPrevFrameBuf = (uint16_t*)aligned_alloc (getNumPixels() * 2, 32);
+  mPrevFrameBuf = (uint16_t*)calloc (getNumPixels(), 2);
   if (!mPrevFrameBuf) {
     //{{{  error return
     cLog::log (LOGERROR, "prevFrameBuf allocate");
     return false;
     }
     //}}}
-  clear();
-  clear();
+  //{{{  should we use aligned_alloc ?
+  //mFrameBuf = (uint16_t*)aligned_alloc (getNumPixels() * 2, 32);
+  //mPrevFrameBuf = (uint16_t*)aligned_alloc (getNumPixels() * 2, 32);
+  //clear();
+  //clear();
+  //}}}
 
   // allocate large possible size
   mSpans = (sSpan*)malloc (kMaxSpans * sizeof(sSpan));
@@ -1536,7 +1539,7 @@ int cLcdIli9320::updateLcd (sSpan* spans) {
         }
 
       writeCommand (0x22); // send GRAM write
-      const uint16_t* src = mFrameBuf + (y * getWidth()) + it->r.left;
+      uint16_t* src = mFrameBuf + (y * getWidth()) + it->r.left;
       // 2 header bytes, alignment for data bswap_16, send spi data from second header byte
       uint16_t* dst = dataHeaderBuf + 1;
       for (int i = 0; i < it->r.getWidth(); i++)
@@ -1661,7 +1664,7 @@ int cLcdSt7735r::updateLcd (sSpan* spans) {
 
   uint16_t swappedFrameBuf [kWidth7735 * kHeight7735];
 
-  const uint16_t* src = mFrameBuf;
+  uint16_t* src = mFrameBuf;
   uint16_t* dst = swappedFrameBuf;
   for (uint32_t i = 0; i < getNumPixels(); i++)
     *dst++ = bswap_16 (*src++);
@@ -1762,7 +1765,7 @@ int cLcdIli9225b::updateLcd (sSpan* spans) {
 
   uint16_t swappedFrameBuf [kWidth9225b * kHeight9225b];
 
-  const uint16_t* src = mFrameBuf;
+  uint16_t* src = mFrameBuf;
   uint16_t* dst = swappedFrameBuf;
   for (uint32_t i = 0; i < getNumPixels(); i++)
     *dst++ = bswap_16 (*src++);
