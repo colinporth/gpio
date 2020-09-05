@@ -105,25 +105,30 @@ void cLcd::clearSnapshot() {
 bool cLcd::present() {
 // present update
 
-  if (mInfo == eTiming)
+  if (mInfo == eTimingOverlay)
     text (kWhite, cPoint(0,0), 20, getPaddedInfoString());
 
   // make diffSpans list
   double diffStartTime = timeUs();
-
   switch (mMode) {
+    //{{{
     case eExact :
       mNumSpans = diffExact (mSpans);
+      merge (mSpans, kSpanMergeThreshold16);
       break;
-
+    //}}}
+    //{{{
     case eCoarse :
       mNumSpans = diffCoarse (mSpans);
+      merge (mSpans, kSpanMergeThreshold16);
       break;
-
+    //}}}
+    //{{{
     case eSingle :
       mNumSpans = diffSingle (mSpans);
       break;
-
+    //}}}
+    //{{{
     case eAll :
       mSpans->r = getRect();
       mSpans->lastScanRight = getWidth();
@@ -131,10 +136,8 @@ bool cLcd::present() {
       mSpans->next = nullptr;
       mNumSpans = 1;
       break;
+    //}}}
     }
-
-  // merge diffSpans
-  //merge (mSpans, kSpanMergeThreshold16);
   mDiffUs = int((timeUs() - diffStartTime) * 1000000.0);
 
   if (!mNumSpans) {// nothing changed
@@ -142,15 +145,38 @@ bool cLcd::present() {
     return false;
     }
 
+  // copy frameBuf to prevFrameBuf without overlays, compare next time without overlays
+  if ((mMode != eAll) && (mInfo == eSpanOverlay))
+    memcpy (mPrevFrameBuf, mFrameBuf, getNumPixels() * 2);
+
   // update lcd with diffSpans
   double updateStartTime = timeUs();
   mUpdatePixels = updateLcd (mSpans);
   mUpdateUs = int((timeUs() - updateStartTime) * 1000000.0);
 
-  // swap buffers
-  auto temp = mPrevFrameBuf;
-  mPrevFrameBuf = mFrameBuf;
-  mFrameBuf = temp;
+  if (eSpanOverlay) {
+    // add overlays
+    text (kWhite, cPoint(0,0), 20, getPaddedInfoString());
+    sSpan* it = mSpans;
+    while (it) {
+      rectOutline (kGreen, it->r);
+      it = it->next;
+      }
+
+    // and update screen again with everything, timing is without overlays
+    sSpan span = { getRect(), getWidth(), getNumPixels(), nullptr };
+    updateLcd (&span);
+    }
+
+  if (mInfo == eTimingLog)
+    cLog::log (LOGINFO, getInfoString());
+
+  if ((mMode != eAll) && (mInfo != eSpanOverlay)) {
+    // swap buffers
+    auto temp = mPrevFrameBuf;
+    mPrevFrameBuf = mFrameBuf;
+    mFrameBuf = temp;
+    }
 
   return true;
   }
@@ -287,7 +313,9 @@ bool cLcd::initialise() {
   cLog::log (LOGINFO, "initialise hwRev:" + hex (gpioHardwareRevision(),8) +
                       " version:" + dec (gpioVersion()) +
                       (mRotate == cLcd::e0 ? "" : dec (mRotate*90)) +
-                      (mInfo == cLcd::eTiming ? " info" : "") +
+                      (mInfo == cLcd::eTimingOverlay ? " timingOverlay" :
+                        mInfo == cLcd::eTimingLog ? " timingLog" : 
+                          mInfo == cLcd::eSpanOverlay ? " spanOverlay" : "") +
                       (mMode == cLcd::eAll ? " updateAll" :
                          mMode == cLcd::eSingle ? " updateSingle" :
                            mMode == cLcd::eCoarse ? " updateCoarse" : " updateExact"));
@@ -305,11 +333,14 @@ bool cLcd::initialise() {
   // allocate and clear frameBufs, align to data cache
   mFrameBuf = (uint16_t*)aligned_alloc (128, getNumPixels() * 2);
   clear();
-  mPrevFrameBuf = mFrameBuf;
-  mFrameBuf = (uint16_t*)aligned_alloc (128, getNumPixels() * 2);
 
-  // allocate lotsa spans
-  mSpans = (sSpan*)malloc (kMaxSpans * sizeof(sSpan));
+  if (mMode != eAll) {
+    mPrevFrameBuf = mFrameBuf;
+    mFrameBuf = (uint16_t*)aligned_alloc (128, getNumPixels() * 2);
+
+    // allocate lotsa spans
+    mSpans = (sSpan*)malloc (kMaxSpans * sizeof(sSpan));
+    }
 
   // dispmanx init
   bcm_host_init();

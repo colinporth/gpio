@@ -19,7 +19,6 @@ int main (int numArgs, char* args[]) {
     argStrings.push_back (args[i]);
 
   bool fontTest = false;
-  bool presentInfo = false;
   cLcd::eRotate rotate = cLcd::e0;
   cLcd::eInfo info = cLcd::eNone;
   cLcd::eMode mode = cLcd::eAll;
@@ -28,13 +27,14 @@ int main (int numArgs, char* args[]) {
     if (argStrings[i] == "90") rotate = cLcd::e90;
     else if (argStrings[i] == "180") rotate = cLcd::e180;
     else if (argStrings[i] == "270") rotate = cLcd::e270;
-    else if (argStrings[i] == "t") info = cLcd::eTiming;
+    else if (argStrings[i] == "t") info = cLcd::eTimingOverlay;
+    else if (argStrings[i] == "p") info = cLcd::eTimingLog;
+    else if (argStrings[i] == "g") info = cLcd::eSpanOverlay;
     else if (argStrings[i] == "l") info = cLcd::eLine;
     else if (argStrings[i] == "a") mode = cLcd::eAll;
     else if (argStrings[i] == "c") mode = cLcd::eCoarse;
     else if (argStrings[i] == "e") mode = cLcd::eExact;
     else if (argStrings[i] == "s") mode = cLcd::eSingle;
-    else if (argStrings[i] == "p") presentInfo = true;
     else if (argStrings[i] == "f") fontTest = true;
 
   //cLcd* lcd = new cLcdIli9320 (rotate, info, mode);
@@ -61,8 +61,7 @@ int main (int numArgs, char* args[]) {
 
         //lcd->text (kYellow, cPoint(), 20, "Hello Colin");
 
-        if (lcd->present() && presentInfo)
-          cLog::log (LOGINFO, lcd->getInfoString());
+        lcd->present();
 
         lcd->setBacklightOn();
         lcd->delayUs (16000);
@@ -75,8 +74,7 @@ int main (int numArgs, char* args[]) {
   // snapshot test
   while (true) {
     lcd->clearSnapshot();
-    if (lcd->present() && presentInfo)
-      cLog::log (LOGINFO, lcd->getInfoString());
+    lcd->present();
     lcd->delayUs (5000);
     }
 
