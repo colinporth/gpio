@@ -302,11 +302,11 @@ bool cLcd::initialise() {
   gpioWrite (kResetGpio, 1);
   gpioDelay (120000);
 
-  // allocate and clear frameBufs
-  mFrameBuf = (uint16_t*)aligned_alloc (32, getNumPixels() * 2);
+  // allocate and clear frameBufs, align to data cache
+  mFrameBuf = (uint16_t*)aligned_alloc (128, getNumPixels() * 2);
   clear();
   mPrevFrameBuf = mFrameBuf;
-  mFrameBuf = (uint16_t*)aligned_alloc (32, getNumPixels() * 2);
+  mFrameBuf = (uint16_t*)aligned_alloc (128, getNumPixels() * 2);
 
   // allocate lotsa spans
   mSpans = (sSpan*)malloc (kMaxSpans * sizeof(sSpan));

@@ -19,6 +19,7 @@ int main (int numArgs, char* args[]) {
     argStrings.push_back (args[i]);
 
   bool fontTest = false;
+  bool presentInfo = false;
   cLcd::eRotate rotate = cLcd::e0;
   cLcd::eInfo info = cLcd::eNone;
   cLcd::eMode mode = cLcd::eAll;
@@ -33,6 +34,7 @@ int main (int numArgs, char* args[]) {
     else if (argStrings[i] == "c") mode = cLcd::eCoarse;
     else if (argStrings[i] == "e") mode = cLcd::eExact;
     else if (argStrings[i] == "s") mode = cLcd::eSingle;
+    else if (argStrings[i] == "p") presentInfo = true;
     else if (argStrings[i] == "f") fontTest = true;
 
   //cLcd* lcd = new cLcdIli9320 (rotate, info, mode);
@@ -60,9 +62,11 @@ int main (int numArgs, char* args[]) {
         //lcd->text (kYellow, cPoint(), 20, "Hello Colin");
         lcd->present();
         lcd->setBacklightOn();
-
         lcd->delayUs (16000);
         height += 4;
+
+        if (presentInfo)
+          cLog::log (LOGINFO, lcd->getInfoString());
         }
       }
     }
@@ -73,7 +77,8 @@ int main (int numArgs, char* args[]) {
     lcd->clearSnapshot();
     lcd->present();
     lcd->delayUs (5000);
-    // cLog::log (LOGINFO, lcd->getInfoString());
+    if (presentInfo)
+      cLog::log (LOGINFO, lcd->getInfoString());
     }
 
   return 0;
