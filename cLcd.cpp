@@ -285,7 +285,7 @@ double cLcd::timeUs() {
 bool cLcd::initialise() {
 
   cLog::log (LOGINFO, "initialise hwRev:" + hex (gpioHardwareRevision(),8) +
-                      " version " + dec (gpioVersion()) +
+                      " version:" + dec (gpioVersion()) +
                       (mRotate == cLcd::e0 ? "" : dec (mRotate*90)) +
                       (mInfo == cLcd::eTiming ? " info" : "") +
                       (mMode == cLcd::eAll ? " updateAll" :
@@ -910,13 +910,6 @@ void cLcd16::writeDataWord (const uint16_t data) {
   }
 //}}}
 //{{{
-void cLcd16::writeCommandData (const uint8_t command, const uint16_t data) {
-
-  writeCommand (command);
-  writeDataWord (data);
-  }
-//}}}
-//{{{
 void cLcd16::writeCommandMultiData (const uint8_t command, const uint8_t* dataPtr, const int len) {
 
   writeCommand (command);
@@ -1338,21 +1331,18 @@ cLcdSpi::~cLcdSpi() {
 void cLcdSpiHeader::writeCommand (const uint8_t command) {
 
   // send command
-  const uint8_t kCommandHeader[3] = { 0x70, 0, command };
-  spiWrite (mSpiHandle, (char*)kCommandHeader, 3);
+  const uint8_t kCommand[3] = { 0x70, 0, command };
+  spiWrite (mSpiHandle, (char*)kCommand, 3);
   }
 //}}}
 //{{{
-void cLcdSpiHeader::writeCommandData (const uint8_t command, const uint16_t data) {
+void cLcdSpiHeader::writeDataWord (const uint16_t data) {
+// send data
 
-  writeCommand (command);
-
-  // send data
-  const uint8_t kDataHeader[3] = { 0x72, uint8_t(data >> 8), uint8_t(data & 0xff) };
-  spiWrite (mSpiHandle, (char*)kDataHeader, 3);
+  const uint8_t kData[3] = { 0x72, uint8_t(data >> 8), uint8_t(data & 0xFF) };
+  spiWrite (mSpiHandle, (char*)kData, 3);
   }
 //}}}
-void cLcdSpiHeader::writeCommandMultiData (const uint8_t command, const uint8_t* dataPtr, const int len) {}
 //}}}
 //{{{  cLcdSpiRegister : public cLcdSpi
 //{{{
@@ -1364,12 +1354,11 @@ void cLcdSpiRegister::writeCommand (const uint8_t command) {
   }
 //}}}
 //{{{
-void cLcdSpiRegister::writeCommandData (const uint8_t command, const uint16_t data) {
+void cLcdSpiRegister::writeDataWord (const uint16_t data) {
+// send data
 
-  writeCommand (command);
-
-  uint8_t dataBytes[2] = { uint8_t(data >> 8), uint8_t(data & 0xff) };
-  spiWrite (mSpiHandle, (char*)dataBytes, 2);
+  uint16_t swappedData = bswap_16 (data);
+  spiWrite (mSpiHandle, (char*)(&swappedData), 2);
   }
 //}}}
 //{{{
@@ -1407,7 +1396,7 @@ void cLcdIli9320::setBacklight (bool on) {
 //{{{
 bool cLcdIli9320::initialise() {
 
-  if (cLcd::initialise())
+  if (!cLcd::initialise())
     return false;
 
   // backlight off - active hi
@@ -1464,11 +1453,6 @@ bool cLcdIli9320::initialise() {
   writeCommandData (0x07, 0x0133); // Display Control 1
   delayUs (40000);
 
-  writeCommandData (0x0050, 0x0000);        // H GRAM start address
-  writeCommandData (0x0051, kWidth9320-1);  // H GRAM end address
-  writeCommandData (0x0052, 0x0000);        // V GRAM start address
-  writeCommandData (0x0053, kHeight9320-1); // V GRAM end address
-
   switch (mRotate) {
     case e0:
       writeCommandData (0x03, 0x1030); // Entry Mode - BGR, HV inc, vert write,
@@ -1491,81 +1475,76 @@ bool cLcdIli9320::initialise() {
   return true;
   }
 //}}}
-
 //{{{
 int cLcdIli9320::updateLcd (sSpan* spans) {
-// command,data sequences expanded inline
-
-  constexpr uint8_t kCommand20[3] = { 0x70, 0, 0x20 };  // GDRAM vert addr command
-  constexpr uint8_t kCommand21[3] = { 0x70, 0, 0x21 };  // GDRAMWR horiz addr command
-  constexpr uint8_t kCommand22[3] = { 0x70, 0, 0x22 };  // GDRAMWR command
-
-  uint8_t dataHeader[3] = { 0x72, 0,0 };
 
   uint16_t dataHeaderBuf [320+1];
   dataHeaderBuf[0] = 0x7272;
+
+  writeCommandData (0x0050, 0x0000);        // H GRAM start address
+  writeCommandData (0x0051, kWidth9320-1);  // H GRAM end address
+  writeCommandData (0x0052, 0x0000);        // V GRAM start address
+  writeCommandData (0x0053, kHeight9320-1); // V GRAM end address
 
   int numPixels = 0;
 
   sSpan* it = spans;
   while (it) {
-    cRect& r = it->r;
-    //{{{  set xstart, ystart, yinc
-    uint16_t xstart = r.left;
-    uint16_t ystart = r.top;
-    uint16_t yinc = 1;
-
+    uint16_t xstart;
+    uint16_t ystart;
+    uint16_t yinc;
     switch (mRotate) {
+      default:
+      //{{{
       case e0:
+        xstart = it->r.left;
+        ystart = it->r.top;
+        yinc = 1;
         break;
-
+      //}}}
+      //{{{
       case e90:
-        xstart = kHeight9320-1 - r.left;
+        xstart = kHeight9320 - 1 - it->r.left;
+        ystart = it->r.top;
+        yinc = 1;
         break;
-
+      //}}}
+      //{{{
       case e180:
-        xstart = kWidth9320-1 - r.left;
-        ystart = kHeight9320-1 - r.top;
+        xstart = kWidth9320 - 1 - it->r.left;
+        ystart = kHeight9320 - 1 - it->r.top;
         yinc = -1;
         break;
-
+      //}}}
+      //{{{
       case e270:
-        ystart = kWidth9320-1 - r.top;
+        xstart = it->r.left;
+        ystart = kWidth9320 - 1 - it->r.top;
         yinc = -1;
         break;
+      //}}}
       }
-    //}}}
-    for (int y = r.top; y < r.bottom; y++) {
-      // send GDRAM vert addr command
-      spiWrite (mSpiHandle, (char*)kCommand20, 3);
 
-      // - data
-      dataHeader[1] = ystart >> 8;
-      dataHeader[2] = ystart & 0xff;
-      spiWrite (mSpiHandle, (char*)dataHeader, 3);
+    for (int y = it->r.top; y < it->r.bottom; y++) {
+      if ((mRotate == e0) || (mRotate == e180)) {
+        writeCommandData (0x20, xstart); // GRAM V start
+        writeCommandData (0x21, ystart); // GRAM H start
+        }
+      else {
+        writeCommandData (0x20, ystart); // GRAM V start
+        writeCommandData (0x21, xstart); // GRAM H start
+        }
 
-      // send GDRAMWR horiz addr command
-      spiWrite (mSpiHandle, (char*)kCommand21, 3);
-
-      // - data
-      dataHeader[1] = xstart >> 8;
-      dataHeader[2] = xstart & 0xff;
-      spiWrite (mSpiHandle, (char*)dataHeader, 3);
-
-      // send GDRAMWR
-      spiWrite (mSpiHandle, (char*)kCommand22, 3);
-
-      // - data, miss header bytes, alignment for bswap_16
-      const uint16_t* src = mFrameBuf + (y * getWidth()) + r.left;
+      writeCommand (0x22); // send GRAM write
+      const uint16_t* src = mFrameBuf + (y * getWidth()) + it->r.left;
+      // 2 header bytes, alignment for data bswap_16, send spi data from second header byte
       uint16_t* dst = dataHeaderBuf + 1;
-      for (int i = 0; i < r.getWidth(); i++)
+      for (int i = 0; i < it->r.getWidth(); i++)
         *dst++ = bswap_16 (*src++);
+      spiWrite (mSpiHandle, ((char*)(dataHeaderBuf))+1, (it->r.getWidth() * 2) + 1);
 
-      // send from second byte of dataHeaderBuf
-      spiWrite (mSpiHandle, ((char*)(dataHeaderBuf))+1, (r.getWidth() * 2) + 1);
-
-      numPixels += r.getWidth();
       ystart += yinc;
+      numPixels += it->r.getWidth();
       }
 
     it = it->next;
@@ -1676,11 +1655,18 @@ bool cLcdSt7735r::initialise() {
   return true;
   }
 //}}}
-
 //{{{
 int cLcdSt7735r::updateLcd (sSpan* spans) {
+// ignore spans, just send everything for now
 
-  writeCommandMultiData (0x2C, (const uint8_t*)mFrameBuf, getNumPixels() * 2); // RAMRW command
+  uint16_t swappedFrameBuf [kWidth7735 * kHeight7735];
+
+  const uint16_t* src = mFrameBuf;
+  uint16_t* dst = swappedFrameBuf;
+  for (uint32_t i = 0; i < getNumPixels(); i++)
+    *dst++ = bswap_16 (*src++);
+
+  writeCommandMultiData (0x2C, (const uint8_t*)swappedFrameBuf, getNumPixels() * 2); // RAMRW command
   return getNumPixels();
   }
 //}}}
@@ -1696,7 +1682,7 @@ cLcdIli9225b::cLcdIli9225b (const cLcd::eRotate rotate, const cLcd::eInfo info, 
 //{{{
 bool cLcdIli9225b::initialise() {
 
-  if (cLcd::initialise())
+  if (!cLcd::initialise())
     return false;
 
   // rs
@@ -1770,11 +1756,18 @@ bool cLcdIli9225b::initialise() {
   return true;
   }
 //}}}
-
 //{{{
 int cLcdIli9225b::updateLcd (sSpan* spans) {
+// ignore spans, just send everything for now
 
-  writeCommandMultiData (0x22, (const uint8_t*)mFrameBuf, getNumPixels() * 2);
+  uint16_t swappedFrameBuf [kWidth9225b * kHeight9225b];
+
+  const uint16_t* src = mFrameBuf;
+  uint16_t* dst = swappedFrameBuf;
+  for (uint32_t i = 0; i < getNumPixels(); i++)
+    *dst++ = bswap_16 (*src++);
+
+  writeCommandMultiData (0x22, (const uint8_t*)swappedFrameBuf, getNumPixels() * 2); // RAMRW command
   return getNumPixels();
   }
 //}}}

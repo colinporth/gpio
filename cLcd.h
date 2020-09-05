@@ -209,8 +209,13 @@ public:
 //{{{
 protected:
   virtual void writeCommand (const uint8_t command) = 0;
-  virtual void writeCommandData (const uint8_t command, const uint16_t data) = 0;
-  virtual void writeCommandMultiData (const uint8_t command, const uint8_t* dataPtr, const int len) = 0;
+  virtual void writeDataWord (const uint16_t data) = 0;
+  //{{{
+  void writeCommandData (const uint8_t command, const uint16_t data) {
+    writeCommand (command);
+    writeDataWord (data);
+    }
+  //}}}
 
   virtual int updateLcd (sSpan* spans) = 0;
 
@@ -271,7 +276,6 @@ public:
 protected:
   virtual void writeCommand (const uint8_t command);
   virtual void writeDataWord (const uint16_t data);
-  virtual void writeCommandData (const uint8_t command, const uint16_t data);
   virtual void writeCommandMultiData (const uint8_t command, const uint8_t* data, const int len);
   };
 //}}}
@@ -321,8 +325,7 @@ public:
 
 protected:
   virtual void writeCommand (const uint8_t command);
-  virtual void writeCommandData (const uint8_t command, const uint16_t data);
-  virtual void writeCommandMultiData (const uint8_t command, const uint8_t* dataPtr, const int len);
+  virtual void writeDataWord (const uint16_t data);
   };
 //}}}
 //{{{
@@ -335,8 +338,8 @@ public:
 
 protected:
   virtual void writeCommand (const uint8_t command);
-  virtual void writeCommandData (const uint8_t command, const uint16_t data);
-  virtual void writeCommandMultiData (const uint8_t command, const uint8_t* dataPtr, const int len);
+  virtual void writeDataWord (const uint16_t data);
+  void writeCommandMultiData (const uint8_t command, const uint8_t* dataPtr, const int len);
   };
 //}}}
 //{{{

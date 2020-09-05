@@ -31,10 +31,11 @@ int main (int numArgs, char* args[]) {
     else if (argStrings[i] == "a") mode = cLcd::eAll;
     else if (argStrings[i] == "c") mode = cLcd::eCoarse;
     else if (argStrings[i] == "e") mode = cLcd::eExact;
+    else if (argStrings[i] == "s") mode = cLcd::eSingle;
     else if (argStrings[i] == "f") fontTest = true;
 
-  //cLcd* lcd = new cLcdIli9320 (rotate, info, mode);
-  cLcd* lcd = new cLcdTa7601 (rotate, info, mode);
+  cLcd* lcd = new cLcdIli9320 (rotate, info, mode);
+  //cLcd* lcd = new cLcdTa7601 (rotate, info, mode);
   if (!lcd->initialise())
     return 0;
 
@@ -70,7 +71,7 @@ int main (int numArgs, char* args[]) {
   while (true) {
     lcd->clearSnapshot();
     lcd->present();
-    lcd->delayUs (1000);
+    lcd->delayUs (5000);
     // cLog::log (LOGINFO, lcd->getInfoString());
     }
 
