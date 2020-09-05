@@ -229,7 +229,7 @@ private:
   int getUpdateUs() { return mUpdateUs; }
   int getUpdatePixels() { return mUpdatePixels; }
   int getDiffUs() { return mDiffUs; }
-  int getNumSpans() { return mNumDiffSpans; }
+  int getNumSpans() { return mNumSpans; }
 
   void setFont (const uint8_t* font, const int fontSize);
 
@@ -249,8 +249,8 @@ private:
   int mDiffUs = 0;
 
   // diff spans
-  sSpan* mDiffSpans = nullptr;
-  int mNumDiffSpans = 0;
+  sSpan* mSpans = nullptr;
+  int mNumSpans = 0;
 
   // dispmanx
   DISPMANX_DISPLAY_HANDLE_T mDisplay;

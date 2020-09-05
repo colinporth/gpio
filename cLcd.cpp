@@ -23,7 +23,7 @@ static FT_Library mLibrary;
 static FT_Face mFace;
 //}}}
 
-constexpr int kMaxSpans = 2000;
+constexpr int kMaxSpans = 4000;
 constexpr bool kCoarseDiff = true;
 constexpr int kSpanMergeThreshold8 = 8;
 constexpr int kSpanMergeThreshold16 = 16;
@@ -113,38 +113,38 @@ bool cLcd::present() {
 
   switch (mMode) {
     case eExact :
-      mNumDiffSpans = diffExact (mDiffSpans);
+      mNumSpans = diffExact (mSpans);
       break;
 
     case eCoarse :
-      mNumDiffSpans = diffCoarse (mDiffSpans);
+      mNumSpans = diffCoarse (mSpans);
       break;
 
     case eSingle :
-      mNumDiffSpans = diffSingle (mDiffSpans);
+      mNumSpans = diffSingle (mSpans);
       break;
 
     case eAll :
-      mDiffSpans->r = getRect();
-      mDiffSpans->lastScanRight = getWidth();
-      mDiffSpans->size = getNumPixels();
-      mDiffSpans->next = nullptr;
-      mNumDiffSpans = 1;
+      mSpans->r = getRect();
+      mSpans->lastScanRight = getWidth();
+      mSpans->size = getNumPixels();
+      mSpans->next = nullptr;
+      mNumSpans = 1;
       break;
     }
 
   // merge diffSpans
-  merge (mDiffSpans, kSpanMergeThreshold16);
+  merge (mSpans, kSpanMergeThreshold16);
    mDiffUs = int((timeUs() - diffStartTime) * 1000000.);
 
-  if (!mNumDiffSpans) {// nothing changed
+  if (!mNumSpans) {// nothing changed
     mUpdateUs = 0;
     return false;
     }
 
   // update lcd with diffSpans
   double updateStartTime = timeUs();
-  mUpdatePixels = updateLcd (mDiffSpans);
+  mUpdatePixels = updateLcd (mSpans);
   mUpdateUs = int((timeUs() - updateStartTime) * 1000000.);
 
   // swap buffers
@@ -287,10 +287,10 @@ bool cLcd::initialise() {
   cLog::log (LOGINFO, "initialise hwRev:" + hex (gpioHardwareRevision(),8) +
                       " version " + dec (gpioVersion()) +
                       (mRotate == cLcd::e0 ? "" : dec (mRotate*90)) +
-                      (mInfo == cLcd::eTiming ? " timing " : "") +
-                      (mMode == cLcd::eAll ? " all" :
-                         mMode == cLcd::eSingle ? " single" :
-                           mMode == cLcd::eCoarse ? " coarse" : " exact"));
+                      (mInfo == cLcd::eTiming ? " info" : "") +
+                      (mMode == cLcd::eAll ? " updateAll" :
+                         mMode == cLcd::eSingle ? " updateSingle" :
+                           mMode == cLcd::eCoarse ? " updateCoarse" : " updateExact"));
 
   if (gpioInitialise() <= 0)
     return false;
@@ -321,9 +321,8 @@ bool cLcd::initialise() {
   clear();
 
   // allocate large possible size
-  // !!! do something better to bomb out > couple of thousand !!!
-  mDiffSpans = (sSpan*)malloc (kMaxSpans * sizeof(sSpan));
-  if (!mDiffSpans) {
+  mSpans = (sSpan*)malloc (kMaxSpans * sizeof(sSpan));
+  if (!mSpans) {
     //{{{  error return
     cLog::log (LOGERROR, "diffSpans allocate");
     return false;
@@ -366,9 +365,9 @@ bool cLcd::initialise() {
 // private
 //{{{
 int cLcd::diffExact (sSpan* spans) {
-// return numDiffSpans
+// return numSpans
 
-  int numDiffSpans = 0;
+  int numSpans = 0;
 
   int y =  0;
   int yInc = 1;
@@ -431,35 +430,35 @@ int cLcd::diffExact (sSpan* spans) {
        }
        //}}}
 
-      sSpan* span = spans + numDiffSpans;
+      sSpan* span = spans + numSpans;
       span->r.left = spanStart - scanlineStart;
       span->r.right = span->lastScanRight = spanEnd - scanlineStart;
       span->r.top = y;
       span->r.bottom = y+1;
       span->lastScanRight = span->r.right;
       span->size = spanEnd - spanStart;
-      if (numDiffSpans > 0)
+      if (numSpans > 0)
         span[-1].next = span;
       span->next = nullptr;
 
-      ++numDiffSpans;
-      if (numDiffSpans >= kMaxSpans) {
+      ++numSpans;
+      if (numSpans >= kMaxSpans) {
         cLog::log (LOGERROR, "too many spans");
-        return numDiffSpans;
+        return numSpans;
         }
       }
 
     y += yInc;
     }
 
-  return numDiffSpans;
+  return numSpans;
   }
 //}}}
 //{{{
 int cLcd::diffCoarse (sSpan* spans) {
-// return numDiffSpans
+// return numSpans
 
-  int numDiffSpans = 0;
+  int numSpans = 0;
 
   int y =  0;
   int yInc = 1;
@@ -508,12 +507,12 @@ int cLcd::diffCoarse (sSpan* spans) {
         span->next = span+1;
 
         ++span;
-        ++numDiffSpans;
+        ++numSpans;
 
-        if (numDiffSpans >= kMaxSpans) {
+        if (numSpans >= kMaxSpans) {
           cLog::log (LOGERROR, "too many spans");
-          spans[numDiffSpans-1].next = nullptr;
-          return numDiffSpans;
+          spans[numSpans-1].next = nullptr;
+          return numSpans;
           }
         }
       else
@@ -525,10 +524,10 @@ int cLcd::diffCoarse (sSpan* spans) {
     prevFrameScanline += scanlineInc;
     }
 
-  if (numDiffSpans > 0)
-    spans[numDiffSpans-1].next = nullptr;
+  if (numSpans > 0)
+    spans[numSpans-1].next = nullptr;
 
-  return numDiffSpans;
+  return numSpans;
   }
 //}}}
 //{{{
