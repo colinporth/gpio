@@ -925,7 +925,6 @@ void cLcd16::writeCommandMultiData (const uint8_t command, const uint8_t* dataPt
   }
 //}}}
 //}}}
-
 //{{{  cLcdTa7601 : public cLcd16
 constexpr int16_t kWidthTa7601 = 320;
 constexpr int16_t kHeightTa7601 = 480;
@@ -1312,7 +1311,7 @@ int cLcdSsd1289::updateLcd (sSpan* spans) {
 //}}}
 //}}}
 
-// spi
+// spi - no data/command register
 //{{{  cLcdSpiHeader : public cLcdSpi
 //{{{
 cLcdSpiHeader::~cLcdSpiHeader() {
@@ -1337,48 +1336,6 @@ void cLcdSpiHeader::writeDataWord (const uint16_t data) {
   }
 //}}}
 //}}}
-//{{{  cLcdSpiRegister : public cLcdSpi
-constexpr uint8_t kSpiRegisterGpio = 24;
-//{{{
-cLcdSpiRegister::~cLcdSpiRegister() {
-  spiClose (mSpiHandle);
-  }
-//}}}
-
-//{{{
-void cLcdSpiRegister::writeCommand (const uint8_t command) {
-
-  gpioWrite (kSpiRegisterGpio, 0);
-  spiWrite (mSpiHandle, (char*)(&command), 1);
-  gpioWrite (kSpiRegisterGpio, 1);
-  }
-//}}}
-//{{{
-void cLcdSpiRegister::writeDataWord (const uint16_t data) {
-// send data
-
-  uint16_t swappedData = bswap_16 (data);
-  spiWrite (mSpiHandle, (char*)(&swappedData), 2);
-  }
-//}}}
-//{{{
-void cLcdSpiRegister::writeCommandMultiData (const uint8_t command, const uint8_t* dataPtr, const int len) {
-
-  writeCommand (command);
-
-  // send data
-  int bytesLeft = len;
-  auto ptr = (char*)dataPtr;
-  while (bytesLeft > 0) {
-   int sendBytes = (bytesLeft > 0xFFFF) ? 0xFFFF : bytesLeft;
-    spiWrite (mSpiHandle, ptr, sendBytes);
-    ptr += sendBytes;
-    bytesLeft -= sendBytes;
-    }
-  }
-//}}}
-//}}}
-
 //{{{  cLcdIli9320 : public cLcdSpiHeader
 constexpr int16_t kWidth9320 = 240;
 constexpr int16_t kHeight9320 = 320;
@@ -1552,6 +1509,49 @@ int cLcdIli9320::updateLcd (sSpan* spans) {
     }
 
   return numPixels;
+  }
+//}}}
+//}}}
+
+// spi - data/command register
+//{{{  cLcdSpiRegister : public cLcdSpi
+constexpr uint8_t kSpiRegisterGpio = 24;
+//{{{
+cLcdSpiRegister::~cLcdSpiRegister() {
+  spiClose (mSpiHandle);
+  }
+//}}}
+
+//{{{
+void cLcdSpiRegister::writeCommand (const uint8_t command) {
+
+  gpioWrite (kSpiRegisterGpio, 0);
+  spiWrite (mSpiHandle, (char*)(&command), 1);
+  gpioWrite (kSpiRegisterGpio, 1);
+  }
+//}}}
+//{{{
+void cLcdSpiRegister::writeDataWord (const uint16_t data) {
+// send data
+
+  uint16_t swappedData = bswap_16 (data);
+  spiWrite (mSpiHandle, (char*)(&swappedData), 2);
+  }
+//}}}
+//{{{
+void cLcdSpiRegister::writeCommandMultiData (const uint8_t command, const uint8_t* dataPtr, const int len) {
+
+  writeCommand (command);
+
+  // send data
+  int bytesLeft = len;
+  auto ptr = (char*)dataPtr;
+  while (bytesLeft > 0) {
+   int sendBytes = (bytesLeft > 0xFFFF) ? 0xFFFF : bytesLeft;
+    spiWrite (mSpiHandle, ptr, sendBytes);
+    ptr += sendBytes;
+    bytesLeft -= sendBytes;
+    }
   }
 //}}}
 //}}}
