@@ -154,7 +154,7 @@ bool cLcd::present() {
   mUpdatePixels = updateLcd (mSpans);
   mUpdateUs = int((timeUs() - updateStartTime) * 1000000.0);
 
-  if (eSpanOverlay) {
+  if (mInfo == eSpanOverlay) {
     // add overlays
     text (kWhite, cPoint(0,0), 20, getPaddedInfoString());
     sSpan* it = mSpans;
@@ -314,7 +314,7 @@ bool cLcd::initialise() {
                       " version:" + dec (gpioVersion()) +
                       (mRotate == cLcd::e0 ? "" : dec (mRotate*90)) +
                       (mInfo == cLcd::eTimingOverlay ? " timingOverlay" :
-                        mInfo == cLcd::eTimingLog ? " timingLog" : 
+                        mInfo == cLcd::eTimingLog ? " timingLog" :
                           mInfo == cLcd::eSpanOverlay ? " spanOverlay" : "") +
                       (mMode == cLcd::eAll ? " updateAll" :
                          mMode == cLcd::eSingle ? " updateSingle" :
