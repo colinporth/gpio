@@ -343,7 +343,7 @@ protected:
 class cLcdIli9320 : public cLcdSpiHeader {
 // 2.8 inch 1240x320 - HY28A
 public:
-  cLcdIli9320 (const cLcd::eRotate rotate = e0, const cLcd::eInfo info = eNone);
+  cLcdIli9320 (const cLcd::eRotate rotate = e0, const cLcd::eInfo info = eNone, const eMode mode = eAll);
   virtual ~cLcdIli9320() {}
 
   virtual void setBacklight (bool on);
@@ -356,7 +356,7 @@ public:
 class cLcdSt7735r : public cLcdSpiRegister {
 // 1.8 inch 128x160
 public:
-  cLcdSt7735r (const cLcd::eRotate rotate = e0, const cLcd::eInfo info = eNone);
+  cLcdSt7735r (const cLcd::eRotate rotate = e0, const cLcd::eInfo info = eNone, const eMode mode = eAll);
   virtual ~cLcdSt7735r() {}
 
   virtual bool initialise();
@@ -367,7 +367,7 @@ public:
 class cLcdIli9225b : public cLcdSpiRegister {
 // 2.2 inch 186x220
 public:
-  cLcdIli9225b (const cLcd::eRotate rotate = e0, const cLcd::eInfo info = eNone);
+  cLcdIli9225b (const cLcd::eRotate rotate = e0, const cLcd::eInfo info = eNone, const eMode mode = eAll);
   virtual ~cLcdIli9225b() {}
 
   virtual bool initialise();

@@ -1395,8 +1395,8 @@ constexpr int16_t kWidth9320 = 240;
 constexpr int16_t kHeight9320 = 320;
 constexpr int kSpiClock9320 = 24000000;
 
-cLcdIli9320::cLcdIli9320 (const cLcd::eRotate rotate, const cLcd::eInfo info)
-  : cLcdSpiHeader(kWidth9320, kHeight9320, rotate, info, eCoarse) {}
+cLcdIli9320::cLcdIli9320 (const cLcd::eRotate rotate, const cLcd::eInfo info, const eMode mode)
+  : cLcdSpiHeader(kWidth9320, kHeight9320, rotate, info, mode) {}
 
 //{{{
 void cLcdIli9320::setBacklight (bool on) {
@@ -1580,8 +1580,8 @@ constexpr int16_t kWidth7735 = 128;
 constexpr int16_t kHeight7735 = 160;
 constexpr int kSpiClock7735 = 24000000;
 
-cLcdSt7735r::cLcdSt7735r (const cLcd::eRotate rotate, const cLcd::eInfo info)
-  : cLcdSpiRegister (kWidth7735, kHeight7735, rotate, info, eCoarse) {}
+cLcdSt7735r::cLcdSt7735r (const cLcd::eRotate rotate, const cLcd::eInfo info, const eMode mode)
+  : cLcdSpiRegister (kWidth7735, kHeight7735, rotate, info, mode) {}
 
 //{{{
 bool cLcdSt7735r::initialise() {
@@ -1690,8 +1690,8 @@ constexpr int16_t kWidth9225b = 176;
 constexpr int16_t kHeight9225b = 220;
 constexpr int kSpiClock9225b = 16000000;
 
-cLcdIli9225b::cLcdIli9225b (const cLcd::eRotate rotate, const cLcd::eInfo info)
-  : cLcdSpiRegister(kWidth9225b, kHeight9225b, rotate, info, eCoarse) {}
+cLcdIli9225b::cLcdIli9225b (const cLcd::eRotate rotate, const cLcd::eInfo info, const eMode mode)
+  : cLcdSpiRegister(kWidth9225b, kHeight9225b, rotate, info, mode) {}
 
 //{{{
 bool cLcdIli9225b::initialise() {
