@@ -306,40 +306,32 @@ public:
 
 // spi screens
 //{{{
-class cLcdSpi : public cLcd {
-public:
-  cLcdSpi (const int16_t width, const int16_t height, const eRotate rotate, const eInfo info, const eMode mode)
-    : cLcd (width, height, rotate, info, mode) {}
-  virtual ~cLcdSpi();
-
-protected:
-  int mSpiHandle = 0;
-  };
-//}}}
-//{{{
-class cLcdSpiHeader : public cLcdSpi {
+class cLcdSpiHeader : public cLcd {
 public:
   cLcdSpiHeader (const int16_t width, const int16_t height, const eRotate rotate, const eInfo info, const eMode mode)
-    : cLcdSpi (width, height, rotate, info, mode) {}
-  virtual ~cLcdSpiHeader() {}
+    : cLcd (width, height, rotate, info, mode) {}
+  virtual ~cLcdSpiHeader();
 
 protected:
   virtual void writeCommand (const uint8_t command);
   virtual void writeDataWord (const uint16_t data);
+
+  int mSpiHandle = 0;
   };
 //}}}
 //{{{
-class cLcdSpiRegister : public cLcdSpi {
+class cLcdSpiRegister : public cLcd {
 public:
   cLcdSpiRegister (const int16_t width, const int16_t height, const eRotate rotate, const eInfo info, const eMode mode)
-    : cLcdSpi (width, height, rotate, info, mode) {}
-
-  virtual ~cLcdSpiRegister() {}
+    : cLcd (width, height, rotate, info, mode) {}
+  virtual ~cLcdSpiRegister();
 
 protected:
   virtual void writeCommand (const uint8_t command);
   virtual void writeDataWord (const uint16_t data);
   void writeCommandMultiData (const uint8_t command, const uint8_t* dataPtr, const int len);
+
+  int mSpiHandle = 0;
   };
 //}}}
 //{{{

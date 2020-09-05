@@ -1313,23 +1313,13 @@ int cLcdSsd1289::updateLcd (sSpan* spans) {
 //}}}
 
 // spi
-//{{{  cLcdSpi : public cLcd
-// spi J8 header pins, gpio, constexpr
-//      3.3v 17  18 gpio24   - Register/backlight
-// spi0 mosi 19  20 0v
-// spi0 miso 20  22 gpio25   - reset
-// spi0 sck -23  24 spi0 Ce0 - gpio8 - cs
-
-constexpr uint8_t kSpiRegisterGpio = 24;
-constexpr uint8_t kBacklightGpio   = 24;
-
+//{{{  cLcdSpiHeader : public cLcdSpi
 //{{{
-cLcdSpi::~cLcdSpi() {
+cLcdSpiHeader::~cLcdSpiHeader() {
   spiClose (mSpiHandle);
   }
 //}}}
-//}}}
-//{{{  cLcdSpiHeader : public cLcdSpi
+
 //{{{
 void cLcdSpiHeader::writeCommand (const uint8_t command) {
 
@@ -1348,6 +1338,13 @@ void cLcdSpiHeader::writeDataWord (const uint16_t data) {
 //}}}
 //}}}
 //{{{  cLcdSpiRegister : public cLcdSpi
+constexpr uint8_t kSpiRegisterGpio = 24;
+//{{{
+cLcdSpiRegister::~cLcdSpiRegister() {
+  spiClose (mSpiHandle);
+  }
+//}}}
+
 //{{{
 void cLcdSpiRegister::writeCommand (const uint8_t command) {
 
@@ -1386,6 +1383,7 @@ void cLcdSpiRegister::writeCommandMultiData (const uint8_t command, const uint8_
 constexpr int16_t kWidth9320 = 240;
 constexpr int16_t kHeight9320 = 320;
 constexpr int kSpiClock9320 = 24000000;
+constexpr uint8_t kBacklightGpio   = 24;
 
 cLcdIli9320::cLcdIli9320 (const cLcd::eRotate rotate, const cLcd::eInfo info, const eMode mode)
   : cLcdSpiHeader(kWidth9320, kHeight9320, rotate, info, mode) {}
