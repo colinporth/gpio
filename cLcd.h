@@ -168,8 +168,8 @@ public:
   //{{{
   cLcd (const int16_t width, const int16_t height, const eRotate rotate, const eInfo info, const eMode mode)
       : mRotate(rotate),
-        mWidth(((rotate == 90) || (rotate == 270)) ? height : width),
-        mHeight(((rotate == 90) || (rotate == 270)) ? width : height),
+        mWidth(((rotate == e90) || (rotate == e270)) ? height : width),
+        mHeight(((rotate == e90) || (rotate == e270)) ? width : height),
         mMode(mode), mInfo(info) {}
   //}}}
   virtual ~cLcd();
@@ -204,7 +204,7 @@ public:
   int text (const uint16_t colour, const cPoint& p, const int height, const std::string& str);
 
   void delayUs (const int us);
-  double time();
+  double timeUs();
 
 //{{{
 protected:
@@ -219,7 +219,9 @@ protected:
   int mUpdateUs = 0;
   int mUpdatePixels = 0;
 
-  uint16_t* mFrameBuf = nullptr;  // uint16 colour pixels
+  // uint16 colour pixels
+  uint16_t* mFrameBuf = nullptr;
+  uint16_t* mPrevFrameBuf = nullptr;
 //}}}
 //{{{
 private:
@@ -246,19 +248,15 @@ private:
   eInfo mInfo = eNone;
   int mDiffUs = 0;
 
-  // main display screen buffers
-  uint16_t* mPrevFrameBuf = nullptr;
+  // diff spans
+  sSpan* mDiffSpans = nullptr;
+  int mNumDiffSpans = 0;
 
   // dispmanx
   DISPMANX_DISPLAY_HANDLE_T mDisplay;
   DISPMANX_MODEINFO_T mModeInfo;
   DISPMANX_RESOURCE_HANDLE_T mSnapshot;
-  uint32_t mImagePrt;
   VC_RECT_T mVcRect;
-
-  // diff spans
-  sSpan* mDiffSpans;
-  int mNumDiffSpans;
 //}}}
   };
 
@@ -315,11 +313,11 @@ protected:
   };
 //}}}
 //{{{
-class cLcdSpiHeaderSelect : public cLcdSpi {
+class cLcdSpiHeader : public cLcdSpi {
 public:
-  cLcdSpiHeaderSelect (const int16_t width, const int16_t height, const eRotate rotate, const eInfo info, const eMode mode)
+  cLcdSpiHeader (const int16_t width, const int16_t height, const eRotate rotate, const eInfo info, const eMode mode)
     : cLcdSpi (width, height, rotate, info, mode) {}
-  virtual ~cLcdSpiHeaderSelect() {}
+  virtual ~cLcdSpiHeader() {}
 
 protected:
   virtual void writeCommand (const uint8_t command);
@@ -328,12 +326,12 @@ protected:
   };
 //}}}
 //{{{
-class cLcdSpiRegisterSelect : public cLcdSpi {
+class cLcdSpiRegister : public cLcdSpi {
 public:
-  cLcdSpiRegisterSelect (const int16_t width, const int16_t height, const eRotate rotate, const eInfo info, const eMode mode)
+  cLcdSpiRegister (const int16_t width, const int16_t height, const eRotate rotate, const eInfo info, const eMode mode)
     : cLcdSpi (width, height, rotate, info, mode) {}
 
-  virtual ~cLcdSpiRegisterSelect() {}
+  virtual ~cLcdSpiRegister() {}
 
 protected:
   virtual void writeCommand (const uint8_t command);
@@ -342,7 +340,7 @@ protected:
   };
 //}}}
 //{{{
-class cLcdIli9320 : public cLcdSpiHeaderSelect {
+class cLcdIli9320 : public cLcdSpiHeader {
 // 2.8 inch 1240x320 - HY28A
 public:
   cLcdIli9320 (const cLcd::eRotate rotate = e0, const cLcd::eInfo info = eNone);
@@ -355,7 +353,7 @@ public:
   };
 //}}}
 //{{{
-class cLcdSt7735r : public cLcdSpiRegisterSelect {
+class cLcdSt7735r : public cLcdSpiRegister {
 // 1.8 inch 128x160
 public:
   cLcdSt7735r (const cLcd::eRotate rotate = e0, const cLcd::eInfo info = eNone);
@@ -366,7 +364,7 @@ public:
   };
 //}}}
 //{{{
-class cLcdIli9225b : public cLcdSpiRegisterSelect {
+class cLcdIli9225b : public cLcdSpiRegister {
 // 2.2 inch 186x220
 public:
   cLcdIli9225b (const cLcd::eRotate rotate = e0, const cLcd::eInfo info = eNone);

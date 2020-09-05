@@ -1,34 +1,35 @@
-//CXX       = clang
-//CCX       = clang++
-CXX       = gcc
-CCX       = g++
+CXX       = clang
+CCX       = clang++
+//CXX       = gcc
+//CCX       = g++
 
 TARGET    = lcd
 SRCS      = lcdTest.cpp \
 	    cLcd.cpp \
-	    ../shared/utils/cLog.cpp \
 	    fonts/FreeSansBold.cpp \
+	    ../shared/utils/cLog.cpp \
 	    pigpio/pigpio.c \
 	    pigpio/command.c \
 
 BUILD_DIR = ./build
 CLEAN_DIRS = $(BUILD_DIR)
-LIBS      = -l pthread -l bfd `pkg-config --libs freetype2` -l pigpio -l rt \
+LIBS      = -l pthread -l bfd -l pigpio -l rt \
+	    `pkg-config --libs freetype2` \
 	    -L /opt/vc/lib -l vchiq_arm -l vchostif -l vcos -l bcm_host
-#
 #
 OBJS      = $(SRCS:%=$(BUILD_DIR)/%.o)
 DEPS      = $(OBJS:.o=.d)
 
 CFLAGS = -Wall \
 	 -MMD -MP \
-	 -g -O2 \
+	 `pkg-config --cflags freetype2` \
 	 -I../opt/vc/include \
 	 -I../opt/vc/include/interface/vcos/pthreads\
 	 -I../opt/vc/include/interface/vmcs_host \
 	 -I../opt/vc/include/interface/vmcs_host/linux \
-	 `pkg-config --cflags freetype2`
-
+	 -g \
+	 -O2 \
+	 -fomit-frame-pointer \
 
 LD_VERSION = $(shell ld -v 2>&1 | sed -ne 's/.*\([0-9]\+\.[0-9]\+\).*/\1/p')
 ifeq "$(LD_VERSION)" "2.34"
