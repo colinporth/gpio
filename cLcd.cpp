@@ -23,7 +23,7 @@ static FT_Library mLibrary;
 static FT_Face mFace;
 //}}}
 
-constexpr int kMaxSpans = 4000;
+constexpr int kMaxSpans = 10000;
 constexpr bool kCoarseDiff = true;
 constexpr int kSpanMergeThreshold8 = 8;
 constexpr int kSpanMergeThreshold16 = 16;
@@ -134,7 +134,7 @@ bool cLcd::present() {
     }
 
   // merge diffSpans
-  merge (mSpans, kSpanMergeThreshold16);
+  //merge (mSpans, kSpanMergeThreshold16);
   mDiffUs = int((timeUs() - diffStartTime) * 1000000.0);
 
   if (!mNumSpans) {// nothing changed
@@ -302,35 +302,14 @@ bool cLcd::initialise() {
   gpioWrite (kResetGpio, 1);
   gpioDelay (120000);
 
-  mFrameBuf = (uint16_t*)calloc (getNumPixels(), 2);
-  if (!mFrameBuf) {
-    //{{{  error return
-    cLog::log (LOGERROR, "frameBuf allocate");
-    return false;
-    }
-    //}}}
-  mPrevFrameBuf = (uint16_t*)calloc (getNumPixels(), 2);
-  if (!mPrevFrameBuf) {
-    //{{{  error return
-    cLog::log (LOGERROR, "prevFrameBuf allocate");
-    return false;
-    }
-    //}}}
-  //{{{  should we use aligned_alloc ?
-  //mFrameBuf = (uint16_t*)aligned_alloc (getNumPixels() * 2, 32);
-  //mPrevFrameBuf = (uint16_t*)aligned_alloc (getNumPixels() * 2, 32);
-  //clear();
-  //clear();
-  //}}}
+  // allocate and clear frameBufs
+  mFrameBuf = (uint16_t*)aligned_alloc (32, getNumPixels() * 2);
+  clear();
+  mPrevFrameBuf = mFrameBuf;
+  mFrameBuf = (uint16_t*)aligned_alloc (32, getNumPixels() * 2);
 
-  // allocate large possible size
+  // allocate lotsa spans
   mSpans = (sSpan*)malloc (kMaxSpans * sizeof(sSpan));
-  if (!mSpans) {
-    //{{{  error return
-    cLog::log (LOGERROR, "diffSpans allocate");
-    return false;
-    }
-    //}}}
 
   // dispmanx init
   bcm_host_init();
@@ -375,6 +354,7 @@ int cLcd::diffExact (sSpan* spans) {
   int y =  0;
   int yInc = 1;
 
+  sSpan* span = spans;
   uint16_t* scanline = mFrameBuf + y * getWidth();
   uint16_t* prevFrameScanline = mPrevFrameBuf + y * getWidth();
   while (y < getHeight()) {
@@ -433,9 +413,8 @@ int cLcd::diffExact (sSpan* spans) {
        }
        //}}}
 
-      sSpan* span = spans + numSpans;
       span->r.left = spanStart - scanlineStart;
-      span->r.right = span->lastScanRight = spanEnd - scanlineStart;
+      span->r.right = spanEnd - scanlineStart;
       span->r.top = y;
       span->r.bottom = y+1;
       span->lastScanRight = span->r.right;
@@ -444,8 +423,8 @@ int cLcd::diffExact (sSpan* spans) {
         span[-1].next = span;
       span->next = nullptr;
 
-      ++numSpans;
-      if (numSpans >= kMaxSpans) {
+      span++;
+      if (numSpans++ >= kMaxSpans) {
         cLog::log (LOGERROR, "too many spans");
         return numSpans;
         }
@@ -504,17 +483,15 @@ int cLcd::diffCoarse (sSpan* spans) {
         span->r.right = spanEnd - scanlineStart;
         span->r.top = y;
         span->r.bottom = y+1;
-
         span->lastScanRight = span->r.right;
         span->size = spanEnd - spanStart;
-        span->next = span+1;
+        if (numSpans > 0)
+          span[-1].next = span;
+        span->next = nullptr;
 
-        ++span;
-        ++numSpans;
-
-        if (numSpans >= kMaxSpans) {
+        span++;
+        if (numSpans++ >= kMaxSpans) {
           cLog::log (LOGERROR, "too many spans");
-          spans[numSpans-1].next = nullptr;
           return numSpans;
           }
         }
@@ -1075,19 +1052,21 @@ int cLcdTa7601::updateLcd (sSpan* spans) {
     int numPixels = 0;
     sSpan* it = spans;
     while (it) {
-      cLog::log (LOGINFO, "span:" + dec(i++) + " " + it->r.getString());
+      if (mInfo == eLine)
+        cLog::log (LOGINFO, "span:" + dec(i++) + " " + it->r.getYfirstString());
       for (int16_t y = it->r.top; y < it->r.bottom; y++) {
         writeCommandData (0x20, (uint16_t)y);            // GRAM V start address of GRAM
         writeCommandData (0x21, (uint16_t)(it->r.left)); // GRAM H start address of GRAM
         writeCommand (0x22);                             // GRAM write
         uint16_t* ptr = mFrameBuf + (y * getWidth()) + it->r.left;
-        for (int16_t x = it->r.left; x < it->r.bottom; x++)
+        for (int16_t x = it->r.left; x < it->r.right; x++)
           writeDataWord (*ptr++);
         }
       numPixels += it->r.getNumPixels();
       it = it->next;
       }
-    cLog::log (LOGINFO, "----------------------------");
+    if (mInfo == eLine)
+      cLog::log (LOGINFO, "----------------------------");
     return numPixels;
     }
   else {

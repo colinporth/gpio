@@ -132,6 +132,11 @@ public:
     }
   //}}}
   //{{{
+  std::string getYfirstString() {
+    return "t:" + dec(top) + " b:" + dec(bottom) + " l:" + dec(left) + " r:" + dec(right);
+    }
+  //}}}
+  //{{{
   bool inside (const cPoint& pos) {
   // return pos inside rect
     return (pos.x >= left) && (pos.x < right) && (pos.y >= top) && (pos.y < bottom);
@@ -169,15 +174,14 @@ struct sSpan;
 class cLcd {
 public:
   enum eRotate { e0, e90, e180, e270 };
-  enum eInfo { eNone, eTiming };
+  enum eInfo { eNone, eTiming, eLine };
   enum eMode { eExact, eCoarse, eSingle, eAll };
 
   //{{{
   cLcd (const int16_t width, const int16_t height, const eRotate rotate, const eInfo info, const eMode mode)
-      : mRotate(rotate),
+      : mRotate(rotate), mInfo(info), mMode(mode),
         mWidth(((rotate == e90) || (rotate == e270)) ? height : width),
-        mHeight(((rotate == e90) || (rotate == e270)) ? width : height),
-        mMode(mode), mInfo(info) {}
+        mHeight(((rotate == e90) || (rotate == e270)) ? width : height) {}
   //}}}
   virtual ~cLcd();
 
@@ -227,6 +231,7 @@ protected:
   virtual int updateLcd (sSpan* spans) = 0;
 
   eRotate mRotate = e0;
+  eInfo mInfo = eNone;
 
   int mUpdateUs = 0;
   int mUpdatePixels = 0;
@@ -253,11 +258,10 @@ private:
   static int coarseLinearDiff (uint16_t* frameBuf, uint16_t* prevFrameBuf, uint16_t* frameBufEnd);
   static int coarseLinearDiffBack (uint16_t* frameBuf, uint16_t* prevFrameBuf, uint16_t* frameBufEnd);
 
+  eMode mMode = eSingle;
   const uint16_t mWidth;
   const uint16_t mHeight;
 
-  eMode mMode = eSingle;
-  eInfo mInfo = eNone;
   int mDiffUs = 0;
 
   // diff spans

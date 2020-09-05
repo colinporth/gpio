@@ -28,6 +28,7 @@ int main (int numArgs, char* args[]) {
     else if (argStrings[i] == "180") rotate = cLcd::e180;
     else if (argStrings[i] == "270") rotate = cLcd::e270;
     else if (argStrings[i] == "t") info = cLcd::eTiming;
+    else if (argStrings[i] == "l") info = cLcd::eLine;
     else if (argStrings[i] == "a") mode = cLcd::eAll;
     else if (argStrings[i] == "c") mode = cLcd::eCoarse;
     else if (argStrings[i] == "e") mode = cLcd::eExact;
@@ -56,7 +57,7 @@ int main (int numArgs, char* args[]) {
             }
           }
 
-        lcd->text (kYellow, cPoint(), 20, "Hello Colin");
+        //lcd->text (kYellow, cPoint(), 20, "Hello Colin");
         lcd->present();
         lcd->setBacklightOn();
 
