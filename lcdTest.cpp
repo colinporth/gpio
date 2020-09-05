@@ -60,13 +60,13 @@ int main (int numArgs, char* args[]) {
           }
 
         //lcd->text (kYellow, cPoint(), 20, "Hello Colin");
-        lcd->present();
+
+        if (lcd->present() && presentInfo)
+          cLog::log (LOGINFO, lcd->getInfoString());
+
         lcd->setBacklightOn();
         lcd->delayUs (16000);
         height += 4;
-
-        if (presentInfo)
-          cLog::log (LOGINFO, lcd->getInfoString());
         }
       }
     }
@@ -75,10 +75,9 @@ int main (int numArgs, char* args[]) {
   // snapshot test
   while (true) {
     lcd->clearSnapshot();
-    lcd->present();
-    lcd->delayUs (5000);
-    if (presentInfo)
+    if (lcd->present() && presentInfo)
       cLog::log (LOGINFO, lcd->getInfoString());
+    lcd->delayUs (5000);
     }
 
   return 0;
