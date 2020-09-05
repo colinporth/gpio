@@ -105,9 +105,6 @@ void cLcd::clearSnapshot() {
 bool cLcd::present() {
 // present update
 
-  if (mInfo == eTimingOverlay)
-    text (kWhite, cPoint(0,0), 20, getPaddedInfoString());
-
   // make diffSpans list
   double diffStartTime = timeUs();
   switch (mMode) {
@@ -146,7 +143,7 @@ bool cLcd::present() {
     }
 
   // copy frameBuf to prevFrameBuf without overlays, compare next time without overlays
-  if ((mMode != eAll) && (mInfo == eSpanOverlay))
+  if ((mMode != eAll) && (mInfo == eOverlay))
     memcpy (mPrevFrameBuf, mFrameBuf, getNumPixels() * 2);
 
   // update lcd with diffSpans
@@ -154,24 +151,23 @@ bool cLcd::present() {
   mUpdatePixels = updateLcd (mSpans);
   mUpdateUs = int((timeUs() - updateStartTime) * 1000000.0);
 
-  if (mInfo == eSpanOverlay) {
-    // add overlays
-    text (kWhite, cPoint(0,0), 20, getPaddedInfoString());
+  if (mInfo == eOverlay) {
     sSpan* it = mSpans;
     while (it) {
-      rectOutline (kGreen, it->r);
+      rect (kGreen, 100, it->r);
       it = it->next;
       }
+    text (kWhite, cPoint(0,0), 20, getPaddedInfoString());
 
-    // and update screen again with everything, timing is without overlays
+    // this time update whole screen with overlays, but not saved in prevFrameBuffer
     sSpan span = { getRect(), getWidth(), getNumPixels(), nullptr };
     updateLcd (&span);
     }
 
-  if (mInfo == eTimingLog)
+  if ((mInfo == eLog) || (mInfo == eLogMore))
     cLog::log (LOGINFO, getInfoString());
 
-  if ((mMode != eAll) && (mInfo != eSpanOverlay)) {
+  if ((mMode != eAll) && (mInfo != eOverlay)) {
     // swap buffers
     auto temp = mPrevFrameBuf;
     mPrevFrameBuf = mFrameBuf;
@@ -313,9 +309,9 @@ bool cLcd::initialise() {
   cLog::log (LOGINFO, "initialise hwRev:" + hex (gpioHardwareRevision(),8) +
                       " version:" + dec (gpioVersion()) +
                       (mRotate == cLcd::e0 ? "" : dec (mRotate*90)) +
-                      (mInfo == cLcd::eTimingOverlay ? " timingOverlay" :
-                        mInfo == cLcd::eTimingLog ? " timingLog" :
-                          mInfo == cLcd::eSpanOverlay ? " spanOverlay" : "") +
+                      (mInfo == cLcd::eLog ? " log" :
+                        mInfo == cLcd::eLogMore ? " logMore" :
+                          mInfo == cLcd::eOverlay ? " overlay" : "") +
                       (mMode == cLcd::eAll ? " updateAll" :
                          mMode == cLcd::eSingle ? " updateSingle" :
                            mMode == cLcd::eCoarse ? " updateCoarse" : " updateExact"));
@@ -1083,7 +1079,7 @@ int cLcdTa7601::updateLcd (sSpan* spans) {
     int numPixels = 0;
     sSpan* it = spans;
     while (it) {
-      if (mInfo == eLine)
+      if (mInfo == eLogMore)
         cLog::log (LOGINFO, "span:" + dec(i++) + " " + it->r.getYfirstString());
       for (int16_t y = it->r.top; y < it->r.bottom; y++) {
         writeCommandData (0x20, (uint16_t)y);            // GRAM V start address of GRAM
@@ -1096,7 +1092,7 @@ int cLcdTa7601::updateLcd (sSpan* spans) {
       numPixels += it->r.getNumPixels();
       it = it->next;
       }
-    if (mInfo == eLine)
+    if (mInfo == eLogMore)
       cLog::log (LOGINFO, "----------------------------");
     return numPixels;
     }

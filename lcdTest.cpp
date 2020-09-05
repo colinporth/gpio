@@ -27,10 +27,9 @@ int main (int numArgs, char* args[]) {
     if (argStrings[i] == "90") rotate = cLcd::e90;
     else if (argStrings[i] == "180") rotate = cLcd::e180;
     else if (argStrings[i] == "270") rotate = cLcd::e270;
-    else if (argStrings[i] == "t") info = cLcd::eTimingOverlay;
-    else if (argStrings[i] == "p") info = cLcd::eTimingLog;
-    else if (argStrings[i] == "g") info = cLcd::eSpanOverlay;
-    else if (argStrings[i] == "l") info = cLcd::eLine;
+    else if (argStrings[i] == "o") info = cLcd::eOverlay;
+    else if (argStrings[i] == "l") info = cLcd::eLog;
+    else if (argStrings[i] == "m") info = cLcd::eLogMore;
     else if (argStrings[i] == "a") mode = cLcd::eAll;
     else if (argStrings[i] == "c") mode = cLcd::eCoarse;
     else if (argStrings[i] == "e") mode = cLcd::eExact;

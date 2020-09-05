@@ -174,7 +174,7 @@ struct sSpan;
 class cLcd {
 public:
   enum eRotate { e0, e90, e180, e270 };
-  enum eInfo { eNone, eTimingLog, eTimingOverlay, eLine, eSpanOverlay };
+  enum eInfo { eNone, eLog, eLogMore, eOverlay };
   enum eMode { eExact, eCoarse, eSingle, eAll };
 
   //{{{
