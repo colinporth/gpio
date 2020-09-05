@@ -34,8 +34,8 @@ int main (int numArgs, char* args[]) {
     else if (argStrings[i] == "s") mode = cLcd::eSingle;
     else if (argStrings[i] == "f") fontTest = true;
 
-  cLcd* lcd = new cLcdIli9320 (rotate, info, mode);
-  //cLcd* lcd = new cLcdTa7601 (rotate, info, mode);
+  //cLcd* lcd = new cLcdIli9320 (rotate, info, mode);
+  cLcd* lcd = new cLcdTa7601 (rotate, info, mode);
   if (!lcd->initialise())
     return 0;
 
