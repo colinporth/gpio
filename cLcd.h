@@ -200,7 +200,6 @@ public:
   virtual void setBacklight (bool on) {}
   void setBacklightOn() { setBacklight (true); }
   void setBacklightOff() { setBacklight (false); }
-  void setInfo (const eInfo info) { mInfo = info; }
 
   void clear (const uint16_t colour = kBlack);
   void clearSnapshot();
@@ -230,8 +229,8 @@ protected:
 
   virtual int updateLcd (sSpan* spans) = 0;
 
-  eRotate mRotate = e0;
-  eInfo mInfo = eNone;
+  const eRotate mRotate;
+  const eInfo mInfo;
 
   int mUpdateUs = 0;
   int mUpdatePixels = 0;
