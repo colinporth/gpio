@@ -135,7 +135,7 @@ bool cLcd::present() {
 
   // merge diffSpans
   merge (mSpans, kSpanMergeThreshold16);
-   mDiffUs = int((timeUs() - diffStartTime) * 1000000.);
+  mDiffUs = int((timeUs() - diffStartTime) * 1000000.0);
 
   if (!mNumSpans) {// nothing changed
     mUpdateUs = 0;
@@ -145,7 +145,7 @@ bool cLcd::present() {
   // update lcd with diffSpans
   double updateStartTime = timeUs();
   mUpdatePixels = updateLcd (mSpans);
-  mUpdateUs = int((timeUs() - updateStartTime) * 1000000.);
+  mUpdateUs = int((timeUs() - updateStartTime) * 1000000.0);
 
   // swap buffers
   auto temp = mPrevFrameBuf;
@@ -933,6 +933,43 @@ cLcdTa7601::cLcdTa7601 (const cLcd::eRotate rotate, const cLcd::eInfo info, cons
   : cLcd16(kWidthTa7601, kHeightTa7601, rotate, info, mode) {}
 
 //{{{
+void cLcdTa7601::writeCommand (const uint8_t command) {
+// slow down write
+
+  gpioWrite (k16RegisterGpio, 0);
+
+  gpioWrite_Bits_0_31_Clear (~command & k16WriteClrMask); // clear lo data bits + k16WrGpio bit lo
+  gpioWrite_Bits_0_31_Clear (~command & k16WriteClrMask); // clear lo data bits + k16WrGpio bit lo
+  gpioWrite_Bits_0_31_Clear (~command & k16WriteClrMask); // clear lo data bits + k16WrGpio bit lo
+
+  gpioWrite_Bits_0_31_Set (command);                      // set hi data bits
+  gpioWrite_Bits_0_31_Set (command);                      // set hi data bits
+  gpioWrite_Bits_0_31_Set (command);                      // set hi data bits
+
+  gpioWrite_Bits_0_31_Set (k16WriteMask);                 // write on k16WrGpio rising edge
+  gpioWrite_Bits_0_31_Set (k16WriteMask);                 // write on k16WrGpio rising edge
+
+  gpioWrite (k16RegisterGpio, 1);
+  }
+//}}}
+//{{{
+void cLcdTa7601::writeDataWord (const uint16_t data) {
+// slow down write
+
+  fastGpioWrite_Bits_0_31_Clear (~data & k16WriteClrMask); // clear lo data bits + k16WrGpio bit lo
+  fastGpioWrite_Bits_0_31_Clear (~data & k16WriteClrMask); // clear lo data bits + k16WrGpio bit lo
+  fastGpioWrite_Bits_0_31_Clear (~data & k16WriteClrMask); // clear lo data bits + k16WrGpio bit lo
+
+  fastGpioWrite_Bits_0_31_Set (data);                      // set hi data bits
+  fastGpioWrite_Bits_0_31_Set (data);                      // set hi data bits
+  fastGpioWrite_Bits_0_31_Set (data);                      // set hi data bits
+
+  fastGpioWrite_Bits_0_31_Set (k16WriteMask);              // write on k16WrGpio rising edge
+  fastGpioWrite_Bits_0_31_Set (k16WriteMask);              // write on k16WrGpio rising edge
+  }
+//}}}
+
+//{{{
 bool cLcdTa7601::initialise() {
 
   if (!cLcd::initialise())
@@ -1013,6 +1050,11 @@ bool cLcdTa7601::initialise() {
   delayUs (10000);
   //}}}
 
+  writeCommandData (0x45, 0x0000);          // GRAM H start address window - even = 0
+  writeCommandData (0x44, kWidthTa7601-1);  // GRAM H   end address window - even = 320-1
+  writeCommandData (0x47, 0x0000);          // GRAM V start address window        = 0
+  writeCommandData (0x46, kHeightTa7601-1); // GRAM V   end address window        = 480-1
+
   writeCommandData (0x07, 0x0012);  // partial, 8-color, display ON
   delayUs (10000);
   writeCommandData (0x07, 0x0017);  // partial, 8-color, display ON
@@ -1025,117 +1067,33 @@ bool cLcdTa7601::initialise() {
   return true;
   }
 //}}}
-
-//{{{
-void cLcdTa7601::writeCommand (const uint8_t command) {
-// slow down write
-
-  gpioWrite (k16RegisterGpio, 0);
-
-  gpioWrite_Bits_0_31_Clear (~command & k16WriteClrMask); // clear lo data bits + k16WrGpio bit lo
-  gpioWrite_Bits_0_31_Clear (~command & k16WriteClrMask); // clear lo data bits + k16WrGpio bit lo
-  gpioWrite_Bits_0_31_Clear (~command & k16WriteClrMask); // clear lo data bits + k16WrGpio bit lo
-
-  gpioWrite_Bits_0_31_Set (command);                      // set hi data bits
-  gpioWrite_Bits_0_31_Set (command);                      // set hi data bits
-  gpioWrite_Bits_0_31_Set (command);                      // set hi data bits
-
-  gpioWrite_Bits_0_31_Set (k16WriteMask);                 // write on k16WrGpio rising edge
-  gpioWrite_Bits_0_31_Set (k16WriteMask);                 // write on k16WrGpio rising edge
-
-  gpioWrite (k16RegisterGpio, 1);
-  }
-//}}}
-//{{{
-void cLcdTa7601::writeDataWord (const uint16_t data) {
-// slow down write
-
-  fastGpioWrite_Bits_0_31_Clear (~data & k16WriteClrMask); // clear lo data bits + k16WrGpio bit lo
-  fastGpioWrite_Bits_0_31_Clear (~data & k16WriteClrMask); // clear lo data bits + k16WrGpio bit lo
-  fastGpioWrite_Bits_0_31_Clear (~data & k16WriteClrMask); // clear lo data bits + k16WrGpio bit lo
-
-  fastGpioWrite_Bits_0_31_Set (data);                      // set hi data bits
-  fastGpioWrite_Bits_0_31_Set (data);                      // set hi data bits
-  fastGpioWrite_Bits_0_31_Set (data);                      // set hi data bits
-
-  fastGpioWrite_Bits_0_31_Set (k16WriteMask);              // write on k16WrGpio rising edge
-  fastGpioWrite_Bits_0_31_Set (k16WriteMask);              // write on k16WrGpio rising edge
-  }
-//}}}
-
 //{{{
 int cLcdTa7601::updateLcd (sSpan* spans) {
-// no AM style inc GDRAM V rather H for landscape, have to do it yourself
-
-  writeCommandData (0x45, 0x0000);          // H start ram address window - even = 0
-  writeCommandData (0x44, kWidthTa7601-1);  // H end ram address window - even   = 320-1
-  writeCommandData (0x47, 0x0000);          // V start ram address window        = 0
-  writeCommandData (0x46, kHeightTa7601-1); // V end ram address window          = 480-1
 
   if (mRotate == cLcd::e0) {
-    //{{{  send spans list, !!! other rotates to do !!!
-    // !!! getting stuff wrong,x out by 1 !!!
-
+    int i = 0;
     int numPixels = 0;
-
     sSpan* it = spans;
     while (it) {
-      uint16_t xstart;
-      uint16_t ystart;
-      uint16_t yinc;
-      int width = it->r.right - it->r.left;
-
-      switch (mRotate) {
-        default:
-        case e0:
-          xstart = it->r.left;
-          ystart = it->r.top;
-          yinc = 1;
-          break;
-
-        case e90:
-          xstart = getWidth() - it->r.left;
-          ystart = it->r.top;
-          yinc = 1;
-          break;
-
-        case e180:
-          // !!! simplify, can i just reverse scan !!!
-          xstart = getWidth()-1 - it->r.left;
-          ystart = getHeight()-1 - it->r.top;
-          yinc = -1;
-          break;
-
-        case e270:
-          xstart = it->r.left;
-          ystart = getHeight()-1 - it->r.top;
-          yinc = -1;
-          break;
-        }
-
-      for (int y = it->r.top; y < it->r.bottom; y++) {
-        writeCommandData (0x20, ystart);  // Y start address of GRAM
-        writeCommandData (0x21, xstart);  // X start address of GRAM
-
-        writeCommand (0x22);              // write GRAM
-        uint16_t* ptr = mFrameBuf + (ystart * getWidth()) + xstart;
-        for (int i = 0; i < width; i++)
+      cLog::log (LOGINFO, "span:" + dec(i++) + " " + it->r.getString());
+      for (int16_t y = it->r.top; y < it->r.bottom; y++) {
+        writeCommandData (0x20, (uint16_t)y);            // GRAM V start address of GRAM
+        writeCommandData (0x21, (uint16_t)(it->r.left)); // GRAM H start address of GRAM
+        writeCommand (0x22);                             // GRAM write
+        uint16_t* ptr = mFrameBuf + (y * getWidth()) + it->r.left;
+        for (int16_t x = it->r.left; x < it->r.bottom; x++)
           writeDataWord (*ptr++);
-
-        numPixels += width;
-        ystart += yinc;
         }
-
+      numPixels += it->r.getNumPixels();
       it = it->next;
       }
-
+    cLog::log (LOGINFO, "----------------------------");
     return numPixels;
     }
-    //}}}
   else {
     //{{{  send whole frame
-    writeCommandData (0x20, 0x0000);  // Y start address of GRAM
-    writeCommandData (0x21, 0x0000);  // X start address of GRAM
+    writeCommandData (0x20, 0x0000);  // GRAM Y start address
+    writeCommandData (0x21, 0x0000);  // GRAM X start address
 
     writeCommand (0x22);
 
@@ -1301,7 +1259,6 @@ bool cLcdSsd1289::initialise() {
   return true;
   }
 //}}}
-
 //{{{
 int cLcdSsd1289::updateLcd (sSpan* spans) {
 

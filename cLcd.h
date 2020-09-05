@@ -5,6 +5,8 @@
 #include <string>
 
 #include <bcm_host.h>
+
+#include "../shared/utils/utils.h"
 //}}}
 
 //{{{
@@ -124,6 +126,11 @@ public:
   int16_t getCentreX() { return (left + right)/2; }
   int16_t getCentreY() { return (top + bottom)/2; }
 
+  //{{{
+  std::string getString() {
+    return "l:" + dec(left) + " r:" + dec(right) + " t:" + dec(top) + " b:" + dec(bottom);
+    }
+  //}}}
   //{{{
   bool inside (const cPoint& pos) {
   // return pos inside rect
