@@ -175,7 +175,7 @@ class cLcd {
 public:
   enum eRotate { e0, e90, e180, e270 };
   enum eInfo { eNone, eOverlay };
-  enum eMode { eExact, eCoarse, eSingle, eAll };
+  enum eMode { eAll, eSingle, eCoarse, eExact };
 
   //{{{
   cLcd (const int16_t width, const int16_t height, const eRotate rotate, const eInfo info, const eMode mode)
@@ -227,13 +227,14 @@ protected:
     }
   //}}}
 
-  virtual int updateLcd (sSpan* spans) = 0;
+  virtual uint32_t updateLcd (sSpan* spans) = 0;
+  uint32_t updateLcdAll();
 
   const eRotate mRotate;
   const eInfo mInfo;
 
   int mUpdateUs = 0;
-  int mUpdatePixels = 0;
+  uint32_t mUpdatePixels = 0;
 
   // uint16 colour pixels
   uint16_t* mFrameBuf = nullptr;
@@ -277,40 +278,35 @@ private:
 
 // parallel 16bit screens
 //{{{
-class cLcd16 : public cLcd {
-public:
-  cLcd16 (const int16_t width, const int16_t height, const eRotate rotate, const eInfo info, const eMode mode)
-    : cLcd (width, height, rotate, info, mode) {}
-  virtual ~cLcd16() {}
-
-protected:
-  virtual void writeCommand (const uint8_t command);
-  virtual void writeDataWord (const uint16_t data);
-  virtual void writeCommandMultiData (const uint8_t command, const uint8_t* data, const int len);
-  };
-//}}}
-//{{{
-class cLcdTa7601 : public cLcd16 {
+class cLcdTa7601 : public cLcd {
 public:
   cLcdTa7601 (const eRotate rotate = e0, const eInfo info = eNone, const eMode mode = eAll);
   virtual ~cLcdTa7601() {}
 
   virtual bool initialise();
-  virtual int updateLcd (sSpan* spans);
 
 protected:
   virtual void writeCommand (const uint8_t command);
   virtual void writeDataWord (const uint16_t data);
+
+  virtual uint32_t updateLcd (sSpan* spans);
   };
 //}}}
 //{{{
-class cLcdSsd1289 : public cLcd16 {
+class cLcdSsd1289 : public cLcd {
 public:
   cLcdSsd1289 (const eRotate rotate = e0, const eInfo info = eNone);
   virtual ~cLcdSsd1289() {}
 
+protected:
+  virtual void writeCommand (const uint8_t command);
+  virtual void writeDataWord (const uint16_t data);
+
   virtual bool initialise();
-  virtual int updateLcd (sSpan* spans);
+  virtual uint32_t updateLcd (sSpan* spans);
+
+private:
+  void writeCommandMultiData (const uint8_t command, const uint8_t* data, const int len);
   };
 //}}}
 
@@ -339,7 +335,9 @@ public:
   virtual void setBacklight (bool on);
 
   virtual bool initialise();
-  virtual int updateLcd (sSpan* spans);
+
+protected:
+  virtual uint32_t updateLcd (sSpan* spans);
   };
 //}}}
 
@@ -367,7 +365,9 @@ public:
   virtual ~cLcdSt7735r() {}
 
   virtual bool initialise();
-  virtual int updateLcd (sSpan* spans);
+
+protected:
+  virtual uint32_t updateLcd (sSpan* spans);
   };
 //}}}
 //{{{
@@ -378,6 +378,8 @@ public:
   virtual ~cLcdIli9225b() {}
 
   virtual bool initialise();
-  virtual int updateLcd (sSpan* spans);
+
+protected:
+  virtual uint32_t updateLcd (sSpan* spans);
   };
 //}}}
