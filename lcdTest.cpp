@@ -19,7 +19,7 @@ int main (int numArgs, char* args[]) {
   bool fontTest = false;
   cLcd::eRotate rotate = cLcd::e0;
   cLcd::eInfo info = cLcd::eNone;
-  cLcd::eMode mode = cLcd::eAll;
+  cLcd::eMode mode = cLcd::eCoarse;
   eLogLevel logLevel = LOGINFO;
 
   for (size_t i = 0; i < argStrings.size(); i++)
@@ -34,6 +34,8 @@ int main (int numArgs, char* args[]) {
     else if (argStrings[i] == "1") logLevel = LOGINFO1;
     else if (argStrings[i] == "2") logLevel = LOGINFO2;
     else if (argStrings[i] == "f") fontTest = true;
+    else
+      cLog::log (LOGERROR, "unrecognised option " + argStrings[i]);
 
   cLog::init (logLevel, false, "", "gpio");
 

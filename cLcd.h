@@ -179,7 +179,7 @@ public:
 
   //{{{
   cLcd (const int16_t width, const int16_t height, const eRotate rotate, const eInfo info, const eMode mode)
-      : mRotate(rotate), mInfo(info), 
+      : mRotate(rotate), mInfo(info),
         mSnapshotEnabled(true), mMode(mode),
         mWidth(((rotate == e90) || (rotate == e270)) ? height : width),
         mHeight(((rotate == e90) || (rotate == e270)) ? width : height) {}
@@ -282,7 +282,7 @@ private:
 //{{{
 class cLcdTa7601 : public cLcd {
 public:
-  cLcdTa7601 (const eRotate rotate = e0, const eInfo info = eNone, const eMode mode = eAll);
+  cLcdTa7601 (const eRotate rotate = e0, const eInfo info = eNone, const eMode mode = eCoarse);
   virtual ~cLcdTa7601() {}
 
   virtual bool initialise();
@@ -297,7 +297,7 @@ protected:
 //{{{
 class cLcdSsd1289 : public cLcd {
 public:
-  cLcdSsd1289 (const eRotate rotate = e0, const eInfo info = eNone);
+  cLcdSsd1289 (const eRotate rotate = e0, const eInfo info = eNone, const eMode mode = eCoarse);
   virtual ~cLcdSsd1289() {}
 
 protected:
@@ -309,37 +309,6 @@ protected:
 
 private:
   void writeCommandMultiData (const uint8_t command, const uint8_t* data, const int len);
-  };
-//}}}
-
-// spi - no data/command register screens
-//{{{
-class cLcdSpiHeader : public cLcd {
-public:
-  cLcdSpiHeader (const int16_t width, const int16_t height, const eRotate rotate, const eInfo info, const eMode mode)
-    : cLcd (width, height, rotate, info, mode) {}
-  virtual ~cLcdSpiHeader();
-
-protected:
-  virtual void writeCommand (const uint8_t command);
-  virtual void writeDataWord (const uint16_t data);
-
-  int mSpiHandle = 0;
-  };
-//}}}
-//{{{
-class cLcdIli9320 : public cLcdSpiHeader {
-// 2.8 inch 1240x320 - HY28A
-public:
-  cLcdIli9320 (const cLcd::eRotate rotate = e0, const cLcd::eInfo info = eNone, const eMode mode = eAll);
-  virtual ~cLcdIli9320() {}
-
-  virtual void setBacklight (bool on);
-
-  virtual bool initialise();
-
-protected:
-  virtual uint32_t updateLcd (sSpan* spans);
   };
 //}}}
 
@@ -378,6 +347,37 @@ class cLcdIli9225b : public cLcdSpiRegister {
 public:
   cLcdIli9225b (const cLcd::eRotate rotate = e0, const cLcd::eInfo info = eNone, const eMode mode = eAll);
   virtual ~cLcdIli9225b() {}
+
+  virtual bool initialise();
+
+protected:
+  virtual uint32_t updateLcd (sSpan* spans);
+  };
+//}}}
+
+// spi - no data/command register screens
+//{{{
+class cLcdSpiHeader : public cLcd {
+public:
+  cLcdSpiHeader (const int16_t width, const int16_t height, const eRotate rotate, const eInfo info, const eMode mode)
+    : cLcd (width, height, rotate, info, mode) {}
+  virtual ~cLcdSpiHeader();
+
+protected:
+  virtual void writeCommand (const uint8_t command);
+  virtual void writeDataWord (const uint16_t data);
+
+  int mSpiHandle = 0;
+  };
+//}}}
+//{{{
+class cLcdIli9320 : public cLcdSpiHeader {
+// 2.8 inch 1240x320 - HY28A
+public:
+  cLcdIli9320 (const cLcd::eRotate rotate = e0, const cLcd::eInfo info = eNone, const eMode mode = eAll);
+  virtual ~cLcdIli9320() {}
+
+  virtual void setBacklight (bool on);
 
   virtual bool initialise();
 

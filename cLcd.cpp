@@ -1003,11 +1003,6 @@ bool cLcdTa7601::initialise() {
   delayUs (10000);
   //}}}
 
-  writeCommandData (0x45, 0x0000);          // GRAM H start address window - even = 0
-  writeCommandData (0x44, kWidthTa7601-1);  // GRAM H   end address window - even = 320-1
-  writeCommandData (0x47, 0x0000);          // GRAM V start address window        = 0
-  writeCommandData (0x46, kHeightTa7601-1); // GRAM V   end address window        = 480-1
-
   writeCommandData (0x07, 0x0012);  // partial, 8-color, display ON
   delayUs (10000);
   writeCommandData (0x07, 0x0017);  // partial, 8-color, display ON
@@ -1061,80 +1056,97 @@ uint32_t cLcdTa7601::updateLcd (sSpan* spans) {
 
   uint32_t numPixels = 0;
 
-  if (mRotate == cLcd::e0) {
-    // try to send spans
-    int i = 0;
+  switch (mRotate) {
+    case e0: { // send spans
+      for (sSpan* it = spans; it; it = it->next) {
+        cRect& r = it->r;
+        writeCommandData (0x45, r.left);     // GRAM V start address window
+        writeCommandData (0x44, r.right-1);  // GRAM V   end address window
+        writeCommandData (0x47, r.top);      // GRAM H start address window - even
+        writeCommandData (0x46, r.bottom-1); // GRAM H   end address window - even
 
-    for (sSpan* it = spans; it; it = it->next) {
-      cLog::log (LOGINFO2, "span:" + dec(i++) + " " + it->r.getYfirstString());
+        writeCommandData (0x20, r.top);      // GRAM V start address
+        writeCommandData (0x21, r.left);     // GRAM H start address
+        writeCommand (0x22);                 // GRAM write
 
-      for (int16_t y = it->r.top; y < it->r.bottom; y++) {
-        writeCommandData (0x20, (uint16_t)y);            // GRAM V start address of GRAM
-        writeCommandData (0x21, (uint16_t)(it->r.left)); // GRAM H start address of GRAM
-        writeCommand (0x22);                             // GRAM write
-        uint16_t* ptr = mFrameBuf + (y * getWidth()) + it->r.left;
-        for (int16_t x = it->r.left; x < it->r.right; x++)
-          writeDataWord (*ptr++);
+        uint16_t* ptr = mFrameBuf + (r.top * getWidth()) + r.left;
+        for (int16_t y = r.top; y < r.bottom; y++) {
+          for (int16_t x = r.left; x < r.right; x++)
+            writeDataWord (*ptr++);
+          ptr += getWidth() - r.getWidth();
+          }
+
+        numPixels += r.getNumPixels();
         }
-
-      numPixels += it->r.getNumPixels();
+      break;
       }
 
-    cLog::log (LOGINFO2, "----------------------------");
-    }
+    //{{{
+    case  e90: // send whole frame
+      writeCommandData (0x45, 0x0000);          // GRAM H start address window = 0
+      writeCommandData (0x44, kWidthTa7601-1);  // GRAM H   end address window = 320-1
+      writeCommandData (0x47, 0x0000);          // GRAM V start address window = 0
+      writeCommandData (0x46, kHeightTa7601-1); // GRAM V   end address window = 480-1
+      writeCommandData (0x20, 0x0000);          // GRAM V start address
+      writeCommandData (0x21, 0x0000);          // GRAM H start address
+      writeCommand (0x22);
 
-  else {
-    // send whole frame
-    writeCommandData (0x20, 0x0000);  // GRAM V start address
-    writeCommandData (0x21, 0x0000);  // GRAM H start address
-    writeCommand (0x22);
-
-    switch (mRotate) {
-      case e0: {
-        uint16_t* ptr = mFrameBuf;
-        for (uint32_t i = 0; i < getNumPixels(); i++)
-          writeDataWord (*ptr++);
-        break;
-        }
-      //{{{
-      case e90:
-        // !!! simplify the back step at end of line !!!
-        for (int x = 0; x < getWidth(); x++) {
-          uint16_t* ptr = mFrameBuf + x;
-          for (int y = 0; y < getHeight(); y++) {
-            writeDataWord (*ptr);
-            ptr += getWidth();
-            }
-          }
-        break;
-      //}}}
-      //{{{
-      case e180:
-        // !!! simplify, can i just reverse scan !!!
+      // !!! simplify the back step at end of line !!!
+      for (int x = 0; x < getWidth(); x++) {
+        uint16_t* ptr = mFrameBuf + x;
         for (int y = 0; y < getHeight(); y++) {
-          uint16_t* ptr = mFrameBuf + ((getHeight()-1-y) * getWidth());
-          for (int x = 0; x < getWidth(); x++) {
-            writeDataWord (*ptr);
-            ptr--;
-            }
+          writeDataWord (*ptr);
+          ptr += getWidth();
           }
-        break;
-      //}}}
-      //{{{
-      case e270:
-        // !!! simplify the back step at aned of line !!!
-        for (int x = 0; x < getWidth(); x++) {
-          uint16_t* ptr = mFrameBuf + ((getHeight()-1) * getWidth()) + x;
-          for (int y = 0; y < getHeight(); y++) {
-            writeDataWord (*ptr);
-            ptr -= getWidth();
-            }
-          }
-        break;
-      //}}}
-      }
+        }
 
-    numPixels = getNumPixels();
+      numPixels = getNumPixels();
+      break;
+    //}}}
+    //{{{
+    case e180: // send whole frame
+      writeCommandData (0x45, 0x0000);          // GRAM H start address window = 0
+      writeCommandData (0x44, kWidthTa7601-1);  // GRAM H   end address window = 320-1
+      writeCommandData (0x47, 0x0000);          // GRAM V start address window = 0
+      writeCommandData (0x46, kHeightTa7601-1); // GRAM V   end address window = 480-1
+      writeCommandData (0x20, 0x0000);          // GRAM V start address
+      writeCommandData (0x21, 0x0000);          // GRAM H start address
+      writeCommand (0x22);
+
+      // !!! simplify, can i just reverse scan !!!
+      for (int y = 0; y < getHeight(); y++) {
+        uint16_t* ptr = mFrameBuf + ((getHeight()-1-y) * getWidth());
+        for (int x = 0; x < getWidth(); x++) {
+          writeDataWord (*ptr);
+          ptr--;
+          }
+        }
+
+      numPixels = getNumPixels();
+      break;
+    //}}}
+    //{{{
+    case e270: // send whole frame
+      writeCommandData (0x45, 0x0000);          // GRAM H start address window = 0
+      writeCommandData (0x44, kWidthTa7601-1);  // GRAM H   end address window = 320-1
+      writeCommandData (0x47, 0x0000);          // GRAM V start address window = 0
+      writeCommandData (0x46, kHeightTa7601-1); // GRAM V   end address window = 480-1
+      writeCommandData (0x20, 0x0000);          // GRAM V start address
+      writeCommandData (0x21, 0x0000);          // GRAM H start address
+      writeCommand (0x22);
+
+      // !!! simplify the back step at aned of line !!!
+      for (int x = 0; x < getWidth(); x++) {
+        uint16_t* ptr = mFrameBuf + ((getHeight()-1) * getWidth()) + x;
+        for (int y = 0; y < getHeight(); y++) {
+          writeDataWord (*ptr);
+          ptr -= getWidth();
+          }
+        }
+
+      numPixels = getNumPixels();
+      break;
+    //}}}
     }
 
   return numPixels;
@@ -1145,8 +1157,8 @@ uint32_t cLcdTa7601::updateLcd (sSpan* spans) {
 constexpr int16_t kWidth1289 = 240;
 constexpr int16_t kHeight1289 = 320;
 
-cLcdSsd1289::cLcdSsd1289 (const cLcd::eRotate rotate, const cLcd::eInfo info)
-  : cLcd(kWidth1289, kHeight1289, rotate, info, eCoarse) {}
+cLcdSsd1289::cLcdSsd1289 (const cLcd::eRotate rotate, const cLcd::eInfo info, const cLcd::eMode mode)
+  : cLcd(kWidth1289, kHeight1289, rotate, info, mode) {}
 
 //{{{
 bool cLcdSsd1289::initialise() {
@@ -1291,206 +1303,6 @@ uint32_t cLcdSsd1289::updateLcd (sSpan* spans) {
 
   writeCommandMultiData (0x22, (const uint8_t*)mFrameBuf, getNumPixels() * 2);
   return getNumPixels();
-  }
-//}}}
-//}}}
-
-// spi - no data/command register
-//{{{  cLcdSpiHeader : public cLcdSpi
-//{{{
-cLcdSpiHeader::~cLcdSpiHeader() {
-  spiClose (mSpiHandle);
-  }
-//}}}
-
-//{{{
-void cLcdSpiHeader::writeCommand (const uint8_t command) {
-
-  // send command
-  const uint8_t kCommand[3] = { 0x70, 0, command };
-  spiWrite (mSpiHandle, (char*)kCommand, 3);
-  }
-//}}}
-//{{{
-void cLcdSpiHeader::writeDataWord (const uint16_t data) {
-// send data
-
-  const uint8_t kData[3] = { 0x72, uint8_t(data >> 8), uint8_t(data & 0xFF) };
-  spiWrite (mSpiHandle, (char*)kData, 3);
-  }
-//}}}
-//}}}
-//{{{  cLcdIli9320 : public cLcdSpiHeader
-constexpr int16_t kWidth9320 = 240;
-constexpr int16_t kHeight9320 = 320;
-constexpr int kSpiClock9320 = 24000000;
-constexpr uint8_t kBacklightGpio   = 24;
-
-cLcdIli9320::cLcdIli9320 (const cLcd::eRotate rotate, const cLcd::eInfo info, const eMode mode)
-  : cLcdSpiHeader(kWidth9320, kHeight9320, rotate, info, mode) {}
-
-//{{{
-bool cLcdIli9320::initialise() {
-
-  if (!cLcd::initialise())
-    return false;
-
-  // backlight off - active hi
-  gpioSetMode (kBacklightGpio, PI_OUTPUT);
-  gpioWrite (kBacklightGpio, 0);
-
-  // spi mode 3, spi manages ce0 active lo
-  mSpiHandle = spiOpen (0, kSpiClock9320, 3);
-
-  writeCommandData (0xE5, 0x8000); // Set the Vcore voltage
-  writeCommandData (0x00, 0x0000); // start oscillation - stopped?
-  writeCommandData (0x01, 0x0100); // Driver Output Control 1 - SS=1 and SM=0
-  writeCommandData (0x02, 0x0700); // LCD Driving Control - set line inversion
-  writeCommandData (0x04, 0x0000); // Resize Control
-  writeCommandData (0x08, 0x0202); // Display Control 2
-  writeCommandData (0x09, 0x0000); // Display Control 3
-  writeCommandData (0x0a, 0x0000); // Display Control 4 - frame marker
-  writeCommandData (0x0c, 0x0001); // RGB Display Interface Control 1
-  writeCommandData (0x0d, 0x0000); // Frame Marker Position
-  writeCommandData (0x0f, 0x0000); // RGB Display Interface Control 2
-  delayUs (40000);
-
-  writeCommandData (0x07, 0x0101); // Display Control 1
-  delayUs (40000);
-
-  //{{{  power control
-  writeCommandData (0x10, 0x10C0); // Power Control 1
-  writeCommandData (0x11, 0x0007); // Power Control 2
-  writeCommandData (0x12, 0x0110); // Power Control 3
-  writeCommandData (0x13, 0x0b00); // Power Control 4
-  writeCommandData (0x29, 0x0000); // Power Control 7
-  //}}}
-  writeCommandData (0x2b, 0x4010); // Frame Rate and Color Control
-  writeCommandData (0x60, 0x2700); // Driver Output Control 2
-  writeCommandData (0x61, 0x0001); // Base Image Display Control
-  writeCommandData (0x6a, 0x0000); // Vertical Scroll Control
-  //{{{  partial image
-  writeCommandData (0x80, 0x0000); // Partial Image 1 Display Position
-  writeCommandData (0x81, 0x0000); // Partial Image 1 Area Start Line
-  writeCommandData (0x82, 0x0000); // Partial Image 1 Area End Line
-  writeCommandData (0x83, 0x0000); // Partial Image 2 Display Position
-  writeCommandData (0x84, 0x0000); // Partial Image 2 Area Start Line
-  writeCommandData (0x85, 0x0000); // Partial Image 2 Area End Line
-  //}}}
-  //{{{  panel interface
-  writeCommandData (0x90, 0x0010); // Panel Interface Control 1
-  writeCommandData (0x92, 0x0000); // Panel Interface Control 2
-  writeCommandData (0x93, 0x0001); // Panel Interface Control 3
-  writeCommandData (0x95, 0x0110); // Panel Interface Control 4
-  writeCommandData (0x97, 0x0000); // Panel Interface Control 5
-  writeCommandData (0x98, 0x0000); // Panel Interface Control 6
-  //}}}
-
-  writeCommandData (0x07, 0x0133); // Display Control 1
-  delayUs (40000);
-
-  switch (mRotate) {
-    case e0:
-      writeCommandData (0x03, 0x1030); // Entry Mode - BGR, HV inc, vert write,
-      break;
-    case e90:
-      writeCommandData (0x03, 0x1018); // Entry Mode - BGR, HV inc, vert write,
-      break;
-    case e180:
-      writeCommandData (0x03, 0x1000); // Entry Mode - BGR, HV inc, vert write,
-      break;
-    case e270:
-      writeCommandData (0x03, 0x1028); // Entry Mode - BGR, HV inc, vert write,
-      break;
-    }
-
-  updateLcdAll();
-
-  return true;
-  }
-//}}}
-//{{{
-void cLcdIli9320::setBacklight (bool on) {
-  gpioWrite (kBacklightGpio, on ? 1 : 0);
-  }
-//}}}
-
-//{{{
-uint32_t cLcdIli9320::updateLcd (sSpan* spans) {
-
-  uint16_t dataHeaderBuf [320+1];
-  dataHeaderBuf[0] = 0x7272;
-
-  writeCommandData (0x0050, 0x0000);        // H GRAM start address
-  writeCommandData (0x0051, kWidth9320-1);  // H GRAM end address
-  writeCommandData (0x0052, 0x0000);        // V GRAM start address
-  writeCommandData (0x0053, kHeight9320-1); // V GRAM end address
-
-  int numPixels = 0;
-
-  sSpan* it = spans;
-  while (it) {
-    uint16_t xstart;
-    uint16_t ystart;
-    uint16_t yinc;
-    switch (mRotate) {
-      default:
-      //{{{
-      case e0:
-        xstart = it->r.left;
-        ystart = it->r.top;
-        yinc = 1;
-        break;
-      //}}}
-      //{{{
-      case e90:
-        xstart = kHeight9320 - 1 - it->r.left;
-        ystart = it->r.top;
-        yinc = 1;
-        break;
-      //}}}
-      //{{{
-      case e180:
-        xstart = kWidth9320 - 1 - it->r.left;
-        ystart = kHeight9320 - 1 - it->r.top;
-        yinc = -1;
-        break;
-      //}}}
-      //{{{
-      case e270:
-        xstart = it->r.left;
-        ystart = kWidth9320 - 1 - it->r.top;
-        yinc = -1;
-        break;
-      //}}}
-      }
-
-    for (int y = it->r.top; y < it->r.bottom; y++) {
-      if ((mRotate == e0) || (mRotate == e180)) {
-        writeCommandData (0x20, xstart); // GRAM V start
-        writeCommandData (0x21, ystart); // GRAM H start
-        }
-      else {
-        writeCommandData (0x20, ystart); // GRAM V start
-        writeCommandData (0x21, xstart); // GRAM H start
-        }
-
-      writeCommand (0x22); // send GRAM write
-      uint16_t* src = mFrameBuf + (y * getWidth()) + it->r.left;
-      // 2 header bytes, alignment for data bswap_16, send spi data from second header byte
-      uint16_t* dst = dataHeaderBuf + 1;
-      for (int i = 0; i < it->r.getWidth(); i++)
-        *dst++ = bswap_16 (*src++);
-      spiWrite (mSpiHandle, ((char*)(dataHeaderBuf))+1, (it->r.getWidth() * 2) + 1);
-
-      ystart += yinc;
-      numPixels += it->r.getWidth();
-      }
-
-    it = it->next;
-    }
-
-  return numPixels;
   }
 //}}}
 //}}}
@@ -1750,6 +1562,206 @@ uint32_t cLcdIli9225b::updateLcd (sSpan* spans) {
 
   writeCommandMultiData (0x22, (const uint8_t*)swappedFrameBuf, getNumPixels() * 2); // RAMRW command
   return getNumPixels();
+  }
+//}}}
+//}}}
+
+// spi - no data/command register
+//{{{  cLcdSpiHeader : public cLcdSpi
+//{{{
+cLcdSpiHeader::~cLcdSpiHeader() {
+  spiClose (mSpiHandle);
+  }
+//}}}
+
+//{{{
+void cLcdSpiHeader::writeCommand (const uint8_t command) {
+
+  // send command
+  const uint8_t kCommand[3] = { 0x70, 0, command };
+  spiWrite (mSpiHandle, (char*)kCommand, 3);
+  }
+//}}}
+//{{{
+void cLcdSpiHeader::writeDataWord (const uint16_t data) {
+// send data
+
+  const uint8_t kData[3] = { 0x72, uint8_t(data >> 8), uint8_t(data & 0xFF) };
+  spiWrite (mSpiHandle, (char*)kData, 3);
+  }
+//}}}
+//}}}
+//{{{  cLcdIli9320 : public cLcdSpiHeader
+constexpr int16_t kWidth9320 = 240;
+constexpr int16_t kHeight9320 = 320;
+constexpr int kSpiClock9320 = 24000000;
+constexpr uint8_t kBacklightGpio   = 24;
+
+cLcdIli9320::cLcdIli9320 (const cLcd::eRotate rotate, const cLcd::eInfo info, const eMode mode)
+  : cLcdSpiHeader(kWidth9320, kHeight9320, rotate, info, mode) {}
+
+//{{{
+bool cLcdIli9320::initialise() {
+
+  if (!cLcd::initialise())
+    return false;
+
+  // backlight off - active hi
+  gpioSetMode (kBacklightGpio, PI_OUTPUT);
+  gpioWrite (kBacklightGpio, 0);
+
+  // spi mode 3, spi manages ce0 active lo
+  mSpiHandle = spiOpen (0, kSpiClock9320, 3);
+
+  writeCommandData (0xE5, 0x8000); // Set the Vcore voltage
+  writeCommandData (0x00, 0x0000); // start oscillation - stopped?
+  writeCommandData (0x01, 0x0100); // Driver Output Control 1 - SS=1 and SM=0
+  writeCommandData (0x02, 0x0700); // LCD Driving Control - set line inversion
+  writeCommandData (0x04, 0x0000); // Resize Control
+  writeCommandData (0x08, 0x0202); // Display Control 2
+  writeCommandData (0x09, 0x0000); // Display Control 3
+  writeCommandData (0x0a, 0x0000); // Display Control 4 - frame marker
+  writeCommandData (0x0c, 0x0001); // RGB Display Interface Control 1
+  writeCommandData (0x0d, 0x0000); // Frame Marker Position
+  writeCommandData (0x0f, 0x0000); // RGB Display Interface Control 2
+  delayUs (40000);
+
+  writeCommandData (0x07, 0x0101); // Display Control 1
+  delayUs (40000);
+
+  //{{{  power control
+  writeCommandData (0x10, 0x10C0); // Power Control 1
+  writeCommandData (0x11, 0x0007); // Power Control 2
+  writeCommandData (0x12, 0x0110); // Power Control 3
+  writeCommandData (0x13, 0x0b00); // Power Control 4
+  writeCommandData (0x29, 0x0000); // Power Control 7
+  //}}}
+  writeCommandData (0x2b, 0x4010); // Frame Rate and Color Control
+  writeCommandData (0x60, 0x2700); // Driver Output Control 2
+  writeCommandData (0x61, 0x0001); // Base Image Display Control
+  writeCommandData (0x6a, 0x0000); // Vertical Scroll Control
+  //{{{  partial image
+  writeCommandData (0x80, 0x0000); // Partial Image 1 Display Position
+  writeCommandData (0x81, 0x0000); // Partial Image 1 Area Start Line
+  writeCommandData (0x82, 0x0000); // Partial Image 1 Area End Line
+  writeCommandData (0x83, 0x0000); // Partial Image 2 Display Position
+  writeCommandData (0x84, 0x0000); // Partial Image 2 Area Start Line
+  writeCommandData (0x85, 0x0000); // Partial Image 2 Area End Line
+  //}}}
+  //{{{  panel interface
+  writeCommandData (0x90, 0x0010); // Panel Interface Control 1
+  writeCommandData (0x92, 0x0000); // Panel Interface Control 2
+  writeCommandData (0x93, 0x0001); // Panel Interface Control 3
+  writeCommandData (0x95, 0x0110); // Panel Interface Control 4
+  writeCommandData (0x97, 0x0000); // Panel Interface Control 5
+  writeCommandData (0x98, 0x0000); // Panel Interface Control 6
+  //}}}
+
+  writeCommandData (0x07, 0x0133); // Display Control 1
+  delayUs (40000);
+
+  switch (mRotate) {
+    case e0:
+      writeCommandData (0x03, 0x1030); // Entry Mode - BGR, HV inc, vert write,
+      break;
+    case e90:
+      writeCommandData (0x03, 0x1018); // Entry Mode - BGR, HV inc, vert write,
+      break;
+    case e180:
+      writeCommandData (0x03, 0x1000); // Entry Mode - BGR, HV inc, vert write,
+      break;
+    case e270:
+      writeCommandData (0x03, 0x1028); // Entry Mode - BGR, HV inc, vert write,
+      break;
+    }
+
+  updateLcdAll();
+
+  return true;
+  }
+//}}}
+//{{{
+void cLcdIli9320::setBacklight (bool on) {
+  gpioWrite (kBacklightGpio, on ? 1 : 0);
+  }
+//}}}
+
+//{{{
+uint32_t cLcdIli9320::updateLcd (sSpan* spans) {
+
+  uint16_t dataHeaderBuf [320+1];
+  dataHeaderBuf[0] = 0x7272;
+
+  writeCommandData (0x0050, 0x0000);        // H GRAM start address
+  writeCommandData (0x0051, kWidth9320-1);  // H GRAM end address
+  writeCommandData (0x0052, 0x0000);        // V GRAM start address
+  writeCommandData (0x0053, kHeight9320-1); // V GRAM end address
+
+  int numPixels = 0;
+
+  sSpan* it = spans;
+  while (it) {
+    uint16_t xstart;
+    uint16_t ystart;
+    uint16_t yinc;
+    switch (mRotate) {
+      default:
+      //{{{
+      case e0:
+        xstart = it->r.left;
+        ystart = it->r.top;
+        yinc = 1;
+        break;
+      //}}}
+      //{{{
+      case e90:
+        xstart = kHeight9320 - 1 - it->r.left;
+        ystart = it->r.top;
+        yinc = 1;
+        break;
+      //}}}
+      //{{{
+      case e180:
+        xstart = kWidth9320 - 1 - it->r.left;
+        ystart = kHeight9320 - 1 - it->r.top;
+        yinc = -1;
+        break;
+      //}}}
+      //{{{
+      case e270:
+        xstart = it->r.left;
+        ystart = kWidth9320 - 1 - it->r.top;
+        yinc = -1;
+        break;
+      //}}}
+      }
+
+    for (int y = it->r.top; y < it->r.bottom; y++) {
+      if ((mRotate == e0) || (mRotate == e180)) {
+        writeCommandData (0x20, xstart); // GRAM V start
+        writeCommandData (0x21, ystart); // GRAM H start
+        }
+      else {
+        writeCommandData (0x20, ystart); // GRAM V start
+        writeCommandData (0x21, xstart); // GRAM H start
+        }
+
+      writeCommand (0x22); // send GRAM write
+      uint16_t* src = mFrameBuf + (y * getWidth()) + it->r.left;
+      // 2 header bytes, alignment for data bswap_16, send spi data from second header byte
+      uint16_t* dst = dataHeaderBuf + 1;
+      for (int i = 0; i < it->r.getWidth(); i++)
+        *dst++ = bswap_16 (*src++);
+      spiWrite (mSpiHandle, ((char*)(dataHeaderBuf))+1, (it->r.getWidth() * 2) + 1);
+
+      ystart += yinc;
+      numPixels += it->r.getWidth();
+      }
+
+    it = it->next;
+    }
+
+  return numPixels;
   }
 //}}}
 //}}}
