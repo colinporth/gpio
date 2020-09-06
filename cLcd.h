@@ -251,9 +251,9 @@ private:
   void setFont (const uint8_t* font, const int fontSize);
 
   // diff
+  int diffSingle (sSpan* spans);
   int diffExact (sSpan* spans);
   int diffCoarse (sSpan* spans);
-  int diffSingle (sSpan* spans);
 
   static sSpan* merge (sSpan* spans, int pixelThreshold);
   static int coarseLinearDiff (uint16_t* frameBuf, uint16_t* prevFrameBuf, uint16_t* frameBufEnd);

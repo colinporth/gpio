@@ -1,4 +1,4 @@
-// cLcd.cpp
+// cLcd.cpp - rgb565 lcd
 //{{{  includes
 #include "cLcd.h"
 
@@ -435,175 +435,6 @@ void cLcd::setFont (const uint8_t* font, const int fontSize)  {
   }
 //}}}
 //{{{
-int cLcd::diffExact (sSpan* spans) {
-// return numSpans
-
-  int numSpans = 0;
-
-  int y =  0;
-  int yInc = 1;
-
-  sSpan* span = spans;
-  uint16_t* scanline = mFrameBuf + y * getWidth();
-  uint16_t* prevFrameScanline = mPrevFrameBuf + y * getWidth();
-  while (y < getHeight()) {
-
-    uint16_t* scanlineStart = scanline;
-    uint16_t* scanlineEnd = scanline + getWidth();
-    while (scanline < scanlineEnd) {
-      uint16_t* spanStart;
-      uint16_t* spanEnd;
-      int numConsecutiveUnchangedPixels = 0;
-      if (scanline + 1 < scanlineEnd) {
-        uint32_t diff = (*(uint32_t*)scanline) ^ (*(uint32_t*)prevFrameScanline);
-        scanline += 2;
-        prevFrameScanline += 2;
-
-        if (diff == 0) // Both 1st and 2nd pixels are the same
-          continue;
-
-        if ((diff & 0xFFFF) == 0) {
-          //{{{  1st pixels are the same, 2nd pixels are not
-          spanStart = scanline - 1;
-          spanEnd = scanline;
-          }
-          //}}}
-        else {
-          //{{{  1st pixels are different
-          spanStart = scanline - 2;
-          if ((diff & 0xFFFF0000u) != 0) // 2nd pixels are different?
-            spanEnd = scanline;
-          else {
-            spanEnd = scanline - 1;
-            numConsecutiveUnchangedPixels = 1;
-            }
-          }
-          //}}}
-        //{{{  We've found a start of a span of different pixels on this scanline, now find where this span ends
-        while (scanline < scanlineEnd) {
-          if (*scanline++ != *prevFrameScanline++) {
-            spanEnd = scanline;
-            numConsecutiveUnchangedPixels = 0;
-            }
-          else {
-            if (++numConsecutiveUnchangedPixels > kSpanExactThreshold)
-              break;
-            }
-          }
-        //}}}
-        }
-      else {
-       //{{{  handle the single last pixel on the row
-       if (*scanline++ == *prevFrameScanline++)
-         break;
-
-       spanStart = scanline - 1;
-       spanEnd = scanline;
-       }
-       //}}}
-
-      span->r.left = spanStart - scanlineStart;
-      span->r.right = spanEnd - scanlineStart;
-      span->r.top = y;
-      span->r.bottom = y+1;
-      span->lastScanRight = span->r.right;
-      span->size = spanEnd - spanStart;
-      if (numSpans > 0)
-        span[-1].next = span;
-      span->next = nullptr;
-
-      span++;
-      if (numSpans++ >= kMaxSpans) {
-        //{{{  error return, could fake up whole screen
-        cLog::log (LOGERROR, "too many spans");
-        return numSpans;
-        }
-        //}}}
-      }
-
-    y += yInc;
-    }
-
-  return numSpans;
-  }
-//}}}
-//{{{
-int cLcd::diffCoarse (sSpan* spans) {
-// return numSpans
-
-  int numSpans = 0;
-
-  int y =  0;
-  int yInc = 1;
-
-  const int width64 = getWidth() >> 2;
-  const int scanlineInc = getWidth() >> 2;
-
-  sSpan* span = spans;
-  uint64_t* scanline = (uint64_t*)(mFrameBuf + (y * getWidth()));
-  uint64_t* prevFrameScanline = (uint64_t*)(mPrevFrameBuf + (y * getWidth()));
-  while (y < getHeight()) {
-    uint16_t* scanlineStart = (uint16_t*)scanline;
-
-    for (int x = 0; x < width64;) {
-      if (scanline[x] != prevFrameScanline[x]) {
-        uint16_t* spanStart = (uint16_t*)(scanline + x) + (__builtin_ctzll (scanline[x] ^ prevFrameScanline[x]) >> 4);
-        ++x;
-
-        // found start of a span of different pixels on this scanline, now find where this span ends
-        uint16_t* spanEnd;
-        for (;;) {
-          if (x < width64) {
-            if (scanline[x] != prevFrameScanline[x]) {
-              ++x;
-              continue;
-              }
-            else {
-              spanEnd = (uint16_t*)(scanline + x) + 1 - (__builtin_clzll(scanline[x-1] ^ prevFrameScanline[x-1]) >> 4);
-              ++x;
-              break;
-              }
-            }
-          else {
-            spanEnd = scanlineStart + getWidth();
-            break;
-            }
-          }
-
-        span->r.left = spanStart - scanlineStart;
-        span->r.right = spanEnd - scanlineStart;
-        span->r.top = y;
-        span->r.bottom = y+1;
-        span->lastScanRight = span->r.right;
-        span->size = spanEnd - spanStart;
-        if (numSpans > 0)
-          span[-1].next = span;
-        span->next = nullptr;
-
-        span++;
-        if (numSpans++ >= kMaxSpans) {
-          //{{{  error return, could fake up whole screen
-          cLog::log (LOGERROR, "too many spans");
-          return numSpans;
-          }
-          //}}}
-        }
-      else
-        ++x;
-      }
-
-    y += yInc;
-    scanline += scanlineInc;
-    prevFrameScanline += scanlineInc;
-    }
-
-  if (numSpans > 0)
-    spans[numSpans-1].next = nullptr;
-
-  return numSpans;
-  }
-//}}}
-//{{{
 int cLcd::diffSingle (sSpan* spans) {
 // return 1, if single bounding span is different, else 0
 
@@ -778,6 +609,177 @@ foundRight:
   spans->next = nullptr;
 
   return 1;
+  }
+//}}}
+//{{{
+int cLcd::diffCoarse (sSpan* spans) {
+// return numSpans, 4pix (64bit) alignment
+
+  int numSpans = 0;
+
+  int y =  0;
+  int yInc = 1;
+
+  const int width64 = getWidth() >> 2;
+  const int scanlineInc = getWidth() >> 2;
+
+  sSpan* span = spans;
+  uint64_t* scanline = (uint64_t*)(mFrameBuf + (y * getWidth()));
+  uint64_t* prevFrameScanline = (uint64_t*)(mPrevFrameBuf + (y * getWidth()));
+  while (y < getHeight()) {
+    uint16_t* scanlineStart = (uint16_t*)scanline;
+
+    for (int x = 0; x < width64;) {
+      if (scanline[x] != prevFrameScanline[x]) {
+        uint16_t* spanStart = (uint16_t*)(scanline + x) +
+                              (__builtin_ctzll (scanline[x] ^ prevFrameScanline[x]) >> 4);
+        ++x;
+
+        // found start of a span of different pixels on this scanline, now find where this span ends
+        uint16_t* spanEnd;
+        for (;;) {
+          if (x < width64) {
+            if (scanline[x] != prevFrameScanline[x]) {
+              ++x;
+              continue;
+              }
+            else {
+              spanEnd = (uint16_t*)(scanline + x) + 1 -
+                                   (__builtin_clzll (scanline[x-1] ^ prevFrameScanline[x-1]) >> 4);
+              ++x;
+              break;
+              }
+            }
+          else {
+            spanEnd = scanlineStart + getWidth();
+            break;
+            }
+          }
+
+        span->r.left = spanStart - scanlineStart;
+        span->r.right = spanEnd - scanlineStart;
+        span->r.top = y;
+        span->r.bottom = y+1;
+        span->lastScanRight = span->r.right;
+        span->size = spanEnd - spanStart;
+        if (numSpans > 0)
+          span[-1].next = span;
+        span->next = nullptr;
+
+        span++;
+        if (numSpans++ >= kMaxSpans) {
+          //{{{  error return, could fake up whole screen
+          cLog::log (LOGERROR, "too many spans");
+          return numSpans;
+          }
+          //}}}
+        }
+      else
+        ++x;
+      }
+
+    y += yInc;
+    scanline += scanlineInc;
+    prevFrameScanline += scanlineInc;
+    }
+
+  if (numSpans > 0)
+    spans[numSpans-1].next = nullptr;
+
+  return numSpans;
+  }
+//}}}
+//{{{
+int cLcd::diffExact (sSpan* spans) {
+// return numSpans
+
+  int numSpans = 0;
+
+  int y =  0;
+  int yInc = 1;
+
+  sSpan* span = spans;
+  uint16_t* scanline = mFrameBuf + y * getWidth();
+  uint16_t* prevFrameScanline = mPrevFrameBuf + y * getWidth();
+  while (y < getHeight()) {
+
+    uint16_t* scanlineStart = scanline;
+    uint16_t* scanlineEnd = scanline + getWidth();
+    while (scanline < scanlineEnd) {
+      uint16_t* spanStart;
+      uint16_t* spanEnd;
+      int numConsecutiveUnchangedPixels = 0;
+      if (scanline + 1 < scanlineEnd) {
+        uint32_t diff = (*(uint32_t*)scanline) ^ (*(uint32_t*)prevFrameScanline);
+        scanline += 2;
+        prevFrameScanline += 2;
+
+        if (diff == 0) // Both 1st and 2nd pixels are the same
+          continue;
+
+        if ((diff & 0xFFFF) == 0) {
+          //{{{  1st pixels are the same, 2nd pixels are not
+          spanStart = scanline - 1;
+          spanEnd = scanline;
+          }
+          //}}}
+        else {
+          //{{{  1st pixels are different
+          spanStart = scanline - 2;
+          if ((diff & 0xFFFF0000u) != 0) // 2nd pixels are different?
+            spanEnd = scanline;
+          else {
+            spanEnd = scanline - 1;
+            numConsecutiveUnchangedPixels = 1;
+            }
+          }
+          //}}}
+        //{{{  found start of span of different pixels on this scanline, find where it ends
+        while (scanline < scanlineEnd) {
+          if (*scanline++ != *prevFrameScanline++) {
+            spanEnd = scanline;
+            numConsecutiveUnchangedPixels = 0;
+            }
+          else {
+            if (++numConsecutiveUnchangedPixels > kSpanExactThreshold)
+              break;
+            }
+          }
+        //}}}
+        }
+      else {
+       //{{{  handle single last pixel on the row
+       if (*scanline++ == *prevFrameScanline++)
+         break;
+
+       spanStart = scanline - 1;
+       spanEnd = scanline;
+       }
+       //}}}
+
+      span->r.left = spanStart - scanlineStart;
+      span->r.right = spanEnd - scanlineStart;
+      span->r.top = y;
+      span->r.bottom = y+1;
+      span->lastScanRight = span->r.right;
+      span->size = spanEnd - spanStart;
+      if (numSpans > 0)
+        span[-1].next = span;
+      span->next = nullptr;
+
+      span++;
+      if (numSpans++ >= kMaxSpans) {
+        //{{{  error return, could fake up whole screen
+        cLog::log (LOGERROR, "too many spans");
+        return numSpans;
+        }
+        //}}}
+      }
+
+    y += yInc;
+    }
+
+  return numSpans;
   }
 //}}}
 
@@ -962,7 +964,7 @@ bool cLcdTa7601::initialise() {
 
   // backlight
   gpioSetMode (k16BacklightGpio, PI_OUTPUT);
-  gpioWrite (k16BacklightGpio, 1);
+  gpioWrite (k16BacklightGpio, 0);
 
   // 16 d0-d15
   for (int i = 0; i < 16; i++)
