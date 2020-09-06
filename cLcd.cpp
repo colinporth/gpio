@@ -729,9 +729,6 @@ private:
   uint16_t mNumSpans = 0;
   };
 //}}}
-static cOutline mOutline;
-static cScanLine mScanLine;
-static uint8_t mGamma[256];
 
 // cLcd public
 //{{{
@@ -744,6 +741,10 @@ cLcd::~cLcd() {
 
   free (mFrameBuf);
   free (mPrevFrameBuf);
+  free (mSpans);
+
+  delete mOutline;
+  delete mScanLine;
   }
 //}}}
 
@@ -812,6 +813,11 @@ bool cLcd::initialise() {
 
   if (mTypeEnabled)
     setFont (getFreeSansBold(), getFreeSansBoldSize());
+
+  mOutline = new cOutline();
+  mScanLine = new cScanLine();
+  uint8_t mGamma[256];
+
 
   for (unsigned i = 0; i < 256; i++)
     mGamma[i] = (uint8_t)(pow(double(i) / 255.0, 1.6) * 255.0);
@@ -1193,12 +1199,12 @@ void cLcd::line (const uint16_t colour, cPoint p1, cPoint p2) {
 //{{{  anti aliased draw
 //{{{
 void cLcd::aMoveTo (const cPointF& p) {
-  mOutline.moveTo (int(p.x * 256.f), int(p.y * 256.f));
+  mOutline->moveTo (int(p.x * 256.f), int(p.y * 256.f));
   }
 //}}}
 //{{{
 void cLcd::aLineTo (const cPointF& p) {
-  mOutline.lineTo (int(p.x * 256.f), int(p.y * 256.f));
+  mOutline->lineTo (int(p.x * 256.f), int(p.y * 256.f));
   }
 //}}}
 //{{{
@@ -1267,12 +1273,12 @@ void cLcd::aEllipseOutline (const cPointF& centre, const cPointF& radius, float 
 //{{{
 void cLcd::aRender (const uint16_t colour, bool fillNonZero) {
 
-  const sCell* const* sortedCells = mOutline.getSortedCells();
-  uint32_t numCells = mOutline.getNumCells();
+  const sCell* const* sortedCells = mOutline->getSortedCells();
+  uint32_t numCells = mOutline->getNumCells();
   if (!numCells)
     return;
 
-  mScanLine.reset (mOutline.getMinx(), mOutline.getMaxx());
+  mScanLine->reset (mOutline->getMinx(), mOutline->getMaxx());
 
   int coverage = 0;
   const sCell* cell = *sortedCells++;
@@ -1294,11 +1300,11 @@ void cLcd::aRender (const uint16_t colour, bool fillNonZero) {
     if (area) {
       uint8_t alpha = calcAlpha ((coverage << 9) - area, fillNonZero);
       if (alpha) {
-        if (mScanLine.isReady (y)) {
-          renderScanLine (colour, &mScanLine);
-          mScanLine.resetSpans();
+        if (mScanLine->isReady (y)) {
+          renderScanLine (colour, mScanLine);
+          mScanLine->resetSpans();
           }
-        mScanLine.addSpan (x, y, 1, mGamma[alpha]);
+        mScanLine->addSpan (x, y, 1, mGamma[alpha]);
         }
       x++;
       }
@@ -1309,17 +1315,17 @@ void cLcd::aRender (const uint16_t colour, bool fillNonZero) {
     if (int16_t(cell->mPackedCoord & 0xFFFF) > x) {
       uint8_t alpha = calcAlpha (coverage << 9, fillNonZero);
       if (alpha) {
-        if (mScanLine.isReady (y)) {
-           renderScanLine (colour, &mScanLine);
-           mScanLine.resetSpans();
+        if (mScanLine->isReady (y)) {
+           renderScanLine (colour, mScanLine);
+           mScanLine->resetSpans();
            }
-         mScanLine.addSpan (x, y, int16_t(cell->mPackedCoord & 0xFFFF) - x, mGamma[alpha]);
+         mScanLine->addSpan (x, y, int16_t(cell->mPackedCoord & 0xFFFF) - x, mGamma[alpha]);
          }
       }
     }
 
-  if (mScanLine.getNumSpans())
-    renderScanLine (colour, &mScanLine);
+  if (mScanLine->getNumSpans())
+    renderScanLine (colour, mScanLine);
   }
 //}}}
 //}}}

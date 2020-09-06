@@ -256,6 +256,7 @@ constexpr uint16_t kWhite       =  0xFFFF;  // 255, 255, 255
 
 struct sSpan;
 class cScanLine;
+class cOutline;
 class cLcd {
 public:
   enum eRotate { e0, e90, e180, e270 };
@@ -378,6 +379,10 @@ private:
   // diff spans
   sSpan* mSpans = nullptr;
   int mNumSpans = 0;
+
+  cOutline* mOutline;
+  cScanLine* mScanLine;
+  uint8_t mGamma[256];
 //}}}
   };
 
