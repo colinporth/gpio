@@ -733,7 +733,6 @@ private:
   uint16_t mNumSpans = 0;
   };
 //}}}
-static uint32_t mNumStamps = 0;
 static cOutline mOutline;
 static cScanLine mScanLine;
 static uint8_t mGamma[256];
@@ -1053,8 +1052,40 @@ void cLcd::copy (const uint16_t* src, cRect& srcRect, const cPoint& dstPoint) {
     //}
   //}
 //}}}
+//{{{
+int cLcd::text (const uint16_t colour, const cPoint& p, const int height, const string& str) {
 
-// simple draw
+  if (mTypeEnabled) {
+    FT_Set_Pixel_Sizes (mFace, 0, height);
+
+    int curX = p.x;
+    for (unsigned i = 0; (i < str.size()) && (curX < getWidth()); i++) {
+      FT_Load_Char (mFace, str[i], FT_LOAD_RENDER);
+      FT_GlyphSlot slot = mFace->glyph;
+
+      int x = curX + slot->bitmap_left;
+      int y = p.y + height - slot->bitmap_top;
+
+      if (slot->bitmap.buffer) {
+        for (unsigned bitmapY = 0; bitmapY < slot->bitmap.rows; bitmapY++) {
+          auto bitmapPtr = slot->bitmap.buffer + (bitmapY * slot->bitmap.pitch);
+          for (unsigned bitmapX = 0; bitmapX < slot->bitmap.width; bitmapX++)
+            pix (colour, *bitmapPtr++, cPoint (x + bitmapX, y + bitmapY));
+          }
+        }
+      curX += slot->advance.x / 64;
+      }
+
+    return curX;
+    }
+
+  cLog::log (LOGERROR, "type not enabled");
+
+  return 0;
+  }
+//}}}
+
+//{{{  simple draw
 //{{{
 void cLcd::rect (const uint16_t colour, const cRect& r) {
 // rect with right,bottom clip
@@ -1089,38 +1120,7 @@ void cLcd::rectOutline (const uint16_t colour, const cRect& r) {
   rect (colour, cRect (r.right-1, r.top, r.right, r.bottom));
   }
 //}}}
-//{{{
-int cLcd::text (const uint16_t colour, const cPoint& p, const int height, const string& str) {
 
-  if (mTypeEnabled) {
-    FT_Set_Pixel_Sizes (mFace, 0, height);
-
-    int curX = p.x;
-    for (unsigned i = 0; (i < str.size()) && (curX < getWidth()); i++) {
-      FT_Load_Char (mFace, str[i], FT_LOAD_RENDER);
-      FT_GlyphSlot slot = mFace->glyph;
-
-      int x = curX + slot->bitmap_left;
-      int y = p.y + height - slot->bitmap_top;
-
-      if (slot->bitmap.buffer) {
-        for (unsigned bitmapY = 0; bitmapY < slot->bitmap.rows; bitmapY++) {
-          auto bitmapPtr = slot->bitmap.buffer + (bitmapY * slot->bitmap.pitch);
-          for (unsigned bitmapX = 0; bitmapX < slot->bitmap.width; bitmapX++)
-            pix (colour, *bitmapPtr++, cPoint (x + bitmapX, y + bitmapY));
-          }
-        }
-      curX += slot->advance.x / 64;
-      }
-
-    return curX;
-    }
-
-  cLog::log (LOGERROR, "type not enabled");
-
-  return 0;
-  }
-//}}}
 //{{{
 void cLcd::ellipse (const uint16_t colour, const uint8_t alpha, cPoint centre, cPoint radius) {
 
@@ -1179,6 +1179,7 @@ void cLcd::ellipseOutline (const uint16_t colour, cPoint centre, cPoint radius) 
 
   }
 //}}}
+
 //{{{
 void cLcd::line (const uint16_t colour, cPoint p1, cPoint p2) {
 
@@ -1213,8 +1214,8 @@ void cLcd::line (const uint16_t colour, cPoint p1, cPoint p2) {
     }
   }
 //}}}
-
-// anti aliased draw
+//}}}
+//{{{  anti aliased draw
 //{{{
 void cLcd::aMoveTo (const cPointF& p) {
   mOutline.moveTo (int(p.x * 256.f), int(p.y * 256.f));
@@ -1244,6 +1245,7 @@ void cLcd::aPointedLine (const cPointF& p1, const cPointF& p2, float width) {
   aLineTo (p1 - perp);
   }
 //}}}
+
 //{{{
 void cLcd::aEllipse (const cPointF& centre, const cPointF& radius, int steps) {
 
@@ -1286,6 +1288,7 @@ void cLcd::aEllipseOutline (const cPointF& centre, const cPointF& radius, float 
     }
   }
 //}}}
+
 //{{{
 uint8_t cLcd::calcAlpha (int area, bool fillNonZero) const {
 
@@ -1345,7 +1348,7 @@ void cLcd::renderScanLine (const uint16_t colour, cScanLine* scanLine) {
         continue;
       }
 
-    mNumStamps++;
+    //for x to getWidth pix(int
 
     //uint32_t dstAddr = uint32_t(mBuffer + y * getWidth() + x);
     //uint32_t stride = getWidth() - numPix;
@@ -1371,7 +1374,6 @@ void cLcd::aRender (const uint16_t colour, bool fillNonZero) {
   if (!numCells)
     return;
 
-  mNumStamps = 0;
   mScanLine.reset (mOutline.getMinx(), mOutline.getMaxx());
 
   int coverage = 0;
@@ -1421,8 +1423,9 @@ void cLcd::aRender (const uint16_t colour, bool fillNonZero) {
   if (mScanLine.getNumSpans())
     renderScanLine (colour, &mScanLine);
 
-  printf ("render cells:%d stamps:%d\n", numCells, mNumStamps);
+  cLog::log (LOGINFO, "render cells:%d", numCells);
   }
+//}}}
 //}}}
 
 //{{{
