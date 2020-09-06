@@ -52,6 +52,7 @@ static FT_Face mFace;
 //          sclk - 23  24 - Ce0
 
 constexpr uint8_t kRegisterGpio = 24;  // parallel and spi
+constexpr uint8_t kBacklightGpio = 24;
 constexpr uint8_t kResetGpio = 25;     // parallel and spi
 
 constexpr uint8_t k16WriteGpio      = 17;
@@ -1603,7 +1604,6 @@ void cLcdSpiHeader::writeDataWord (const uint16_t data) {
 constexpr int16_t kWidth9320 = 240;
 constexpr int16_t kHeight9320 = 320;
 constexpr int kSpiClock9320 = 24000000;
-constexpr uint8_t kBacklightGpio   = 24;
 
 cLcdIli9320::cLcdIli9320 (const cLcd::eRotate rotate, const cLcd::eInfo info, const eMode mode)
   : cLcdSpiHeader(kWidth9320, kHeight9320, rotate, info, mode) {}
