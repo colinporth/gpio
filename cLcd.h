@@ -202,7 +202,7 @@ public:
   void setBacklightOff() { setBacklight (false); }
 
   void clear (const uint16_t colour = kBlack);
-  void clearSnapshot();
+  void snapshot();
   bool present();
 
   void rect (const uint16_t colour, const cRect& r);

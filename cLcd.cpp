@@ -200,7 +200,7 @@ void cLcd::clear (const uint16_t colour) {
   }
 //}}}
 //{{{
-void cLcd::clearSnapshot() {
+void cLcd::snapshot() {
 // start update, snapshot main display to frameBuffer
 
   if (mSnapshotEnabled) {

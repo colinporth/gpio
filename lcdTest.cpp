@@ -76,7 +76,7 @@ int main (int numArgs, char* args[]) {
 
   // snapshot test
   while (true) {
-    lcd->clearSnapshot();
+    lcd->snapshot();
     lcd->present();
     lcd->delayUs (5000);
     }
