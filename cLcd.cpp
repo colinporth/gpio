@@ -816,8 +816,6 @@ bool cLcd::initialise() {
 
   mOutline = new cOutline();
   mScanLine = new cScanLine();
-  uint8_t mGamma[256];
-
 
   for (unsigned i = 0; i < 256; i++)
     mGamma[i] = (uint8_t)(pow(double(i) / 255.0, 1.6) * 255.0);
