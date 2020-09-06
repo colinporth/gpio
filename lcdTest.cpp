@@ -80,6 +80,7 @@ int main (int numArgs, char* args[]) {
   while (true) {
     lcd->snapshot();
     lcd->present();
+    lcd->setBacklightOn();
     lcd->delayUs (5000);
     }
 
