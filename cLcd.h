@@ -2,6 +2,7 @@
 #pragma once
 #include <cstdint>
 #include <string>
+#include <math.h>
 
 //{{{
 struct cPoint {
@@ -135,6 +136,97 @@ public:
   int16_t bottom;
   };
 //}}}
+//{{{
+struct cPointF {
+public:
+  //{{{
+  cPointF()  {
+    x = 0;
+    y = 0;
+    }
+  //}}}
+  //{{{
+  cPointF (float x, float y) {
+    this->x = x;
+    this->y = y;
+    }
+  //}}}
+
+  //{{{
+  cPointF operator - (const cPointF& point) const {
+    return cPointF (x - point.x, y - point.y);
+    }
+  //}}}
+  //{{{
+  cPointF operator + (const cPointF& point) const {
+    return cPointF (x + point.x, y + point.y);
+    }
+  //}}}
+  //{{{
+  cPointF operator * (const float s) const {
+    return cPointF (x * s, y * s);
+    }
+  //}}}
+  //{{{
+  cPointF operator / (const float s) const {
+    return cPointF (x / s, y / s);
+    }
+  //}}}
+
+  //{{{
+  const cPointF& operator += (const cPoint& point)  {
+    x += point.x;
+    y += point.y;
+    return *this;
+    }
+  //}}}
+  //{{{
+  const cPointF& operator -= (const cPoint& point)  {
+    x -= point.x;
+    y -= point.y;
+    return *this;
+    }
+  //}}}
+  //{{{
+  const cPointF& operator *= (const float s)  {
+    x *= s;
+    y *= s;
+    return *this;
+    }
+  //}}}
+  //{{{
+  const cPointF& operator /= (const float s)  {
+    x /= s;
+    y /= s;
+    return *this;
+    }
+  //}}}
+
+  //{{{
+  bool inside (const cPointF& pos) const {
+  // return pos inside rect formed by us as size
+    return pos.x >= 0 && pos.x < x && pos.y >= 0 && pos.y < y;
+    }
+  //}}}
+  //{{{
+  float magnitude() const {
+  // return magnitude of point as vector
+    return sqrt ((x*x) + (y*y));
+    }
+  //}}}
+
+  //{{{
+  cPointF perp() {
+    float mag = magnitude();
+    return cPointF (-y / mag, x / mag);
+    }
+  //}}}
+
+  float x;
+  float y;
+  };
+
+//}}}
 //{{{  colours - uint16 RGB565
 constexpr uint16_t kBlue        =  0x001F;  //   0,   0, 255
 constexpr uint16_t kNavy        =  0x000F;  //   0,   0, 128
@@ -157,6 +249,7 @@ constexpr uint16_t kWhite       =  0xFFFF;  // 255, 255, 255
 //}}}
 
 struct sSpan;
+class cScanLine;
 class cLcd {
 public:
   enum eRotate { e0, e90, e180, e270 };
@@ -202,6 +295,18 @@ public:
   void ellipse (const uint16_t colour, const uint8_t alpha, cPoint centre, cPoint radius);
   void ellipseOutline (const uint16_t colour, cPoint centre, cPoint radius);
   void line (const uint16_t colour, cPoint p1, cPoint p2);
+  //void grad (const uint16_t colTL, const uint16_t colTR,
+  //           const uint16_t  colBL, const uint16_t const uint16_t, const cRect& r);
+
+  void aMoveTo (const cPointF& p);
+  void aLineTo (const cPointF& p);
+  void aWideLine (const cPointF& p1, const cPointF& p2, float width);
+  void aPointedLine (const cPointF& p1, const cPointF& p2, float width);
+  void aEllipse (const cPointF& centre, const cPointF& radius, int steps);
+  void aEllipseOutline (const cPointF& centre, const cPointF& radius, float width, int steps);
+  uint8_t calcAlpha (int area, bool fillNonZero) const;
+  void renderScanLine (const uint16_t colour, cScanLine* scanLine);
+  void aRender (const uint16_t colour, bool fillNonZero);
 
   void delayUs (const int us);
   double timeUs();
