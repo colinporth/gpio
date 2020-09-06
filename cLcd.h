@@ -188,7 +188,6 @@ public:
 
   virtual bool initialise();
 
-  // dimensions
   constexpr uint16_t getWidth() { return mWidth; }
   constexpr uint16_t getHeight() { return mHeight; }
   constexpr uint32_t getNumPixels() { return mWidth * mHeight; }
@@ -243,14 +242,15 @@ protected:
 //}}}
 //{{{
 private:
-  // info
-  int getUpdateUs() { return mUpdateUs; }
+  // get info
   int getUpdatePixels() { return mUpdatePixels; }
+  int getUpdateUs() { return mUpdateUs; }
   int getDiffUs() { return mDiffUs; }
   int getNumSpans() { return mNumSpans; }
 
   void setFont (const uint8_t* font, const int fontSize);
 
+  // diff
   int diffExact (sSpan* spans);
   int diffCoarse (sSpan* spans);
   int diffSingle (sSpan* spans);
@@ -259,6 +259,7 @@ private:
   static int coarseLinearDiff (uint16_t* frameBuf, uint16_t* prevFrameBuf, uint16_t* frameBufEnd);
   static int coarseLinearDiffBack (uint16_t* frameBuf, uint16_t* prevFrameBuf, uint16_t* frameBufEnd);
 
+  // vars
   const bool mSnapshotEnabled;
   const bool mTypeEnabled;
 
@@ -314,7 +315,7 @@ private:
   };
 //}}}
 
-// spi - data/command register screens
+// spi - data/command register pin screens
 //{{{
 class cLcdSpiRegister : public cLcd {
 public:
@@ -357,7 +358,7 @@ protected:
   };
 //}}}
 
-// spi - no data/command register screens
+// spi - no data/command register pin screens
 //{{{
 class cLcdSpiHeader : public cLcd {
 public:

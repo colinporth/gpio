@@ -1,44 +1,5 @@
-// cLcd.cpp -
-//{{{  includes
-#include "cLcd.h"
-
-#include <cstdint>
-#include <string>
-#include <thread>
-#include <byteswap.h>
-
-#include "pigpio/pigpio.h"
-
-#include "../shared/utils/utils.h"
-#include "../shared/utils/cLog.h"
-#include "fonts/FreeSansBold.h"
-
-using namespace std;
-//}}}
-//{{{  include freetype static library
-#include <ft2build.h>
-#include FT_FREETYPE_H
-
-static FT_Library mLibrary;
-static FT_Face mFace;
-//}}}
-
-constexpr int kMaxSpans = 10000;
-constexpr bool kCoarseDiff = true;
-constexpr int kSpanExactThreshold = 8;
-constexpr int kSpanMergeThreshold = 16;
-//{{{
-struct sSpan {
-  cRect r;
-
-  uint16_t lastScanRight; // scanline bottom-1 can be partial, ends in lastScanRight.
-  uint32_t size;
-
-  sSpan* next;   // linked skip list in array for fast pruning
-  };
-//}}}
-
-//{{{  pins
+// cLcd.cpp
+//{{{  raspberry pi J8 connnector pins
 // parallel 16bit J8
 //      3.3v led -  1  2  - 5v
 //     d2  gpio2 -  3  4  - 5v
@@ -79,8 +40,48 @@ constexpr uint32_t k16DataMask     = 0xFFFF;
 constexpr uint32_t k16WriteMask    = 1 << k16WriteGpio;
 constexpr uint32_t k16WriteClrMask = k16WriteMask | k16DataMask;
 //}}}
+//{{{  includes
+#include "cLcd.h"
 
-// public
+#include <cstdint>
+#include <string>
+#include <thread>
+#include <byteswap.h>
+
+#include "pigpio/pigpio.h"
+
+#include "../shared/utils/utils.h"
+#include "../shared/utils/cLog.h"
+#include "fonts/FreeSansBold.h"
+
+using namespace std;
+//}}}
+//{{{  include freetype static library
+#include <ft2build.h>
+#include FT_FREETYPE_H
+
+static FT_Library mLibrary;
+static FT_Face mFace;
+//}}}
+
+//{{{  span constexpr
+constexpr int kMaxSpans = 10000;
+constexpr bool kCoarseDiff = true;
+constexpr int kSpanExactThreshold = 8;
+constexpr int kSpanMergeThreshold = 16;
+//}}}
+//{{{
+struct sSpan {
+  cRect r;
+
+  uint16_t lastScanRight; // scanline bottom-1 can be partial, ends in lastScanRight.
+  uint32_t size;
+
+  sSpan* next;   // linked skip list in array for fast pruning
+  };
+//}}}
+
+// cLcd public
 //{{{
 cLcd::~cLcd() {
 
@@ -414,7 +415,7 @@ double cLcd::timeUs() {
   }
 //}}}
 
-// protected
+// cLcd protected
 //{{{
 uint32_t cLcd::updateLcdAll() {
 // update all of lcd with single span
@@ -424,7 +425,7 @@ uint32_t cLcd::updateLcdAll() {
   }
 //}}}
 
-// private
+// cLcd private
 //{{{
 void cLcd::setFont (const uint8_t* font, const int fontSize)  {
 
@@ -432,7 +433,6 @@ void cLcd::setFont (const uint8_t* font, const int fontSize)  {
   FT_New_Memory_Face (mLibrary, (FT_Byte*)font, fontSize, 0, &mFace);
   }
 //}}}
-
 //{{{
 int cLcd::diffExact (sSpan* spans) {
 // return numSpans
@@ -923,7 +923,7 @@ int cLcd::coarseLinearDiffBack (uint16_t* frameBuf, uint16_t* prevFrameBuf, uint
   }
 //}}}
 
-// parallel 16bit
+// parallel 16bit classes
 //{{{  cLcdTa7601 : public cLcd
 constexpr int16_t kWidthTa7601 = 320;
 constexpr int16_t kHeightTa7601 = 480;
@@ -1315,7 +1315,7 @@ uint32_t cLcdSsd1289::updateLcd (sSpan* spans) {
 //}}}
 //}}}
 
-// spi - data/command register
+// spi - data/command pin classes
 //{{{  cLcdSpiRegister : public cLcdSpi
 //{{{
 cLcdSpiRegister::~cLcdSpiRegister() {
@@ -1574,7 +1574,7 @@ uint32_t cLcdIli9225b::updateLcd (sSpan* spans) {
 //}}}
 //}}}
 
-// spi - no data/command register
+// spi - no data/command pin classes
 //{{{  cLcdSpiHeader : public cLcdSpi
 //{{{
 cLcdSpiHeader::~cLcdSpiHeader() {
