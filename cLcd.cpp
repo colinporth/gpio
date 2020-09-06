@@ -1,4 +1,27 @@
 // cLcd.cpp
+//{{{  includes
+#include "cLcd.h"
+
+#include <cstdint>
+#include <string>
+#include <thread>
+#include <byteswap.h>
+
+#include "pigpio/pigpio.h"
+
+#include "../shared/utils/utils.h"
+#include "../shared/utils/cLog.h"
+#include "fonts/FreeSansBold.h"
+
+using namespace std;
+//}}}
+//{{{  include freetype static library
+#include <ft2build.h>
+#include FT_FREETYPE_H
+
+static FT_Library mLibrary;
+static FT_Face mFace;
+//}}}
 //{{{  raspberry pi J8 connnector pins
 // parallel 16bit J8
 //      3.3v led -  1  2  - 5v
@@ -39,29 +62,6 @@ constexpr uint8_t k16BacklightGpio  = 27;
 constexpr uint32_t k16DataMask     = 0xFFFF;
 constexpr uint32_t k16WriteMask    = 1 << k16WriteGpio;
 constexpr uint32_t k16WriteClrMask = k16WriteMask | k16DataMask;
-//}}}
-//{{{  includes
-#include "cLcd.h"
-
-#include <cstdint>
-#include <string>
-#include <thread>
-#include <byteswap.h>
-
-#include "pigpio/pigpio.h"
-
-#include "../shared/utils/utils.h"
-#include "../shared/utils/cLog.h"
-#include "fonts/FreeSansBold.h"
-
-using namespace std;
-//}}}
-//{{{  include freetype static library
-#include <ft2build.h>
-#include FT_FREETYPE_H
-
-static FT_Library mLibrary;
-static FT_Face mFace;
 //}}}
 
 //{{{  span constexpr
