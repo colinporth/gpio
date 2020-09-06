@@ -2,6 +2,8 @@
 //{{{  includes
 #include "cLcd.h"
 
+#include <cstdint>
+#include <string>
 #include <vector>
 
 #include "../shared/utils/utils.h"
@@ -12,15 +14,16 @@ using namespace std;
 
 int main (int numArgs, char* args[]) {
 
-  vector <string> argStrings;
-  for (int i = 1; i < numArgs; i++)
-    argStrings.push_back (args[i]);
-
   bool fontTest = false;
   cLcd::eRotate rotate = cLcd::e0;
   cLcd::eInfo info = cLcd::eNone;
   cLcd::eMode mode = cLcd::eCoarse;
   eLogLevel logLevel = LOGINFO;
+
+  // dumb command line option parser
+  vector <string> argStrings;
+  for (int i = 1; i < numArgs; i++)
+    argStrings.push_back (args[i]);
 
   for (size_t i = 0; i < argStrings.size(); i++)
     if (argStrings[i] == "90") rotate = cLcd::e90;
@@ -38,7 +41,6 @@ int main (int numArgs, char* args[]) {
       cLog::log (LOGERROR, "unrecognised option " + argStrings[i]);
 
   cLog::init (logLevel, false, "", "gpio");
-
 
   //cLcd* lcd = new cLcdIli9320 (rotate, info, mode);
   cLcd* lcd = new cLcdTa7601 (rotate, info, mode);

@@ -514,9 +514,11 @@ int cLcd::diffExact (sSpan* spans) {
 
       span++;
       if (numSpans++ >= kMaxSpans) {
+        //{{{  error return, could fake up whole screen
         cLog::log (LOGERROR, "too many spans");
         return numSpans;
         }
+        //}}}
       }
 
     y += yInc;
@@ -580,9 +582,11 @@ int cLcd::diffCoarse (sSpan* spans) {
 
         span++;
         if (numSpans++ >= kMaxSpans) {
+          //{{{  error return, could fake up whole screen
           cLog::log (LOGERROR, "too many spans");
           return numSpans;
           }
+          //}}}
         }
       else
         ++x;
@@ -601,7 +605,7 @@ int cLcd::diffCoarse (sSpan* spans) {
 //}}}
 //{{{
 int cLcd::diffSingle (sSpan* spans) {
-// return 1, if single bounding span if different, else 0
+// return 1, if single bounding span is different, else 0
 
   int minY = 0;
   int minX = -1;
@@ -664,11 +668,11 @@ int cLcd::diffSingle (sSpan* spans) {
     //}}}
 
 foundTop:
-  //{{{  found top
   int maxX = -1;
   int maxY = getHeight() - 1;
 
   if (kCoarseDiff) {
+    //{{{  coarse diff
     int numPixels = getWidth() * getHeight();
 
     // coarse diff computes a diff at 8 adjacent pixels at a time
@@ -678,13 +682,14 @@ foundTop:
     // compute the precise diff position here.
     while (firstDiff > 0 && mFrameBuf[firstDiff] == mPrevFrameBuf[firstDiff])
       --firstDiff;
+
     maxX = firstDiff % getWidth();
     maxY = firstDiff / getWidth();
     }
-
+    //}}}
   else {
+    //{{{  fine diff
     scanline = mFrameBuf + (getHeight() - 1)*stride;
-    // same scanline from previous frame, not preceding scanline
     prevFrameScanline = mPrevFrameBuf + (getHeight() - 1)*stride;
 
     while (maxY >= minY) {
@@ -702,7 +707,7 @@ foundTop:
       for (; x >= 0; x -= 4) {
         uint64_t diff = *(uint64_t*)(scanline + x) ^ *(uint64_t*)(prevFrameScanline + x);
         if (diff) {
-          maxX = x + 3 - (__builtin_clzll(diff) >> 4);
+          maxX = x + 3 - (__builtin_clzll (diff) >> 4);
           goto foundBottom;
           }
         }
@@ -712,7 +717,7 @@ foundTop:
       --maxY;
       }
     }
-  //}}}
+    //}}}
 
 foundBottom:
   //{{{  found bottom
@@ -767,7 +772,6 @@ foundRight:
   spans->r.right = rightX+1;
   spans->r.top = minY;
   spans->r.bottom = maxY+1;
-
   spans->lastScanRight = lastScanRight+1;
   spans->size = (spans->r.right - spans->r.left) * (spans->r.bottom - spans->r.top - 1) +
                 (spans->lastScanRight - spans->r.left);
@@ -776,6 +780,8 @@ foundRight:
   return 1;
   }
 //}}}
+
+// cLcd private static
 //{{{
 sSpan* cLcd::merge (sSpan* spans, int pixelThreshold) {
 
@@ -1113,7 +1119,7 @@ uint32_t cLcdTa7601::updateLcd (sSpan* spans) {
       break;
     //}}}
     //{{{
-    case e180: // send whole frame
+    case e180: // send whole frame - should use direction bits
       writeCommandData (0x45, 0x0000);          // GRAM H start address window = 0
       writeCommandData (0x44, kWidthTa7601-1);  // GRAM H   end address window = 320-1
       writeCommandData (0x47, 0x0000);          // GRAM V start address window = 0
