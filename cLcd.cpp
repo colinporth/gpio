@@ -15,7 +15,7 @@
 
 using namespace std;
 //}}}
-//{{{  include static freetype - assumes singleton cLcd 
+//{{{  include static freetype - assumes singleton cLcd
 #include <ft2build.h>
 #include FT_FREETYPE_H
 
@@ -350,7 +350,7 @@ void cLcd::pix (const uint16_t colour, const uint8_t alpha, const cPoint& p) {
 // - Converts  0000000000000000rrrrrggggggbbbbb
 // -     into  00000gggggg00000rrrrr000000bbbbb
 
-  if ((alpha >= 0) && (p.x >= 0) && (p.y > 0) && (p.x < getWidth()) && (p.y < getHeight())) {
+  if ((alpha > 0) && (p.x >= 0) && (p.y >= 0) && (p.x < getWidth()) && (p.y < getHeight())) {
     // clip opaque and offscreen
     if (alpha == 0xFF)
       // simple case - set bigEndianColour frameBuf pixel to littleEndian colour
