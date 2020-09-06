@@ -273,9 +273,6 @@ public:
   cPoint getSize() { return cPoint(mWidth, mHeight); }
   cRect getRect() { return cRect(0,0, mWidth,mHeight); }
 
-  std::string getInfoString();
-  std::string getPaddedInfoString();
-
   virtual void setBacklight (bool on) {}
   void setBacklightOn() { setBacklight (true); }
   void setBacklightOff() { setBacklight (false); }
@@ -345,6 +342,9 @@ private:
   int getUpdateUs() { return mUpdateUs; }
   int getDiffUs() { return mDiffUs; }
   int getNumSpans() { return mNumSpans; }
+
+  std::string getInfoString();
+  std::string getPaddedInfoString();
 
   void setFont (const uint8_t* font, const int fontSize);
 

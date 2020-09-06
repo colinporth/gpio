@@ -101,6 +101,7 @@ struct sSpan {
   sSpan* next;   // linked skip list in array for fast pruning
   };
 //}}}
+
 //{{{
 struct sCell {
 public:
@@ -825,27 +826,6 @@ bool cLcd::initialise() {
 //}}}
 
 //{{{
-string cLcd::getInfoString() {
-// return info string for log display
-
-  return dec(getUpdatePixels()) + "px took:" +
-         dec(getUpdateUs()) + "uS " +
-         dec(getNumSpans()) + "spn took:" +
-         dec(getDiffUs()) + "uS";
-  }
-//}}}
-//{{{
-string cLcd::getPaddedInfoString() {
-// return info string with padded format for on screen display
-
-  return dec(getUpdatePixels(),5,'0') + " " +
-         dec(getUpdateUs(),5,'0') + "uS " +
-         dec(getNumSpans(),4,'0') + " " +
-         dec(getDiffUs(),3,'0') + "uS";
-  }
-//}}}
-
-//{{{
 void cLcd::clear (const uint16_t colour) {
 // start update
 
@@ -1454,6 +1434,27 @@ uint32_t cLcd::updateLcdAll() {
 //}}}
 
 // cLcd private
+//{{{
+string cLcd::getInfoString() {
+// return info string for log display
+
+  return dec(getUpdatePixels()) + "px took:" +
+         dec(getUpdateUs()) + "uS " +
+         dec(getNumSpans()) + "spn took:" +
+         dec(getDiffUs()) + "uS";
+  }
+//}}}
+//{{{
+string cLcd::getPaddedInfoString() {
+// return info string with padded format for on screen display
+
+  return dec(getUpdatePixels(),5,'0') + " " +
+         dec(getUpdateUs(),5,'0') + "uS " +
+         dec(getNumSpans(),4,'0') + " " +
+         dec(getDiffUs(),3,'0') + "uS";
+  }
+//}}}
+
 //{{{
 void cLcd::setFont (const uint8_t* font, const int fontSize)  {
 
