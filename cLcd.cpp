@@ -157,7 +157,8 @@ bool cLcd::initialise() {
     cLog::log (LOGINFO, "display %dx%d", mModeInfo.width, mModeInfo.height);
     }
 
-  setFont (getFreeSansBold(), getFreeSansBoldSize());
+  if (mTypeEnabled)
+    setFont (getFreeSansBold(), getFreeSansBoldSize());
 
   return true;
   }
@@ -181,13 +182,6 @@ string cLcd::getPaddedInfoString() {
          dec(getUpdateUs(),5,'0') + "uS " +
          dec(getNumSpans(),4,'0') + " " +
          dec(getDiffUs(),3,'0') + "uS";
-  }
-//}}}
-//{{{
-void cLcd::setFont (const uint8_t* font, const int fontSize)  {
-
-  FT_Init_FreeType (&mLibrary);
-  FT_New_Memory_Face (mLibrary, (FT_Byte*)font, fontSize, 0, &mFace);
   }
 //}}}
 
@@ -375,27 +369,33 @@ void cLcd::copy (const uint16_t* src, cRect& srcRect, const cPoint& dstPoint) {
 //{{{
 int cLcd::text (const uint16_t colour, const cPoint& p, const int height, const string& str) {
 
-  FT_Set_Pixel_Sizes (mFace, 0, height);
+  if (mTypeEnabled) {
+    FT_Set_Pixel_Sizes (mFace, 0, height);
 
-  int curX = p.x;
-  for (unsigned i = 0; (i < str.size()) && (curX < getWidth()); i++) {
-    FT_Load_Char (mFace, str[i], FT_LOAD_RENDER);
-    FT_GlyphSlot slot = mFace->glyph;
+    int curX = p.x;
+    for (unsigned i = 0; (i < str.size()) && (curX < getWidth()); i++) {
+      FT_Load_Char (mFace, str[i], FT_LOAD_RENDER);
+      FT_GlyphSlot slot = mFace->glyph;
 
-    int x = curX + slot->bitmap_left;
-    int y = p.y + height - slot->bitmap_top;
+      int x = curX + slot->bitmap_left;
+      int y = p.y + height - slot->bitmap_top;
 
-    if (slot->bitmap.buffer) {
-      for (unsigned bitmapY = 0; bitmapY < slot->bitmap.rows; bitmapY++) {
-        auto bitmapPtr = slot->bitmap.buffer + (bitmapY * slot->bitmap.pitch);
-        for (unsigned bitmapX = 0; bitmapX < slot->bitmap.width; bitmapX++)
-          pix (colour, *bitmapPtr++, cPoint (x + bitmapX, y + bitmapY));
+      if (slot->bitmap.buffer) {
+        for (unsigned bitmapY = 0; bitmapY < slot->bitmap.rows; bitmapY++) {
+          auto bitmapPtr = slot->bitmap.buffer + (bitmapY * slot->bitmap.pitch);
+          for (unsigned bitmapX = 0; bitmapX < slot->bitmap.width; bitmapX++)
+            pix (colour, *bitmapPtr++, cPoint (x + bitmapX, y + bitmapY));
+          }
         }
+      curX += slot->advance.x / 64;
       }
-    curX += slot->advance.x / 64;
+
+    return curX;
     }
 
-  return curX;
+  cLog::log (LOGERROR, "type not enabled");
+
+  return 0;
   }
 //}}}
 
@@ -425,6 +425,14 @@ uint32_t cLcd::updateLcdAll() {
 //}}}
 
 // private
+//{{{
+void cLcd::setFont (const uint8_t* font, const int fontSize)  {
+
+  FT_Init_FreeType (&mLibrary);
+  FT_New_Memory_Face (mLibrary, (FT_Byte*)font, fontSize, 0, &mFace);
+  }
+//}}}
+
 //{{{
 int cLcd::diffExact (sSpan* spans) {
 // return numSpans
