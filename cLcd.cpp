@@ -255,13 +255,8 @@ private:
         // use next block of sCells
         uint32_t block = mNumCells / mNumCellsInBlock;
         if (block >= mNumBlockOfCells) {
-          // allocate new block
-          auto newCellPtrs = (sCell**)malloc ((mNumBlockOfCells + 1) * sizeof(sCell*));
-          if (mBlockOfCells && mNumBlockOfCells) {
-            memcpy (newCellPtrs, mBlockOfCells, mNumBlockOfCells * sizeof(sCell*));
-            free (mBlockOfCells);
-            }
-          mBlockOfCells = newCellPtrs;
+          // allocate new block of sCells
+          mBlockOfCells = (sCell**)realloc (mBlockOfCells, (mNumBlockOfCells + 1) * sizeof(sCell*));
           mBlockOfCells[mNumBlockOfCells] = (sCell*)malloc (mNumCellsInBlock * sizeof(sCell));
           mNumBlockOfCells++;
           cLog::log (LOGINFO, "allocated new blockOfCells %d of %d", block, mNumBlockOfCells);
@@ -298,8 +293,7 @@ private:
 
     // allocate mSortedCells, a contiguous vector of sCell pointers
     if (mNumCells > mNumSortedCells) {
-      free (mSortedCells);
-      mSortedCells = (sCell**)malloc ((mNumCells + 1) * 4);
+      mSortedCells = (sCell**)realloc (mSortedCells, (mNumCells + 1) * 4);
       mNumSortedCells = mNumCells;
       }
 
@@ -938,19 +932,19 @@ void cLcd::pix (const uint16_t colour, const uint8_t alpha, const cPoint& p) {
   if ((alpha > 0) && (p.x >= 0) && (p.y >= 0) && (p.x < getWidth()) && (p.y < getHeight())) {
     // clip opaque and offscreen
     if (alpha == 0xFF)
-      // simple case - set bigEndianColour frameBuf pixel to littleEndian colour
+      // simple case - set frameBuf pixel to colour
       mFrameBuf[(p.y*getWidth()) + p.x] = colour;
     else {
-      // get bigEndianColour frame buffer into littleEndian background
+      // get frameBuf background
       uint32_t background = mFrameBuf[(p.y*getWidth()) + p.x];
 
-      // composite littleEndian colour
+      // composite colour
       uint32_t foreground = colour;
       foreground = (foreground | (foreground << 16)) & 0x07e0f81f;
       background = (background | (background << 16)) & 0x07e0f81f;
       background += (((foreground - background) * ((alpha + 4) >> 3)) >> 5) & 0x07e0f81f;
 
-      // set bigEndianColour frameBuf pixel to littleEndian background result
+      // set frameBuf pixel to background result
       mFrameBuf[(p.y*getWidth()) + p.x] = background | (background >> 16);
       }
     }
@@ -1270,70 +1264,6 @@ void cLcd::aEllipseOutline (const cPointF& centre, const cPointF& radius, float 
   }
 //}}}
 
-//{{{
-uint8_t cLcd::calcAlpha (int area, bool fillNonZero) const {
-
-  int coverage = area >> 9;
-  if (coverage < 0)
-    coverage = -coverage;
-
-  if (!fillNonZero) {
-    coverage &= 0x1FF;
-    if (coverage > 0x100)
-      coverage = 0x200 - coverage;
-    }
-
-  if (coverage > 0xFF)
-    coverage = 0xFF;
-
-  return coverage;
-  }
-//}}}
-//{{{
-void cLcd::renderScanLine (const uint16_t colour, cScanLine* scanLine) {
-
-  // clip top
-  auto y = scanLine->getY();
-  if (y < 0)
-    return;
-
-  // clip bottom
-  if (y >= getHeight())
-    return;
-
-  int baseX = scanLine->getBaseX();
-  uint16_t numSpans = scanLine->getNumSpans();
-
-  cScanLine::iterator span (*scanLine);
-  do {
-    cPoint p (baseX + span.next(),y);
-    auto coverage = (uint8_t*)span.getCoverage();
-
-    // clip left
-    int16_t numPix = span.getNumPix();
-    if (p.x < 0) {
-      numPix += p.x;
-      if (numPix <= 0)
-        continue;
-      coverage -= p.x;
-      p.x = 0;
-      }
-
-    // clip right
-    if (p.x + numPix >= getWidth()) {
-      numPix = getWidth() - p.x;
-      if (numPix <= 0)
-        continue;
-      }
-
-    for (uint16_t i = 0; i < numPix; i++) {
-      pix (colour, *coverage++, p);
-      p.x++;
-      }
-
-    } while (--numSpans);
-  }
-//}}}
 //{{{
 void cLcd::aRender (const uint16_t colour, bool fillNonZero) {
 
@@ -1796,6 +1726,66 @@ int cLcd::diffExact (sSpan* spans) {
   return numSpans;
   }
 //}}}
+//{{{
+void cLcd::renderScanLine (const uint16_t colour, cScanLine* scanLine) {
+
+  // clip top
+  auto y = scanLine->getY();
+  if (y < 0)
+    return;
+
+  // clip bottom
+  if (y >= getHeight())
+    return;
+
+  int baseX = scanLine->getBaseX();
+  uint16_t numSpans = scanLine->getNumSpans();
+
+  cScanLine::iterator span (*scanLine);
+  do {
+    cPoint p (baseX + span.next(), y);
+    auto coverage = (uint8_t*)span.getCoverage();
+
+    // clip left
+    int16_t numPix = span.getNumPix();
+    if (p.x < 0) {
+      numPix += p.x;
+      if (numPix <= 0)
+        continue;
+      coverage -= p.x;
+      p.x = 0;
+      }
+
+    // clip right
+    if (p.x + numPix >= getWidth()) {
+      numPix = getWidth() - p.x;
+      if (numPix <= 0)
+        continue;
+      }
+
+    uint16_t* ptr = mFrameBuf + (p.y * getWidth()) + p.x;
+    for (uint16_t i = 0; i < numPix; i++) {
+      // inline pix without clip and better ptr usage
+      uint8_t alpha = *coverage++;
+      if (alpha == 0xFF)
+        // simple case - set frameBuf pixel to colour
+        *ptr++ = colour;
+      else {
+        // get colour
+        uint32_t foreground = colour;
+        foreground = (foreground | (foreground << 16)) & 0x07e0f81f;
+
+        // get frameBuf background, composite and write back
+        uint32_t background = *ptr;
+        background = (background | (background << 16)) & 0x07e0f81f;
+        background += (((foreground - background) * ((alpha + 4) >> 3)) >> 5) & 0x07e0f81f;
+        *ptr++ = background | (background >> 16);
+        }
+      }
+
+    } while (--numSpans);
+  }
+//}}}
 
 // cLcd private static
 //{{{
@@ -1943,6 +1933,25 @@ int cLcd::coarseLinearDiffBack (uint16_t* frameBuf, uint16_t* prevFrameBuf, uint
     );
 
   return endPtr - frameBuf;
+  }
+//}}}
+//{{{
+uint8_t cLcd::calcAlpha (int area, bool fillNonZero) {
+
+  int coverage = area >> 9;
+  if (coverage < 0)
+    coverage = -coverage;
+
+  if (!fillNonZero) {
+    coverage &= 0x1FF;
+    if (coverage > 0x100)
+      coverage = 0x200 - coverage;
+    }
+
+  if (coverage > 0xFF)
+    coverage = 0xFF;
+
+  return coverage;
   }
 //}}}
 

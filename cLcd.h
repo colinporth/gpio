@@ -309,8 +309,6 @@ public:
   void aPointedLine (const cPointF& p1, const cPointF& p2, float width);
   void aEllipse (const cPointF& centre, const cPointF& radius, int steps);
   void aEllipseOutline (const cPointF& centre, const cPointF& radius, float width, int steps);
-  uint8_t calcAlpha (int area, bool fillNonZero) const;
-  void renderScanLine (const uint16_t colour, cScanLine* scanLine);
   void aRender (const uint16_t colour, bool fillNonZero);
 
   void delayUs (const int us);
@@ -362,6 +360,10 @@ private:
   static sSpan* merge (sSpan* spans, int pixelThreshold);
   static int coarseLinearDiff (uint16_t* frameBuf, uint16_t* prevFrameBuf, uint16_t* frameBufEnd);
   static int coarseLinearDiffBack (uint16_t* frameBuf, uint16_t* prevFrameBuf, uint16_t* frameBufEnd);
+
+  // aa drawing
+  void renderScanLine (const uint16_t colour, cScanLine* scanLine);
+  static uint8_t calcAlpha (int area, bool fillNonZero);
 
   // vars
   const bool mSnapshotEnabled;
