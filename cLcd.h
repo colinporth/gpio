@@ -284,20 +284,22 @@ public:
   void snapshot();
   bool present();
 
-  void rect (const uint16_t colour, const cRect& r);
-  void rect (const uint16_t colour, const uint8_t alpha, const cRect& r);
-  void rectOutline (const uint16_t colour, const cRect& r);
   void pix (const uint16_t colour, const uint8_t alpha, const cPoint& p);
   void copy (const uint16_t* src);
   void copy (const uint16_t* src, cRect& srcRect, const cPoint& dstPoint);
   int text (const uint16_t colour, const cPoint& p, const int height, const std::string& str);
-
-  void ellipse (const uint16_t colour, const uint8_t alpha, cPoint centre, cPoint radius);
-  void ellipseOutline (const uint16_t colour, cPoint centre, cPoint radius);
-  void line (const uint16_t colour, cPoint p1, cPoint p2);
   //void grad (const uint16_t colTL, const uint16_t colTR,
   //           const uint16_t  colBL, const uint16_t const uint16_t, const cRect& r);
 
+  // simple draw
+  void rect (const uint16_t colour, const cRect& r);
+  void rect (const uint16_t colour, const uint8_t alpha, const cRect& r);
+  void rectOutline (const uint16_t colour, const cRect& r);
+  void ellipse (const uint16_t colour, const uint8_t alpha, cPoint centre, cPoint radius);
+  void ellipseOutline (const uint16_t colour, cPoint centre, cPoint radius);
+  void line (const uint16_t colour, cPoint p1, cPoint p2);
+
+  // anti aliased draw
   void aMoveTo (const cPointF& p);
   void aLineTo (const cPointF& p);
   void aWideLine (const cPointF& p1, const cPointF& p2, float width);

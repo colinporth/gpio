@@ -946,40 +946,6 @@ bool cLcd::present() {
 //}}}
 
 //{{{
-void cLcd::rect (const uint16_t colour, const cRect& r) {
-// rect with right,bottom clip
-
-  int16_t xmax = min (r.right, (int16_t)getWidth());
-  int16_t ymax = min (r.bottom, (int16_t)getHeight());
-
-  for (int16_t y = r.top; y < ymax; y++) {
-    uint16_t* ptr = mFrameBuf + y*getWidth() + r.left;
-    for (int16_t x = r.left; x < xmax; x++)
-      *ptr++ = colour;
-    }
-  }
-//}}}
-//{{{
-void cLcd::rect (const uint16_t colour, const uint8_t alpha, const cRect& r) {
-
-  uint16_t xmax = min (r.right, (int16_t)getWidth());
-  uint16_t ymax = min (r.bottom, (int16_t)getHeight());
-
-  for (int16_t y = r.top; y < ymax; y++)
-    for (int16_t x = r.left; x < xmax; x++)
-      pix (colour, alpha, cPoint(x, y));
-  }
-//}}}
-//{{{
-void cLcd::rectOutline (const uint16_t colour, const cRect& r) {
-
-  rect (colour, cRect (r.left, r.top, r.right, r.top+1));
-  rect (colour, cRect (r.left, r.bottom-1, r.right, r.bottom));
-  rect (colour, cRect (r.left, r.top, r.left+1, r.bottom));
-  rect (colour, cRect (r.right-1, r.top, r.right, r.bottom));
-  }
-//}}}
-//{{{
 void cLcd::pix (const uint16_t colour, const uint8_t alpha, const cPoint& p) {
 // blend with clip
 // magical rgb565 alpha composite
@@ -1028,6 +994,102 @@ void cLcd::copy (const uint16_t* src, cRect& srcRect, const cPoint& dstPoint) {
   }
 //}}}
 //{{{
+//void cLcd::grad (const uint16_t colTL, const uint16_t colTR,
+                 //const uint16_t  colBL, const uint16_t const uint16_t, const cRect& r) {
+
+  //int32_t rTL = colTL.getR() << 16;
+  //int32_t rTR = colTR.getR() << 16;
+  //int32_t rBL = colBL.getR() << 16;
+  //int32_t rBR = colBR.getR() << 16;
+
+  //int32_t gTL = colTL.getG() << 16;
+  //int32_t gTR = colTR.getG() << 16;
+  //int32_t gBL = colBL.getG() << 16;
+  //int32_t gBR = colBR.getG() << 16;
+
+  //int32_t bTL = colTL.getB() << 16;
+  //int32_t bTR = colTR.getB() << 16;
+  //int32_t bBL = colBL.getB() << 16;
+  //int32_t bBR = colBR.getB() << 16;
+
+  //int32_t rl16 = rTL;
+  //int32_t gl16 = gTL;
+  //int32_t bl16 = bTL;
+  //int32_t rGradl16 = (rBL - rTL) / r.getHeight();
+  //int32_t gGradl16 = (gBL - gTL) / r.getHeight();
+  //int32_t bGradl16 = (bBL - bTL) / r.getHeight();
+
+  //int32_t rr16 = rTR;
+  //int32_t gr16 = gTR;
+  //int32_t br16 = bTR;
+  //int32_t rGradr16 = (rBR - rTR) / r.getHeight();
+  //int32_t gGradr16 = (gBR - gTR) / r.getHeight();
+  //int32_t bGradr16 = (bBR - bTR) / r.getHeight();
+
+  //auto dst = (uint16_t*)mBuffer + r.top * getWidth() + r.left;
+  //for (uint16_t y = r.top; y < r.bottom; y++) {
+    //int32_t rGradx16 = (rr16 - rl16) / r.getWidth();
+    //int32_t gGradx16 = (gr16 - gl16) / r.getWidth();
+    //int32_t bGradx16 = (br16 - bl16) / r.getWidth();
+
+    //int32_t r16 = rl16;
+    //int32_t g16 = gl16;
+    //int32_t b16 = bl16;
+    //for (uint16_t x = r.left; x < r.right; x++) {
+      //*dst++ = (b16 >> 16) | ((g16 >> 11) & 0x07E0) | ((r16 >> 5) & 0xF800);
+      //r16 += rGradx16;
+      //g16 += gGradx16;
+      //b16 += bGradx16;
+      //}
+    //dst += getWidth() - r.getWidth();
+
+    //rl16 += rGradl16;
+    //gl16 += gGradl16;
+    //bl16 += bGradl16;
+
+    //rr16 += rGradr16;
+    //gr16 += gGradr16;
+    //br16 += bGradr16;
+    //}
+  //}
+//}}}
+
+// simple draw
+//{{{
+void cLcd::rect (const uint16_t colour, const cRect& r) {
+// rect with right,bottom clip
+
+  int16_t xmax = min (r.right, (int16_t)getWidth());
+  int16_t ymax = min (r.bottom, (int16_t)getHeight());
+
+  for (int16_t y = r.top; y < ymax; y++) {
+    uint16_t* ptr = mFrameBuf + y*getWidth() + r.left;
+    for (int16_t x = r.left; x < xmax; x++)
+      *ptr++ = colour;
+    }
+  }
+//}}}
+//{{{
+void cLcd::rect (const uint16_t colour, const uint8_t alpha, const cRect& r) {
+
+  uint16_t xmax = min (r.right, (int16_t)getWidth());
+  uint16_t ymax = min (r.bottom, (int16_t)getHeight());
+
+  for (int16_t y = r.top; y < ymax; y++)
+    for (int16_t x = r.left; x < xmax; x++)
+      pix (colour, alpha, cPoint(x, y));
+  }
+//}}}
+//{{{
+void cLcd::rectOutline (const uint16_t colour, const cRect& r) {
+
+  rect (colour, cRect (r.left, r.top, r.right, r.top+1));
+  rect (colour, cRect (r.left, r.bottom-1, r.right, r.bottom));
+  rect (colour, cRect (r.left, r.top, r.left+1, r.bottom));
+  rect (colour, cRect (r.right-1, r.top, r.right, r.bottom));
+  }
+//}}}
+//{{{
 int cLcd::text (const uint16_t colour, const cPoint& p, const int height, const string& str) {
 
   if (mTypeEnabled) {
@@ -1059,7 +1121,6 @@ int cLcd::text (const uint16_t colour, const cPoint& p, const int height, const 
   return 0;
   }
 //}}}
-
 //{{{
 void cLcd::ellipse (const uint16_t colour, const uint8_t alpha, cPoint centre, cPoint radius) {
 
@@ -1152,68 +1213,8 @@ void cLcd::line (const uint16_t colour, cPoint p1, cPoint p2) {
     }
   }
 //}}}
-//{{{
-//void cLcd::grad (const uint16_t colTL, const uint16_t colTR,
-                 //const uint16_t  colBL, const uint16_t const uint16_t, const cRect& r) {
 
-  //int32_t rTL = colTL.getR() << 16;
-  //int32_t rTR = colTR.getR() << 16;
-  //int32_t rBL = colBL.getR() << 16;
-  //int32_t rBR = colBR.getR() << 16;
-
-  //int32_t gTL = colTL.getG() << 16;
-  //int32_t gTR = colTR.getG() << 16;
-  //int32_t gBL = colBL.getG() << 16;
-  //int32_t gBR = colBR.getG() << 16;
-
-  //int32_t bTL = colTL.getB() << 16;
-  //int32_t bTR = colTR.getB() << 16;
-  //int32_t bBL = colBL.getB() << 16;
-  //int32_t bBR = colBR.getB() << 16;
-
-  //int32_t rl16 = rTL;
-  //int32_t gl16 = gTL;
-  //int32_t bl16 = bTL;
-  //int32_t rGradl16 = (rBL - rTL) / r.getHeight();
-  //int32_t gGradl16 = (gBL - gTL) / r.getHeight();
-  //int32_t bGradl16 = (bBL - bTL) / r.getHeight();
-
-  //int32_t rr16 = rTR;
-  //int32_t gr16 = gTR;
-  //int32_t br16 = bTR;
-  //int32_t rGradr16 = (rBR - rTR) / r.getHeight();
-  //int32_t gGradr16 = (gBR - gTR) / r.getHeight();
-  //int32_t bGradr16 = (bBR - bTR) / r.getHeight();
-
-  //auto dst = (uint16_t*)mBuffer + r.top * getWidth() + r.left;
-  //for (uint16_t y = r.top; y < r.bottom; y++) {
-    //int32_t rGradx16 = (rr16 - rl16) / r.getWidth();
-    //int32_t gGradx16 = (gr16 - gl16) / r.getWidth();
-    //int32_t bGradx16 = (br16 - bl16) / r.getWidth();
-
-    //int32_t r16 = rl16;
-    //int32_t g16 = gl16;
-    //int32_t b16 = bl16;
-    //for (uint16_t x = r.left; x < r.right; x++) {
-      //*dst++ = (b16 >> 16) | ((g16 >> 11) & 0x07E0) | ((r16 >> 5) & 0xF800);
-      //r16 += rGradx16;
-      //g16 += gGradx16;
-      //b16 += bGradx16;
-      //}
-    //dst += getWidth() - r.getWidth();
-
-    //rl16 += rGradl16;
-    //gl16 += gGradl16;
-    //bl16 += bGradl16;
-
-    //rr16 += rGradr16;
-    //gr16 += gGradr16;
-    //br16 += bGradr16;
-    //}
-  //}
-//}}}
-
-// antiAliased draw
+// anti aliased draw
 //{{{
 void cLcd::aMoveTo (const cPointF& p) {
   mOutline.moveTo (int(p.x * 256.f), int(p.y * 256.f));
