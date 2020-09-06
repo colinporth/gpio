@@ -1204,7 +1204,7 @@ void cLcd::aLineTo (const cPointF& p) {
 //{{{
 void cLcd::aWideLine (const cPointF& p1, const cPointF& p2, float width) {
 
-  cPointF perp = (p2-p1).perp() * width;
+  cPointF perp = (p2 - p1).perp() * width;
   aMoveTo (p1 + perp);
   aLineTo (p2 + perp);
   aLineTo (p2 - perp);
@@ -1214,7 +1214,7 @@ void cLcd::aWideLine (const cPointF& p1, const cPointF& p2, float width) {
 //{{{
 void cLcd::aPointedLine (const cPointF& p1, const cPointF& p2, float width) {
 
-  cPointF perp = (p2-p1).perp() * width;
+  cPointF perp = (p2 - p1).perp() * width;
   aMoveTo (p1 + perp);
   aLineTo (p2);
   aLineTo (p1 - perp);
