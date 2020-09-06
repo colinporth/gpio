@@ -1,13 +1,7 @@
 // cLcd - rgb565 display classes
 #pragma once
-//{{{  includes
 #include <cstdint>
 #include <string>
-
-#include <bcm_host.h>
-
-#include "../shared/utils/utils.h"
-//}}}
 
 //{{{
 struct cPoint {
@@ -126,16 +120,8 @@ public:
   int16_t getCentreX() { return (left + right)/2; }
   int16_t getCentreY() { return (top + bottom)/2; }
 
-  //{{{
-  std::string getString() {
-    return "l:" + dec(left) + " r:" + dec(right) + " t:" + dec(top) + " b:" + dec(bottom);
-    }
-  //}}}
-  //{{{
-  std::string getYfirstString() {
-    return "t:" + dec(top) + " b:" + dec(bottom) + " l:" + dec(left) + " r:" + dec(right);
-    }
-  //}}}
+  std::string getString();
+  std::string getYfirstString();
   //{{{
   bool inside (const cPoint& pos) {
   // return pos inside rect
@@ -272,12 +258,6 @@ private:
   // diff spans
   sSpan* mSpans = nullptr;
   int mNumSpans = 0;
-
-  // dispmanx
-  DISPMANX_DISPLAY_HANDLE_T mDisplay;
-  DISPMANX_MODEINFO_T mModeInfo;
-  DISPMANX_RESOURCE_HANDLE_T mSnapshot;
-  VC_RECT_T mVcRect;
 //}}}
   };
 

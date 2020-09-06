@@ -15,12 +15,20 @@
 
 using namespace std;
 //}}}
-//{{{  include freetype static library
+//{{{  include static freetype - assumes singleton cLcd 
 #include <ft2build.h>
 #include FT_FREETYPE_H
 
 static FT_Library mLibrary;
 static FT_Face mFace;
+//}}}
+//{{{  include static dispmanx - assumes singleton cLcd
+#include <bcm_host.h>
+
+static DISPMANX_DISPLAY_HANDLE_T mDisplay;
+static DISPMANX_MODEINFO_T mModeInfo;
+static DISPMANX_RESOURCE_HANDLE_T mSnapshot;
+static VC_RECT_T mVcRect;
 //}}}
 //{{{  raspberry pi J8 connnector pins
 // parallel 16bit J8
@@ -66,6 +74,17 @@ constexpr uint32_t k16WriteClrMask = k16WriteMask | k16DataMask;
 constexpr uint8_t kSpiBacklightGpio = 24;
 //}}}
 
+//{{{
+string cRect::getString() {
+  return "l:" + dec(left) + " r:" + dec(right) + " t:" + dec(top) + " b:" + dec(bottom);
+  }
+//}}}
+//{{{
+string cRect::getYfirstString() {
+  return "t:" + dec(top) + " b:" + dec(bottom) + " l:" + dec(left) + " r:" + dec(right);
+  }
+//}}}
+
 //{{{  span constexpr
 constexpr int kMaxSpans = 10000;
 constexpr bool kCoarseDiff = true;
@@ -104,9 +123,9 @@ bool cLcd::initialise() {
                       " version:" + dec (gpioVersion()) +
                       (mRotate == cLcd::e0 ? "" : dec (mRotate*90)) +
                       (mInfo == cLcd::eOverlay ? " overlay" : "") +
-                      (mMode == cLcd::eAll ? " updateAll" :
-                         mMode == cLcd::eSingle ? " updateSingle" :
-                           mMode == cLcd::eCoarse ? " updateCoarse" : " updateExact"));
+                      (mMode == cLcd::eAll ? " all" :
+                         mMode == cLcd::eSingle ? " single" :
+                           mMode == cLcd::eCoarse ? " coarse" : " exact"));
 
   if (gpioInitialise() <= 0)
     return false;
