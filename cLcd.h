@@ -216,13 +216,14 @@ protected:
   virtual uint32_t updateLcd (sSpan* spans) = 0;
   uint32_t updateLcdAll();
 
+  // vars
   const eRotate mRotate;
   const eInfo mInfo;
 
-  int mUpdateUs = 0;
   uint32_t mUpdatePixels = 0;
+  int mUpdateUs = 0;
 
-  // uint16 colour pixels
+  // uint16_t colour frameBufs
   uint16_t* mFrameBuf = nullptr;
   uint16_t* mPrevFrameBuf = nullptr;
 //}}}
