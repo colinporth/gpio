@@ -39,8 +39,7 @@ struct sSpan {
 //}}}
 
 //{{{  pins
-// parallel
-// 16bit J8 header pins, gpio, constexpr
+// parallel 16bit J8
 //      3.3v led -  1  2  - 5v
 //     d2  gpio2 -  3  4  - 5v
 //     d3  gpio3 -  5  6  - 0v
@@ -62,6 +61,12 @@ struct sSpan {
 // unused gpio26 - 37  38 - gpio20 unused
 //            0v - 39  40 - gpio21 unused
 
+// spi J8
+//          3.3v - 17  18 - gpio24 rs / back
+//          mosi - 19  20 - 0v
+//          miso - 21  22 - gpio25 reset
+//          sclk - 23  24 - Ce0
+
 constexpr uint8_t kRegisterGpio = 24;  // parallel and spi
 constexpr uint8_t kResetGpio = 25;     // parallel and spi
 
@@ -73,12 +78,6 @@ constexpr uint8_t k16BacklightGpio  = 27;
 constexpr uint32_t k16DataMask     = 0xFFFF;
 constexpr uint32_t k16WriteMask    = 1 << k16WriteGpio;
 constexpr uint32_t k16WriteClrMask = k16WriteMask | k16DataMask;
-
-// spi
-// 3.3v - 17  18 - gpio24 rs / back
-// mosi - 19  20 - 0v
-// miso - 21  22 - gpio25 reset
-// sclk - 23  24 - Ce0
 //}}}
 
 // public
@@ -92,6 +91,75 @@ cLcd::~cLcd() {
 
   free (mFrameBuf);
   free (mPrevFrameBuf);
+  }
+//}}}
+
+//{{{
+bool cLcd::initialise() {
+
+  cLog::log (LOGINFO, "initialise hwRev:" + hex (gpioHardwareRevision(),8) +
+                      " version:" + dec (gpioVersion()) +
+                      (mRotate == cLcd::e0 ? "" : dec (mRotate*90)) +
+                      (mInfo == cLcd::eOverlay ? " overlay" : "") +
+                      (mMode == cLcd::eAll ? " updateAll" :
+                         mMode == cLcd::eSingle ? " updateSingle" :
+                           mMode == cLcd::eCoarse ? " updateCoarse" : " updateExact"));
+
+  if (gpioInitialise() <= 0)
+    return false;
+
+  // reset lcd
+  gpioSetMode (kResetGpio, PI_OUTPUT);
+  gpioWrite (kResetGpio, 0);
+  gpioDelay (10000);
+  gpioWrite (kResetGpio, 1);
+  gpioDelay (120000);
+
+  // allocate and clear frameBufs, align to data cache
+  mFrameBuf = (uint16_t*)aligned_alloc (128, getNumPixels() * 2);
+  clear();
+
+  if (mMode != eAll) {
+    // allocate prevFrameBuf and diff span list
+    mPrevFrameBuf = mFrameBuf;
+    mFrameBuf = (uint16_t*)aligned_alloc (128, getNumPixels() * 2);
+
+    // allocate lotsa spans
+    mSpans = (sSpan*)malloc (kMaxSpans * sizeof(sSpan));
+    }
+
+  if (mSnapshotEnabled) {
+    // dispmanx init
+    bcm_host_init();
+    mDisplay = vc_dispmanx_display_open (0);
+    if (!mDisplay) {
+      //{{{  error return
+      cLog::log (LOGERROR, "vc_dispmanx_display_open failed");
+      return false;
+      }
+      //}}}
+    if (vc_dispmanx_display_get_info (mDisplay, &mModeInfo)) {
+      //{{{  error return
+      cLog::log (LOGERROR, "vc_dispmanx_display_get_info failed");
+      return false;
+      }
+      //}}}
+    uint32_t imageHandle;
+    mSnapshot = vc_dispmanx_resource_create (VC_IMAGE_RGB565, getWidth(), getHeight(), &imageHandle);
+    if (!mSnapshot) {
+      //{{{  error return
+      cLog::log (LOGERROR, "vc_dispmanx_resource_create failed");
+      return false;
+      }
+      //}}}
+    vc_dispmanx_rect_set (&mVcRect, 0, 0, getWidth(), getHeight());
+
+    cLog::log (LOGINFO, "display %dx%d", mModeInfo.width, mModeInfo.height);
+    }
+
+  setFont (getFreeSansBold(), getFreeSansBoldSize());
+
+  return true;
   }
 //}}}
 
@@ -139,8 +207,12 @@ void cLcd::clear (const uint16_t colour) {
 void cLcd::clearSnapshot() {
 // start update, snapshot main display to frameBuffer
 
-  vc_dispmanx_snapshot (mDisplay, mSnapshot, DISPMANX_TRANSFORM_T(0));
-  vc_dispmanx_resource_read_data (mSnapshot, &mVcRect, mFrameBuf, getWidth() * 2);
+  if (mSnapshotEnabled) {
+    vc_dispmanx_snapshot (mDisplay, mSnapshot, DISPMANX_TRANSFORM_T(0));
+    vc_dispmanx_resource_read_data (mSnapshot, &mVcRect, mFrameBuf, getWidth() * 2);
+    }
+  else
+    cLog::log (LOGERROR, "snapahot not enabled");
   }
 //}}}
 //{{{
@@ -343,71 +415,6 @@ double cLcd::timeUs() {
 //}}}
 
 // protected
-//{{{
-bool cLcd::initialise() {
-
-  cLog::log (LOGINFO, "initialise hwRev:" + hex (gpioHardwareRevision(),8) +
-                      " version:" + dec (gpioVersion()) +
-                      (mRotate == cLcd::e0 ? "" : dec (mRotate*90)) +
-                      (mInfo == cLcd::eOverlay ? " overlay" : "") +
-                      (mMode == cLcd::eAll ? " updateAll" :
-                         mMode == cLcd::eSingle ? " updateSingle" :
-                           mMode == cLcd::eCoarse ? " updateCoarse" : " updateExact"));
-
-  if (gpioInitialise() <= 0)
-    return false;
-
-  // reset lcd
-  gpioSetMode (kResetGpio, PI_OUTPUT);
-  gpioWrite (kResetGpio, 0);
-  gpioDelay (10000);
-  gpioWrite (kResetGpio, 1);
-  gpioDelay (120000);
-
-  // allocate and clear frameBufs, align to data cache
-  mFrameBuf = (uint16_t*)aligned_alloc (128, getNumPixels() * 2);
-  clear();
-
-  if (mMode != eAll) {
-    mPrevFrameBuf = mFrameBuf;
-    mFrameBuf = (uint16_t*)aligned_alloc (128, getNumPixels() * 2);
-
-    // allocate lotsa spans
-    mSpans = (sSpan*)malloc (kMaxSpans * sizeof(sSpan));
-    }
-
-  // dispmanx init
-  bcm_host_init();
-  mDisplay = vc_dispmanx_display_open (0);
-  if (!mDisplay) {
-    //{{{  error return
-    cLog::log (LOGERROR, "vc_dispmanx_display_open failed");
-    return false;
-    }
-    //}}}
-  if (vc_dispmanx_display_get_info (mDisplay, &mModeInfo)) {
-    //{{{  error return
-    cLog::log (LOGERROR, "vc_dispmanx_display_get_info failed");
-    return false;
-    }
-    //}}}
-  uint32_t imageHandle;
-  mSnapshot = vc_dispmanx_resource_create (VC_IMAGE_RGB565, getWidth(), getHeight(), &imageHandle);
-  if (!mSnapshot) {
-    //{{{  error return
-    cLog::log (LOGERROR, "vc_dispmanx_resource_create failed");
-    return false;
-    }
-    //}}}
-  vc_dispmanx_rect_set (&mVcRect, 0, 0, getWidth(), getHeight());
-
-  cLog::log (LOGINFO, "display %dx%d", mModeInfo.width, mModeInfo.height);
-
-  setFont (getFreeSansBold(), getFreeSansBoldSize());
-
-  return true;
-  }
-//}}}
 //{{{
 uint32_t cLcd::updateLcdAll() {
 // update all of lcd with single span
@@ -908,50 +915,13 @@ int cLcd::coarseLinearDiffBack (uint16_t* frameBuf, uint16_t* prevFrameBuf, uint
   }
 //}}}
 
-// 16bit parallel
+// parallel 16bit
 //{{{  cLcdTa7601 : public cLcd
 constexpr int16_t kWidthTa7601 = 320;
 constexpr int16_t kHeightTa7601 = 480;
 
 cLcdTa7601::cLcdTa7601 (const cLcd::eRotate rotate, const cLcd::eInfo info, const cLcd::eMode mode)
   : cLcd(kWidthTa7601, kHeightTa7601, rotate, info, mode) {}
-
-//{{{
-void cLcdTa7601::writeCommand (const uint8_t command) {
-// slow down write
-
-  gpioWrite (kRegisterGpio, 0);
-
-  gpioWrite_Bits_0_31_Clear (~command & k16WriteClrMask); // clear lo data bits + k16WrGpio bit lo
-  gpioWrite_Bits_0_31_Clear (~command & k16WriteClrMask); // clear lo data bits + k16WrGpio bit lo
-  gpioWrite_Bits_0_31_Clear (~command & k16WriteClrMask); // clear lo data bits + k16WrGpio bit lo
-
-  gpioWrite_Bits_0_31_Set (command);                      // set hi data bits
-  gpioWrite_Bits_0_31_Set (command);                      // set hi data bits
-  gpioWrite_Bits_0_31_Set (command);                      // set hi data bits
-
-  gpioWrite_Bits_0_31_Set (k16WriteMask);                 // write on k16WrGpio rising edge
-  gpioWrite_Bits_0_31_Set (k16WriteMask);                 // write on k16WrGpio rising edge
-
-  gpioWrite (kRegisterGpio, 1);
-  }
-//}}}
-//{{{
-void cLcdTa7601::writeDataWord (const uint16_t data) {
-// slow down write
-
-  fastGpioWrite_Bits_0_31_Clear (~data & k16WriteClrMask); // clear lo data bits + k16WrGpio bit lo
-  fastGpioWrite_Bits_0_31_Clear (~data & k16WriteClrMask); // clear lo data bits + k16WrGpio bit lo
-  fastGpioWrite_Bits_0_31_Clear (~data & k16WriteClrMask); // clear lo data bits + k16WrGpio bit lo
-
-  fastGpioWrite_Bits_0_31_Set (data);                      // set hi data bits
-  fastGpioWrite_Bits_0_31_Set (data);                      // set hi data bits
-  fastGpioWrite_Bits_0_31_Set (data);                      // set hi data bits
-
-  fastGpioWrite_Bits_0_31_Set (k16WriteMask);              // write on k16WrGpio rising edge
-  fastGpioWrite_Bits_0_31_Set (k16WriteMask);              // write on k16WrGpio rising edge
-  }
-//}}}
 
 //{{{
 bool cLcdTa7601::initialise() {
@@ -1048,6 +1018,44 @@ bool cLcdTa7601::initialise() {
   return true;
   }
 //}}}
+
+//{{{
+void cLcdTa7601::writeCommand (const uint8_t command) {
+// slow down write
+
+  gpioWrite (kRegisterGpio, 0);
+
+  gpioWrite_Bits_0_31_Clear (~command & k16WriteClrMask); // clear lo data bits + k16WrGpio bit lo
+  gpioWrite_Bits_0_31_Clear (~command & k16WriteClrMask); // clear lo data bits + k16WrGpio bit lo
+  gpioWrite_Bits_0_31_Clear (~command & k16WriteClrMask); // clear lo data bits + k16WrGpio bit lo
+
+  gpioWrite_Bits_0_31_Set (command);                      // set hi data bits
+  gpioWrite_Bits_0_31_Set (command);                      // set hi data bits
+  gpioWrite_Bits_0_31_Set (command);                      // set hi data bits
+
+  gpioWrite_Bits_0_31_Set (k16WriteMask);                 // write on k16WrGpio rising edge
+  gpioWrite_Bits_0_31_Set (k16WriteMask);                 // write on k16WrGpio rising edge
+
+  gpioWrite (kRegisterGpio, 1);
+  }
+//}}}
+//{{{
+void cLcdTa7601::writeDataWord (const uint16_t data) {
+// slow down write
+
+  fastGpioWrite_Bits_0_31_Clear (~data & k16WriteClrMask); // clear lo data bits + k16WrGpio bit lo
+  fastGpioWrite_Bits_0_31_Clear (~data & k16WriteClrMask); // clear lo data bits + k16WrGpio bit lo
+  fastGpioWrite_Bits_0_31_Clear (~data & k16WriteClrMask); // clear lo data bits + k16WrGpio bit lo
+
+  fastGpioWrite_Bits_0_31_Set (data);                      // set hi data bits
+  fastGpioWrite_Bits_0_31_Set (data);                      // set hi data bits
+  fastGpioWrite_Bits_0_31_Set (data);                      // set hi data bits
+
+  fastGpioWrite_Bits_0_31_Set (k16WriteMask);              // write on k16WrGpio rising edge
+  fastGpioWrite_Bits_0_31_Set (k16WriteMask);              // write on k16WrGpio rising edge
+  }
+//}}}
+
 //{{{
 uint32_t cLcdTa7601::updateLcd (sSpan* spans) {
 
@@ -1139,39 +1147,6 @@ constexpr int16_t kHeight1289 = 320;
 
 cLcdSsd1289::cLcdSsd1289 (const cLcd::eRotate rotate, const cLcd::eInfo info)
   : cLcd(kWidth1289, kHeight1289, rotate, info, eCoarse) {}
-
-//{{{
-void cLcdSsd1289::writeCommand (const uint8_t command) {
-
-  gpioWrite (kRegisterGpio, 0);
-
-  gpioWrite_Bits_0_31_Clear (~command & k16WriteClrMask); // clear lo data bits + k16WrGpio bit lo
-  gpioWrite_Bits_0_31_Set (command);                      // set hi data bits
-  gpioWrite_Bits_0_31_Set (k16WriteMask);                 // write on k16WrGpio rising edge
-
-  gpioWrite (kRegisterGpio, 1);
-  }
-//}}}
-//{{{
-void cLcdSsd1289::writeDataWord (const uint16_t data) {
-
-  fastGpioWrite_Bits_0_31_Clear (~data & k16WriteClrMask); // clear lo data bits + k16WrGpio bit lo
-  fastGpioWrite_Bits_0_31_Set (data);                      // set hi data bits
-  fastGpioWrite_Bits_0_31_Set (k16WriteMask);              // write on k16WrGpio rising edge
-  }
-//}}}
-//{{{
-void cLcdSsd1289::writeCommandMultiData (const uint8_t command, const uint8_t* dataPtr, const int len) {
-
-  writeCommand (command);
-
-  // send data
-  uint16_t* ptr = (uint16_t*)dataPtr;
-  uint16_t* ptrEnd = (uint16_t*)dataPtr + len/2;
-  while (ptr < ptrEnd)
-    writeDataWord (*ptr++);
-  }
-//}}}
 
 //{{{
 bool cLcdSsd1289::initialise() {
@@ -1277,6 +1252,40 @@ bool cLcdSsd1289::initialise() {
   return true;
   }
 //}}}
+
+//{{{
+void cLcdSsd1289::writeCommand (const uint8_t command) {
+
+  gpioWrite (kRegisterGpio, 0);
+
+  gpioWrite_Bits_0_31_Clear (~command & k16WriteClrMask); // clear lo data bits + k16WrGpio bit lo
+  gpioWrite_Bits_0_31_Set (command);                      // set hi data bits
+  gpioWrite_Bits_0_31_Set (k16WriteMask);                 // write on k16WrGpio rising edge
+
+  gpioWrite (kRegisterGpio, 1);
+  }
+//}}}
+//{{{
+void cLcdSsd1289::writeDataWord (const uint16_t data) {
+
+  fastGpioWrite_Bits_0_31_Clear (~data & k16WriteClrMask); // clear lo data bits + k16WrGpio bit lo
+  fastGpioWrite_Bits_0_31_Set (data);                      // set hi data bits
+  fastGpioWrite_Bits_0_31_Set (k16WriteMask);              // write on k16WrGpio rising edge
+  }
+//}}}
+//{{{
+void cLcdSsd1289::writeCommandMultiData (const uint8_t command, const uint8_t* dataPtr, const int len) {
+
+  writeCommand (command);
+
+  // send data
+  uint16_t* ptr = (uint16_t*)dataPtr;
+  uint16_t* ptrEnd = (uint16_t*)dataPtr + len/2;
+  while (ptr < ptrEnd)
+    writeDataWord (*ptr++);
+  }
+//}}}
+
 //{{{
 uint32_t cLcdSsd1289::updateLcd (sSpan* spans) {
 
@@ -1319,12 +1328,6 @@ constexpr uint8_t kBacklightGpio   = 24;
 
 cLcdIli9320::cLcdIli9320 (const cLcd::eRotate rotate, const cLcd::eInfo info, const eMode mode)
   : cLcdSpiHeader(kWidth9320, kHeight9320, rotate, info, mode) {}
-
-//{{{
-void cLcdIli9320::setBacklight (bool on) {
-  gpioWrite (kBacklightGpio, on ? 1 : 0);
-  }
-//}}}
 
 //{{{
 bool cLcdIli9320::initialise() {
@@ -1406,6 +1409,12 @@ bool cLcdIli9320::initialise() {
   return true;
   }
 //}}}
+//{{{
+void cLcdIli9320::setBacklight (bool on) {
+  gpioWrite (kBacklightGpio, on ? 1 : 0);
+  }
+//}}}
+
 //{{{
 uint32_t cLcdIli9320::updateLcd (sSpan* spans) {
 
@@ -1627,6 +1636,7 @@ bool cLcdSt7735r::initialise() {
   return true;
   }
 //}}}
+
 //{{{
 uint32_t cLcdSt7735r::updateLcd (sSpan* spans) {
 // ignore spans, just send everything for now
@@ -1726,6 +1736,7 @@ bool cLcdIli9225b::initialise() {
   return true;
   }
 //}}}
+
 //{{{
 uint32_t cLcdIli9225b::updateLcd (sSpan* spans) {
 // ignore spans, just send everything for now

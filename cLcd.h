@@ -179,7 +179,8 @@ public:
 
   //{{{
   cLcd (const int16_t width, const int16_t height, const eRotate rotate, const eInfo info, const eMode mode)
-      : mRotate(rotate), mInfo(info), mMode(mode),
+      : mRotate(rotate), mInfo(info), 
+        mSnapshotEnabled(true), mMode(mode),
         mWidth(((rotate == e90) || (rotate == e270)) ? height : width),
         mHeight(((rotate == e90) || (rotate == e270)) ? width : height) {}
   //}}}
@@ -258,7 +259,8 @@ private:
   static int coarseLinearDiff (uint16_t* frameBuf, uint16_t* prevFrameBuf, uint16_t* frameBufEnd);
   static int coarseLinearDiffBack (uint16_t* frameBuf, uint16_t* prevFrameBuf, uint16_t* frameBufEnd);
 
-  eMode mMode = eSingle;
+  const bool mSnapshotEnabled;
+  const eMode mMode = eSingle;
   const uint16_t mWidth;
   const uint16_t mHeight;
 
