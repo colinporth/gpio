@@ -164,8 +164,7 @@ bool cLcd::present() {
     updateLcd (&span);
     }
 
-  if ((mInfo == eLog) || (mInfo == eLogMore))
-    cLog::log (LOGINFO, getInfoString());
+  cLog::log (LOGINFO1, getInfoString());
 
   if ((mMode != eAll) && (mInfo != eOverlay)) {
     // swap buffers
@@ -309,9 +308,7 @@ bool cLcd::initialise() {
   cLog::log (LOGINFO, "initialise hwRev:" + hex (gpioHardwareRevision(),8) +
                       " version:" + dec (gpioVersion()) +
                       (mRotate == cLcd::e0 ? "" : dec (mRotate*90)) +
-                      (mInfo == cLcd::eLog ? " log" :
-                        mInfo == cLcd::eLogMore ? " logMore" :
-                          mInfo == cLcd::eOverlay ? " overlay" : "") +
+                      (mInfo == cLcd::eOverlay ? " overlay" : "") +
                       (mMode == cLcd::eAll ? " updateAll" :
                          mMode == cLcd::eSingle ? " updateSingle" :
                            mMode == cLcd::eCoarse ? " updateCoarse" : " updateExact"));
@@ -1079,8 +1076,7 @@ int cLcdTa7601::updateLcd (sSpan* spans) {
     int numPixels = 0;
     sSpan* it = spans;
     while (it) {
-      if (mInfo == eLogMore)
-        cLog::log (LOGINFO, "span:" + dec(i++) + " " + it->r.getYfirstString());
+      cLog::log (LOGINFO2, "span:" + dec(i++) + " " + it->r.getYfirstString());
       for (int16_t y = it->r.top; y < it->r.bottom; y++) {
         writeCommandData (0x20, (uint16_t)y);            // GRAM V start address of GRAM
         writeCommandData (0x21, (uint16_t)(it->r.left)); // GRAM H start address of GRAM
@@ -1092,8 +1088,7 @@ int cLcdTa7601::updateLcd (sSpan* spans) {
       numPixels += it->r.getNumPixels();
       it = it->next;
       }
-    if (mInfo == eLogMore)
-      cLog::log (LOGINFO, "----------------------------");
+    cLog::log (LOGINFO2, "----------------------------");
     return numPixels;
     }
   else {
