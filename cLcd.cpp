@@ -422,6 +422,99 @@ int cLcd::text (const uint16_t colour, const cPoint& p, const int height, const 
 //}}}
 
 //{{{
+void cLcd::ellipse (const uint16_t colour, const uint8_t alpha, cPoint centre, cPoint radius) {
+
+  if (!radius.x)
+    return;
+  if (!radius.y)
+    return;
+
+  int x1 = 0;
+  int y1 = -radius.x;
+  int err = 2 - 2*radius.x;
+  float k = (float)radius.y / radius.x;
+
+  do {
+    rect (colour, alpha, cRect (centre.x-(uint16_t)(x1 / k), centre.y + y1,
+                                centre.x-(uint16_t)(x1 / k) + 2*(uint16_t)(x1 / k) + 1, centre.y  + y1 + 1));
+    rect (colour, alpha, cRect (centre.x-(uint16_t)(x1 / k), centre.y  - y1,
+                                centre.x-(uint16_t)(x1 / k) + 2*(uint16_t)(x1 / k) + 1, centre.y  - y1 + 1));
+
+    int e2 = err;
+    if (e2 <= x1) {
+      err += ++x1 * 2 + 1;
+      if (-y1 == centre.x && e2 <= y1)
+        e2 = 0;
+      }
+    if (e2 > y1)
+      err += ++y1*2 + 1;
+    } while (y1 <= 0);
+  }
+//}}}
+//{{{
+void cLcd::ellipseOutline (const uint16_t colour, cPoint centre, cPoint radius) {
+
+  int x = 0;
+  int y = -radius.y;
+
+  int err = 2 - 2 * radius.x;
+  float k = (float)radius.y / (float)radius.x;
+
+  do {
+    pix (colour, 0xFF, centre + cPoint (-(int16_t)(x / k), y));
+    pix (colour, 0xFF, centre + cPoint ((int16_t)(x / k), y));
+    pix (colour, 0xFF, centre + cPoint ((int16_t)(x / k), -y));
+    pix (colour, 0xFF, centre + cPoint (- (int16_t)(x / k), - y));
+
+    int e2 = err;
+    if (e2 <= x) {
+      err += ++x * 2 + 1;
+      if (-y == x && e2 <= y)
+        e2 = 0;
+      }
+
+    if (e2 > y)
+      err += ++y *2 + 1;
+    } while (y <= 0);
+
+  }
+//}}}
+//{{{
+void cLcd::line (const uint16_t colour, cPoint p1, cPoint p2) {
+
+  int16_t deltax = abs(p2.x - p1.x); // The difference between the x's
+  int16_t deltay = abs(p2.y - p1.y); // The difference between the y's
+
+  cPoint p = p1;
+  cPoint inc1 ((p2.x >= p1.x) ? 1 : -1, (p2.y >= p1.y) ? 1 : -1);
+  cPoint inc2 = inc1;
+
+  int16_t numAdd = (deltax >= deltay) ? deltay : deltax;
+  int16_t den = (deltax >= deltay) ? deltax : deltay;
+  if (deltax >= deltay) { // There is at least one x-value for every y-value
+    inc1.x = 0;            // Don't change the x when numerator >= denominator
+    inc2.y = 0;            // Don't change the y for every iteration
+    }
+  else {                  // There is at least one y-value for every x-value
+    inc2.x = 0;            // Don't change the x for every iteration
+    inc1.y = 0;            // Don't change the y when numerator >= denominator
+    }
+
+  int16_t num = den / 2;
+  int16_t numPixels = den;
+  for (int16_t pixel = 0; pixel <= numPixels; pixel++) {
+    pix (colour, 0xFF, p);
+    num += numAdd;     // Increase the numerator by the top of the fraction
+    if (num >= den) {   // Check if numerator >= denominator
+      num -= den;       // Calculate the new numerator value
+      p += inc1;
+      }
+    p += inc2;
+    }
+  }
+//}}}
+
+//{{{
 void cLcd::delayUs (const int us) {
 // delay in microSeconds
 

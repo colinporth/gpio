@@ -199,6 +199,10 @@ public:
   void copy (const uint16_t* src, cRect& srcRect, const cPoint& dstPoint);
   int text (const uint16_t colour, const cPoint& p, const int height, const std::string& str);
 
+  void ellipse (const uint16_t colour, const uint8_t alpha, cPoint centre, cPoint radius);
+  void ellipseOutline (const uint16_t colour, cPoint centre, cPoint radius);
+  void line (const uint16_t colour, cPoint p1, cPoint p2);
+
   void delayUs (const int us);
   double timeUs();
 
