@@ -15,6 +15,7 @@ using namespace std;
 int main (int numArgs, char* args[]) {
 
   bool fontTest = false;
+  bool drawTest = false;
   cLcd::eRotate rotate = cLcd::e0;
   cLcd::eInfo info = cLcd::eNone;
   cLcd::eMode mode = cLcd::eCoarse;
@@ -36,6 +37,7 @@ int main (int numArgs, char* args[]) {
     else if (argStrings[i] == "e") mode = cLcd::eExact;
     else if (argStrings[i] == "1") logLevel = LOGINFO1;
     else if (argStrings[i] == "2") logLevel = LOGINFO2;
+    else if (argStrings[i] == "d") drawTest = true;
     else if (argStrings[i] == "f") fontTest = true;
     else
       cLog::log (LOGERROR, "unrecognised option " + argStrings[i]);
@@ -46,6 +48,26 @@ int main (int numArgs, char* args[]) {
   cLcd* lcd = new cLcdTa7601 (rotate, info, mode);
   if (!lcd->initialise())
     return 0;
+
+  if (drawTest) {
+    //{{{  draw test
+    while (true) {
+      int height = 8;
+      while (height < 100) {
+        lcd->clear (kBlack);
+        lcd->aEllipse (lcd->getRect().getCentre(), cPointF(height, height), 16);
+        lcd->aRender (kYellow, true);
+        lcd->aEllipseOutline (lcd->getRect().getCentre(), cPointF(height, height), 6, 16);
+        lcd->aRender (kBlue, true);
+        lcd->present();
+
+        lcd->setBacklightOn();
+        lcd->delayUs (10000);
+        height += 2;
+        }
+      }
+    }
+    //}}}
 
   if (fontTest) {
     //{{{  font test

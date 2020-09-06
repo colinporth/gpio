@@ -146,6 +146,12 @@ public:
     }
   //}}}
   //{{{
+  cPointF (const cPoint& p) {
+    this->x = p.x;
+    this->y = p.y;
+    }
+  //}}}
+  //{{{
   cPointF (float x, float y) {
     this->x = x;
     this->y = y;

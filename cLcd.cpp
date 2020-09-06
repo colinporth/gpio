@@ -180,6 +180,7 @@ public:
       addCurCell();
       if (mNumCells == 0)
         return 0;
+
       sortCells();
       mSortRequired = false;
       }
@@ -263,7 +264,7 @@ private:
           mBlockOfCells = newCellPtrs;
           mBlockOfCells[mNumBlockOfCells] = (sCell*)malloc (mNumCellsInBlock * sizeof(sCell));
           mNumBlockOfCells++;
-          printf ("allocated new blockOfCells %d of %d\n", block, mNumBlockOfCells);
+          cLog::log (LOGINFO, "allocated new blockOfCells %d of %d", block, mNumBlockOfCells);
           }
         mCurCellPtr = mBlockOfCells[block];
         }
@@ -1291,58 +1292,45 @@ uint8_t cLcd::calcAlpha (int area, bool fillNonZero) const {
 //{{{
 void cLcd::renderScanLine (const uint16_t colour, cScanLine* scanLine) {
 
-  // yclip top
+  // clip top
   auto y = scanLine->getY();
   if (y < 0)
     return;
 
-  // yclip bottom
+  // clip bottom
   if (y >= getHeight())
     return;
 
-  //ready();
-  //DMA2D->FGPFCCR = (colour.getA() < 255) ? ((colour.getA() << 24) | 0x20000 | DMA2D_INPUT_A8) : DMA2D_INPUT_A8;
-  //DMA2D->FGCOLR = (colour.getR() << 16) | (colour.getG() << 8) | colour.getB();;
-
   int baseX = scanLine->getBaseX();
   uint16_t numSpans = scanLine->getNumSpans();
+
   cScanLine::iterator span (*scanLine);
   do {
-    auto x = baseX + span.next() ;
+    cPoint p (baseX + span.next(),y);
     auto coverage = (uint8_t*)span.getCoverage();
 
-    // xclip left
+    // clip left
     int16_t numPix = span.getNumPix();
-    if (x < 0) {
-      numPix += x;
+    if (p.x < 0) {
+      numPix += p.x;
       if (numPix <= 0)
         continue;
-      coverage -= x;
-      x = 0;
+      coverage -= p.x;
+      p.x = 0;
       }
 
-    // xclip right
-    if (x + numPix >= getWidth()) {
-      numPix = getWidth() - x;
+    // clip right
+    if (p.x + numPix >= getWidth()) {
+      numPix = getWidth() - p.x;
       if (numPix <= 0)
         continue;
       }
 
-    //for x to getWidth pix(int
+    for (uint16_t i = 0; i < numPix; i++) {
+      pix (colour, *coverage++, p);
+      p.x++;
+      }
 
-    //uint32_t dstAddr = uint32_t(mBuffer + y * getWidth() + x);
-    //uint32_t stride = getWidth() - numPix;
-    //ready();
-    //DMA2D->BGPFCCR = DMA2D_INPUT_RGB565;
-    //DMA2D->BGMAR = dstAddr;
-    //DMA2D->OMAR = dstAddr;
-    //DMA2D->BGOR = stride;
-    //DMA2D->OOR = stride;
-    //DMA2D->NLR = (numPix << 16) | 1;
-    //DMA2D->FGMAR = (uint32_t)coverage;
-    //DMA2D->FGOR = 0;
-    //DMA2D->CR = DMA2D_M2M_BLEND | DMA2D_CR_START;
-    //mDma2dWait = eWaitDone;
     } while (--numSpans);
   }
 //}}}
@@ -1402,8 +1390,6 @@ void cLcd::aRender (const uint16_t colour, bool fillNonZero) {
 
   if (mScanLine.getNumSpans())
     renderScanLine (colour, &mScanLine);
-
-  cLog::log (LOGINFO, "render cells:%d", numCells);
   }
 //}}}
 //}}}
