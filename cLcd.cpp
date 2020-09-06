@@ -52,7 +52,6 @@ static FT_Face mFace;
 //          sclk - 23  24 - Ce0
 
 constexpr uint8_t kRegisterGpio = 24;  // parallel and spi
-constexpr uint8_t kBacklightGpio = 24;
 constexpr uint8_t kResetGpio = 25;     // parallel and spi
 
 constexpr uint8_t k16WriteGpio      = 17;
@@ -63,6 +62,8 @@ constexpr uint8_t k16BacklightGpio  = 27;
 constexpr uint32_t k16DataMask     = 0xFFFF;
 constexpr uint32_t k16WriteMask    = 1 << k16WriteGpio;
 constexpr uint32_t k16WriteClrMask = k16WriteMask | k16DataMask;
+
+constexpr uint8_t kSpiBacklightGpio = 24;
 //}}}
 
 //{{{  span constexpr
@@ -1030,6 +1031,11 @@ bool cLcdTa7601::initialise() {
   return true;
   }
 //}}}
+//{{{
+void cLcdTa7601::setBacklight (bool on) {
+  gpioWrite (k16BacklightGpio, on ? 1 : 0);
+  }
+//}}}
 
 //{{{
 void cLcdTa7601::writeCommand (const uint8_t command) {
@@ -1623,8 +1629,8 @@ bool cLcdIli9320::initialise() {
     return false;
 
   // backlight off - active hi
-  gpioSetMode (kBacklightGpio, PI_OUTPUT);
-  gpioWrite (kBacklightGpio, 0);
+  gpioSetMode (kSpiBacklightGpio, PI_OUTPUT);
+  gpioWrite (kSpiBacklightGpio, 0);
 
   // spi mode 3, spi manages ce0 active lo
   mSpiHandle = spiOpen (0, kSpiClock9320, 3);
@@ -1698,7 +1704,7 @@ bool cLcdIli9320::initialise() {
 //}}}
 //{{{
 void cLcdIli9320::setBacklight (bool on) {
-  gpioWrite (kBacklightGpio, on ? 1 : 0);
+  gpioWrite (kSpiBacklightGpio, on ? 1 : 0);
   }
 //}}}
 

@@ -289,6 +289,7 @@ public:
   virtual ~cLcdTa7601() {}
 
   virtual bool initialise();
+  virtual void setBacklight (bool on);
 
 protected:
   virtual void writeCommand (const uint8_t command);
