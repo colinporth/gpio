@@ -35,8 +35,7 @@ public:
 
   //{{{
   cLcd (const int16_t width, const int16_t height, const eRotate rotate, const eInfo info, const eMode mode)
-      : mRotate(rotate), mInfo(info),
-        mMode(mode),
+      : mRotate(rotate), mInfo(info), mMode(mode),
         mWidth(((rotate == e90) || (rotate == e270)) ? height : width),
         mHeight(((rotate == e90) || (rotate == e270)) ? width : height),
         mSnapshotEnabled(true), mTypeEnabled(true) {}

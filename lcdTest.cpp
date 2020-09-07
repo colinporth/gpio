@@ -22,7 +22,8 @@ int main (int numArgs, char* args[]) {
   // dumb command line option parser
   for (int argIndex = 1; argIndex < numArgs; argIndex++) {
     string str (args[argIndex]);
-    if (str == "90") rotate = cLcd::e90;
+    if (str == "0") rotate = cLcd::e0;
+    else if (str == "90") rotate = cLcd::e180;
     else if (str == "180") rotate = cLcd::e180;
     else if (str == "270") rotate = cLcd::e270;
     else if (str == "o") info = cLcd::eOverlay;

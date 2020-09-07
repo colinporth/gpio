@@ -855,11 +855,11 @@ uint32_t cLcdTa7601::updateLcd (sSpan* spans) {
         writeCommandData (0x21, r.left);     // GRAM H start address
         writeCommand (0x22);                 // GRAM write
 
-        uint16_t* ptr = mFrameBuf + (r.top * mWidth) + r.left;
+        uint16_t* ptr = mFrameBuf + (r.top * kWidthTa7601) + r.left;
         for (int16_t y = r.top; y < r.bottom; y++) {
           for (int16_t x = r.left; x < r.right; x++)
             writeDataWord (*ptr++);
-          ptr += mWidth - r.getWidth();
+          ptr += kWidthTa7601 - r.getWidth();
           }
 
         numPixels += r.getNumPixels();
@@ -942,10 +942,10 @@ uint32_t cLcdTa7601::updateLcd (sSpan* spans) {
         writeCommand (0x22);                              // GRAM write
 
         for (int16_t x = r.left; x < r.right; x++) {
-          uint16_t* ptr = mFrameBuf + ((r.bottom-1) * mWidth) + x;
+          uint16_t* ptr = mFrameBuf + ((r.bottom-1) * kHeightTa7601) + x;
           for (int16_t y = r.bottom-1; y >= r.top; y--) {
             writeDataWord (*ptr);
-            ptr -= mWidth;
+            ptr -= kHeightTa7601;
             }
           }
 

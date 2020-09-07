@@ -6,6 +6,7 @@ CCX       = g++
 TARGET    = lcd
 SRCS      = lcdTest.cpp \
 	    cLcd.cpp \
+	    cFrameDiff.cpp \
 	    cDrawAA.cpp \
 	    fonts/FreeSansBold.cpp \
 	    ../shared/utils/cLog.cpp \
