@@ -552,12 +552,12 @@ void cLcd::line (const uint16_t colour, cPoint p1, cPoint p2) {
 //}}}
 //{{{  drawAA
 //{{{
-void cLcd::moveTo (const cPointF& p) {
+void cLcd::moveToAA (const cPointF& p) {
   mDrawAA->moveTo (int(p.x * 256.f), int(p.y * 256.f));
   }
 //}}}
 //{{{
-void cLcd::lineTo (const cPointF& p) {
+void cLcd::lineToAA (const cPointF& p) {
   mDrawAA->lineTo (int(p.x * 256.f), int(p.y * 256.f));
   }
 //}}}
@@ -569,63 +569,63 @@ void cLcd::renderAA (const uint16_t colour, bool fillNonZero) {
 
 // helpers
 //{{{
-void cLcd::wideLine (const cPointF& p1, const cPointF& p2, float width) {
+void cLcd::wideLineAA (const cPointF& p1, const cPointF& p2, float width) {
 
   cPointF perp = (p2 - p1).perp() * width;
-  moveTo (p1 + perp);
-  lineTo (p2 + perp);
-  lineTo (p2 - perp);
-  lineTo (p1 - perp);
+  moveToAA (p1 + perp);
+  lineToAA (p2 + perp);
+  lineToAA (p2 - perp);
+  lineToAA (p1 - perp);
   }
 //}}}
 //{{{
-void cLcd::pointedLine (const cPointF& p1, const cPointF& p2, float width) {
+void cLcd::pointedLineAA (const cPointF& p1, const cPointF& p2, float width) {
 
   cPointF perp = (p2 - p1).perp() * width;
-  moveTo (p1 + perp);
-  lineTo (p2);
-  lineTo (p1 - perp);
+  moveToAA (p1 + perp);
+  lineToAA (p2);
+  lineToAA (p1 - perp);
   }
 //}}}
 
 //{{{
-void cLcd::ellipse (const cPointF& centre, const cPointF& radius, int steps) {
+void cLcd::ellipseAA (const cPointF& centre, const cPointF& radius, int steps) {
 
   // anticlockwise ellipse
   float angle = 0.f;
   float fstep = 360.f / steps;
-  moveTo (centre + cPointF(radius.x, 0.f));
+  moveToAA (centre + cPointF(radius.x, 0.f));
 
   angle += fstep;
   while (angle < 360.f) {
     auto radians = angle * 3.1415926f / 180.0f;
-    lineTo (centre + cPointF (cos(radians) * radius.x, sin(radians) * radius.y));
+    lineToAA (centre + cPointF (cos(radians) * radius.x, sin(radians) * radius.y));
     angle += fstep;
     }
   }
 //}}}
 //{{{
-void cLcd::ellipseOutline (const cPointF& centre, const cPointF& radius, float width, int steps) {
+void cLcd::ellipseOutlineAA (const cPointF& centre, const cPointF& radius, float width, int steps) {
 
   float angle = 0.f;
   float fstep = 360.f / steps;
-  moveTo (centre + cPointF(radius.x, 0.f));
+  moveToAA (centre + cPointF(radius.x, 0.f));
 
   // clockwise ellipse
   angle += fstep;
   while (angle < 360.f) {
     auto radians = angle * 3.1415926f / 180.0f;
-    lineTo (centre + cPointF (cos(radians) * radius.x, sin(radians) * radius.y));
+    lineToAA (centre + cPointF (cos(radians) * radius.x, sin(radians) * radius.y));
     angle += fstep;
     }
 
   // anti clockwise ellipse
-  moveTo (centre + cPointF(radius.x - width, 0.f));
+  moveToAA (centre + cPointF(radius.x - width, 0.f));
 
   angle -= fstep;
   while (angle > 0.f) {
     auto radians = angle * 3.1415926f / 180.0f;
-    lineTo (centre + cPointF (cos(radians) * (radius.x - width), sin(radians) * (radius.y - width)));
+    lineToAA (centre + cPointF (cos(radians) * (radius.x - width), sin(radians) * (radius.y - width)));
     angle -= fstep;
     }
   }
