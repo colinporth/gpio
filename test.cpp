@@ -1,9 +1,6 @@
 // lcdTest.cpp
 //{{{  includes
-#include "cLcd.h"
-
-#include <cstdint>
-#include <string>
+#include "lcd/cLcd.h"
 
 #include "../shared/utils/utils.h"
 #include "../shared/utils/cLog.h"
