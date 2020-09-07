@@ -7,10 +7,12 @@
 #include "../shared/utils/cLog.h"
 using namespace std;
 
-static DISPMANX_DISPLAY_HANDLE_T mDisplay;
-static DISPMANX_MODEINFO_T mModeInfo;
-static DISPMANX_RESOURCE_HANDLE_T mSnapshot;
-static VC_RECT_T mVcRect;
+namespace {
+  DISPMANX_DISPLAY_HANDLE_T mDisplay;
+  DISPMANX_MODEINFO_T mModeInfo;
+  DISPMANX_RESOURCE_HANDLE_T mSnapshot;
+  VC_RECT_T mVcRect;
+  }
 
 // public
 //{{{
@@ -54,6 +56,7 @@ cSnapshot::~cSnapshot() {
 
 //{{{
 void cSnapshot::snap (uint16_t* frameBuf) {
+
   vc_dispmanx_snapshot (mDisplay, mSnapshot, DISPMANX_TRANSFORM_T(0));
   vc_dispmanx_resource_read_data (mSnapshot, &mVcRect, frameBuf, mWidth * 2);
   }
