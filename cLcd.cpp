@@ -1363,10 +1363,13 @@ uint32_t cLcdTa7601::updateLcd (sSpan* spans) {
   uint32_t numPixels = 0;
 
   switch (mRotate) {
-    case e0: { // send spans
+    //{{{
+    case e0: {
       for (sSpan* it = spans; it; it = it->next) {
-        cRect& r = it->r;
-        // !!! left right should be even !!!!
+        // ensure GRAM even H start, end addressses
+        cRect r = it->r;
+        r.left &= 0xFFFE;
+        r.right = (r.right + 1) & 0xFFFE;
         writeCommandData (0x45, r.left);     // GRAM V start address window
         writeCommandData (0x44, r.right-1);  // GRAM V   end address window
         writeCommandData (0x47, r.top);      // GRAM H start address window - even
@@ -1387,55 +1390,68 @@ uint32_t cLcdTa7601::updateLcd (sSpan* spans) {
         }
       break;
       }
-
-    //{{{
-    case  e90: // send whole frame
-      writeCommandData (0x45, 0x0000);          // GRAM H start address window = 0
-      writeCommandData (0x44, kWidthTa7601-1);  // GRAM H   end address window = 320-1
-      writeCommandData (0x47, 0x0000);          // GRAM V start address window = 0
-      writeCommandData (0x46, kHeightTa7601-1); // GRAM V   end address window = 480-1
-      writeCommandData (0x20, 0x0000);          // GRAM V start address
-      writeCommandData (0x21, 0x0000);          // GRAM H start address
-      writeCommand (0x22);
-
-      // !!! simplify the back step at end of line !!!
-      for (int x = 0; x < getWidth(); x++) {
-        uint16_t* ptr = mFrameBuf + x;
-        for (int y = 0; y < getHeight(); y++) {
-          writeDataWord (*ptr);
-          ptr += getWidth();
-          }
-        }
-
-      numPixels = getNumPixels();
-      break;
     //}}}
     //{{{
-    case e180: // send whole frame - should use direction bits
-      writeCommandData (0x45, 0x0000);          // GRAM H start address window = 0
-      writeCommandData (0x44, kWidthTa7601-1);  // GRAM H   end address window = 320-1
-      writeCommandData (0x47, 0x0000);          // GRAM V start address window = 0
-      writeCommandData (0x46, kHeightTa7601-1); // GRAM V   end address window = 480-1
-      writeCommandData (0x20, 0x0000);          // GRAM V start address
-      writeCommandData (0x21, 0x0000);          // GRAM H start address
-      writeCommand (0x22);
-
-      // !!! simplify, can i just reverse scan !!!
-      for (int y = 0; y < getHeight(); y++) {
-        uint16_t* ptr = mFrameBuf + ((getHeight()-1-y) * getWidth());
-        for (int x = 0; x < getWidth(); x++) {
-          writeDataWord (*ptr);
-          ptr--;
-          }
-        }
-
-      numPixels = getNumPixels();
-      break;
-    //}}}
-    //{{{
-    case e270: { // send spans
+    case e90: {
       for (sSpan* it = spans; it; it = it->next) {
-        // ensure GRAM even start, end addressses
+        // ensure GRAM even H start, end addressses
+        cRect r = it->r;
+        r.top &= 0xFFFE;
+        r.bottom = (r.bottom + 1) & 0xFFFE;
+
+        writeCommandData (0x45, kWidthTa7601 - r.bottom); // GRAM H start address window - even
+        writeCommandData (0x44, kWidthTa7601-1 - r.top);  // GRAM H   end address window - even
+        writeCommandData (0x47, r.left);                  // GRAM V start address window
+        writeCommandData (0x46, r.right-1);               // GRAM V   end address window
+
+        writeCommandData (0x20, r.left);                  // GRAM V start address
+        writeCommandData (0x21, kWidthTa7601 - r.bottom); // GRAM H start address
+        writeCommand (0x22);                              // GRAM write
+
+        for (int16_t x = r.right-1; x >= r.left; x--) {
+          uint16_t* ptr = mFrameBuf + (r.top * getWidth()) + x;
+          for (int16_t y = r.top; y < r.bottom; y++) {
+            writeDataWord (*ptr);
+            ptr += getWidth();
+            }
+          }
+
+        numPixels += r.getNumPixels();
+        }
+      break;
+      }
+    //}}}
+    //{{{
+    case e180: {
+      for (sSpan* it = spans; it; it = it->next) {
+        // ensure GRAM even H start, end addressses
+        cRect r = it->r;
+        r.left &= 0xFFFE;
+        r.right = (r.right + 1) & 0xFFFE;
+        writeCommandData (0x45, r.left);     // GRAM V start address window
+        writeCommandData (0x44, r.right-1);  // GRAM V   end address window
+        writeCommandData (0x47, r.top);      // GRAM H start address window - even
+        writeCommandData (0x46, r.bottom-1); // GRAM H   end address window - even
+
+        writeCommandData (0x20, r.top);      // GRAM V start address
+        writeCommandData (0x21, r.left);     // GRAM H start address
+        writeCommand (0x22);                 // GRAM write
+
+        for (int16_t y = r.bottom-1; y >= r.top; y--) {
+          uint16_t* ptr = mFrameBuf + (y * getWidth()) + r.right-1;
+          for (int16_t x = r.right-1; x >= r.left; x--)
+            writeDataWord (*ptr--);
+          }
+
+        numPixels += r.getNumPixels();
+        }
+      break;
+      }
+    //}}}
+    //{{{
+    case e270: {
+      for (sSpan* it = spans; it; it = it->next) {
+        // ensure GRAM even H start, end addressses
         cRect r = it->r;
         r.top &= 0xFFFE;
         r.bottom = (r.bottom + 1) & 0xFFFE;
