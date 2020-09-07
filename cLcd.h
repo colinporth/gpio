@@ -255,8 +255,7 @@ constexpr uint16_t kWhite       =  0xFFFF;  // 255, 255, 255
 //}}}
 
 struct sSpan;
-class cScanLine;
-class cOutline;
+class cDrawAA;
 class cLcd {
 public:
   enum eRotate { e0, e90, e180, e270 };
@@ -308,13 +307,15 @@ public:
   void line (const uint16_t colour, cPoint p1, cPoint p2);
 
   // aa draw
-  void aMoveTo (const cPointF& p);
-  void aLineTo (const cPointF& p);
-  void aWideLine (const cPointF& p1, const cPointF& p2, float width);
-  void aPointedLine (const cPointF& p1, const cPointF& p2, float width);
-  void aEllipse (const cPointF& centre, const cPointF& radius, int steps);
-  void aEllipseOutline (const cPointF& centre, const cPointF& radius, float width, int steps);
-  void aRender (const uint16_t colour, bool fillNonZero);
+  void aaMoveTo (const cPointF& p);
+  void aaLineTo (const cPointF& p);
+  void aaRender (const uint16_t colour, bool fillNonZero);
+
+  // aa draw helpers
+  void aaWideLine (const cPointF& p1, const cPointF& p2, float width);
+  void aaPointedLine (const cPointF& p1, const cPointF& p2, float width);
+  void aaEllipse (const cPointF& centre, const cPointF& radius, int steps);
+  void aaEllipseOutline (const cPointF& centre, const cPointF& radius, float width, int steps);
 
   int text (const uint16_t colour, const cPoint& p, const int height, const std::string& str);
 
@@ -368,10 +369,6 @@ private:
   static int coarseLinearDiff (uint16_t* frameBuf, uint16_t* prevFrameBuf, uint16_t* frameBufEnd);
   static int coarseLinearDiffBack (uint16_t* frameBuf, uint16_t* prevFrameBuf, uint16_t* frameBufEnd);
 
-  // aa drawing
-  void renderScanLine (const uint16_t colour, cScanLine* scanLine);
-  static uint8_t calcAlpha (int area, bool fillNonZero);
-
   // vars
   const bool mSnapshotEnabled;
   const bool mTypeEnabled;
@@ -386,8 +383,7 @@ private:
   sSpan* mSpans = nullptr;
   int mNumSpans = 0;
 
-  cOutline* mOutline;
-  cScanLine* mScanLine;
+  cDrawAA* mDrawAA;
   uint8_t mGamma[256];
 //}}}
   };
