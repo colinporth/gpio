@@ -75,18 +75,6 @@ constexpr uint32_t k16WriteClrMask = k16WriteMask | k16DataMask;
 constexpr uint8_t kSpiBacklightGpio = 24;
 //}}}
 
-//{{{  cRect members
-//{{{
-string cRect::getString() {
-  return "l:" + dec(left) + " r:" + dec(right) + " t:" + dec(top) + " b:" + dec(bottom);
-  }
-//}}}
-//{{{
-string cRect::getYfirstString() {
-  return "t:" + dec(top) + " b:" + dec(bottom) + " l:" + dec(left) + " r:" + dec(right);
-  }
-//}}}
-//}}}
 //{{{  cSpan
 constexpr int kMaxSpans = 10000;
 constexpr bool kCoarseDiff = true;
