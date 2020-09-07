@@ -6,8 +6,30 @@
 
 using namespace std;
 
+constexpr int kMaxSpans = 10000;
+constexpr bool kCoarseDiff = true;
+constexpr int kSpanExactThreshold = 8;
+constexpr int kSpanMergeThreshold = 16;
+
+//{{{
+cFrameDiff::cFrameDiff (const int width, const int height) : mWidth(width), mHeight(height) {
+
+  mPrevFrameBuf = (uint16_t*)aligned_alloc (128, width * height * 2);
+  mSpans = (sSpan*)malloc (kMaxSpans * sizeof(sSpan));
+  }
+//}}}
+//{{{
+cFrameDiff::~cFrameDiff() {
+
+  free (mPrevFrameBuf);
+  free (mSpans);
+  }
+//}}}
+
 //{{{
 uint16_t* cFrameDiff::swap (uint16_t* frameBuf) {
+// just swap pointers with new frameBuf
+
   uint16_t* temp = mPrevFrameBuf;
   mPrevFrameBuf = frameBuf;
   return temp;
@@ -15,12 +37,14 @@ uint16_t* cFrameDiff::swap (uint16_t* frameBuf) {
 //}}}
 //{{{
 void cFrameDiff::copy (uint16_t* frameBuf) {
+// copy from frameBuf
+
   memcpy (mPrevFrameBuf, frameBuf, mWidth * mHeight * 2);
   }
 //}}}
 
 //{{{
-sSpan* cFrameDiff::diffSingle (uint16_t* frameBuf) {
+sSpan* cFrameDiff::single (uint16_t* frameBuf) {
 // return 1, if single bounding span is different, else 0
 
   sSpan* spans = mSpans;
@@ -201,7 +225,7 @@ foundRight:
   }
 //}}}
 //{{{
-sSpan* cFrameDiff::diffCoarse (uint16_t* frameBuf) {
+sSpan* cFrameDiff::coarse (uint16_t* frameBuf) {
 // return numSpans, 4pix (64bit) alignment
 
   sSpan* spans = mSpans;
@@ -277,11 +301,12 @@ sSpan* cFrameDiff::diffCoarse (uint16_t* frameBuf) {
     spans[numSpans-1].next = nullptr;
 
   mNumSpans = numSpans;
+  merge (kSpanMergeThreshold);
   return numSpans > 0 ? mSpans : nullptr;
   }
 //}}}
 //{{{
-sSpan* cFrameDiff::diffExact (uint16_t* frameBuf) {
+sSpan* cFrameDiff::exact (uint16_t* frameBuf) {
 // return numSpans
 
   sSpan* spans = mSpans;
@@ -372,14 +397,17 @@ sSpan* cFrameDiff::diffExact (uint16_t* frameBuf) {
     }
 
   mNumSpans = numSpans;
+  merge (kSpanMergeThreshold);
   return numSpans > 0 ? mSpans : nullptr;
   }
 //}}}
-//{{{
-sSpan* cFrameDiff::merge (sSpan* spans, int pixelThreshold) {
-// need to recalc mNumSpans 
 
-  for (sSpan* i = spans; i; i = i->next) {
+// private
+//{{{
+void cFrameDiff::merge (int pixelThreshold) {
+// !!!! need to recalc mNumSpans !!!!
+
+  for (sSpan* i = mSpans; i; i = i->next) {
     sSpan* prev = i;
     for (sSpan* j = i->next; j; j = j->next) {
       // If the spans i and j are vertically apart, don't attempt to merge span i any further
@@ -417,8 +445,6 @@ sSpan* cFrameDiff::merge (sSpan* spans, int pixelThreshold) {
         prev = j;
       }
     }
-
-  return spans;
   }
 //}}}
 

@@ -2,38 +2,17 @@
 #pragma once
 #include "cPointRect.h"
 
-//{{{  sSpan - diff span list element
-constexpr int kMaxSpans = 10000;
-constexpr bool kCoarseDiff = true;
-constexpr int kSpanExactThreshold = 8;
-constexpr int kSpanMergeThreshold = 16;
-
 struct sSpan {
   cRect r;
-
   uint16_t lastScanRight; // scanline bottom-1 can be partial, ends in lastScanRight.
   uint32_t size;
-
   sSpan* next;   // linked skip list in array for fast pruning
   };
-//}}}
 
 class cFrameDiff {
 public:
-  //{{{
-  cFrameDiff (const int width, const int height) : mWidth(width), mHeight(height) {
-
-    mPrevFrameBuf = (uint16_t*)aligned_alloc (128, width * height * 2);
-    mSpans = (sSpan*)malloc (kMaxSpans * sizeof(sSpan));
-    }
-  //}}}
-  //{{{
-  ~cFrameDiff() {
-
-    free (mPrevFrameBuf);
-    free (mSpans);
-    }
-  //}}}
+  cFrameDiff (const int width, const int height);
+  ~cFrameDiff();
 
   int getNumSpans() { return mNumSpans; }
 
@@ -41,18 +20,19 @@ public:
   void copy (uint16_t* frameBuf);
 
   // diff
-  sSpan* diffSingle (uint16_t* frameBuf);
-  sSpan* diffExact (uint16_t* frameBuf);
-  sSpan* diffCoarse (uint16_t* frameBuf);
-  static sSpan* merge (sSpan* spans, int pixelThreshold);
+  sSpan* single (uint16_t* frameBuf);
+  sSpan* exact (uint16_t* frameBuf);
+  sSpan* coarse (uint16_t* frameBuf);
 
 private:
+  void merge (int pixelThreshold);
+
   static int coarseLinearDiff (uint16_t* frameBuf, uint16_t* prevFrameBuf, uint16_t* frameBufEnd);
   static int coarseLinearDiffBack (uint16_t* frameBuf, uint16_t* prevFrameBuf, uint16_t* frameBufEnd);
 
+  // vars
   const uint16_t mWidth;
   const uint16_t mHeight;
-  //const eMode mMode = eSingle;
 
   uint16_t* mPrevFrameBuf = nullptr;
   sSpan* mSpans = nullptr;

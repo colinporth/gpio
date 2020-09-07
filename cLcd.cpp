@@ -209,19 +209,17 @@ bool cLcd::present() {
     //}}}
     //{{{
     case eSingle :
-      mSpans = mFrameDiff->diffSingle (mFrameBuf);
+      mSpans = mFrameDiff->single (mFrameBuf);
       break;
     //}}}
     //{{{
     case eCoarse :
-      mSpans = mFrameDiff->diffCoarse (mFrameBuf);
-      mFrameDiff->merge (mSpans, kSpanMergeThreshold);
+      mSpans = mFrameDiff->coarse (mFrameBuf);
       break;
     //}}}
     //{{{
     case eExact :
-      mSpans = mFrameDiff->diffExact (mFrameBuf);
-      mFrameDiff->merge (mSpans, kSpanMergeThreshold);
+      mSpans = mFrameDiff->exact (mFrameBuf);
       break;
     //}}}
     }
