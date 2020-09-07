@@ -118,15 +118,17 @@ bool cLcd::initialise() {
   mFrameBuf = (uint16_t*)aligned_alloc (128, getNumPixels() * 2);
   clear();
 
-  if (mMode == eAll) {
-    // allocate single span
-    mSpanAll = (sSpan*)malloc (sizeof (sSpan));
-    mSpanAll->r = getRect();
-    mSpanAll->lastScanRight = mWidth;
-    mSpanAll->size = getNumPixels();
-    mSpanAll->next = nullptr;
-    }
-  else
+  mDrawAA = new cDrawAA();
+
+  // gamma table, !!! duplicate of cDrawAA !!!
+  for (unsigned i = 0; i < 256; i++)
+    mGamma[i] = (uint8_t)(pow(double(i) / 255.0, 1.6) * 255.0);
+
+  // allocate and init sSpan for all of screen
+  mSpanAll = (sSpan*)malloc (sizeof (sSpan));
+  *mSpanAll = { getRect(), mWidth, getNumPixels(), nullptr};
+
+  if (mMode != eAll) 
     mFrameDiff = new cFrameDiff (mWidth, mHeight);
 
   if (mSnapshotEnabled) {
@@ -160,11 +162,6 @@ bool cLcd::initialise() {
 
   if (mTypeEnabled)
     setFont (getFreeSansBold(), getFreeSansBoldSize());
-
-  mDrawAA = new cDrawAA();
-
-  for (unsigned i = 0; i < 256; i++)
-    mGamma[i] = (uint8_t)(pow(double(i) / 255.0, 1.6) * 255.0);
 
   return true;
   }
@@ -248,7 +245,7 @@ bool cLcd::present() {
     text (kWhite, cPoint(0,0), 20, getPaddedInfoString());
 
     // update whole screen with overlays, its saved without them in prevFrameBuffer
-    updateLcdAll();
+    updateLcd (mSpanAll);
     }
 
   cLog::log (LOGINFO1, getInfoString());
@@ -654,16 +651,6 @@ double cLcd::timeUs() {
   }
 //}}}
 
-// cLcd protected
-//{{{
-uint32_t cLcd::updateLcdAll() {
-// update all of lcd with single span
-
-  sSpan span = { getRect(), mWidth, getNumPixels(), nullptr };
-  return updateLcd (&span);
-  }
-//}}}
-
 // cLcd private
 //{{{
 string cLcd::getInfoString() {
@@ -785,7 +772,7 @@ bool cLcdTa7601::initialise() {
   writeCommandData (0x07, 0x0017);  // partial, 8-color, display ON
   delayUs (10000);
 
-  updateLcdAll();
+  updateLcd (mSpanAll);
 
   return true;
   }
@@ -1066,7 +1053,7 @@ bool cLcdSsd1289::initialise() {
       break;
     }
 
-  updateLcdAll();
+  updateLcd (mSpanAll);
 
   return true;
   }
@@ -1250,7 +1237,7 @@ bool cLcdSt7735r::initialise() {
 
   writeCommand (k7335_DISPON); // display ON
 
-  updateLcdAll();
+  updateLcd (mSpanAll);
 
   return true;
   }
@@ -1350,7 +1337,7 @@ bool cLcdIli9225b::initialise() {
   writeCommandData (0x21, 0);
   //}}}
 
-  updateLcdAll();
+  updateLcd (mSpanAll);
 
   return true;
   }
@@ -1481,7 +1468,7 @@ bool cLcdIli9320::initialise() {
       break;
     }
 
-  updateLcdAll();
+  updateLcd (mSpanAll);
 
   return true;
   }

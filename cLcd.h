@@ -105,7 +105,6 @@ protected:
   //}}}
 
   virtual uint32_t updateLcd (sSpan* spans) = 0;
-  uint32_t updateLcdAll();
 
   // vars
   const eRotate mRotate;
@@ -119,6 +118,9 @@ protected:
 
   // uint16_t colour frameBufs
   uint16_t* mFrameBuf = nullptr;
+
+  // span for whole screen
+  sSpan* mSpanAll = nullptr;
 //}}}
 //{{{
 private:
@@ -139,8 +141,6 @@ private:
   int mDiffUs = 0;
 
   // diff spans
-  sSpan* mSpanAll = nullptr;
-
   cDrawAA* mDrawAA = nullptr;
   cFrameDiff* mFrameDiff = nullptr;
   uint8_t mGamma[256];
