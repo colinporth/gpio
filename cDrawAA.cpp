@@ -1,11 +1,11 @@
 // cDrawAA.cpp
 #include "cDrawAA.h"
-
+#include <cstring>
 #include <math.h>
-#include "../shared/utils/utils.h"
-#include "../shared/utils/cLog.h"
 
-using namespace std;
+//#include "../shared/utils/utils.h"
+//#include "../shared/utils/cLog.h"
+//using namespace std;
 
 // cDrawAA public
 //{{{
@@ -140,6 +140,7 @@ void cDrawAA::render (const uint16_t colour, bool fillNonZero, uint16_t* frameBu
   if (mScanLine->getNumSpans())
     renderScanLine (colour, frameBuf, width, height);
 
+  // clear down for next time
   init();
   }
 //}}}
@@ -194,7 +195,7 @@ void cDrawAA::addCurCell() {
         mBlockOfCells = (sCell**)realloc (mBlockOfCells, (mNumBlockOfCells + 1) * sizeof(sCell*));
         mBlockOfCells[mNumBlockOfCells] = (sCell*)malloc (mNumCellsInBlock * sizeof(sCell));
         mNumBlockOfCells++;
-        cLog::log (LOGINFO, "allocated new blockOfCells %d of %d", block, mNumBlockOfCells);
+        //cLog::log (LOGINFO, "allocated new blockOfCells %d of %d", block, mNumBlockOfCells);
         }
       mCurCellPtr = mBlockOfCells[block];
       }

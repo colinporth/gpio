@@ -1,7 +1,5 @@
 // cDrawAA - anti aliased drawing
 #pragma once
-#include <cstdint>
-
 #include "cPointRect.h"
 
 class cDrawAA {

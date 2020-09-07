@@ -47,42 +47,37 @@ int main (int numArgs, char* args[]) {
   if (!lcd->initialise())
     return 0;
 
-  if (draw) {
-    //{{{  draw test
-    while (true) {
-      int height = 8;
-      while (height < 120) {
-        lcd->grad (kBlack, kRed, kYellow, kWhite, lcd->getRect());
+  while (true) {
+    if (draw) {
+      //{{{  draw test
+      float height = 6.f;
+      float maxHeight = 60.f;
 
-        lcd->ellipseAA (lcd->getRect().getCentre(), cPointF(height, height), 16);
+      while (height < maxHeight) {
+        lcd->snapshot();
+        lcd->grad (kBlack, kRed, kYellow, kWhite, cRect (0,0, lcd->getWidth(), int(height)));
+
+        lcd->ellipseAA (cPointF(height/2.f, height/2.f), cPointF(height/2.f, height/2.f), 16);
         lcd->renderAA (kYellow, true);
 
-        lcd->ellipseOutlineAA (lcd->getRect().getCentre(), cPointF(height, height), 6, 16);
+        lcd->ellipseOutlineAA (cPointF(height/2.f, height/2.f), cPointF(height/2.f, height/2.f), height / 4.f, 16);
         lcd->renderAA (kBlue, true);
 
-        cPoint point;
+        cPoint point (int(maxHeight), 0);
         for (char ch = 'A'; ch < 0x7f; ch++) {
           point.x = lcd->text (kWhite, point, height, string(1,ch));
-          if (point.x > lcd->getWidth()) {
-            point.x = 0;
-            point.y += height;
-            if (point.y > lcd->getHeight())
-              break;
-            }
+          if (point.x > lcd->getWidth())
+            break;
           }
+        height += 1;
 
         lcd->present();
-
         lcd->setBacklightOn();
-        lcd->delayUs (10000);
-        height += 4;
+        lcd->delayUs (5000);
         }
-      }
-    }
-    //}}}
-  else {
-    // snapshot
-    while (true) {
+      //}}}
+    else {
+      // snapshot
       lcd->snapshot();
       lcd->present();
       lcd->setBacklightOn();
