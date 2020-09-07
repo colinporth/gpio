@@ -75,6 +75,7 @@ int main (int numArgs, char* args[]) {
         lcd->setBacklightOn();
         lcd->delayUs (5000);
         }
+      }
       //}}}
     else {
       // snapshot
