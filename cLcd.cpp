@@ -2,6 +2,7 @@
 //{{{  includes
 #include "cLcd.h"
 #include "cDrawAA.h"
+#include "cFrameDiff.h"
 
 #include <cstdint>
 #include <string>
@@ -75,22 +76,6 @@ constexpr uint32_t k16WriteClrMask = k16WriteMask | k16DataMask;
 constexpr uint8_t kSpiBacklightGpio = 24;
 //}}}
 
-//{{{  sSpan - diff span list element
-constexpr int kMaxSpans = 10000;
-constexpr bool kCoarseDiff = true;
-constexpr int kSpanExactThreshold = 8;
-constexpr int kSpanMergeThreshold = 16;
-
-struct sSpan {
-  cRect r;
-
-  uint16_t lastScanRight; // scanline bottom-1 can be partial, ends in lastScanRight.
-  uint32_t size;
-
-  sSpan* next;   // linked skip list in array for fast pruning
-  };
-//}}}
-
 // cLcd public
 //{{{
 cLcd::~cLcd() {
@@ -105,6 +90,7 @@ cLcd::~cLcd() {
   free (mSpans);
 
   delete mDrawAA;
+  delete mFrameDiff;
   }
 //}}}
 
@@ -136,14 +122,8 @@ bool cLcd::initialise() {
   if (mMode == eAll)
     // allocate single span
     mSpans = (sSpan*)malloc (sizeof(sSpan));
-  else {
-    // allocate prevFrameBuf and diff span list
-    mPrevFrameBuf = mFrameBuf;
-    mFrameBuf = (uint16_t*)aligned_alloc (128, getNumPixels() * 2);
-
-    // allocate lotsa spans
-    mSpans = (sSpan*)malloc (kMaxSpans * sizeof(sSpan));
-    }
+  else
+    mFrameDiff = new cFrameDiff (mWidth, mHeight);
 
   if (mSnapshotEnabled) {
     // dispmanx init
@@ -162,14 +142,14 @@ bool cLcd::initialise() {
       }
       //}}}
     uint32_t imageHandle;
-    mSnapshot = vc_dispmanx_resource_create (VC_IMAGE_RGB565, getWidth(), getHeight(), &imageHandle);
+    mSnapshot = vc_dispmanx_resource_create (VC_IMAGE_RGB565, mWidth, mHeight, &imageHandle);
     if (!mSnapshot) {
       //{{{  error return
       cLog::log (LOGERROR, "vc_dispmanx_resource_create failed");
       return false;
       }
       //}}}
-    vc_dispmanx_rect_set (&mVcRect, 0, 0, getWidth(), getHeight());
+    vc_dispmanx_rect_set (&mVcRect, 0, 0, mWidth, mHeight);
 
     cLog::log (LOGINFO, "display %dx%d", mModeInfo.width, mModeInfo.height);
     }
@@ -204,7 +184,7 @@ void cLcd::snapshot() {
 
   if (mSnapshotEnabled) {
     vc_dispmanx_snapshot (mDisplay, mSnapshot, DISPMANX_TRANSFORM_T(0));
-    vc_dispmanx_resource_read_data (mSnapshot, &mVcRect, mFrameBuf, getWidth() * 2);
+    vc_dispmanx_resource_read_data (mSnapshot, &mVcRect, mFrameBuf, mWidth * 2);
     }
   else
     cLog::log (LOGERROR, "snapahot not enabled");
@@ -219,40 +199,40 @@ bool cLcd::present() {
   switch (mMode) {
     //{{{
     case eAll :
+      mSpans = new sSpan();
       mSpans->r = getRect();
-      mSpans->lastScanRight = getWidth();
+      mSpans->lastScanRight = mWidth;
       mSpans->size = getNumPixels();
       mSpans->next = nullptr;
-      mNumSpans = 1;
       break;
     //}}}
     //{{{
     case eSingle :
-      mNumSpans = diffSingle (mSpans);
+      mSpans = mFrameDiff->diffSingle (mFrameBuf);
       break;
     //}}}
     //{{{
     case eCoarse :
-      mNumSpans = diffCoarse (mSpans);
-      merge (mSpans, kSpanMergeThreshold);
+      mSpans = mFrameDiff->diffCoarse (mFrameBuf);
+      mFrameDiff->merge (mSpans, kSpanMergeThreshold);
       break;
     //}}}
     //{{{
     case eExact :
-      mNumSpans = diffExact (mSpans);
-      merge (mSpans, kSpanMergeThreshold);
+      mSpans = mFrameDiff->diffExact (mFrameBuf);
+      mFrameDiff->merge (mSpans, kSpanMergeThreshold);
       break;
     //}}}
     }
   mDiffUs = int((timeUs() - diffStartTime) * 1000000.0);
 
-  if (!mNumSpans) {// nothing changed
+  if (!mSpans) {// nothing changed
     mUpdateUs = 0;
     return false;
     }
 
   if ((mInfo == eOverlay) && (mMode != eAll)) // copy frameBuf to prevFrameBuf without overlays
-    memcpy (mPrevFrameBuf, mFrameBuf, getNumPixels() * 2);
+    mFrameDiff->copy (mFrameBuf);
 
   // updateLcd with diff spans list
   double updateStartTime = timeUs();
@@ -274,12 +254,8 @@ bool cLcd::present() {
 
   cLog::log (LOGINFO1, getInfoString());
 
-  if ((mMode != eAll) && (mInfo != eOverlay)) {
-    // swap buffers
-    auto temp = mPrevFrameBuf;
-    mPrevFrameBuf = mFrameBuf;
-    mFrameBuf = temp;
-    }
+  if ((mMode != eAll) && (mInfo != eOverlay))
+    mFrameBuf = mFrameDiff->swap (mFrameBuf);
 
   return true;
   }
@@ -295,14 +271,14 @@ void cLcd::pix (const uint16_t colour, const uint8_t alpha, const cPoint& p) {
 // - Converts  0000000000000000rrrrrggggggbbbbb
 // -     into  00000gggggg00000rrrrr000000bbbbb
 
-  if ((alpha > 0) && (p.x >= 0) && (p.y >= 0) && (p.x < getWidth()) && (p.y < getHeight())) {
+  if ((alpha > 0) && (p.x >= 0) && (p.y >= 0) && (p.x < mWidth) && (p.y < mHeight)) {
     // clip opaque and offscreen
     if (alpha == 0xFF)
       // simple case - set frameBuf pixel to colour
-      mFrameBuf[(p.y*getWidth()) + p.x] = colour;
+      mFrameBuf[(p.y*mWidth) + p.x] = colour;
     else {
       // get frameBuf back
-      uint32_t back = mFrameBuf[(p.y*getWidth()) + p.x];
+      uint32_t back = mFrameBuf[(p.y*mWidth) + p.x];
 
       // composite colour
       uint32_t fore = colour;
@@ -311,7 +287,7 @@ void cLcd::pix (const uint16_t colour, const uint8_t alpha, const cPoint& p) {
       back += (((fore - back) * ((alpha + 4) >> 3)) >> 5) & 0x07e0f81f;
 
       // set frameBuf pixel to back result
-      mFrameBuf[(p.y*getWidth()) + p.x] = back | (back >> 16);
+      mFrameBuf[(p.y*mWidth) + p.x] = back | (back >> 16);
       }
     }
   }
@@ -321,7 +297,7 @@ void cLcd::copy (const uint16_t* src, cRect& srcRect, const uint16_t srcStride, 
 // copy line by line
 
   for (int y = 0; y < srcRect.getHeight(); y++)
-    memcpy (mFrameBuf + ((dstPoint.y + y) * getWidth()) + dstPoint.x,
+    memcpy (mFrameBuf + ((dstPoint.y + y) * mWidth) + dstPoint.x,
                   src + ((srcRect.top + y) * srcStride) + srcRect.left,
             srcRect.getWidth() * 2);
   }
@@ -331,12 +307,12 @@ void cLcd::copy (const uint16_t* src, cRect& srcRect, const uint16_t srcStride, 
 void cLcd::hGrad (const uint16_t colourL, const uint16_t colourR, const cRect& r) {
 // clip right, bottom, should do left top
 
-  int16_t xmax = min (r.right, (int16_t)getWidth());
-  int16_t ymax = min (r.bottom, (int16_t)getHeight());
+  int16_t xmax = min (r.right, (int16_t)mWidth);
+  int16_t ymax = min (r.bottom, (int16_t)mHeight);
 
   // draw a line
   int16_t y = r.top;
-  uint16_t* dst = mFrameBuf + (y * getWidth()) + r.left;
+  uint16_t* dst = mFrameBuf + (y * mWidth) + r.left;
   for (uint16_t x = r.left; x < xmax; x++) {
     uint32_t fore = colourR;
     fore = (fore | (fore << 16)) & 0x07e0f81f;
@@ -353,22 +329,22 @@ void cLcd::hGrad (const uint16_t colourL, const uint16_t colourR, const cRect& r
   y++;
 
   // copy line to subsequnt lines
-  uint16_t* src = mFrameBuf + (r.top * getWidth()) + r.left;
+  uint16_t* src = mFrameBuf + (r.top * mWidth) + r.left;
   for (; y < ymax; y++) {
-    uint16_t* dst = mFrameBuf + (y * getWidth()) + r.left;
+    uint16_t* dst = mFrameBuf + (y * mWidth) + r.left;
     memcpy (dst, src, (xmax - r.left) * 2);
-    dst += getWidth();
+    dst += mWidth;
     }
   }
 //}}}
 //{{{
 void cLcd::vGrad (const uint16_t colourT, const uint16_t colourB, const cRect& r) {
 
-  int16_t xmax = min (r.right, (int16_t)getWidth());
-  int16_t ymax = min (r.bottom, (int16_t)getHeight());
+  int16_t xmax = min (r.right, (int16_t)mWidth);
+  int16_t ymax = min (r.bottom, (int16_t)mHeight);
 
   for (uint16_t y = r.top; y < ymax; y++) {
-    uint16_t* dst = mFrameBuf + (y * getWidth()) + r.left;
+    uint16_t* dst = mFrameBuf + (y * mWidth) + r.left;
 
     uint32_t fore = colourB;
     fore = (fore | (fore << 16)) & 0x07e0f81f;
@@ -390,11 +366,11 @@ void cLcd::grad (const uint16_t colourTL ,const uint16_t colourTR,
                  const uint16_t colourBL, const uint16_t colourBR, const cRect& r) {
 // !!! check for losing colour res, is the double gamma right ???
 
-  int16_t xmax = min (r.right, (int16_t)getWidth());
-  int16_t ymax = min (r.bottom, (int16_t)getHeight());
+  int16_t xmax = min (r.right, (int16_t)mWidth);
+  int16_t ymax = min (r.bottom, (int16_t)mHeight);
 
   for (uint16_t y = r.top; y < ymax; y++) {
-    uint16_t* dst = mFrameBuf + (y * getWidth()) + r.left;
+    uint16_t* dst = mFrameBuf + (y * mWidth) + r.left;
 
     for (uint16_t x = r.left; x < xmax; x++) {
       uint32_t colour32TL = colourTL;
@@ -425,11 +401,11 @@ void cLcd::grad (const uint16_t colourTL ,const uint16_t colourTR,
 void cLcd::rect (const uint16_t colour, const cRect& r) {
 // rect with right,bottom clip
 
-  int16_t xmax = min (r.right, (int16_t)getWidth());
-  int16_t ymax = min (r.bottom, (int16_t)getHeight());
+  int16_t xmax = min (r.right, (int16_t)mWidth);
+  int16_t ymax = min (r.bottom, (int16_t)mHeight);
 
   for (int16_t y = r.top; y < ymax; y++) {
-    uint16_t* ptr = mFrameBuf + y*getWidth() + r.left;
+    uint16_t* ptr = mFrameBuf + y*mWidth + r.left;
     for (int16_t x = r.left; x < xmax; x++)
       *ptr++ = colour;
     }
@@ -438,8 +414,8 @@ void cLcd::rect (const uint16_t colour, const cRect& r) {
 //{{{
 void cLcd::rect (const uint16_t colour, const uint8_t alpha, const cRect& r) {
 
-  uint16_t xmax = min (r.right, (int16_t)getWidth());
-  uint16_t ymax = min (r.bottom, (int16_t)getHeight());
+  uint16_t xmax = min (r.right, (int16_t)mWidth);
+  uint16_t ymax = min (r.bottom, (int16_t)mHeight);
 
   for (int16_t y = r.top; y < ymax; y++)
     for (int16_t x = r.left; x < xmax; x++)
@@ -563,7 +539,7 @@ void cLcd::lineToAA (const cPointF& p) {
 //}}}
 //{{{
 void cLcd::renderAA (const uint16_t colour, bool fillNonZero) {
-  mDrawAA->render (colour, fillNonZero, mFrameBuf, getWidth(), getHeight());
+  mDrawAA->render (colour, fillNonZero, mFrameBuf, mWidth, mHeight);
   }
 //}}}
 
@@ -638,7 +614,7 @@ int cLcd::text (const uint16_t colour, const cPoint& p, const int height, const 
     FT_Set_Pixel_Sizes (mFace, 0, height);
 
     int curX = p.x;
-    for (unsigned i = 0; (i < str.size()) && (curX < getWidth()); i++) {
+    for (unsigned i = 0; (i < str.size()) && (curX < mWidth); i++) {
       FT_Load_Char (mFace, str[i], FT_LOAD_RENDER);
       FT_GlyphSlot slot = mFace->glyph;
 
@@ -684,7 +660,7 @@ double cLcd::timeUs() {
 uint32_t cLcd::updateLcdAll() {
 // update all of lcd with single span
 
-  sSpan span = { getRect(), getWidth(), getNumPixels(), nullptr };
+  sSpan span = { getRect(), mWidth, getNumPixels(), nullptr };
   return updateLcd (&span);
   }
 //}}}
@@ -716,503 +692,6 @@ void cLcd::setFont (const uint8_t* font, const int fontSize)  {
 
   FT_Init_FreeType (&mLibrary);
   FT_New_Memory_Face (mLibrary, (FT_Byte*)font, fontSize, 0, &mFace);
-  }
-//}}}
-//{{{
-int cLcd::diffSingle (sSpan* spans) {
-// return 1, if single bounding span is different, else 0
-
-  int minY = 0;
-  int minX = -1;
-
-  // stride as uint16 elements.
-  const int stride = getWidth();
-  const int widthAligned4 = (uint32_t)getWidth() & ~3u;
-
-  uint16_t* scanline = mFrameBuf;
-  uint16_t* prevFrameScanline = mPrevFrameBuf;
-
-  if (kCoarseDiff) {
-    //{{{  coarse diff
-    // Coarse diff computes a diff at 8 adjacent pixels at a time
-    // returns the point to the 8-pixel aligned coordinate where the pixels began to differ.
-
-    int numPixels = getWidth() * getHeight();
-    int firstDiff = coarseLinearDiff (mFrameBuf, mPrevFrameBuf, mFrameBuf + numPixels);
-    if (firstDiff == numPixels)
-      return 0;
-
-    // Compute the precise diff position here.
-    while (mFrameBuf[firstDiff] == mPrevFrameBuf[firstDiff])
-      ++firstDiff;
-
-    minX = firstDiff % getWidth();
-    minY = firstDiff / getWidth();
-    }
-    //}}}
-  else {
-    //{{{  fine diff
-    while (minY < getHeight()) {
-      int x = 0;
-      // diff 4 pixels at a time
-      for (; x < widthAligned4; x += 4) {
-        uint64_t diff = *(uint64_t*)(scanline+x) ^ *(uint64_t*)(prevFrameScanline+x);
-        if (diff) {
-          minX = x + (__builtin_ctzll (diff) >> 4);
-          goto foundTop;
-          }
-        }
-
-      // tail unaligned 0-3 pixels one by one
-      for (; x < getWidth(); ++x) {
-        uint16_t diff = *(scanline+x) ^ *(prevFrameScanline+x);
-        if (diff) {
-          minX = x;
-          goto foundTop;
-          }
-        }
-
-      scanline += stride;
-      prevFrameScanline += stride;
-      ++minY;
-      }
-
-    // No pixels changed, nothing to do.
-    return 0;
-    }
-    //}}}
-
-foundTop:
-  int maxX = -1;
-  int maxY = getHeight() - 1;
-
-  if (kCoarseDiff) {
-    //{{{  coarse diff
-    int numPixels = getWidth() * getHeight();
-
-    // coarse diff computes a diff at 8 adjacent pixels at a time
-    // returns the point to the 8-pixel aligned coordinate where the pixels began to differ.
-    int firstDiff = coarseLinearDiffBack (mFrameBuf, mPrevFrameBuf, mFrameBuf + numPixels);
-
-    // compute the precise diff position here.
-    while (firstDiff > 0 && mFrameBuf[firstDiff] == mPrevFrameBuf[firstDiff])
-      --firstDiff;
-
-    maxX = firstDiff % getWidth();
-    maxY = firstDiff / getWidth();
-    }
-    //}}}
-  else {
-    //{{{  fine diff
-    scanline = mFrameBuf + (getHeight() - 1)*stride;
-    prevFrameScanline = mPrevFrameBuf + (getHeight() - 1)*stride;
-
-    while (maxY >= minY) {
-      int x = getWidth()-1;
-      // tail unaligned 0-3 pixels one by one
-      for (; x >= widthAligned4; --x) {
-        if (scanline[x] != prevFrameScanline[x]) {
-          maxX = x;
-          goto foundBottom;
-          }
-        }
-
-      // diff 4 pixels at a time
-      x = x & ~3u;
-      for (; x >= 0; x -= 4) {
-        uint64_t diff = *(uint64_t*)(scanline + x) ^ *(uint64_t*)(prevFrameScanline + x);
-        if (diff) {
-          maxX = x + 3 - (__builtin_clzll (diff) >> 4);
-          goto foundBottom;
-          }
-        }
-
-      scanline -= stride;
-      prevFrameScanline -= stride;
-      --maxY;
-      }
-    }
-    //}}}
-
-foundBottom:
-  //{{{  found bottom
-  scanline = mFrameBuf + minY*stride;
-  prevFrameScanline = mPrevFrameBuf + minY*stride;
-
-  int lastScanRight = maxX;
-  if (minX > maxX) {
-    //{{{  swap minX, maxX
-    uint32_t temp = minX;
-    minX = maxX;
-    maxX = temp;
-    }
-    //}}}
-
-  int leftX = 0;
-  while (leftX < minX) {
-    uint16_t* s = scanline + leftX;
-    uint16_t* prevS = prevFrameScanline + leftX;
-    for (int y = minY; y <= maxY; ++y) {
-      if (*s != *prevS)
-        goto foundLeft;
-
-      s += stride;
-      prevS += stride;
-      }
-
-    ++leftX;
-    }
-  //}}}
-
-foundLeft:
-  //{{{  found left
-  int rightX = getWidth()-1;
-  while (rightX > maxX) {
-    uint16_t* s = scanline + rightX;
-    uint16_t* prevS = prevFrameScanline + rightX;
-    for (int y = minY; y <= maxY; ++y) {
-      if (*s != *prevS)
-        goto foundRight;
-
-      s += stride;
-      prevS += stride;
-      }
-
-    --rightX;
-    }
-  //}}}
-
-foundRight:
-  spans->r.left = leftX;
-  spans->r.right = rightX+1;
-  spans->r.top = minY;
-  spans->r.bottom = maxY+1;
-  spans->lastScanRight = lastScanRight+1;
-  spans->size = (spans->r.right - spans->r.left) * (spans->r.bottom - spans->r.top - 1) +
-                (spans->lastScanRight - spans->r.left);
-  spans->next = nullptr;
-
-  return 1;
-  }
-//}}}
-//{{{
-int cLcd::diffCoarse (sSpan* spans) {
-// return numSpans, 4pix (64bit) alignment
-
-  int numSpans = 0;
-
-  int y =  0;
-  int yInc = 1;
-
-  const int width64 = getWidth() >> 2;
-  const int scanlineInc = getWidth() >> 2;
-
-  sSpan* span = spans;
-  uint64_t* scanline = (uint64_t*)(mFrameBuf + (y * getWidth()));
-  uint64_t* prevFrameScanline = (uint64_t*)(mPrevFrameBuf + (y * getWidth()));
-  while (y < getHeight()) {
-    uint16_t* scanlineStart = (uint16_t*)scanline;
-
-    for (int x = 0; x < width64;) {
-      if (scanline[x] != prevFrameScanline[x]) {
-        uint16_t* spanStart = (uint16_t*)(scanline + x) +
-                              (__builtin_ctzll (scanline[x] ^ prevFrameScanline[x]) >> 4);
-        ++x;
-
-        // found start of a span of different pixels on this scanline, now find where this span ends
-        uint16_t* spanEnd;
-        for (;;) {
-          if (x < width64) {
-            if (scanline[x] != prevFrameScanline[x]) {
-              ++x;
-              continue;
-              }
-            else {
-              spanEnd = (uint16_t*)(scanline + x) + 1 -
-                                   (__builtin_clzll (scanline[x-1] ^ prevFrameScanline[x-1]) >> 4);
-              ++x;
-              break;
-              }
-            }
-          else {
-            spanEnd = scanlineStart + getWidth();
-            break;
-            }
-          }
-
-        span->r.left = spanStart - scanlineStart;
-        span->r.right = spanEnd - scanlineStart;
-        span->r.top = y;
-        span->r.bottom = y+1;
-        span->lastScanRight = span->r.right;
-        span->size = spanEnd - spanStart;
-        if (numSpans > 0)
-          span[-1].next = span;
-        span->next = nullptr;
-
-        span++;
-        if (numSpans++ >= kMaxSpans) {
-          //{{{  error return, could fake up whole screen
-          cLog::log (LOGERROR, "too many spans");
-          return numSpans;
-          }
-          //}}}
-        }
-      else
-        ++x;
-      }
-
-    y += yInc;
-    scanline += scanlineInc;
-    prevFrameScanline += scanlineInc;
-    }
-
-  if (numSpans > 0)
-    spans[numSpans-1].next = nullptr;
-
-  return numSpans;
-  }
-//}}}
-//{{{
-int cLcd::diffExact (sSpan* spans) {
-// return numSpans
-
-  int numSpans = 0;
-
-  int y =  0;
-  int yInc = 1;
-
-  sSpan* span = spans;
-  uint16_t* scanline = mFrameBuf + y * getWidth();
-  uint16_t* prevFrameScanline = mPrevFrameBuf + y * getWidth();
-  while (y < getHeight()) {
-
-    uint16_t* scanlineStart = scanline;
-    uint16_t* scanlineEnd = scanline + getWidth();
-    while (scanline < scanlineEnd) {
-      uint16_t* spanStart;
-      uint16_t* spanEnd;
-      int numConsecutiveUnchangedPixels = 0;
-      if (scanline + 1 < scanlineEnd) {
-        uint32_t diff = (*(uint32_t*)scanline) ^ (*(uint32_t*)prevFrameScanline);
-        scanline += 2;
-        prevFrameScanline += 2;
-
-        if (diff == 0) // Both 1st and 2nd pixels are the same
-          continue;
-
-        if ((diff & 0xFFFF) == 0) {
-          //{{{  1st pixels are the same, 2nd pixels are not
-          spanStart = scanline - 1;
-          spanEnd = scanline;
-          }
-          //}}}
-        else {
-          //{{{  1st pixels are different
-          spanStart = scanline - 2;
-          if ((diff & 0xFFFF0000u) != 0) // 2nd pixels are different?
-            spanEnd = scanline;
-          else {
-            spanEnd = scanline - 1;
-            numConsecutiveUnchangedPixels = 1;
-            }
-          }
-          //}}}
-        //{{{  found start of span of different pixels on this scanline, find where it ends
-        while (scanline < scanlineEnd) {
-          if (*scanline++ != *prevFrameScanline++) {
-            spanEnd = scanline;
-            numConsecutiveUnchangedPixels = 0;
-            }
-          else {
-            if (++numConsecutiveUnchangedPixels > kSpanExactThreshold)
-              break;
-            }
-          }
-        //}}}
-        }
-      else {
-       //{{{  handle single last pixel on the row
-       if (*scanline++ == *prevFrameScanline++)
-         break;
-
-       spanStart = scanline - 1;
-       spanEnd = scanline;
-       }
-       //}}}
-
-      span->r.left = spanStart - scanlineStart;
-      span->r.right = spanEnd - scanlineStart;
-      span->r.top = y;
-      span->r.bottom = y+1;
-      span->lastScanRight = span->r.right;
-      span->size = spanEnd - spanStart;
-      if (numSpans > 0)
-        span[-1].next = span;
-      span->next = nullptr;
-
-      span++;
-      if (numSpans++ >= kMaxSpans) {
-        //{{{  error return, could fake up whole screen
-        cLog::log (LOGERROR, "too many spans");
-        return numSpans;
-        }
-        //}}}
-      }
-
-    y += yInc;
-    }
-
-  return numSpans;
-  }
-//}}}
-
-// cLcd private static
-//{{{
-sSpan* cLcd::merge (sSpan* spans, int pixelThreshold) {
-
-  for (sSpan* i = spans; i; i = i->next) {
-    sSpan* prev = i;
-    for (sSpan* j = i->next; j; j = j->next) {
-      // If the spans i and j are vertically apart, don't attempt to merge span i any further
-      // since all spans >= j will also be farther vertically apart.
-      // (the list is nondecreasing with respect to Span::y)
-      if (j->r.top > i->r.bottom)
-        break;
-
-      // Merge the spans i and j, and figure out the wastage of doing so
-      int left = min (i->r.left, j->r.left);
-      int top = min (i->r.top, j->r.top);
-      int right = max (i->r.right, j->r.right);
-      int bottom = max (i->r.bottom, j->r.bottom);
-
-      int lastScanRight = bottom > i->r.bottom ?
-                            j->lastScanRight : (bottom > j->r.bottom ?
-                              i->lastScanRight : max (i->lastScanRight, j->lastScanRight));
-
-      int newSize = (right - left) * (bottom - top - 1) + (lastScanRight - left);
-
-      int wastedPixels = newSize - i->size - j->size;
-      if (wastedPixels <= pixelThreshold) {
-        i->r.left = left;
-        i->r.top = top;
-        i->r.right = right;
-        i->r.bottom = bottom;
-
-        i->lastScanRight = lastScanRight;
-        i->size = newSize;
-
-        prev->next = j->next;
-        j = prev;
-        }
-      else // Not merging - travel to next node remembering where we came from
-        prev = j;
-      }
-    }
-
-  return spans;
-  }
-//}}}
-//{{{
-int cLcd::coarseLinearDiff (uint16_t* frameBuf, uint16_t* prevFrameBuf, uint16_t* frameBufEnd) {
-// Coarse diffing of two frameBufs with tight stride, 16 pixels at a time
-// Finds the first changed pixel, coarse result aligned down to 8 pixels boundary
-
-  uint16_t* endPtr;
-
-  asm volatile(
-    "mov r0, %[frameBufEnd]\n"   // r0 <- pointer to end of current frameBuf
-    "mov r1, %[frameBuf]\n"      // r1 <- current frameBuf
-    "mov r2, %[prevFrameBuf]\n"  // r2 <- frameBuf of previous frame
-
-    "start_%=:\n"
-      "pld [r1, #128]\n" // preload data caches for both current and previous frameBufs 128 bytes ahead of time
-      "pld [r2, #128]\n"
-
-      "ldmia r1!, {r3,r4,r5,r6}\n"  // load 4x32-bit elements (8 pixels) of current frameBuf
-      "ldmia r2!, {r7,r8,r9,r10}\n" // load corresponding 4x32-bit elements (8 pixels) of previous frameBuf
-      "cmp r3, r7\n"                // compare all 8 pixels if they are different
-      "cmpeq r4, r8\n"
-      "cmpeq r5, r9\n"
-      "cmpeq r6, r10\n"
-      "bne end_%=\n"                // if we found a difference, we are done
-
-      // Unroll once for another set of 4x32-bit elements.
-      // On Raspberry Pi Zero, data cache line is 32 bytes in size
-      // one iteration of the loop computes a single data cache line, with preloads in place at the top.
-      "ldmia r1!, {r3,r4,r5,r6}\n"
-      "ldmia r2!, {r7,r8,r9,r10}\n"
-      "cmp r3, r7\n"
-      "cmpeq r4, r8\n"
-      "cmpeq r5, r9\n"
-      "cmpeq r6, r10\n"
-      "bne end_%=\n"                // if we found a difference, we are done
-
-      "cmp r0, r1\n"                // frameBuf == frameBufEnd? did we finish through the array?
-      "bne start_%=\n"
-      "b done_%=\n"
-
-    "end_%=:\n"
-      "sub r1, r1, #16\n"           // ldmia r1! increments r1 after load
-                                    //subtract back last increment in order to not shoot past the first changed pixels
-    "done_%=:\n"
-      "mov %[endPtr], r1\n"         // output endPtr back to C code
-      : [endPtr]"=r"(endPtr)
-      : [frameBuf]"r"(frameBuf), [prevFrameBuf]"r"(prevFrameBuf), [frameBufEnd]"r"(frameBufEnd)
-      : "r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7", "r8", "r9", "r10", "cc"
-    );
-
-  return endPtr - frameBuf;
-  }
-//}}}
-//{{{
-int cLcd::coarseLinearDiffBack (uint16_t* frameBuf, uint16_t* prevFrameBuf, uint16_t* frameBufEnd) {
-// Same as coarse_linear_diff, but finds the last changed pixel in linear order instead of first, i.e.
-// Finds the last changed pixel, coarse result aligned up to 8 pixels boundary
-
-  uint16_t* endPtr;
-  asm volatile(
-    "mov r0, %[frameBufBegin]\n" // r0 <- pointer to beginning of current frameBuf
-    "mov r1, %[frameBuf]\n"      // r1 <- current frameBuf (starting from end of frameBuf)
-    "mov r2, %[prevFrameBuf]\n"  // r2 <- frameBuf of previous frame (starting from end of frameBuf)
-
-    "start_%=:\n"
-      "pld [r1, #-128]\n"           // preload data caches for both current and previous frameBufs 128 bytes ahead of time
-      "pld [r2, #-128]\n"
-
-      "ldmdb r1!, {r3,r4,r5,r6}\n"  // load 4x32-bit elements (8 pixels) of current frameBuf
-      "ldmdb r2!, {r7,r8,r9,r10}\n" // load corresponding 4x32-bit elements (8 pixels) of previous frameBuf
-      "cmp r3, r7\n"                // compare all 8 pixels if they are different
-      "cmpeq r4, r8\n"
-      "cmpeq r5, r9\n"
-      "cmpeq r6, r10\n"
-      "bne end_%=\n"                // if we found a difference, we are done
-
-      // Unroll once for another set of 4x32-bit elements. On Raspberry Pi Zero, data cache line is 32 bytes in size, so one iteration
-      // of the loop computes a single data cache line, with preloads in place at the top.
-      "ldmdb r1!, {r3,r4,r5,r6}\n"
-      "ldmdb r2!, {r7,r8,r9,r10}\n"
-      "cmp r3, r7\n"
-      "cmpeq r4, r8\n"
-      "cmpeq r5, r9\n"
-      "cmpeq r6, r10\n"
-      "bne end_%=\n"                // if we found a difference, we are done
-
-      "cmp r0, r1\n"                // frameBuf == frameBufEnd? did we finish through the array?
-      "bne start_%=\n"
-      "b done_%=\n"
-
-    "end_%=:\n"
-      "add r1, r1, #16\n"           // ldmdb r1! decrements r1 before load,
-                                    // so add back the last decrement in order to not shoot past the first changed pixels
-    "done_%=:\n"
-      "mov %[endPtr], r1\n"         // output endPtr back to C code
-      : [endPtr]"=r"(endPtr)
-      : [frameBuf]"r"(frameBufEnd), [prevFrameBuf]"r"(prevFrameBuf+(frameBufEnd-frameBuf)), [frameBufBegin]"r"(frameBuf)
-      : "r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7", "r8", "r9", "r10", "cc"
-    );
-
-  return endPtr - frameBuf;
   }
 //}}}
 
@@ -1379,11 +858,11 @@ uint32_t cLcdTa7601::updateLcd (sSpan* spans) {
         writeCommandData (0x21, r.left);     // GRAM H start address
         writeCommand (0x22);                 // GRAM write
 
-        uint16_t* ptr = mFrameBuf + (r.top * getWidth()) + r.left;
+        uint16_t* ptr = mFrameBuf + (r.top * mWidth) + r.left;
         for (int16_t y = r.top; y < r.bottom; y++) {
           for (int16_t x = r.left; x < r.right; x++)
             writeDataWord (*ptr++);
-          ptr += getWidth() - r.getWidth();
+          ptr += mWidth - r.getWidth();
           }
 
         numPixels += r.getNumPixels();
@@ -1409,10 +888,10 @@ uint32_t cLcdTa7601::updateLcd (sSpan* spans) {
         writeCommand (0x22);                              // GRAM write
 
         for (int16_t x = r.right-1; x >= r.left; x--) {
-          uint16_t* ptr = mFrameBuf + (r.top * getWidth()) + x;
+          uint16_t* ptr = mFrameBuf + (r.top * mWidth) + x;
           for (int16_t y = r.top; y < r.bottom; y++) {
             writeDataWord (*ptr);
-            ptr += getWidth();
+            ptr += mWidth;
             }
           }
 
@@ -1438,7 +917,7 @@ uint32_t cLcdTa7601::updateLcd (sSpan* spans) {
         writeCommand (0x22);                 // GRAM write
 
         for (int16_t y = r.bottom-1; y >= r.top; y--) {
-          uint16_t* ptr = mFrameBuf + (y * getWidth()) + r.right-1;
+          uint16_t* ptr = mFrameBuf + (y * mWidth) + r.right-1;
           for (int16_t x = r.right-1; x >= r.left; x--)
             writeDataWord (*ptr--);
           }
@@ -1466,10 +945,10 @@ uint32_t cLcdTa7601::updateLcd (sSpan* spans) {
         writeCommand (0x22);                              // GRAM write
 
         for (int16_t x = r.left; x < r.right; x++) {
-          uint16_t* ptr = mFrameBuf + ((r.bottom-1) * getWidth()) + x;
+          uint16_t* ptr = mFrameBuf + ((r.bottom-1) * mWidth) + x;
           for (int16_t y = r.bottom-1; y >= r.top; y--) {
             writeDataWord (*ptr);
-            ptr -= getWidth();
+            ptr -= mWidth;
             }
           }
 
@@ -1866,9 +1345,9 @@ bool cLcdIli9225b::initialise() {
 
   writeCommandData (0x07, 0x1017);
   //{{{  set ram area
-  writeCommandData (0x36, getWidth()-1);
+  writeCommandData (0x36, mWidth-1);
   writeCommandData (0x37, 0);
-  writeCommandData (0x38, getHeight()-1);
+  writeCommandData (0x38, mHeight-1);
   writeCommandData (0x39, 0);
   writeCommandData (0x20, 0);
   writeCommandData (0x21, 0);
@@ -2077,7 +1556,7 @@ uint32_t cLcdIli9320::updateLcd (sSpan* spans) {
         }
 
       writeCommand (0x22); // send GRAM write
-      uint16_t* src = mFrameBuf + (y * getWidth()) + it->r.left;
+      uint16_t* src = mFrameBuf + (y * mWidth) + it->r.left;
       // 2 header bytes, alignment for data bswap_16, send spi data from second header byte
       uint16_t* dst = dataHeaderBuf + 1;
       for (int i = 0; i < it->r.getWidth(); i++)

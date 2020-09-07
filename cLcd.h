@@ -26,6 +26,7 @@ constexpr uint16_t kWhite       =  0xFFFF;  // 255, 255, 255
 
 struct sSpan;
 class cDrawAA;
+class cFrameDiff;
 class cLcd {
 public:
   enum eRotate { e0, e90, e180, e270 };
@@ -35,9 +36,10 @@ public:
   //{{{
   cLcd (const int16_t width, const int16_t height, const eRotate rotate, const eInfo info, const eMode mode)
       : mRotate(rotate), mInfo(info),
-        mSnapshotEnabled(true), mTypeEnabled(true), mMode(mode),
+        mMode(mode),
         mWidth(((rotate == e90) || (rotate == e270)) ? height : width),
-        mHeight(((rotate == e90) || (rotate == e270)) ? width : height) {}
+        mHeight(((rotate == e90) || (rotate == e270)) ? width : height),
+        mSnapshotEnabled(true), mTypeEnabled(true) {}
   //}}}
   virtual ~cLcd();
 
@@ -109,6 +111,9 @@ protected:
   // vars
   const eRotate mRotate;
   const eInfo mInfo;
+  const eMode mMode = eSingle;
+  const uint16_t mWidth;
+  const uint16_t mHeight;
 
   uint32_t mUpdatePixels = 0;
   int mUpdateUs = 0;
@@ -130,22 +135,9 @@ private:
 
   void setFont (const uint8_t* font, const int fontSize);
 
-  // diff
-  int diffSingle (sSpan* spans);
-  int diffExact (sSpan* spans);
-  int diffCoarse (sSpan* spans);
-
-  static sSpan* merge (sSpan* spans, int pixelThreshold);
-  static int coarseLinearDiff (uint16_t* frameBuf, uint16_t* prevFrameBuf, uint16_t* frameBufEnd);
-  static int coarseLinearDiffBack (uint16_t* frameBuf, uint16_t* prevFrameBuf, uint16_t* frameBufEnd);
-
   // vars
   const bool mSnapshotEnabled;
   const bool mTypeEnabled;
-
-  const eMode mMode = eSingle;
-  const uint16_t mWidth;
-  const uint16_t mHeight;
 
   int mDiffUs = 0;
 
@@ -153,7 +145,8 @@ private:
   sSpan* mSpans = nullptr;
   int mNumSpans = 0;
 
-  cDrawAA* mDrawAA;
+  cDrawAA* mDrawAA = nullptr;
+  cFrameDiff* mFrameDiff = nullptr;
   uint8_t mGamma[256];
 //}}}
   };
