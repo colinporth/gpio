@@ -1,5 +1,4 @@
 // cFrameDiff.cpp
-//includes
 #include "cFrameDiff.h"
 
 #include "../shared/utils/utils.h"
@@ -25,6 +24,7 @@ sSpan* cFrameDiff::diffSingle (uint16_t* frameBuf) {
 // return 1, if single bounding span is different, else 0
 
   sSpan* spans = mSpans;
+  mNumSpans = 0;
 
   int minY = 0;
   int minX = -1;
@@ -196,6 +196,7 @@ foundRight:
                 (spans->lastScanRight - spans->r.left);
   spans->next = nullptr;
 
+  mNumSpans = 1;
   return mSpans;
   }
 //}}}
@@ -275,6 +276,7 @@ sSpan* cFrameDiff::diffCoarse (uint16_t* frameBuf) {
   if (numSpans > 0)
     spans[numSpans-1].next = nullptr;
 
+  mNumSpans = numSpans;
   return numSpans > 0 ? mSpans : nullptr;
   }
 //}}}
@@ -369,13 +371,13 @@ sSpan* cFrameDiff::diffExact (uint16_t* frameBuf) {
     y += yInc;
     }
 
+  mNumSpans = numSpans;
   return numSpans > 0 ? mSpans : nullptr;
   }
 //}}}
-
-// cLcd private static
 //{{{
 sSpan* cFrameDiff::merge (sSpan* spans, int pixelThreshold) {
+// need to recalc mNumSpans 
 
   for (sSpan* i = spans; i; i = i->next) {
     sSpan* prev = i;
@@ -419,6 +421,8 @@ sSpan* cFrameDiff::merge (sSpan* spans, int pixelThreshold) {
   return spans;
   }
 //}}}
+
+// cLcd private static
 //{{{
 int cFrameDiff::coarseLinearDiff (uint16_t* frameBuf, uint16_t* prevFrameBuf, uint16_t* frameBufEnd) {
 // Coarse diffing of two frameBufs with tight stride, 16 pixels at a time

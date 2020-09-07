@@ -120,7 +120,6 @@ protected:
 
   // uint16_t colour frameBufs
   uint16_t* mFrameBuf = nullptr;
-  uint16_t* mPrevFrameBuf = nullptr;
 //}}}
 //{{{
 private:
@@ -128,7 +127,6 @@ private:
   int getUpdatePixels() { return mUpdatePixels; }
   int getUpdateUs() { return mUpdateUs; }
   int getDiffUs() { return mDiffUs; }
-  int getNumSpans() { return mNumSpans; }
 
   std::string getInfoString();
   std::string getPaddedInfoString();
@@ -142,8 +140,7 @@ private:
   int mDiffUs = 0;
 
   // diff spans
-  sSpan* mSpans = nullptr;
-  int mNumSpans = 0;
+  sSpan* mSpanAll = nullptr;
 
   cDrawAA* mDrawAA = nullptr;
   cFrameDiff* mFrameDiff = nullptr;

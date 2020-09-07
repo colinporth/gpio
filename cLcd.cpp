@@ -86,8 +86,7 @@ cLcd::~cLcd() {
   vc_dispmanx_display_close (mDisplay);
 
   free (mFrameBuf);
-  free (mPrevFrameBuf);
-  free (mSpans);
+  free (mSpanAll);
 
   delete mDrawAA;
   delete mFrameDiff;
@@ -119,9 +118,14 @@ bool cLcd::initialise() {
   mFrameBuf = (uint16_t*)aligned_alloc (128, getNumPixels() * 2);
   clear();
 
-  if (mMode == eAll)
+  if (mMode == eAll) {
     // allocate single span
-    mSpans = (sSpan*)malloc (sizeof(sSpan));
+    mSpanAll = (sSpan*)malloc (sizeof (sSpan));
+    mSpanAll->r = getRect();
+    mSpanAll->lastScanRight = mWidth;
+    mSpanAll->size = getNumPixels();
+    mSpanAll->next = nullptr;
+    }
   else
     mFrameDiff = new cFrameDiff (mWidth, mHeight);
 
@@ -195,15 +199,12 @@ bool cLcd::present() {
 // present update
 
   // make diff spans list
+  sSpan* mSpans = nullptr;
   double diffStartTime = timeUs();
   switch (mMode) {
     //{{{
     case eAll :
-      mSpans = new sSpan();
-      mSpans->r = getRect();
-      mSpans->lastScanRight = mWidth;
-      mSpans->size = getNumPixels();
-      mSpans->next = nullptr;
+      mSpans = mSpanAll;
       break;
     //}}}
     //{{{
@@ -671,8 +672,7 @@ string cLcd::getInfoString() {
 // return info string for log display
 
   return dec(getUpdatePixels()) + "px took:" +
-         dec(getUpdateUs()) + "uS " +
-         dec(getNumSpans()) + "spn took:" +
+         dec(getUpdateUs()) + "uS diff took" +
          dec(getDiffUs()) + "uS";
   }
 //}}}
@@ -681,8 +681,7 @@ string cLcd::getPaddedInfoString() {
 // return info string with padded format for on screen display
 
   return dec(getUpdatePixels(),5,'0') + " " +
-         dec(getUpdateUs(),5,'0') + "uS " +
-         dec(getNumSpans(),4,'0') + " " +
+         dec(getUpdateUs(),5,'0') + "uS diff:" +
          dec(getDiffUs(),3,'0') + "uS";
   }
 //}}}
