@@ -1366,6 +1366,7 @@ uint32_t cLcdTa7601::updateLcd (sSpan* spans) {
     case e0: { // send spans
       for (sSpan* it = spans; it; it = it->next) {
         cRect& r = it->r;
+        // !!! left right should be even !!!!
         writeCommandData (0x45, r.left);     // GRAM V start address window
         writeCommandData (0x44, r.right-1);  // GRAM V   end address window
         writeCommandData (0x47, r.top);      // GRAM H start address window - even
@@ -1432,43 +1433,25 @@ uint32_t cLcdTa7601::updateLcd (sSpan* spans) {
       break;
     //}}}
     //{{{
-    //case e270: // send whole frame
-      //writeCommandData (0x45, 0x0000);          // GRAM H start address window = 0
-      //writeCommandData (0x44, kWidthTa7601-1);  // GRAM H   end address window = 320-1
-      //writeCommandData (0x47, 0x0000);          // GRAM V start address window = 0
-      //writeCommandData (0x46, kHeightTa7601-1); // GRAM V   end address window = 480-1
-      //writeCommandData (0x20, 0x0000);          // GRAM V start address
-      //writeCommandData (0x21, 0x0000);          // GRAM H start address
-      //writeCommand (0x22);
-
-      //// !!! simplify the back step at aned of line !!!
-      //for (int x = 0; x < getWidth(); x++) {
-        //uint16_t* ptr = mFrameBuf + ((getHeight()-1) * getWidth()) + x;
-        //for (int y = 0; y < getHeight(); y++) {
-          //writeDataWord (*ptr);
-          //ptr -= getWidth();
-          //}
-        //}
-
-      //numPixels = getNumPixels();
-      //break;
-    //}}}
-    //{{{
-    case e270: { // send spans - something like this
+    case e270: { // send spans
       for (sSpan* it = spans; it; it = it->next) {
-        cRect& r = it->r;
-        writeCommandData (0x45, r.top);      // GRAM H start address window - even
-        writeCommandData (0x44, r.bottom-1); // GRAM H   end address window - even
-        writeCommandData (0x47, r.left);     // GRAM V start address window
-        writeCommandData (0x46, r.right-1);  // GRAM V   end address window
+        // ensure GRAM even start, end addressses
+        cRect r = it->r;
+        r.top &= 0xFFFE;
+        r.bottom = (r.bottom + 1) & 0xFFFE;
 
-        writeCommandData (0x20, r.left);     // GRAM V start address
-        writeCommandData (0x21, r.top;       // GRAM H start address
-        writeCommand (0x22);                 // GRAM write
+        writeCommandData (0x45, kWidthTa7601 - r.bottom); // GRAM H start address window - even
+        writeCommandData (0x44, kWidthTa7601-1 - r.top);  // GRAM H   end address window - even
+        writeCommandData (0x47, r.left);                  // GRAM V start address window
+        writeCommandData (0x46, r.right-1);               // GRAM V   end address window
+
+        writeCommandData (0x20, r.left);                  // GRAM V start address
+        writeCommandData (0x21, kWidthTa7601 - r.bottom); // GRAM H start address
+        writeCommand (0x22);                              // GRAM write
 
         for (int16_t x = r.left; x < r.right; x++) {
           uint16_t* ptr = mFrameBuf + ((r.bottom-1) * getWidth()) + x;
-          for (int16_t y = r.bottom-1; y <= r.top; y--) {
+          for (int16_t y = r.bottom-1; y >= r.top; y--) {
             writeDataWord (*ptr);
             ptr -= getWidth();
             }
