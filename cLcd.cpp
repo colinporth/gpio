@@ -87,13 +87,11 @@ string cRect::getYfirstString() {
 //}}}
 //}}}
 //{{{  cSpan
-//{{{  span constexpr
 constexpr int kMaxSpans = 10000;
 constexpr bool kCoarseDiff = true;
 constexpr int kSpanExactThreshold = 8;
 constexpr int kSpanMergeThreshold = 16;
-//}}}
-//{{{
+
 struct sSpan {
   cRect r;
 
@@ -103,46 +101,158 @@ struct sSpan {
   sSpan* next;   // linked skip list in array for fast pruning
   };
 //}}}
-//}}}
 //{{{  aa drawing classes
+// stolen from somewhere I can't remember
 //{{{
-struct sCell {
+class cScanLine {
 public:
   //{{{
-  void set (int16_t x, int16_t y, int c, int a) {
+  class iterator {
+  public:
+    iterator (const cScanLine& scanLine) :
+      mCoverage(scanLine.mCoverage), mCurCount(scanLine.mCounts), mCurStartPtr(scanLine.mStartPtrs) {}
 
-    mPackedCoord = (y << 16) + x;
-    mCoverage = c;
-    mArea = a;
+    int next() {
+      ++mCurCount;
+      ++mCurStartPtr;
+      return int(*mCurStartPtr - mCoverage);
+      }
+
+    int getNumPix() const { return int(*mCurCount); }
+    const uint8_t* getCoverage() const { return *mCurStartPtr; }
+
+  private:
+    const uint8_t* mCoverage;
+    const uint16_t* mCurCount;
+    const uint8_t* const* mCurStartPtr;
+    };
+  //}}}
+  friend class iterator;
+
+  cScanLine() {}
+  //{{{
+  ~cScanLine() {
+
+    free (mCounts);
+    free (mStartPtrs);
+    free (mCoverage);
+    }
+  //}}}
+
+  int16_t getY() const { return mLastY; }
+  int16_t getBaseX() const { return mMinx;  }
+  uint16_t getNumSpans() const { return mNumSpans; }
+  int isReady (int16_t y) const { return mNumSpans && (y ^ mLastY); }
+
+  //{{{
+  void initSpans() {
+
+    mNumSpans = 0;
+
+    mCurCount = mCounts;
+    mCurStartPtr = mStartPtrs;
+
+    mLastX = 0x7FFF;
+    mLastY = 0x7FFF;
     }
   //}}}
   //{{{
-  void setCoverage (int32_t c, int32_t a) {
+  void init (int16_t minx, int16_t maxx) {
 
-    mCoverage = c;
-    mArea = a;
+    uint16_t maxLen = maxx - minx + 2;
+    if (maxLen > mMaxlen) {
+      // increase allocations
+      mMaxlen = maxLen;
+
+      free (mStartPtrs);
+      free (mCounts);
+      free (mCoverage);
+
+      mCoverage = (uint8_t*)malloc (maxLen);
+      mCounts = (uint16_t*)malloc (maxLen * 2);
+      mStartPtrs = (uint8_t**)malloc (maxLen * 4);
+      }
+
+    mMinx = minx;
+    initSpans();
     }
   //}}}
+
   //{{{
-  void addCoverage (int32_t c, int32_t a) {
+  void addSpan (int16_t x, int16_t y, uint16_t num, uint16_t coverage) {
 
-    mCoverage += c;
-    mArea += a;
+    x -= mMinx;
+
+    memset (mCoverage + x, coverage, num);
+    if (x == mLastX+1)
+      (*mCurCount) += (uint16_t)num;
+    else {
+      *++mCurCount = (uint16_t)num;
+      *++mCurStartPtr = mCoverage + x;
+      mNumSpans++;
+      }
+
+    mLastX = x + num - 1;
+    mLastY = y;
     }
   //}}}
 
-  int32_t mPackedCoord;
-  int32_t mCoverage;
-  int32_t mArea;
+private:
+  int16_t mMinx = 0;
+  uint16_t mMaxlen = 0;
+  int16_t mLastX = 0x7FFF;
+  int16_t mLastY = 0x7FFF;
+
+  uint8_t* mCoverage = nullptr;
+
+  uint8_t** mStartPtrs = nullptr;
+  uint8_t** mCurStartPtr = nullptr;
+
+  uint16_t* mCounts = nullptr;
+  uint16_t* mCurCount = nullptr;
+
+  uint16_t mNumSpans = 0;
   };
 //}}}
-//{{{
+
 class cOutline {
 public:
   //{{{
+  struct sCell {
+  public:
+    //{{{
+    void set (int16_t x, int16_t y, int c, int a) {
+
+      mPackedCoord = (y << 16) + x;
+      mCoverage = c;
+      mArea = a;
+      }
+    //}}}
+    //{{{
+    void setCoverage (int32_t c, int32_t a) {
+
+      mCoverage = c;
+      mArea = a;
+      }
+    //}}}
+    //{{{
+    void addCoverage (int32_t c, int32_t a) {
+
+      mCoverage += c;
+      mArea += a;
+      }
+    //}}}
+
+    int32_t mPackedCoord;
+    int32_t mCoverage;
+    int32_t mArea;
+    };
+  //}}}
+
+  //{{{
   cOutline() {
     mNumCellsInBlock = 2048;
-    reset();
+    init();
     }
   //}}}
   //{{{
@@ -164,11 +274,26 @@ public:
     }
   //}}}
 
+  //{{{
+  void init() {
+
+    mNumCells = 0;
+    mCurCell.set (0x7FFF, 0x7FFF, 0, 0);
+    mSortRequired = true;
+    mClosed = true;
+
+    mMinx =  0x7FFFFFFF;
+    mMiny =  0x7FFFFFFF;
+    mMaxx = -0x7FFFFFFF;
+    mMaxy = -0x7FFFFFFF;
+    }
+  //}}}
+
+  // gets
   int32_t getMinx() const { return mMinx; }
   int32_t getMiny() const { return mMiny; }
   int32_t getMaxx() const { return mMaxx; }
   int32_t getMaxy() const { return mMaxy; }
-
   uint16_t getNumCells() const { return mNumCells; }
   //{{{
   const sCell* const* getSortedCells() {
@@ -193,24 +318,10 @@ public:
   //}}}
 
   //{{{
-  void reset() {
-
-    mNumCells = 0;
-    mCurCell.set (0x7FFF, 0x7FFF, 0, 0);
-    mSortRequired = true;
-    mClosed = true;
-
-    mMinx =  0x7FFFFFFF;
-    mMiny =  0x7FFFFFFF;
-    mMaxx = -0x7FFFFFFF;
-    mMaxy = -0x7FFFFFFF;
-    }
-  //}}}
-  //{{{
   void moveTo (int32_t x, int32_t y) {
 
     if (!mSortRequired)
-      reset();
+      init();
 
     if (!mClosed)
       lineTo (mClosex, mClosey);
@@ -597,6 +708,7 @@ private:
     }
   //}}}
 
+  // vars
   uint16_t mNumCellsInBlock = 0;
   uint16_t mNumBlockOfCells = 0;
   uint16_t mNumSortedCells = 0;
@@ -620,118 +732,6 @@ private:
   bool mClosed;
   bool mSortRequired;
   };
-//}}}
-//{{{
-class cScanLine {
-public:
-  //{{{
-  class iterator {
-  public:
-    iterator (const cScanLine& scanLine) :
-      mCoverage(scanLine.mCoverage), mCurCount(scanLine.mCounts), mCurStartPtr(scanLine.mStartPtrs) {}
-
-    int next() {
-      ++mCurCount;
-      ++mCurStartPtr;
-      return int(*mCurStartPtr - mCoverage);
-      }
-
-    int getNumPix() const { return int(*mCurCount); }
-    const uint8_t* getCoverage() const { return *mCurStartPtr; }
-
-  private:
-    const uint8_t* mCoverage;
-    const uint16_t* mCurCount;
-    const uint8_t* const* mCurStartPtr;
-    };
-  //}}}
-  friend class iterator;
-
-  cScanLine() {}
-  //{{{
-  ~cScanLine() {
-
-    free (mCounts);
-    free (mStartPtrs);
-    free (mCoverage);
-    }
-  //}}}
-
-  int16_t getY() const { return mLastY; }
-  int16_t getBaseX() const { return mMinx;  }
-  uint16_t getNumSpans() const { return mNumSpans; }
-  int isReady (int16_t y) const { return mNumSpans && (y ^ mLastY); }
-
-  //{{{
-  void resetSpans() {
-
-    mNumSpans = 0;
-
-    mCurCount = mCounts;
-    mCurStartPtr = mStartPtrs;
-
-    mLastX = 0x7FFF;
-    mLastY = 0x7FFF;
-    }
-  //}}}
-  //{{{
-  void reset (int16_t minx, int16_t maxx) {
-
-    uint16_t maxLen = maxx - minx + 2;
-    if (maxLen > mMaxlen) {
-      // increase allocations
-      mMaxlen = maxLen;
-
-      free (mStartPtrs);
-      free (mCounts);
-      free (mCoverage);
-
-      mCoverage = (uint8_t*)malloc (maxLen);
-      mCounts = (uint16_t*)malloc (maxLen * 2);
-      mStartPtrs = (uint8_t**)malloc (maxLen * 4);
-      }
-
-    mMinx = minx;
-    resetSpans();
-    }
-  //}}}
-
-  //{{{
-  void addSpan (int16_t x, int16_t y, uint16_t num, uint16_t coverage) {
-
-    x -= mMinx;
-
-    memset (mCoverage + x, coverage, num);
-    if (x == mLastX+1)
-      (*mCurCount) += (uint16_t)num;
-    else {
-      *++mCurCount = (uint16_t)num;
-      *++mCurStartPtr = mCoverage + x;
-      mNumSpans++;
-      }
-
-    mLastX = x + num - 1;
-    mLastY = y;
-    }
-  //}}}
-
-private:
-  int16_t mMinx = 0;
-  uint16_t mMaxlen = 0;
-  int16_t mLastX = 0x7FFF;
-  int16_t mLastY = 0x7FFF;
-
-  uint8_t* mCoverage = nullptr;
-
-  uint8_t** mStartPtrs = nullptr;
-  uint8_t** mCurStartPtr = nullptr;
-
-  uint16_t* mCounts = nullptr;
-  uint16_t* mCurCount = nullptr;
-
-  uint16_t mNumSpans = 0;
-  };
-//}}}
 //}}}
 
 // cLcd public
@@ -962,22 +962,16 @@ void cLcd::pix (const uint16_t colour, const uint8_t alpha, const cPoint& p) {
   }
 //}}}
 //{{{
-void cLcd::copy (const uint16_t* src) {
-// copy all of src of same width,height
-
-  memcpy (mFrameBuf, src, getNumPixels() * 2);
-  }
-//}}}
-//{{{
-void cLcd::copy (const uint16_t* src, cRect& srcRect, const cPoint& dstPoint) {
-// copy rect from src of same width,height
+void cLcd::copy (const uint16_t* src, cRect& srcRect, const uint16_t srcStride, const cPoint& dstPoint) {
+// copy line by line
 
   for (int y = 0; y < srcRect.getHeight(); y++)
     memcpy (mFrameBuf + ((dstPoint.y + y) * getWidth()) + dstPoint.x,
-                  src + ((srcRect.top + y) * getWidth()) + srcRect.left,
+                  src + ((srcRect.top + y) * srcStride) + srcRect.left,
             srcRect.getWidth() * 2);
   }
 //}}}
+//{{{  grad
 //{{{
 void cLcd::hGrad (const uint16_t colourL, const uint16_t colourR, const cRect& r) {
 // clip right, bottom, should do left top
@@ -1070,7 +1064,7 @@ void cLcd::grad (const uint16_t colourTL ,const uint16_t colourTR,
     }
   }
 //}}}
-
+//}}}
 //{{{  draw
 //{{{
 void cLcd::rect (const uint16_t colour, const cRect& r) {
@@ -1278,15 +1272,15 @@ void cLcd::aEllipseOutline (const cPointF& centre, const cPointF& radius, float 
 //{{{
 void cLcd::aRender (const uint16_t colour, bool fillNonZero) {
 
-  const sCell* const* sortedCells = mOutline->getSortedCells();
+  const cOutline::sCell* const* sortedCells = mOutline->getSortedCells();
   uint32_t numCells = mOutline->getNumCells();
   if (!numCells)
     return;
 
-  mScanLine->reset (mOutline->getMinx(), mOutline->getMaxx());
+  mScanLine->init (mOutline->getMinx(), mOutline->getMaxx());
 
   int coverage = 0;
-  const sCell* cell = *sortedCells++;
+  const cOutline::sCell* cell = *sortedCells++;
   while (true) {
     int x = cell->mPackedCoord & 0xFFFF;
     int y = cell->mPackedCoord >> 16;
@@ -1307,7 +1301,7 @@ void cLcd::aRender (const uint16_t colour, bool fillNonZero) {
       if (alpha) {
         if (mScanLine->isReady (y)) {
           renderScanLine (colour, mScanLine);
-          mScanLine->resetSpans();
+          mScanLine->initSpans();
           }
         mScanLine->addSpan (x, y, 1, mGamma[alpha]);
         }
@@ -1322,7 +1316,7 @@ void cLcd::aRender (const uint16_t colour, bool fillNonZero) {
       if (alpha) {
         if (mScanLine->isReady (y)) {
            renderScanLine (colour, mScanLine);
-           mScanLine->resetSpans();
+           mScanLine->initSpans();
            }
          mScanLine->addSpan (x, y, int16_t(cell->mPackedCoord & 0xFFFF) - x, mGamma[alpha]);
          }
@@ -2396,7 +2390,7 @@ uint32_t cLcdSsd1289::updateLcd (sSpan* spans) {
 //}}}
 //}}}
 
-// spi - data/command pin classes
+// spi data/command pin classes
 //{{{  cLcdSpiRegister : public cLcdSpi
 //{{{
 cLcdSpiRegister::~cLcdSpiRegister() {
@@ -2655,7 +2649,7 @@ uint32_t cLcdIli9225b::updateLcd (sSpan* spans) {
 //}}}
 //}}}
 
-// spi - no data/command pin classes
+// spi no data/command pin classes
 //{{{  cLcdSpiHeader : public cLcdSpi
 //{{{
 cLcdSpiHeader::~cLcdSpiHeader() {

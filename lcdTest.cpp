@@ -14,8 +14,7 @@ using namespace std;
 
 int main (int numArgs, char* args[]) {
 
-  bool fontTest = false;
-  bool drawTest = false;
+  bool draw = false;
   cLcd::eRotate rotate = cLcd::e0;
   cLcd::eInfo info = cLcd::eNone;
   cLcd::eMode mode = cLcd::eCoarse;
@@ -37,8 +36,7 @@ int main (int numArgs, char* args[]) {
     else if (argStrings[i] == "e") mode = cLcd::eExact;
     else if (argStrings[i] == "1") logLevel = LOGINFO1;
     else if (argStrings[i] == "2") logLevel = LOGINFO2;
-    else if (argStrings[i] == "d") drawTest = true;
-    else if (argStrings[i] == "f") fontTest = true;
+    else if (argStrings[i] == "d") draw = true;
     else
       cLog::log (LOGERROR, "unrecognised option " + argStrings[i]);
 
@@ -49,36 +47,20 @@ int main (int numArgs, char* args[]) {
   if (!lcd->initialise())
     return 0;
 
-  if (drawTest) {
+  if (draw) {
     //{{{  draw test
     while (true) {
       int height = 8;
-      while (height < 100) {
-        lcd->clear (kBlack);
-        //lcd->hGrad (kBlack, kWhite, cRect(0,0, lcd->getWidth(), lcd->getHeight()/2));
-        //lcd->vGrad (kBlack, kWhite, cRect(0,lcd->getHeight()/2, lcd->getWidth(), lcd->getHeight()));
+      while (height < 120) {
         lcd->grad (kBlack, kRed, kYellow, kWhite, lcd->getRect());
+
         lcd->aEllipse (lcd->getRect().getCentre(), cPointF(height, height), 16);
         lcd->aRender (kYellow, true);
+
         lcd->aEllipseOutline (lcd->getRect().getCentre(), cPointF(height, height), 6, 16);
         lcd->aRender (kBlue, true);
-        lcd->present();
 
-        lcd->setBacklightOn();
-        lcd->delayUs (10000);
-        height += 2;
-        }
-      }
-    }
-    //}}}
-
-  if (fontTest) {
-    //{{{  font test
-    while (true) {
-      int height = 8;
-      while (height < 100) {
         cPoint point;
-        lcd->clear (kMagenta);
         for (char ch = 'A'; ch < 0x7f; ch++) {
           point.x = lcd->text (kWhite, point, height, string(1,ch));
           if (point.x > lcd->getWidth()) {
@@ -89,24 +71,23 @@ int main (int numArgs, char* args[]) {
             }
           }
 
-        //lcd->text (kYellow, cPoint(), 20, "Hello Colin");
-
         lcd->present();
 
         lcd->setBacklightOn();
-        lcd->delayUs (16000);
+        lcd->delayUs (10000);
         height += 4;
         }
       }
     }
     //}}}
-
-  // snapshot test
-  while (true) {
-    lcd->snapshot();
-    lcd->present();
-    lcd->setBacklightOn();
-    lcd->delayUs (5000);
+  else {
+    // snapshot
+    while (true) {
+      lcd->snapshot();
+      lcd->present();
+      lcd->setBacklightOn();
+      lcd->delayUs (5000);
+      }
     }
 
   return 0;

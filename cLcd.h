@@ -73,70 +73,6 @@ public:
   };
 //}}}
 //{{{
-struct cRect {
-public:
-  //{{{
-  cRect() {
-    left = 0;
-    bottom = 0;
-    right = 0;
-    bottom = 0;
-    }
-  //}}}
-  //{{{
-  cRect (const int16_t l, const int16_t t, const int16_t r, const int16_t b)  {
-    left = l;
-    top = t;
-    right = r;
-    bottom = b;
-    }
-  //}}}
-  //{{{
-  cRect (const cPoint& topLeft, const cPoint& bottomRight)  {
-    left = topLeft.x;
-    top = topLeft.y;
-    right = bottomRight.x;
-    bottom = bottomRight.y;
-    }
-  //}}}
-
-  //{{{
-  cRect operator + (const cPoint& point) {
-    return cRect (left + point.x, top + point.y, right + point.x, bottom + point.y);
-    }
-  //}}}
-
-  int16_t getWidth() { return right - left; }
-  int16_t getHeight() { return bottom - top; }
-  int getNumPixels() { return getWidth() * getHeight(); }
-
-  cPoint getTL() { return cPoint(left, top); }
-  cPoint getTL (const int16_t offset) { return cPoint(left+offset, top+offset); }
-  cPoint getTR() { return cPoint(right, top); }
-  cPoint getBL() { return cPoint(left, bottom); }
-  cPoint getBR() { return cPoint(right, bottom); }
-
-  cPoint getSize() { return cPoint(right-left, bottom-top); }
-  cPoint getCentre() { return cPoint(getCentreX(), getCentreY()); }
-  int16_t getCentreX() { return (left + right)/2; }
-  int16_t getCentreY() { return (top + bottom)/2; }
-
-  std::string getString();
-  std::string getYfirstString();
-  //{{{
-  bool inside (const cPoint& pos) {
-  // return pos inside rect
-    return (pos.x >= left) && (pos.x < right) && (pos.y >= top) && (pos.y < bottom);
-    }
-  //}}}
-
-  int16_t left;
-  int16_t top;
-  int16_t right;
-  int16_t bottom;
-  };
-//}}}
-//{{{
 struct cPointF {
 public:
   //{{{
@@ -233,6 +169,70 @@ public:
   };
 
 //}}}
+//{{{
+struct cRect {
+public:
+  //{{{
+  cRect() {
+    left = 0;
+    bottom = 0;
+    right = 0;
+    bottom = 0;
+    }
+  //}}}
+  //{{{
+  cRect (const int16_t l, const int16_t t, const int16_t r, const int16_t b)  {
+    left = l;
+    top = t;
+    right = r;
+    bottom = b;
+    }
+  //}}}
+  //{{{
+  cRect (const cPoint& topLeft, const cPoint& bottomRight)  {
+    left = topLeft.x;
+    top = topLeft.y;
+    right = bottomRight.x;
+    bottom = bottomRight.y;
+    }
+  //}}}
+
+  //{{{
+  cRect operator + (const cPoint& point) {
+    return cRect (left + point.x, top + point.y, right + point.x, bottom + point.y);
+    }
+  //}}}
+
+  int16_t getWidth() { return right - left; }
+  int16_t getHeight() { return bottom - top; }
+  int getNumPixels() { return getWidth() * getHeight(); }
+
+  cPoint getTL() { return cPoint(left, top); }
+  cPoint getTL (const int16_t offset) { return cPoint(left+offset, top+offset); }
+  cPoint getTR() { return cPoint(right, top); }
+  cPoint getBL() { return cPoint(left, bottom); }
+  cPoint getBR() { return cPoint(right, bottom); }
+
+  cPoint getSize() { return cPoint(right-left, bottom-top); }
+  cPoint getCentre() { return cPoint(getCentreX(), getCentreY()); }
+  int16_t getCentreX() { return (left + right)/2; }
+  int16_t getCentreY() { return (top + bottom)/2; }
+
+  std::string getString();
+  std::string getYfirstString();
+  //{{{
+  bool inside (const cPoint& pos) {
+  // return pos inside rect
+    return (pos.x >= left) && (pos.x < right) && (pos.y >= top) && (pos.y < bottom);
+    }
+  //}}}
+
+  int16_t left;
+  int16_t top;
+  int16_t right;
+  int16_t bottom;
+  };
+//}}}
 //{{{  colours - uint16 RGB565
 constexpr uint16_t kBlue        =  0x001F;  //   0,   0, 255
 constexpr uint16_t kNavy        =  0x000F;  //   0,   0, 128
@@ -280,17 +280,21 @@ public:
   cPoint getSize() { return cPoint(mWidth, mHeight); }
   cRect getRect() { return cRect(0,0, mWidth,mHeight); }
 
+  //{{{  backlight
   virtual void setBacklight (bool on) {}
   void setBacklightOn() { setBacklight (true); }
   void setBacklightOff() { setBacklight (false); }
+  //}}}
 
+  // present
   void clear (const uint16_t colour = kBlack);
   void snapshot();
   bool present();
 
   void pix (const uint16_t colour, const uint8_t alpha, const cPoint& p);
-  void copy (const uint16_t* src);
-  void copy (const uint16_t* src, cRect& srcRect, const cPoint& dstPoint);
+  void copy (const uint16_t* src, cRect& srcRect, const uint16_t srcStride, const cPoint& dstPoint);
+
+  // gradient
   void hGrad (const uint16_t colourL, const uint16_t colourR, const cRect& r);
   void vGrad (const uint16_t colourT, const uint16_t colourB, const cRect& r);
   void grad (const uint16_t colourTL ,const uint16_t colourTR,
@@ -423,7 +427,7 @@ private:
   };
 //}}}
 
-// spi - data/command register pin screens
+// spi data/command register pin screens
 //{{{
 class cLcdSpiRegister : public cLcd {
 public:
@@ -466,7 +470,7 @@ protected:
   };
 //}}}
 
-// spi - no data/command register pin screens
+// spi no data/command register pin screens
 //{{{
 class cLcdSpiHeader : public cLcd {
 public:
