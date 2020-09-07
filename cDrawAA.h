@@ -7,9 +7,7 @@
 class cDrawAA {
 public:
   cDrawAA();
-  ~cDrawAA();
-
-  void init();
+  virtual ~cDrawAA();
 
   void moveTo (int32_t x, int32_t y);
   void lineTo (int32_t x, int32_t y);
@@ -102,6 +100,8 @@ private:
     uint16_t mNumSpans = 0;
     };
   //}}}
+
+  void init();
 
   // gets
   int32_t getMinx() const { return mMinx; }

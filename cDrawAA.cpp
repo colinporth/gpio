@@ -42,25 +42,10 @@ cDrawAA::~cDrawAA() {
 //}}}
 
 //{{{
-void cDrawAA::init() {
-
-  mNumCells = 0;
-  mCurCell.set (0x7FFF, 0x7FFF, 0, 0);
-  mSortRequired = true;
-  mClosed = true;
-
-  mMinx =  0x7FFFFFFF;
-  mMiny =  0x7FFFFFFF;
-  mMaxx = -0x7FFFFFFF;
-  mMaxy = -0x7FFFFFFF;
-  }
-//}}}
-
-//{{{
 void cDrawAA::moveTo (int32_t x, int32_t y) {
 
-  if (!mSortRequired)
-    init();
+  //if (!mSortRequired)
+  //  init();
 
   if (!mClosed)
     lineTo (mClosex, mClosey);
@@ -154,10 +139,27 @@ void cDrawAA::render (const uint16_t colour, bool fillNonZero, uint16_t* frameBu
 
   if (mScanLine->getNumSpans())
     renderScanLine (colour, frameBuf, width, height);
+
+  init();
   }
 //}}}
 
 // cDrawAA private
+//{{{
+void cDrawAA::init() {
+
+  mNumCells = 0;
+  mCurCell.set (0x7FFF, 0x7FFF, 0, 0);
+  mSortRequired = true;
+  mClosed = true;
+
+  mMinx =  0x7FFFFFFF;
+  mMiny =  0x7FFFFFFF;
+  mMaxx = -0x7FFFFFFF;
+  mMaxy = -0x7FFFFFFF;
+  }
+//}}}
+
 //{{{
 const cDrawAA::sCell* const* cDrawAA::getSortedCells() {
 
