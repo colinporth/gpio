@@ -21,40 +21,40 @@ public:
   //}}}
 
   //{{{
-  cPoint operator - (const cPoint& point) {
+  const cPoint operator - (const cPoint& point) const {
     return cPoint (x - point.x, y - point.y);
     }
   //}}}
   //{{{
-  cPoint operator + (const cPoint& point) {
+  const cPoint operator + (const cPoint& point) const {
     return cPoint (x + point.x, y + point.y);
     }
   //}}}
   //{{{
-  cPoint operator * (const int16_t f) {
+  const cPoint operator * (const int16_t f) const {
     return cPoint (x * f, y * f);
     }
   //}}}
   //{{{
-  cPoint operator * (const cPoint& point) {
+  const cPoint operator * (const cPoint& point) const {
     return cPoint (x * point.x, y * point.y);
     }
   //}}}
   //{{{
-  cPoint operator / (const int16_t f) {
+  const cPoint operator / (const int16_t f) const {
     return cPoint (x / f, y / f);
     }
   //}}}
 
   //{{{
-  cPoint& operator += (const cPoint& point)  {
+  const cPoint& operator += (const cPoint& point) {
     x += point.x;
     y += point.y;
     return *this;
     }
   //}}}
   //{{{
-  cPoint& operator -= (const cPoint& point)  {
+  const cPoint& operator -= (const cPoint& point) {
     x -= point.x;
     y -= point.y;
     return *this;
@@ -292,10 +292,10 @@ public:
   void copy (const uint16_t* src);
   void copy (const uint16_t* src, cRect& srcRect, const cPoint& dstPoint);
   int text (const uint16_t colour, const cPoint& p, const int height, const std::string& str);
-  //void grad (const uint16_t colTL, const uint16_t colTR,
-  //           const uint16_t  colBL, const uint16_t const uint16_t, const cRect& r);
+  void hGrad (const uint16_t colL, const uint16_t colR, const cRect& r);
+  void vGrad (const uint16_t colT, const uint16_t colB, const cRect& r);
 
-  // simple draw
+  // draw
   void rect (const uint16_t colour, const cRect& r);
   void rect (const uint16_t colour, const uint8_t alpha, const cRect& r);
   void rectOutline (const uint16_t colour, const cRect& r);
@@ -303,7 +303,7 @@ public:
   void ellipseOutline (const uint16_t colour, cPoint centre, cPoint radius);
   void line (const uint16_t colour, cPoint p1, cPoint p2);
 
-  // anti aliased draw
+  // aa draw
   void aMoveTo (const cPointF& p);
   void aLineTo (const cPointF& p);
   void aWideLine (const cPointF& p1, const cPointF& p2, float width);

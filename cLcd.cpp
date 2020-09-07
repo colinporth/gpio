@@ -74,6 +74,7 @@ constexpr uint32_t k16WriteClrMask = k16WriteMask | k16DataMask;
 constexpr uint8_t kSpiBacklightGpio = 24;
 //}}}
 
+//{{{  cRect members
 //{{{
 string cRect::getString() {
   return "l:" + dec(left) + " r:" + dec(right) + " t:" + dec(top) + " b:" + dec(bottom);
@@ -84,7 +85,8 @@ string cRect::getYfirstString() {
   return "t:" + dec(top) + " b:" + dec(bottom) + " l:" + dec(left) + " r:" + dec(right);
   }
 //}}}
-
+//}}}
+//{{{  cSpan
 //{{{  span constexpr
 constexpr int kMaxSpans = 10000;
 constexpr bool kCoarseDiff = true;
@@ -101,7 +103,8 @@ struct sSpan {
   sSpan* next;   // linked skip list in array for fast pruning
   };
 //}}}
-
+//}}}
+//{{{  aa drawing classes
 //{{{
 struct sCell {
 public:
@@ -729,6 +732,7 @@ private:
   uint16_t mNumSpans = 0;
   };
 //}}}
+//}}}
 
 // cLcd public
 //{{{
@@ -1035,6 +1039,33 @@ void cLcd::copy (const uint16_t* src, cRect& srcRect, const cPoint& dstPoint) {
   //}
 //}}}
 //{{{
+void cLcd::hGrad (const uint16_t colL, const uint16_t colR, const cRect& r) {
+// clip right, bottom, should do left top
+
+  int16_t xmax = min (r.right, (int16_t)getWidth());
+  int16_t ymax = min (r.bottom, (int16_t)getHeight());
+
+  for (uint16_t y = r.top; y < ymax; y++) {
+    for (uint16_t x = r.left; x < xmax; x++) {
+      uint8_t alpha = (x * 0xFF) / (r.right - r.left);
+      uint32_t background = colL;
+      uint32_t foreground = colR;
+      foreground = (foreground | (foreground << 16)) & 0x07e0f81f;
+      background = (background | (background << 16)) & 0x07e0f81f;
+      background += (((foreground - background) * ((alpha + 4) >> 3)) >> 5) & 0x07e0f81f;
+
+      // set frameBuf pixel to background result
+      mFrameBuf[(y*getWidth()) + x] = background | (background >> 16);
+      }
+    }
+  }
+//}}}
+//{{{
+void cLcd::vGrad (const uint16_t colT, const uint16_t colB, const cRect& r) {
+  }
+//}}}
+
+//{{{
 int cLcd::text (const uint16_t colour, const cPoint& p, const int height, const string& str) {
 
   if (mTypeEnabled) {
@@ -1067,7 +1098,7 @@ int cLcd::text (const uint16_t colour, const cPoint& p, const int height, const 
   }
 //}}}
 
-//{{{  simple draw
+//{{{  draw
 //{{{
 void cLcd::rect (const uint16_t colour, const cRect& r) {
 // rect with right,bottom clip
@@ -1197,7 +1228,7 @@ void cLcd::line (const uint16_t colour, cPoint p1, cPoint p2) {
   }
 //}}}
 //}}}
-//{{{  anti aliased draw
+//{{{  aa draw
 //{{{
 void cLcd::aMoveTo (const cPointF& p) {
   mOutline->moveTo (int(p.x * 256.f), int(p.y * 256.f));
