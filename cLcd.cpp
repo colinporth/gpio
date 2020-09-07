@@ -773,7 +773,10 @@ bool cLcd::initialise() {
   mFrameBuf = (uint16_t*)aligned_alloc (128, getNumPixels() * 2);
   clear();
 
-  if (mMode != eAll) {
+  if (mMode == eAll)
+    // allocate single span
+    mSpans = (sSpan*)malloc (sizeof(sSpan));
+  else {
     // allocate prevFrameBuf and diff span list
     mPrevFrameBuf = mFrameBuf;
     mFrameBuf = (uint16_t*)aligned_alloc (128, getNumPixels() * 2);

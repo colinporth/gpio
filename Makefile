@@ -1,7 +1,7 @@
-CXX       = clang
-CCX       = clang++
-//CXX       = gcc
-//CCX       = g++
+//CXX       = clang
+//CCX       = clang++
+CXX       = gcc
+CCX       = g++
 
 TARGET    = lcd
 SRCS      = lcdTest.cpp \
@@ -27,9 +27,9 @@ CFLAGS = -Wall \
 	 -I../opt/vc/include/interface/vcos/pthreads\
 	 -I../opt/vc/include/interface/vmcs_host \
 	 -I../opt/vc/include/interface/vmcs_host/linux \
+	 -fomit-frame-pointer \
 	 -g \
 	 -O2 \
-	 -fomit-frame-pointer \
 
 LD_VERSION = $(shell ld -v 2>&1 | sed -ne 's/.*\([0-9]\+\.[0-9]\+\).*/\1/p')
 ifeq "$(LD_VERSION)" "2.34"
