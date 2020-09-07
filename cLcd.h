@@ -77,15 +77,15 @@ public:
   void line (const uint16_t colour, cPoint p1, cPoint p2);
 
   // aa draw
-  void aaMoveTo (const cPointF& p);
-  void aaLineTo (const cPointF& p);
-  void aaRender (const uint16_t colour, bool fillNonZero);
+  void moveTo (const cPointF& p);
+  void lineTo (const cPointF& p);
+  void renderAA (const uint16_t colour, bool fillNonZero);
 
   // aa draw helpers
-  void aaWideLine (const cPointF& p1, const cPointF& p2, float width);
-  void aaPointedLine (const cPointF& p1, const cPointF& p2, float width);
-  void aaEllipse (const cPointF& centre, const cPointF& radius, int steps);
-  void aaEllipseOutline (const cPointF& centre, const cPointF& radius, float width, int steps);
+  void wideLine (const cPointF& p1, const cPointF& p2, float width);
+  void pointedLine (const cPointF& p1, const cPointF& p2, float width);
+  void ellipse (const cPointF& centre, const cPointF& radius, int steps);
+  void ellipseOutline (const cPointF& centre, const cPointF& radius, float width, int steps);
 
   int text (const uint16_t colour, const cPoint& p, const int height, const std::string& str);
 

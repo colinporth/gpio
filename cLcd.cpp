@@ -75,7 +75,7 @@ constexpr uint32_t k16WriteClrMask = k16WriteMask | k16DataMask;
 constexpr uint8_t kSpiBacklightGpio = 24;
 //}}}
 
-//{{{  cSpan
+//{{{  sSpan - diff span list element
 constexpr int kMaxSpans = 10000;
 constexpr bool kCoarseDiff = true;
 constexpr int kSpanExactThreshold = 8;
@@ -550,82 +550,82 @@ void cLcd::line (const uint16_t colour, cPoint p1, cPoint p2) {
   }
 //}}}
 //}}}
-//{{{  aa draw
+//{{{  drawAA
 //{{{
-void cLcd::aaMoveTo (const cPointF& p) {
+void cLcd::moveTo (const cPointF& p) {
   mDrawAA->moveTo (int(p.x * 256.f), int(p.y * 256.f));
   }
 //}}}
 //{{{
-void cLcd::aaLineTo (const cPointF& p) {
+void cLcd::lineTo (const cPointF& p) {
   mDrawAA->lineTo (int(p.x * 256.f), int(p.y * 256.f));
   }
 //}}}
 //{{{
-void cLcd::aaRender (const uint16_t colour, bool fillNonZero) {
+void cLcd::renderAA (const uint16_t colour, bool fillNonZero) {
   mDrawAA->render (colour, fillNonZero, mFrameBuf, getWidth(), getHeight());
   }
 //}}}
 
 // helpers
 //{{{
-void cLcd::aaWideLine (const cPointF& p1, const cPointF& p2, float width) {
+void cLcd::wideLine (const cPointF& p1, const cPointF& p2, float width) {
 
   cPointF perp = (p2 - p1).perp() * width;
-  aaMoveTo (p1 + perp);
-  aaLineTo (p2 + perp);
-  aaLineTo (p2 - perp);
-  aaLineTo (p1 - perp);
+  moveTo (p1 + perp);
+  lineTo (p2 + perp);
+  lineTo (p2 - perp);
+  lineTo (p1 - perp);
   }
 //}}}
 //{{{
-void cLcd::aaPointedLine (const cPointF& p1, const cPointF& p2, float width) {
+void cLcd::pointedLine (const cPointF& p1, const cPointF& p2, float width) {
 
   cPointF perp = (p2 - p1).perp() * width;
-  aaMoveTo (p1 + perp);
-  aaLineTo (p2);
-  aaLineTo (p1 - perp);
+  moveTo (p1 + perp);
+  lineTo (p2);
+  lineTo (p1 - perp);
   }
 //}}}
 
 //{{{
-void cLcd::aaEllipse (const cPointF& centre, const cPointF& radius, int steps) {
+void cLcd::ellipse (const cPointF& centre, const cPointF& radius, int steps) {
 
   // anticlockwise ellipse
   float angle = 0.f;
   float fstep = 360.f / steps;
-  aaMoveTo (centre + cPointF(radius.x, 0.f));
+  moveTo (centre + cPointF(radius.x, 0.f));
 
   angle += fstep;
   while (angle < 360.f) {
     auto radians = angle * 3.1415926f / 180.0f;
-    aaLineTo (centre + cPointF (cos(radians) * radius.x, sin(radians) * radius.y));
+    lineTo (centre + cPointF (cos(radians) * radius.x, sin(radians) * radius.y));
     angle += fstep;
     }
   }
 //}}}
 //{{{
-void cLcd::aaEllipseOutline (const cPointF& centre, const cPointF& radius, float width, int steps) {
+void cLcd::ellipseOutline (const cPointF& centre, const cPointF& radius, float width, int steps) {
 
   float angle = 0.f;
   float fstep = 360.f / steps;
-  aaMoveTo (centre + cPointF(radius.x, 0.f));
+  moveTo (centre + cPointF(radius.x, 0.f));
 
   // clockwise ellipse
   angle += fstep;
   while (angle < 360.f) {
     auto radians = angle * 3.1415926f / 180.0f;
-    aaLineTo (centre + cPointF (cos(radians) * radius.x, sin(radians) * radius.y));
+    lineTo (centre + cPointF (cos(radians) * radius.x, sin(radians) * radius.y));
     angle += fstep;
     }
 
   // anti clockwise ellipse
-  aaMoveTo (centre + cPointF(radius.x - width, 0.f));
+  moveTo (centre + cPointF(radius.x - width, 0.f));
 
   angle -= fstep;
   while (angle > 0.f) {
     auto radians = angle * 3.1415926f / 180.0f;
-    aaLineTo (centre + cPointF (cos(radians) * (radius.x - width), sin(radians) * (radius.y - width)));
+    lineTo (centre + cPointF (cos(radians) * (radius.x - width), sin(radians) * (radius.y - width)));
     angle -= fstep;
     }
   }

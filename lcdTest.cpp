@@ -54,11 +54,11 @@ int main (int numArgs, char* args[]) {
       while (height < 120) {
         lcd->grad (kBlack, kRed, kYellow, kWhite, lcd->getRect());
 
-        lcd->aaEllipse (lcd->getRect().getCentre(), cPointF(height, height), 16);
-        lcd->aaRender (kYellow, true);
+        lcd->ellipse (lcd->getRect().getCentre(), cPointF(height, height), 16);
+        lcd->renderAA (kYellow, true);
 
-        lcd->aaEllipseOutline (lcd->getRect().getCentre(), cPointF(height, height), 6, 16);
-        lcd->aaRender (kBlue, true);
+        lcd->ellipseOutline (lcd->getRect().getCentre(), cPointF(height, height), 6, 16);
+        lcd->renderAA (kBlue, true);
 
         cPoint point;
         for (char ch = 'A'; ch < 0x7f; ch++) {
