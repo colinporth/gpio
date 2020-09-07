@@ -27,6 +27,7 @@ constexpr uint16_t kWhite       =  0xFFFF;  // 255, 255, 255
 struct sSpan;
 class cDrawAA;
 class cFrameDiff;
+class cSnapshot;
 class cLcd {
 public:
   enum eRotate { e0, e90, e180, e270 };
@@ -110,6 +111,7 @@ protected:
   const eRotate mRotate;
   const eInfo mInfo;
   const eMode mMode = eSingle;
+
   const uint16_t mWidth;
   const uint16_t mHeight;
 
@@ -138,12 +140,13 @@ private:
   const bool mSnapshotEnabled;
   const bool mTypeEnabled;
 
+  cDrawAA* mDrawAA = nullptr;
+  uint8_t mGamma[256];
+
+  cFrameDiff* mFrameDiff = nullptr;
   int mDiffUs = 0;
 
-  // diff spans
-  cDrawAA* mDrawAA = nullptr;
-  cFrameDiff* mFrameDiff = nullptr;
-  uint8_t mGamma[256];
+  cSnapshot* mSnapshot = nullptr;
 //}}}
   };
 

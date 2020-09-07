@@ -8,6 +8,7 @@ SRCS      = lcdTest.cpp \
 	    cLcd.cpp \
 	    cFrameDiff.cpp \
 	    cDrawAA.cpp \
+	    cSnapshot.cpp \
 	    fonts/FreeSansBold.cpp \
 	    ../shared/utils/cLog.cpp \
 	    pigpio/pigpio.c \
