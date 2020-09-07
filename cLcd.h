@@ -291,10 +291,10 @@ public:
   void pix (const uint16_t colour, const uint8_t alpha, const cPoint& p);
   void copy (const uint16_t* src);
   void copy (const uint16_t* src, cRect& srcRect, const cPoint& dstPoint);
-  int text (const uint16_t colour, const cPoint& p, const int height, const std::string& str);
-  void hGrad (const uint16_t colL, const uint16_t colR, const cRect& r);
-  void vGrad (const uint16_t colT, const uint16_t colB, const cRect& r);
-
+  void hGrad (const uint16_t colourL, const uint16_t colourR, const cRect& r);
+  void vGrad (const uint16_t colourT, const uint16_t colourB, const cRect& r);
+  void grad (const uint16_t colourTL ,const uint16_t colourTR,
+             const uint16_t colourBL, const uint16_t colourBR, const cRect& r);
   // draw
   void rect (const uint16_t colour, const cRect& r);
   void rect (const uint16_t colour, const uint8_t alpha, const cRect& r);
@@ -311,6 +311,8 @@ public:
   void aEllipse (const cPointF& centre, const cPointF& radius, int steps);
   void aEllipseOutline (const cPointF& centre, const cPointF& radius, float width, int steps);
   void aRender (const uint16_t colour, bool fillNonZero);
+
+  int text (const uint16_t colour, const cPoint& p, const int height, const std::string& str);
 
   void delayUs (const int us);
   double timeUs();

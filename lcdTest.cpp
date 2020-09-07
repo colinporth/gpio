@@ -55,7 +55,9 @@ int main (int numArgs, char* args[]) {
       int height = 8;
       while (height < 100) {
         lcd->clear (kBlack);
-        lcd->hGrad (kBlack, kWhite, lcd->getRect());
+        //lcd->hGrad (kBlack, kWhite, cRect(0,0, lcd->getWidth(), lcd->getHeight()/2));
+        //lcd->vGrad (kBlack, kWhite, cRect(0,lcd->getHeight()/2, lcd->getWidth(), lcd->getHeight()));
+        lcd->grad (kBlack, kRed, kYellow, kWhite, lcd->getRect());
         lcd->aEllipse (lcd->getRect().getCentre(), cPointF(height, height), 16);
         lcd->aRender (kYellow, true);
         lcd->aEllipseOutline (lcd->getRect().getCentre(), cPointF(height, height), 6, 16);

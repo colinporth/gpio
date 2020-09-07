@@ -934,8 +934,8 @@ bool cLcd::present() {
 void cLcd::pix (const uint16_t colour, const uint8_t alpha, const cPoint& p) {
 // blend with clip
 // magical rgb565 alpha composite
-// - linear interp background * (1.0 - alpha) + foreground * alpha
-//   - factorized into: result = background + (foreground - background) * alpha
+// - linear interp back * (1.0 - alpha) + fore * alpha
+//   - factorized into: result = back + (fore - back) * alpha
 //   - alpha is in Q1.5 format, so 0.0 is represented by 0, and 1.0 is represented by 32
 // - Converts  0000000000000000rrrrrggggggbbbbb
 // -     into  00000gggggg00000rrrrr000000bbbbb
@@ -946,17 +946,17 @@ void cLcd::pix (const uint16_t colour, const uint8_t alpha, const cPoint& p) {
       // simple case - set frameBuf pixel to colour
       mFrameBuf[(p.y*getWidth()) + p.x] = colour;
     else {
-      // get frameBuf background
-      uint32_t background = mFrameBuf[(p.y*getWidth()) + p.x];
+      // get frameBuf back
+      uint32_t back = mFrameBuf[(p.y*getWidth()) + p.x];
 
       // composite colour
-      uint32_t foreground = colour;
-      foreground = (foreground | (foreground << 16)) & 0x07e0f81f;
-      background = (background | (background << 16)) & 0x07e0f81f;
-      background += (((foreground - background) * ((alpha + 4) >> 3)) >> 5) & 0x07e0f81f;
+      uint32_t fore = colour;
+      fore = (fore | (fore << 16)) & 0x07e0f81f;
+      back = (back | (back << 16)) & 0x07e0f81f;
+      back += (((fore - back) * ((alpha + 4) >> 3)) >> 5) & 0x07e0f81f;
 
-      // set frameBuf pixel to background result
-      mFrameBuf[(p.y*getWidth()) + p.x] = background | (background >> 16);
+      // set frameBuf pixel to back result
+      mFrameBuf[(p.y*getWidth()) + p.x] = back | (back >> 16);
       }
     }
   }
@@ -979,122 +979,95 @@ void cLcd::copy (const uint16_t* src, cRect& srcRect, const cPoint& dstPoint) {
   }
 //}}}
 //{{{
-//void cLcd::grad (const uint16_t colTL, const uint16_t colTR,
-                 //const uint16_t  colBL, const uint16_t const uint16_t, const cRect& r) {
-
-  //int32_t rTL = colTL.getR() << 16;
-  //int32_t rTR = colTR.getR() << 16;
-  //int32_t rBL = colBL.getR() << 16;
-  //int32_t rBR = colBR.getR() << 16;
-
-  //int32_t gTL = colTL.getG() << 16;
-  //int32_t gTR = colTR.getG() << 16;
-  //int32_t gBL = colBL.getG() << 16;
-  //int32_t gBR = colBR.getG() << 16;
-
-  //int32_t bTL = colTL.getB() << 16;
-  //int32_t bTR = colTR.getB() << 16;
-  //int32_t bBL = colBL.getB() << 16;
-  //int32_t bBR = colBR.getB() << 16;
-
-  //int32_t rl16 = rTL;
-  //int32_t gl16 = gTL;
-  //int32_t bl16 = bTL;
-  //int32_t rGradl16 = (rBL - rTL) / r.getHeight();
-  //int32_t gGradl16 = (gBL - gTL) / r.getHeight();
-  //int32_t bGradl16 = (bBL - bTL) / r.getHeight();
-
-  //int32_t rr16 = rTR;
-  //int32_t gr16 = gTR;
-  //int32_t br16 = bTR;
-  //int32_t rGradr16 = (rBR - rTR) / r.getHeight();
-  //int32_t gGradr16 = (gBR - gTR) / r.getHeight();
-  //int32_t bGradr16 = (bBR - bTR) / r.getHeight();
-
-  //auto dst = (uint16_t*)mBuffer + r.top * getWidth() + r.left;
-  //for (uint16_t y = r.top; y < r.bottom; y++) {
-    //int32_t rGradx16 = (rr16 - rl16) / r.getWidth();
-    //int32_t gGradx16 = (gr16 - gl16) / r.getWidth();
-    //int32_t bGradx16 = (br16 - bl16) / r.getWidth();
-
-    //int32_t r16 = rl16;
-    //int32_t g16 = gl16;
-    //int32_t b16 = bl16;
-    //for (uint16_t x = r.left; x < r.right; x++) {
-      //*dst++ = (b16 >> 16) | ((g16 >> 11) & 0x07E0) | ((r16 >> 5) & 0xF800);
-      //r16 += rGradx16;
-      //g16 += gGradx16;
-      //b16 += bGradx16;
-      //}
-    //dst += getWidth() - r.getWidth();
-
-    //rl16 += rGradl16;
-    //gl16 += gGradl16;
-    //bl16 += bGradl16;
-
-    //rr16 += rGradr16;
-    //gr16 += gGradr16;
-    //br16 += bGradr16;
-    //}
-  //}
-//}}}
-//{{{
-void cLcd::hGrad (const uint16_t colL, const uint16_t colR, const cRect& r) {
+void cLcd::hGrad (const uint16_t colourL, const uint16_t colourR, const cRect& r) {
 // clip right, bottom, should do left top
 
   int16_t xmax = min (r.right, (int16_t)getWidth());
   int16_t ymax = min (r.bottom, (int16_t)getHeight());
 
+  // draw a line
+  int16_t y = r.top;
+  uint16_t* dst = mFrameBuf + (y * getWidth()) + r.left;
+  for (uint16_t x = r.left; x < xmax; x++) {
+    uint32_t fore = colourR;
+    fore = (fore | (fore << 16)) & 0x07e0f81f;
+
+    uint32_t back = colourL;
+    back = (back | (back << 16)) & 0x07e0f81f;
+
+    uint8_t alpha = (x * 0xFF) / (r.right - r.left);
+    back += (((fore - back) * ((mGamma[alpha] + 4) >> 3)) >> 5) & 0x07e0f81f;
+    back |= back >> 16;
+
+    *dst++ = back;
+    }
+  y++;
+
+  // copy line to subsequnt lines
+  uint16_t* src = mFrameBuf + (r.top * getWidth()) + r.left;
+  for (; y < ymax; y++) {
+    uint16_t* dst = mFrameBuf + (y * getWidth()) + r.left;
+    memcpy (dst, src, (xmax - r.left) * 2);
+    dst += getWidth();
+    }
+  }
+//}}}
+//{{{
+void cLcd::vGrad (const uint16_t colourT, const uint16_t colourB, const cRect& r) {
+
+  int16_t xmax = min (r.right, (int16_t)getWidth());
+  int16_t ymax = min (r.bottom, (int16_t)getHeight());
+
   for (uint16_t y = r.top; y < ymax; y++) {
+    uint16_t* dst = mFrameBuf + (y * getWidth()) + r.left;
+
+    uint32_t fore = colourB;
+    fore = (fore | (fore << 16)) & 0x07e0f81f;
+
+    uint32_t back = colourT;
+    back = (back | (back << 16)) & 0x07e0f81f;
+
+    uint8_t alpha = (y * 0xFF) / (r.bottom - r.top);
+    back += (((fore - back) * ((mGamma[alpha] + 4) >> 3)) >> 5) & 0x07e0f81f;
+    back |= back >> 16;
+
+    for (uint16_t x = r.left; x < xmax; x++)
+      *dst++ = back;
+    }
+  }
+//}}}
+//{{{
+void cLcd::grad (const uint16_t colourTL ,const uint16_t colourTR,
+                 const uint16_t colourBL, const uint16_t colourBR, const cRect& r) {
+// !!! check for losing colour res, is the double gamma right ???
+
+  int16_t xmax = min (r.right, (int16_t)getWidth());
+  int16_t ymax = min (r.bottom, (int16_t)getHeight());
+
+  for (uint16_t y = r.top; y < ymax; y++) {
+    uint16_t* dst = mFrameBuf + (y * getWidth()) + r.left;
+
     for (uint16_t x = r.left; x < xmax; x++) {
-      uint8_t alpha = (x * 0xFF) / (r.right - r.left);
-      uint32_t background = colL;
-      uint32_t foreground = colR;
-      foreground = (foreground | (foreground << 16)) & 0x07e0f81f;
-      background = (background | (background << 16)) & 0x07e0f81f;
-      background += (((foreground - background) * ((alpha + 4) >> 3)) >> 5) & 0x07e0f81f;
+      uint32_t colour32TL = colourTL;
+      colour32TL = (colour32TL | (colour32TL << 16)) & 0x07e0f81f;
+      uint32_t colour32TR = colourTR;
+      colour32TR = (colour32TR | (colour32TR << 16)) & 0x07e0f81f;
+      uint8_t alphaLR = (x * 0xFF) / (r.right - r.left);
+      colour32TL += (((colour32TR - colour32TL) * ((mGamma[alphaLR] + 4) >> 3)) >> 5) & 0x07e0f81f;
 
-      // set frameBuf pixel to background result
-      mFrameBuf[(y*getWidth()) + x] = background | (background >> 16);
+      uint32_t colour32BL = colourBL;
+      colour32BL = (colour32BL | (colour32BL << 16)) & 0x07e0f81f;
+      uint32_t colour32BR = colourBR;
+      colour32BR = (colour32BR | (colour32BR << 16)) & 0x07e0f81f;
+      colour32BL += (((colour32BR - colour32BL) * ((mGamma[alphaLR] + 4) >> 3)) >> 5) & 0x07e0f81f;
+
+      uint8_t alphaTB = (y * 0xFF) / (r.bottom - r.top);
+      colour32TL += (((colour32BL - colour32TL) * ((mGamma[alphaTB] + 4) >> 3)) >> 5) & 0x07e0f81f;
+      colour32TL |= colour32TL >> 16;
+
+      *dst++ = colour32TL;
       }
     }
-  }
-//}}}
-//{{{
-void cLcd::vGrad (const uint16_t colT, const uint16_t colB, const cRect& r) {
-  }
-//}}}
-
-//{{{
-int cLcd::text (const uint16_t colour, const cPoint& p, const int height, const string& str) {
-
-  if (mTypeEnabled) {
-    FT_Set_Pixel_Sizes (mFace, 0, height);
-
-    int curX = p.x;
-    for (unsigned i = 0; (i < str.size()) && (curX < getWidth()); i++) {
-      FT_Load_Char (mFace, str[i], FT_LOAD_RENDER);
-      FT_GlyphSlot slot = mFace->glyph;
-
-      int x = curX + slot->bitmap_left;
-      int y = p.y + height - slot->bitmap_top;
-
-      if (slot->bitmap.buffer) {
-        for (unsigned bitmapY = 0; bitmapY < slot->bitmap.rows; bitmapY++) {
-          auto bitmapPtr = slot->bitmap.buffer + (bitmapY * slot->bitmap.pitch);
-          for (unsigned bitmapX = 0; bitmapX < slot->bitmap.width; bitmapX++)
-            pix (colour, *bitmapPtr++, cPoint (x + bitmapX, y + bitmapY));
-          }
-        }
-      curX += slot->advance.x / 64;
-      }
-
-    return curX;
-    }
-
-  cLog::log (LOGERROR, "type not enabled");
-
-  return 0;
   }
 //}}}
 
@@ -1360,6 +1333,38 @@ void cLcd::aRender (const uint16_t colour, bool fillNonZero) {
     renderScanLine (colour, mScanLine);
   }
 //}}}
+//}}}
+//{{{
+int cLcd::text (const uint16_t colour, const cPoint& p, const int height, const string& str) {
+
+  if (mTypeEnabled) {
+    FT_Set_Pixel_Sizes (mFace, 0, height);
+
+    int curX = p.x;
+    for (unsigned i = 0; (i < str.size()) && (curX < getWidth()); i++) {
+      FT_Load_Char (mFace, str[i], FT_LOAD_RENDER);
+      FT_GlyphSlot slot = mFace->glyph;
+
+      int x = curX + slot->bitmap_left;
+      int y = p.y + height - slot->bitmap_top;
+
+      if (slot->bitmap.buffer) {
+        for (unsigned bitmapY = 0; bitmapY < slot->bitmap.rows; bitmapY++) {
+          auto bitmapPtr = slot->bitmap.buffer + (bitmapY * slot->bitmap.pitch);
+          for (unsigned bitmapX = 0; bitmapX < slot->bitmap.width; bitmapX++)
+            pix (colour, *bitmapPtr++, cPoint (x + bitmapX, y + bitmapY));
+          }
+        }
+      curX += slot->advance.x / 64;
+      }
+
+    return curX;
+    }
+
+  cLog::log (LOGERROR, "type not enabled");
+
+  return 0;
+  }
 //}}}
 
 //{{{
@@ -1810,14 +1815,15 @@ void cLcd::renderScanLine (const uint16_t colour, cScanLine* scanLine) {
         *ptr++ = colour;
       else {
         // get colour
-        uint32_t foreground = colour;
-        foreground = (foreground | (foreground << 16)) & 0x07e0f81f;
+        uint32_t fore = colour;
+        fore = (fore | (fore << 16)) & 0x07e0f81f;
 
-        // get frameBuf background, composite and write back
-        uint32_t background = *ptr;
-        background = (background | (background << 16)) & 0x07e0f81f;
-        background += (((foreground - background) * ((alpha + 4) >> 3)) >> 5) & 0x07e0f81f;
-        *ptr++ = background | (background >> 16);
+        // get frameBuf back, composite and write back
+        uint32_t back = *ptr;
+        back = (back | (back << 16)) & 0x07e0f81f;
+        back += (((fore - back) * ((alpha + 4) >> 3)) >> 5) & 0x07e0f81f;
+        back |= back >> 16;
+        *ptr++ = back;
         }
       }
 
