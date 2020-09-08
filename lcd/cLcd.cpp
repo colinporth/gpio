@@ -116,8 +116,20 @@ bool cLcd::initialise() {
   mSpanAll = (sSpan*)malloc (sizeof (sSpan));
   *mSpanAll = { getRect(), mWidth, getNumPixels(), nullptr};
 
-  if (mMode != eAll)
-    mFrameDiff = new cFrameDiff (mWidth, mHeight);
+  switch (mMode) {
+    case eSingle:
+      mFrameDiff = new cSingleFrameDiff (mWidth, mHeight);
+      break;
+    case eCoarse:
+      break;
+      mFrameDiff = new cCoarseFrameDiff (mWidth, mHeight);
+    case eExact:
+      mFrameDiff = new cExactFrameDiff (mWidth, mHeight);
+      break;
+    case eAll:
+      mFrameDiff = nullptr;
+      break;
+    }
 
   if (mSnapshotEnabled)
     mSnapshot = new cSnapshot (mWidth, mHeight);
@@ -155,32 +167,13 @@ void cLcd::snapshot() {
 bool cLcd::present() {
 // present update
 
-  // make diff spans list
-  sSpan* mSpans = nullptr;
-  double diffStartTime = timeUs();
-  switch (mMode) {
-    //{{{
-    case eAll :
-      mSpans = mSpanAll;
-      break;
-    //}}}
-    //{{{
-    case eSingle :
-      mSpans = mFrameDiff->single (mFrameBuf);
-      break;
-    //}}}
-    //{{{
-    case eCoarse :
-      mSpans = mFrameDiff->coarse (mFrameBuf);
-      break;
-    //}}}
-    //{{{
-    case eExact :
-      mSpans = mFrameDiff->exact (mFrameBuf);
-      break;
-    //}}}
+  sSpan* mSpans =  mSpanAll;
+  if (mFrameDiff) {
+    // make diff spans list
+    double diffStartTime = timeUs();
+    mSpans = mFrameDiff->diff (mFrameBuf);
+    mDiffUs = int((timeUs() - diffStartTime) * 1000000.0);
     }
-  mDiffUs = int((timeUs() - diffStartTime) * 1000000.0);
 
   if (!mSpans) {// nothing changed
     mUpdateUs = 0;
@@ -793,6 +786,7 @@ uint32_t cLcdTa7601::updateLcd (sSpan* spans) {
         cRect r = it->r;
         r.left &= 0xFFFE;
         r.right = (r.right + 1) & 0xFFFE;
+
         writeCommandData (0x45, r.left);     // GRAM V start address window
         writeCommandData (0x44, r.right-1);  // GRAM V   end address window
         writeCommandData (0x47, r.top);      // GRAM H start address window - even
@@ -811,6 +805,7 @@ uint32_t cLcdTa7601::updateLcd (sSpan* spans) {
 
         numPixels += r.getNumPixels();
         }
+
       break;
       }
     //}}}
@@ -841,6 +836,7 @@ uint32_t cLcdTa7601::updateLcd (sSpan* spans) {
 
         numPixels += r.getNumPixels();
         }
+
       break;
       }
     //}}}
@@ -851,6 +847,7 @@ uint32_t cLcdTa7601::updateLcd (sSpan* spans) {
         cRect r = it->r;
         r.left &= 0xFFFE;
         r.right = (r.right + 1) & 0xFFFE;
+
         writeCommandData (0x45, kWidthTa7601 - r.right);   // GRAM V start address window
         writeCommandData (0x44, kWidthTa7601-1 - r.left);  // GRAM V   end address window
         writeCommandData (0x47, kHeightTa7601 - r.bottom); // GRAM H start address window - even
@@ -869,6 +866,7 @@ uint32_t cLcdTa7601::updateLcd (sSpan* spans) {
 
         numPixels += r.getNumPixels();
         }
+
       break;
       }
     //}}}
@@ -899,6 +897,7 @@ uint32_t cLcdTa7601::updateLcd (sSpan* spans) {
 
         numPixels += r.getNumPixels();
         }
+
       break;
       }
     //}}}

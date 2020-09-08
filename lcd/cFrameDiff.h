@@ -1,18 +1,12 @@
-// cFrameDiff.h
+// cFrameDiff.h - classes
 #pragma once
 #include "cPointRect.h"
 
-struct sSpan {
-  cRect r;
-  uint16_t lastScanRight; // scanline bottom-1 can be partial, ends in lastScanRight.
-  uint32_t size;
-  sSpan* next;   // linked skip list in array for fast pruning
-  };
-
+// cFrameDiff - base class
 class cFrameDiff {
 public:
   cFrameDiff (const int width, const int height);
-  ~cFrameDiff();
+  virtual ~cFrameDiff();
 
   int getNumSpans() { return mNumSpans; }
 
@@ -20,21 +14,45 @@ public:
   void copy (uint16_t* frameBuf);
 
   // diff
-  sSpan* single (uint16_t* frameBuf);
-  sSpan* exact (uint16_t* frameBuf);
-  sSpan* coarse (uint16_t* frameBuf);
+  virtual sSpan* diff (uint16_t* frameBuf) = 0;
 
-private:
+protected:
   void merge (int pixelThreshold);
 
-  static int coarseLinearDiff (uint16_t* frameBuf, uint16_t* prevFrameBuf, uint16_t* frameBufEnd);
-  static int coarseLinearDiffBack (uint16_t* frameBuf, uint16_t* prevFrameBuf, uint16_t* frameBufEnd);
-
-  // vars
   const uint16_t mWidth;
   const uint16_t mHeight;
 
   uint16_t* mPrevFrameBuf = nullptr;
   sSpan* mSpans = nullptr;
   int mNumSpans = 0;
+  };
+
+// cSingleFrameDiff
+class cSingleFrameDiff : public cFrameDiff {
+public:
+  cSingleFrameDiff (const int width, const int height) : cFrameDiff (width, height) {}
+  virtual ~cSingleFrameDiff() {}
+
+  sSpan* diff (uint16_t* frameBuf);
+
+private:
+  static int coarseLinearDiff (uint16_t* frameBuf, uint16_t* prevFrameBuf, uint16_t* frameBufEnd);
+  static int coarseLinearDiffBack (uint16_t* frameBuf, uint16_t* prevFrameBuf, uint16_t* frameBufEnd);
+  };
+
+// cCoarseFrameDiff
+class cCoarseFrameDiff : public cFrameDiff {
+public:
+  cCoarseFrameDiff (const int width, const int height) : cFrameDiff (width, height) {}
+  virtual ~cCoarseFrameDiff();
+  sSpan* diff (uint16_t* frameBuf);
+  };
+
+// cExactFrameDiff
+class cExactFrameDiff : public cFrameDiff {
+public:
+  cExactFrameDiff (const int width, const int height) : cFrameDiff (width, height) {}
+  virtual ~cExactFrameDiff() {}
+
+  sSpan* diff (uint16_t* frameBuf);
   };

@@ -5,6 +5,7 @@
 #include <math.h>
 //#include "../shared/utils/utils.h"
 
+//{{{
 struct cPoint {
 public:
   //{{{
@@ -69,7 +70,7 @@ public:
   int16_t x;
   int16_t y;
   };
-
+//}}}
 //{{{
 struct cPointF {
 public:
@@ -164,7 +165,7 @@ public:
   float y;
   };
 //}}}
-
+//{{{
 struct cRect {
 public:
   //{{{
@@ -234,3 +235,12 @@ public:
   int16_t right;
   int16_t bottom;
   };
+//}}}
+//{{{
+struct sSpan {
+  cRect r;
+  uint16_t lastScanRight; // scanline bottom-1 can be partial, ends in lastScanRight.
+  uint32_t size;
+  sSpan* next;   // linked skip list in array for fast pruning
+  };
+//}}}

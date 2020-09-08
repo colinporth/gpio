@@ -11,6 +11,7 @@ constexpr bool kCoarseDiff = true;
 constexpr int kSpanExactThreshold = 8;
 constexpr int kSpanMergeThreshold = 16;
 
+// cFrameDiff public
 //{{{
 cFrameDiff::cFrameDiff (const int width, const int height) : mWidth(width), mHeight(height) {
 
@@ -43,8 +44,55 @@ void cFrameDiff::copy (uint16_t* frameBuf) {
   }
 //}}}
 
+// cFrameDiff protected
 //{{{
-sSpan* cFrameDiff::single (uint16_t* frameBuf) {
+void cFrameDiff::merge (int pixelThreshold) {
+// !!!! need to recalc mNumSpans !!!!
+
+  for (sSpan* i = mSpans; i; i = i->next) {
+    sSpan* prev = i;
+    for (sSpan* j = i->next; j; j = j->next) {
+      // If the spans i and j are vertically apart, don't attempt to merge span i any further
+      // since all spans >= j will also be farther vertically apart.
+      // (the list is nondecreasing with respect to Span::y)
+      if (j->r.top > i->r.bottom)
+        break;
+
+      // Merge the spans i and j, and figure out the wastage of doing so
+      int left = min (i->r.left, j->r.left);
+      int top = min (i->r.top, j->r.top);
+      int right = max (i->r.right, j->r.right);
+      int bottom = max (i->r.bottom, j->r.bottom);
+
+      int lastScanRight = bottom > i->r.bottom ?
+                            j->lastScanRight : (bottom > j->r.bottom ?
+                              i->lastScanRight : max (i->lastScanRight, j->lastScanRight));
+
+      int newSize = (right - left) * (bottom - top - 1) + (lastScanRight - left);
+
+      int wastedPixels = newSize - i->size - j->size;
+      if (wastedPixels <= pixelThreshold) {
+        i->r.left = left;
+        i->r.top = top;
+        i->r.right = right;
+        i->r.bottom = bottom;
+
+        i->lastScanRight = lastScanRight;
+        i->size = newSize;
+
+        prev->next = j->next;
+        j = prev;
+        }
+      else // Not merging - travel to next node remembering where we came from
+        prev = j;
+      }
+    }
+  }
+//}}}
+
+// cSingleFrameDiff
+//{{{
+sSpan* cSingleFrameDiff::diff (uint16_t* frameBuf) {
 // return 1, if single bounding span is different, else 0
 
   sSpan* spans = mSpans;
@@ -225,7 +273,111 @@ foundRight:
   }
 //}}}
 //{{{
-sSpan* cFrameDiff::coarse (uint16_t* frameBuf) {
+int cSingleFrameDiff::coarseLinearDiff (uint16_t* frameBuf, uint16_t* prevFrameBuf, uint16_t* frameBufEnd) {
+// Coarse diffing of two frameBufs with tight stride, 16 pixels at a time
+// Finds the first changed pixel, coarse result aligned down to 8 pixels boundary
+
+  uint16_t* endPtr;
+
+  asm volatile(
+    "mov r0, %[frameBufEnd]\n"   // r0 <- pointer to end of current frameBuf
+    "mov r1, %[frameBuf]\n"      // r1 <- current frameBuf
+    "mov r2, %[prevFrameBuf]\n"  // r2 <- frameBuf of previous frame
+
+    "start_%=:\n"
+      "pld [r1, #128]\n" // preload data caches for both current and previous frameBufs 128 bytes ahead of time
+      "pld [r2, #128]\n"
+
+      "ldmia r1!, {r3,r4,r5,r6}\n"  // load 4x32-bit elements (8 pixels) of current frameBuf
+      "ldmia r2!, {r7,r8,r9,r10}\n" // load corresponding 4x32-bit elements (8 pixels) of previous frameBuf
+      "cmp r3, r7\n"                // compare all 8 pixels if they are different
+      "cmpeq r4, r8\n"
+      "cmpeq r5, r9\n"
+      "cmpeq r6, r10\n"
+      "bne end_%=\n"                // if we found a difference, we are done
+
+      // Unroll once for another set of 4x32-bit elements.
+      // On Raspberry Pi Zero, data cache line is 32 bytes in size
+      // one iteration of the loop computes a single data cache line, with preloads in place at the top.
+      "ldmia r1!, {r3,r4,r5,r6}\n"
+      "ldmia r2!, {r7,r8,r9,r10}\n"
+      "cmp r3, r7\n"
+      "cmpeq r4, r8\n"
+      "cmpeq r5, r9\n"
+      "cmpeq r6, r10\n"
+      "bne end_%=\n"                // if we found a difference, we are done
+
+      "cmp r0, r1\n"                // frameBuf == frameBufEnd? did we finish through the array?
+      "bne start_%=\n"
+      "b done_%=\n"
+
+    "end_%=:\n"
+      "sub r1, r1, #16\n"           // ldmia r1! increments r1 after load
+                                    //subtract back last increment in order to not shoot past the first changed pixels
+    "done_%=:\n"
+      "mov %[endPtr], r1\n"         // output endPtr back to C code
+      : [endPtr]"=r"(endPtr)
+      : [frameBuf]"r"(frameBuf), [prevFrameBuf]"r"(prevFrameBuf), [frameBufEnd]"r"(frameBufEnd)
+      : "r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7", "r8", "r9", "r10", "cc"
+    );
+
+  return endPtr - frameBuf;
+  }
+//}}}
+//{{{
+int cSingleFrameDiff::coarseLinearDiffBack (uint16_t* frameBuf, uint16_t* prevFrameBuf, uint16_t* frameBufEnd) {
+// Same as coarse_linear_diff, but finds the last changed pixel in linear order instead of first, i.e.
+// Finds the last changed pixel, coarse result aligned up to 8 pixels boundary
+
+  uint16_t* endPtr;
+  asm volatile(
+    "mov r0, %[frameBufBegin]\n" // r0 <- pointer to beginning of current frameBuf
+    "mov r1, %[frameBuf]\n"      // r1 <- current frameBuf (starting from end of frameBuf)
+    "mov r2, %[prevFrameBuf]\n"  // r2 <- frameBuf of previous frame (starting from end of frameBuf)
+
+    "start_%=:\n"
+      "pld [r1, #-128]\n"           // preload data caches for both current and previous frameBufs 128 bytes ahead of time
+      "pld [r2, #-128]\n"
+
+      "ldmdb r1!, {r3,r4,r5,r6}\n"  // load 4x32-bit elements (8 pixels) of current frameBuf
+      "ldmdb r2!, {r7,r8,r9,r10}\n" // load corresponding 4x32-bit elements (8 pixels) of previous frameBuf
+      "cmp r3, r7\n"                // compare all 8 pixels if they are different
+      "cmpeq r4, r8\n"
+      "cmpeq r5, r9\n"
+      "cmpeq r6, r10\n"
+      "bne end_%=\n"                // if we found a difference, we are done
+
+      // Unroll once for another set of 4x32-bit elements. On Raspberry Pi Zero, data cache line is 32 bytes in size, so one iteration
+      // of the loop computes a single data cache line, with preloads in place at the top.
+      "ldmdb r1!, {r3,r4,r5,r6}\n"
+      "ldmdb r2!, {r7,r8,r9,r10}\n"
+      "cmp r3, r7\n"
+      "cmpeq r4, r8\n"
+      "cmpeq r5, r9\n"
+      "cmpeq r6, r10\n"
+      "bne end_%=\n"                // if we found a difference, we are done
+
+      "cmp r0, r1\n"                // frameBuf == frameBufEnd? did we finish through the array?
+      "bne start_%=\n"
+      "b done_%=\n"
+
+    "end_%=:\n"
+      "add r1, r1, #16\n"           // ldmdb r1! decrements r1 before load,
+                                    // so add back the last decrement in order to not shoot past the first changed pixels
+    "done_%=:\n"
+      "mov %[endPtr], r1\n"         // output endPtr back to C code
+      : [endPtr]"=r"(endPtr)
+      : [frameBuf]"r"(frameBufEnd), [prevFrameBuf]"r"(prevFrameBuf+(frameBufEnd-frameBuf)), [frameBufBegin]"r"(frameBuf)
+      : "r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7", "r8", "r9", "r10", "cc"
+    );
+
+  return endPtr - frameBuf;
+  }
+//}}}
+
+// cCoarseFrameDiff
+//{{{
+sSpan* cCoarseFrameDiff::diff (uint16_t* frameBuf) {
 // return numSpans, 4pix (64bit) alignment
 
   sSpan* spans = mSpans;
@@ -305,8 +457,10 @@ sSpan* cFrameDiff::coarse (uint16_t* frameBuf) {
   return numSpans > 0 ? mSpans : nullptr;
   }
 //}}}
+
+// cExactFrameDiff
 //{{{
-sSpan* cFrameDiff::exact (uint16_t* frameBuf) {
+sSpan* cExactFrameDiff::diff (uint16_t* frameBuf) {
 // return numSpans
 
   sSpan* spans = mSpans;
@@ -399,155 +553,5 @@ sSpan* cFrameDiff::exact (uint16_t* frameBuf) {
   mNumSpans = numSpans;
   merge (kSpanMergeThreshold);
   return numSpans > 0 ? mSpans : nullptr;
-  }
-//}}}
-
-// private
-//{{{
-void cFrameDiff::merge (int pixelThreshold) {
-// !!!! need to recalc mNumSpans !!!!
-
-  for (sSpan* i = mSpans; i; i = i->next) {
-    sSpan* prev = i;
-    for (sSpan* j = i->next; j; j = j->next) {
-      // If the spans i and j are vertically apart, don't attempt to merge span i any further
-      // since all spans >= j will also be farther vertically apart.
-      // (the list is nondecreasing with respect to Span::y)
-      if (j->r.top > i->r.bottom)
-        break;
-
-      // Merge the spans i and j, and figure out the wastage of doing so
-      int left = min (i->r.left, j->r.left);
-      int top = min (i->r.top, j->r.top);
-      int right = max (i->r.right, j->r.right);
-      int bottom = max (i->r.bottom, j->r.bottom);
-
-      int lastScanRight = bottom > i->r.bottom ?
-                            j->lastScanRight : (bottom > j->r.bottom ?
-                              i->lastScanRight : max (i->lastScanRight, j->lastScanRight));
-
-      int newSize = (right - left) * (bottom - top - 1) + (lastScanRight - left);
-
-      int wastedPixels = newSize - i->size - j->size;
-      if (wastedPixels <= pixelThreshold) {
-        i->r.left = left;
-        i->r.top = top;
-        i->r.right = right;
-        i->r.bottom = bottom;
-
-        i->lastScanRight = lastScanRight;
-        i->size = newSize;
-
-        prev->next = j->next;
-        j = prev;
-        }
-      else // Not merging - travel to next node remembering where we came from
-        prev = j;
-      }
-    }
-  }
-//}}}
-
-// cLcd private static
-//{{{
-int cFrameDiff::coarseLinearDiff (uint16_t* frameBuf, uint16_t* prevFrameBuf, uint16_t* frameBufEnd) {
-// Coarse diffing of two frameBufs with tight stride, 16 pixels at a time
-// Finds the first changed pixel, coarse result aligned down to 8 pixels boundary
-
-  uint16_t* endPtr;
-
-  asm volatile(
-    "mov r0, %[frameBufEnd]\n"   // r0 <- pointer to end of current frameBuf
-    "mov r1, %[frameBuf]\n"      // r1 <- current frameBuf
-    "mov r2, %[prevFrameBuf]\n"  // r2 <- frameBuf of previous frame
-
-    "start_%=:\n"
-      "pld [r1, #128]\n" // preload data caches for both current and previous frameBufs 128 bytes ahead of time
-      "pld [r2, #128]\n"
-
-      "ldmia r1!, {r3,r4,r5,r6}\n"  // load 4x32-bit elements (8 pixels) of current frameBuf
-      "ldmia r2!, {r7,r8,r9,r10}\n" // load corresponding 4x32-bit elements (8 pixels) of previous frameBuf
-      "cmp r3, r7\n"                // compare all 8 pixels if they are different
-      "cmpeq r4, r8\n"
-      "cmpeq r5, r9\n"
-      "cmpeq r6, r10\n"
-      "bne end_%=\n"                // if we found a difference, we are done
-
-      // Unroll once for another set of 4x32-bit elements.
-      // On Raspberry Pi Zero, data cache line is 32 bytes in size
-      // one iteration of the loop computes a single data cache line, with preloads in place at the top.
-      "ldmia r1!, {r3,r4,r5,r6}\n"
-      "ldmia r2!, {r7,r8,r9,r10}\n"
-      "cmp r3, r7\n"
-      "cmpeq r4, r8\n"
-      "cmpeq r5, r9\n"
-      "cmpeq r6, r10\n"
-      "bne end_%=\n"                // if we found a difference, we are done
-
-      "cmp r0, r1\n"                // frameBuf == frameBufEnd? did we finish through the array?
-      "bne start_%=\n"
-      "b done_%=\n"
-
-    "end_%=:\n"
-      "sub r1, r1, #16\n"           // ldmia r1! increments r1 after load
-                                    //subtract back last increment in order to not shoot past the first changed pixels
-    "done_%=:\n"
-      "mov %[endPtr], r1\n"         // output endPtr back to C code
-      : [endPtr]"=r"(endPtr)
-      : [frameBuf]"r"(frameBuf), [prevFrameBuf]"r"(prevFrameBuf), [frameBufEnd]"r"(frameBufEnd)
-      : "r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7", "r8", "r9", "r10", "cc"
-    );
-
-  return endPtr - frameBuf;
-  }
-//}}}
-//{{{
-int cFrameDiff::coarseLinearDiffBack (uint16_t* frameBuf, uint16_t* prevFrameBuf, uint16_t* frameBufEnd) {
-// Same as coarse_linear_diff, but finds the last changed pixel in linear order instead of first, i.e.
-// Finds the last changed pixel, coarse result aligned up to 8 pixels boundary
-
-  uint16_t* endPtr;
-  asm volatile(
-    "mov r0, %[frameBufBegin]\n" // r0 <- pointer to beginning of current frameBuf
-    "mov r1, %[frameBuf]\n"      // r1 <- current frameBuf (starting from end of frameBuf)
-    "mov r2, %[prevFrameBuf]\n"  // r2 <- frameBuf of previous frame (starting from end of frameBuf)
-
-    "start_%=:\n"
-      "pld [r1, #-128]\n"           // preload data caches for both current and previous frameBufs 128 bytes ahead of time
-      "pld [r2, #-128]\n"
-
-      "ldmdb r1!, {r3,r4,r5,r6}\n"  // load 4x32-bit elements (8 pixels) of current frameBuf
-      "ldmdb r2!, {r7,r8,r9,r10}\n" // load corresponding 4x32-bit elements (8 pixels) of previous frameBuf
-      "cmp r3, r7\n"                // compare all 8 pixels if they are different
-      "cmpeq r4, r8\n"
-      "cmpeq r5, r9\n"
-      "cmpeq r6, r10\n"
-      "bne end_%=\n"                // if we found a difference, we are done
-
-      // Unroll once for another set of 4x32-bit elements. On Raspberry Pi Zero, data cache line is 32 bytes in size, so one iteration
-      // of the loop computes a single data cache line, with preloads in place at the top.
-      "ldmdb r1!, {r3,r4,r5,r6}\n"
-      "ldmdb r2!, {r7,r8,r9,r10}\n"
-      "cmp r3, r7\n"
-      "cmpeq r4, r8\n"
-      "cmpeq r5, r9\n"
-      "cmpeq r6, r10\n"
-      "bne end_%=\n"                // if we found a difference, we are done
-
-      "cmp r0, r1\n"                // frameBuf == frameBufEnd? did we finish through the array?
-      "bne start_%=\n"
-      "b done_%=\n"
-
-    "end_%=:\n"
-      "add r1, r1, #16\n"           // ldmdb r1! decrements r1 before load,
-                                    // so add back the last decrement in order to not shoot past the first changed pixels
-    "done_%=:\n"
-      "mov %[endPtr], r1\n"         // output endPtr back to C code
-      : [endPtr]"=r"(endPtr)
-      : [frameBuf]"r"(frameBufEnd), [prevFrameBuf]"r"(prevFrameBuf+(frameBufEnd-frameBuf)), [frameBufBegin]"r"(frameBuf)
-      : "r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7", "r8", "r9", "r10", "cc"
-    );
-
-  return endPtr - frameBuf;
   }
 //}}}
