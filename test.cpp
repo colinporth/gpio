@@ -1,4 +1,4 @@
-// lcdTest.cpp
+// test.cpp
 //{{{  includes
 #include "lcd/cLcd.h"
 
@@ -6,6 +6,297 @@
 #include "../shared/utils/cLog.h"
 
 using namespace std;
+//}}}
+
+typedef unsigned char color_t;
+static color_t surface[320*320];
+//{{{
+void gradSimpleSymmetry (const color_t& c1, const color_t& c2, int dim) {
+// faster version using symmetry and direct writing to memory
+// (assumes width and height are even!)
+
+  int width = dim;
+  int height = dim;
+
+  double r,x,y,M,dc,K,cx,cy;
+
+  // the center
+  cx = (double)width/2.0;
+  cy = (double)height/2.0;
+
+  // compute max distance M from center
+  M = sqrt(cx*cx+cy*cy);
+
+  // the color delta
+  dc = c2-c1;
+
+  // and constant used in the code....
+  K = dc/M;
+  color_t ce; // the exact color computed for each square
+  color_t * p1, *p2, *p3, *p4; // 4 quadrant pointers
+  for (int j = 0; j < height/2; j++) {
+    p1 = surface + j*width;
+    p2 = p1 + width - 1;
+    p3 = surface + (height - 1 - j)*width;
+    p4 = p3 + width - 1;
+    for (int i = 0; i < width/2; i++) {
+      // coodinates relative to center, shifted to pixel centers
+      x = i - cx + 0.5;
+      y = j - cy + 0.5;
+      r = sqrt(x*x+y*y);
+      ce = (color_t)(r*K+c1); // the "exact" color
+
+      // now draw exact colors - 4 pixels
+      *p1++ = ce;
+      *p2-- = ce;
+      *p3++ = ce;
+      *p4-- = ce;
+      }
+    }
+  } // GradientFill_3
+//}}}
+//{{{
+void gradChebyshev (const color_t& c1, const color_t& c2, int dim) {
+// version using Chebyshev polynomial and constants precomputed
+
+  int width = dim;
+  int height = dim;
+
+  // the color delta
+  double dc = c2-c1;
+  double maxDimension = max(height,width);
+
+  // and constant used in the code....
+  double t1 = width/maxDimension;
+  double t2 = height/maxDimension;
+  double K = dc / (sqrt(t1*t1+t2*t2));
+  for (int j = 0; j < height/2; j++) {
+    double beta = ((double)(height/2-1-j)+0.5)/(maxDimension/2.0);
+    color_t* p1 = surface + j*width;
+    color_t* p2 = p1 + width - 1;
+    color_t* p3 = surface + (height - 1 - j)*width;
+    color_t* p4 = p3 + width - 1;
+    double j2 = beta*beta;
+    double r1 = sqrt(0.0014485813926750633 + j2);
+    double r2 = sqrt(0.09526993616913669 + j2);
+    double r3 = sqrt(0.4779533685342265 + j2);
+    double r4 = sqrt(0.9253281139039617 + j2);
+    double a0 = 1.2568348730314625*r1 - 0.3741514406663722*r2 +
+                0.16704465947982383*r3 - 0.04972809184491411*r4;
+    double a1 = -7.196457548543286*r1 + 10.760659484982682*r2 -
+                5.10380523549030050*r3 + 1.53960329905090450*r4;
+    double a2 = 12.012829501508346*r1 - 25.001535905017075*r2 +
+                19.3446816555246950*r3 - 6.35597525201596500*r4;
+    double a3 = -6.122934917841437*r1 + 14.782072520180590*r2 -
+               14.7820725201805900*r3 + 6.12293491784143700*r4;
+    for (int i = 0; i < width/2; i++) {
+      // get color
+      double alpha = ((double)(width/2-1-i)+0.5)/(maxDimension/2.0);
+
+      // evaluate approximating polynomial
+      double d = ((a3*alpha+a2)*alpha+a1)*alpha+a0;
+      color_t ce = (color_t)(d*K + c1);
+
+      // now draw exact colors - 4 pixels
+      *p1++ = ce;
+      *p2-- = ce;
+      *p3++ = ce;
+      *p4-- = ce;
+      }
+    }
+  }
+//}}}
+//{{{
+void gradChebyshevForward (const color_t& c1, const color_t& c2, int dim) {
+// version using Chebyshev polynomial approximation, and forward differencing
+
+  int width = dim;
+  int height = dim;
+
+  // the color delta
+  double dc = c2-c1;
+  double maxDimension = max(height,width);
+
+  // and constant used in the code....
+  double t1 = width/maxDimension;
+  double t2 = height/maxDimension;
+  double K = dc/(sqrt(t1*t1+t2*t2));
+  double delta = 1.0/(maxDimension/2.0); // stepsize
+
+  // initial pixel relative x coord
+  double alpha = (1.0) / maxDimension;
+  for (int j = 0; j < height/2; j++) {
+    double beta = ((double)(height/2 - 1 - j) + 0.5) / (maxDimension /2.0);
+    color_t*p1 = surface + j*width+width/2;
+    color_t*p2 = p1 - 1;
+    color_t*p3 = surface + (height - 1 - j) * width + width/2;
+    color_t*p4 = p3 - 1;
+    double j2 = beta * beta;
+    double r1 = sqrt (0.0014485813926750633 + j2);
+    double r2 = sqrt (0.0952699361691366900 + j2);
+    double r3 = sqrt (0.4779533685342265000 + j2);
+    double r4 = sqrt (0.9253281139039617000 + j2);
+    double a0 = 1.2568348730314625*r1 - 0.3741514406663722*r2 +
+                0.16704465947982383*r3 - 0.04972809184491411*r4;
+    double a1 = -7.196457548543286*r1 + 10.760659484982682*r2 -
+                 5.10380523549030050*r3 + 1.53960329905090450*r4;
+    double a2 = 12.012829501508346*r1 - 25.001535905017075*r2 +
+                19.3446816555246950*r3 - 6.35597525201596500*r4;
+    double a3 = -6.122934917841437*r1 + 14.782072520180590*r2 -
+                14.7820725201805900*r3 + 6.12293491784143700*r4;
+
+    // forward differencing stuff, initial color value and differences
+    double d = ((a3*alpha+a2)*alpha+a1)*alpha+a0+c1/K;
+    double d1 = 3*a3*alpha*alpha*delta + alpha*delta*(2*a2+3*a3*delta) + delta*(a1+a2*delta+a3*delta*delta);
+    double d2 = 6*a3*alpha*delta*delta + 2*delta*delta*(a2 + 3*a3*delta);
+    double d3 = 6*a3*delta*delta*delta;
+
+    d *= K; // we can prescale these here
+    d1 *= K;
+    d2 *= K;
+    d3 *= K;
+    for (int i = 0; i < width/2; i++) {
+      // get color and update forward differencing stuff
+      color_t ce = (color_t)(d);
+      d += d1;
+      d1 += d2;
+      d2 += d3;
+
+      // now draw 4 pixels
+      *p1++ = ce;
+      *p2-- = ce;
+      *p3++ = ce;
+      *p4-- = ce;
+      }
+    }
+  }
+//}}}
+//{{{
+void gradChebyshevForwardFixed (const color_t& c1, const color_t& c2, int dim) {
+// stuff above, with fixed point math
+
+  int width = dim;
+  int height = dim;
+
+  #define _BITS 23 // bits of fractional point stuff
+  #define _SCALE (1 << _BITS) // size to scale it
+
+  // color delta
+  double dc = c2 - c1;
+
+  double maxDimension = max (height, width);
+
+  // and constants used in the code
+  double t1 = width / maxDimension;
+  double t2 = height / maxDimension;
+
+  double K = dc / sqrt(t1 * t1 + t2 * t2) * _SCALE;
+
+  double delta = 2.0 / maxDimension; // stepsize
+  double delta2 = delta * delta;
+  double delta3 = delta2 * delta;
+
+  // initial color value and differences
+  double alpha = 1.0/maxDimension;
+  for (int j = 0; j < height/2; j++) {
+    // pixel coords in rectangle [-1,1]x[-1,1]
+    double beta = ((double)(height-1-(j<<1))) / maxDimension;
+    color_t* p1 = surface + j * width + width/2;
+    color_t* p2 = p1 - 1;
+    color_t* p3 = surface + (height - 1 - j) * width + width/2;
+    color_t* p4 = p3 - 1;
+
+    double j2 = beta * beta;
+
+    // numbers from the analysis to create the polynomial
+    double r1 = sqrt (0.0014485813926750633 + j2);
+    double r2 = sqrt (0.0952699361691366900 + j2);
+    double r3 = sqrt (0.4779533685342265000 + j2);
+    double r4 = sqrt (0.9253281139039617000 + j2);
+    double a0 =  1.2568348730314625 * r1 -  0.3741514406663722 * r2 +
+                0.16704465947982383 * r3 - 0.04972809184491411 * r4;
+    double a1 =  -7.196457548543286 * r1 +  10.760659484982682 * r2 -
+                5.10380523549030050 * r3 + 1.53960329905090450 * r4;
+    double a2 =  12.012829501508346 * r1 -  25.001535905017075 * r2 +
+                19.3446816555246950 * r3 - 6.35597525201596500 * r4;
+    double a3 =  -6.122934917841437 * r1 +  14.782072520180590 * r2 -
+                14.7820725201805900 * r3 + 6.12293491784143700 * r4;
+
+    // forward differencing variables, initial color value and differences
+    double d = ((a3 * alpha + a2) * alpha + a1) * alpha + a0 + c1/K * _SCALE;
+    double d1 = delta * (3 * a3 * alpha * alpha + alpha * (2 * a2 + 3 * a3 * delta) + a2 * delta + a3 * delta2 + a1);
+    double d2 = 2 * delta2 * (3 * a3 * (alpha + delta) + a2);
+    double d3 = 6 * a3 * delta3;
+
+    // fixed point stuff
+    int color = (int)(d * K + 0.5); // round to nearest value
+    int dc1 = (int)(d1 * K + 0.5);
+    int dc2 = (int)(d2 * K + 0.5);
+    int dc3 = (int)(d3 * K + 0.5);
+    for (int i = 0; i < width/2; i++) {
+      // get color and update forward differencing stuff
+      color_t ce = (color >> _BITS);
+      color += dc1;
+      dc1 += dc2;
+      dc2 += dc3;
+
+      // now draw 4 pixels
+      *p1++ = ce;
+      *p2-- = ce;
+      *p3++ = ce;
+      *p4-- = ce;
+      }
+    }
+
+  }
+//}}}
+//{{{
+void radial (cLcd* lcd, int dim) {
+
+  int width = dim;
+  int height = dim;
+
+  lcd->clear();
+  memset (surface, 0, width*height);
+
+  double time = lcd->timeUs();
+  gradChebyshev (255, 0, dim);
+  double time2 = lcd->timeUs() - time;
+
+  for (int y = 0; y < height; y++)
+    for (int x = 0; x < width; x++)
+      lcd->pix (kWhite, surface[(y*width) + x], cPoint(x,y));
+  lcd->present();
+
+  lcd->clear();
+  memset (surface, 0, width*height);
+
+  time = lcd->timeUs();
+  gradChebyshevForward (255, 0, dim);
+  double time3 = lcd->timeUs() - time;
+
+  for (int y = 0; y < height; y++)
+    for (int x = 0; x < width; x++)
+      lcd->pix (kWhite, surface[(y*width) + x], cPoint(x,y));
+  lcd->present();
+
+  lcd->clear();
+  memset (surface, 0, width*height);
+
+  time = lcd->timeUs();
+  gradChebyshevForwardFixed (255, 0, dim);
+  double time4 = lcd->timeUs() - time;
+
+  for (int y = 0; y < height; y++)
+    for (int x = 0; x < width; x++)
+      lcd->pix (kWhite, surface[(y*width) + x], cPoint(x,y));
+
+  lcd->present();
+
+  cLog::log (LOGINFO, dec(int(time2*1000000.)) + " " +
+                      dec(int(time3*1000000.)) + " " +
+                      dec(int(time4*1000000.)));
+  }
 //}}}
 
 int main (int numArgs, char* args[]) {
@@ -41,6 +332,11 @@ int main (int numArgs, char* args[]) {
   cLcd* lcd = new cLcdTa7601 (rotate, info, mode);
   if (!lcd->initialise())
     return 0;
+
+  lcd->setBacklightOn();
+  for (int i = 2; i < 320; i += 2)
+    radial (lcd, i);
+  return 0;
 
   while (true) {
     if (draw) {
