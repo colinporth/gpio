@@ -9,6 +9,4 @@ Makefile~
 *.o
 *.a
 
-lcd
-blink
-
+test
