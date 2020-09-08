@@ -822,20 +822,20 @@ uint32_t cLcdTa7601::updateLcd (sSpan* spans) {
         r.top &= 0xFFFE;
         r.bottom = (r.bottom + 1) & 0xFFFE;
 
-        writeCommandData (0x45, kWidthTa7601 - r.bottom); // GRAM H start address window - even
-        writeCommandData (0x44, kWidthTa7601-1 - r.top);  // GRAM H   end address window - even
-        writeCommandData (0x47, r.left);                  // GRAM V start address window
-        writeCommandData (0x46, r.right-1);               // GRAM V   end address window
+        writeCommandData (0x45, r.top);                    // GRAM H start address window - even
+        writeCommandData (0x44, r.bottom-1);               // GRAM H   end address window - even
+        writeCommandData (0x47, kHeightTa7601 - r.right);  // GRAM V start address window
+        writeCommandData (0x46, kHeightTa7601-1 - r.left); // GRAM V   end address window
 
-        writeCommandData (0x20, r.left);                  // GRAM V start address
-        writeCommandData (0x21, kWidthTa7601 - r.bottom); // GRAM H start address
-        writeCommand (0x22);                              // GRAM write
+        writeCommandData (0x20, kHeightTa7601 - r.right);  // GRAM V start address
+        writeCommandData (0x21, r.top);                    // GRAM H start address
+        writeCommand (0x22);                               // GRAM write
 
         for (int16_t x = r.right-1; x >= r.left; x--) {
-          uint16_t* ptr = mFrameBuf + (r.top * mWidth) + x;
+          uint16_t* ptr = mFrameBuf + (r.top * kHeightTa7601) + x;
           for (int16_t y = r.top; y < r.bottom; y++) {
             writeDataWord (*ptr);
-            ptr += mWidth;
+            ptr += kHeightTa7601;
             }
           }
 
@@ -851,19 +851,20 @@ uint32_t cLcdTa7601::updateLcd (sSpan* spans) {
         cRect r = it->r;
         r.left &= 0xFFFE;
         r.right = (r.right + 1) & 0xFFFE;
-        writeCommandData (0x45, r.left);     // GRAM V start address window
-        writeCommandData (0x44, r.right-1);  // GRAM V   end address window
-        writeCommandData (0x47, r.top);      // GRAM H start address window - even
-        writeCommandData (0x46, r.bottom-1); // GRAM H   end address window - even
+        writeCommandData (0x45, kWidthTa7601 - r.right);   // GRAM V start address window
+        writeCommandData (0x44, kWidthTa7601-1 - r.left);  // GRAM V   end address window
+        writeCommandData (0x47, kHeightTa7601 - r.bottom); // GRAM H start address window - even
+        writeCommandData (0x46, kHeightTa7601-1- r.top);   // GRAM H   end address window - even
 
-        writeCommandData (0x20, r.top);      // GRAM V start address
-        writeCommandData (0x21, r.left);     // GRAM H start address
-        writeCommand (0x22);                 // GRAM write
+        writeCommandData (0x20, kHeightTa7601 - r.bottom); // GRAM V start address
+        writeCommandData (0x21, kWidthTa7601 - r.right);   // GRAM H start address
+        writeCommand (0x22);                               // GRAM write
 
+        uint16_t* ptr = mFrameBuf + ((r.bottom-1) * kWidthTa7601) + r.right-1;
         for (int16_t y = r.bottom-1; y >= r.top; y--) {
-          uint16_t* ptr = mFrameBuf + (y * mWidth) + r.right-1;
           for (int16_t x = r.right-1; x >= r.left; x--)
             writeDataWord (*ptr--);
+          ptr -= kWidthTa7601 - r.getWidth();
           }
 
         numPixels += r.getNumPixels();

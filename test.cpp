@@ -8,55 +8,48 @@
 using namespace std;
 //}}}
 
-typedef unsigned char color_t;
-static color_t surface[320*320];
+static uint8_t surface[320*320];
 //{{{
-void gradSimpleSymmetry (const color_t& c1, const color_t& c2, int dim) {
+void gradSimpleSymmetry (const uint8_t& c1, const uint8_t& c2, int dim) {
 // faster version using symmetry and direct writing to memory
 // (assumes width and height are even!)
 
   int width = dim;
   int height = dim;
 
-  double r,x,y,M,dc,K,cx,cy;
-
   // the center
-  cx = (double)width/2.0;
-  cy = (double)height/2.0;
+  double cx = (double)width/2.0;
+  double cy = (double)height/2.0;
 
   // compute max distance M from center
-  M = sqrt(cx*cx+cy*cy);
+  double M = sqrt(cx*cx+cy*cy);
 
   // the color delta
-  dc = c2-c1;
+  double dc = c2 - c1;
 
-  // and constant used in the code....
-  K = dc/M;
-  color_t ce; // the exact color computed for each square
-  color_t * p1, *p2, *p3, *p4; // 4 quadrant pointers
+  // and constant used in the code
+  double K = dc / M;
   for (int j = 0; j < height/2; j++) {
-    p1 = surface + j*width;
-    p2 = p1 + width - 1;
-    p3 = surface + (height - 1 - j)*width;
-    p4 = p3 + width - 1;
+    uint8_t* p1 = surface + (j * width);
+    uint8_t* p2 = p1 + width - 1;
+    uint8_t* p3 = surface + (height - 1 - j) * width;
+    uint8_t* p4 = p3 + width - 1;
     for (int i = 0; i < width/2; i++) {
       // coodinates relative to center, shifted to pixel centers
-      x = i - cx + 0.5;
-      y = j - cy + 0.5;
-      r = sqrt(x*x+y*y);
-      ce = (color_t)(r*K+c1); // the "exact" color
-
-      // now draw exact colors - 4 pixels
+      double x = i - cx + 0.5;
+      double y = j - cy + 0.5;
+      double r = sqrt ((x * x) + (y * y));
+      int8_t ce = (uint8_t)((r * K) + c1);
       *p1++ = ce;
       *p2-- = ce;
       *p3++ = ce;
       *p4-- = ce;
       }
     }
-  } // GradientFill_3
+  }
 //}}}
 //{{{
-void gradChebyshev (const color_t& c1, const color_t& c2, int dim) {
+void gradChebyshev (const uint8_t& c1, const uint8_t& c2, int dim) {
 // version using Chebyshev polynomial and constants precomputed
 
   int width = dim;
@@ -72,10 +65,10 @@ void gradChebyshev (const color_t& c1, const color_t& c2, int dim) {
   double K = dc / (sqrt(t1*t1+t2*t2));
   for (int j = 0; j < height/2; j++) {
     double beta = ((double)(height/2-1-j)+0.5)/(maxDimension/2.0);
-    color_t* p1 = surface + j*width;
-    color_t* p2 = p1 + width - 1;
-    color_t* p3 = surface + (height - 1 - j)*width;
-    color_t* p4 = p3 + width - 1;
+    uint8_t* p1 = surface + j*width;
+    uint8_t* p2 = p1 + width - 1;
+    uint8_t* p3 = surface + (height - 1 - j)*width;
+    uint8_t* p4 = p3 + width - 1;
     double j2 = beta*beta;
     double r1 = sqrt(0.0014485813926750633 + j2);
     double r2 = sqrt(0.09526993616913669 + j2);
@@ -95,7 +88,7 @@ void gradChebyshev (const color_t& c1, const color_t& c2, int dim) {
 
       // evaluate approximating polynomial
       double d = ((a3*alpha+a2)*alpha+a1)*alpha+a0;
-      color_t ce = (color_t)(d*K + c1);
+      uint8_t ce = (uint8_t)(d*K + c1);
 
       // now draw exact colors - 4 pixels
       *p1++ = ce;
@@ -107,7 +100,7 @@ void gradChebyshev (const color_t& c1, const color_t& c2, int dim) {
   }
 //}}}
 //{{{
-void gradChebyshevForward (const color_t& c1, const color_t& c2, int dim) {
+void gradChebyshevForward (const uint8_t& c1, const uint8_t& c2, int dim) {
 // version using Chebyshev polynomial approximation, and forward differencing
 
   int width = dim;
@@ -127,15 +120,19 @@ void gradChebyshevForward (const color_t& c1, const color_t& c2, int dim) {
   double alpha = (1.0) / maxDimension;
   for (int j = 0; j < height/2; j++) {
     double beta = ((double)(height/2 - 1 - j) + 0.5) / (maxDimension /2.0);
-    color_t*p1 = surface + j*width+width/2;
-    color_t*p2 = p1 - 1;
-    color_t*p3 = surface + (height - 1 - j) * width + width/2;
-    color_t*p4 = p3 - 1;
+
+    uint8_t*p1 = surface + j*width+width/2;
+    uint8_t*p2 = p1 - 1;
+    uint8_t*p3 = surface + (height - 1 - j) * width + width/2;
+    uint8_t*p4 = p3 - 1;
+
     double j2 = beta * beta;
+
     double r1 = sqrt (0.0014485813926750633 + j2);
     double r2 = sqrt (0.0952699361691366900 + j2);
     double r3 = sqrt (0.4779533685342265000 + j2);
     double r4 = sqrt (0.9253281139039617000 + j2);
+
     double a0 = 1.2568348730314625*r1 - 0.3741514406663722*r2 +
                 0.16704465947982383*r3 - 0.04972809184491411*r4;
     double a1 = -7.196457548543286*r1 + 10.760659484982682*r2 -
@@ -146,9 +143,9 @@ void gradChebyshevForward (const color_t& c1, const color_t& c2, int dim) {
                 14.7820725201805900*r3 + 6.12293491784143700*r4;
 
     // forward differencing stuff, initial color value and differences
-    double d = ((a3*alpha+a2)*alpha+a1)*alpha+a0+c1/K;
+    double d = ((a3 * alpha + a2) * alpha + a1) * alpha + a0 + c1/K;
     double d1 = 3*a3*alpha*alpha*delta + alpha*delta*(2*a2+3*a3*delta) + delta*(a1+a2*delta+a3*delta*delta);
-    double d2 = 6*a3*alpha*delta*delta + 2*delta*delta*(a2 + 3*a3*delta);
+    double d2 = 6*a3*alpha*delta*delta + 2*delta*delta * (a2 + 3*a3*delta);
     double d3 = 6*a3*delta*delta*delta;
 
     d *= K; // we can prescale these here
@@ -157,7 +154,7 @@ void gradChebyshevForward (const color_t& c1, const color_t& c2, int dim) {
     d3 *= K;
     for (int i = 0; i < width/2; i++) {
       // get color and update forward differencing stuff
-      color_t ce = (color_t)(d);
+      uint8_t ce = (uint8_t)d;
       d += d1;
       d1 += d2;
       d2 += d3;
@@ -172,7 +169,7 @@ void gradChebyshevForward (const color_t& c1, const color_t& c2, int dim) {
   }
 //}}}
 //{{{
-void gradChebyshevForwardFixed (const color_t& c1, const color_t& c2, int dim) {
+void gradChebyshevForwardFixed (const uint8_t& c1, const uint8_t& c2, int dim) {
 // stuff above, with fixed point math
 
   int width = dim;
@@ -201,10 +198,10 @@ void gradChebyshevForwardFixed (const color_t& c1, const color_t& c2, int dim) {
   for (int j = 0; j < height/2; j++) {
     // pixel coords in rectangle [-1,1]x[-1,1]
     double beta = ((double)(height-1-(j<<1))) / maxDimension;
-    color_t* p1 = surface + j * width + width/2;
-    color_t* p2 = p1 - 1;
-    color_t* p3 = surface + (height - 1 - j) * width + width/2;
-    color_t* p4 = p3 - 1;
+    uint8_t* p1 = surface + j * width + width/2;
+    uint8_t* p2 = p1 - 1;
+    uint8_t* p3 = surface + (height - 1 - j) * width + width/2;
+    uint8_t* p4 = p3 - 1;
 
     double j2 = beta * beta;
 
@@ -235,7 +232,7 @@ void gradChebyshevForwardFixed (const color_t& c1, const color_t& c2, int dim) {
     int dc3 = (int)(d3 * K + 0.5);
     for (int i = 0; i < width/2; i++) {
       // get color and update forward differencing stuff
-      color_t ce = (color >> _BITS);
+      uint8_t ce = (color >> _BITS);
       color += dc1;
       dc1 += dc2;
       dc2 += dc3;
@@ -261,7 +258,7 @@ void radial (cLcd* lcd, int dim) {
 
   double time = lcd->timeUs();
   gradChebyshev (255, 0, dim);
-  double time2 = lcd->timeUs() - time;
+  double time1 = lcd->timeUs() - time;
 
   for (int y = 0; y < height; y++)
     for (int x = 0; x < width; x++)
@@ -273,7 +270,7 @@ void radial (cLcd* lcd, int dim) {
 
   time = lcd->timeUs();
   gradChebyshevForward (255, 0, dim);
-  double time3 = lcd->timeUs() - time;
+  double time2 = lcd->timeUs() - time;
 
   for (int y = 0; y < height; y++)
     for (int x = 0; x < width; x++)
@@ -285,7 +282,7 @@ void radial (cLcd* lcd, int dim) {
 
   time = lcd->timeUs();
   gradChebyshevForwardFixed (255, 0, dim);
-  double time4 = lcd->timeUs() - time;
+  double time3 = lcd->timeUs() - time;
 
   for (int y = 0; y < height; y++)
     for (int x = 0; x < width; x++)
@@ -293,9 +290,9 @@ void radial (cLcd* lcd, int dim) {
 
   lcd->present();
 
-  cLog::log (LOGINFO, dec(int(time2*1000000.)) + " " +
-                      dec(int(time3*1000000.)) + " " +
-                      dec(int(time4*1000000.)));
+  cLog::log (LOGINFO1, dec(int(time1*1000000.)) + " " +
+                       dec(int(time2*1000000.)) + " " +
+                       dec(int(time3*1000000.)));
   }
 //}}}
 
@@ -333,10 +330,11 @@ int main (int numArgs, char* args[]) {
   if (!lcd->initialise())
     return 0;
 
-  lcd->setBacklightOn();
-  for (int i = 2; i < 320; i += 2)
-    radial (lcd, i);
-  return 0;
+  if (draw) {
+    lcd->setBacklightOn();
+    for (int i = 2; i < 320; i += 2)
+      radial (lcd, i);
+     }
 
   while (true) {
     if (draw) {
