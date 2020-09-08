@@ -13,13 +13,6 @@ constexpr int kSpanMergeThreshold = 16;
 
 // cFrameDiff public
 //{{{
-cFrameDiff::cFrameDiff (const int width, const int height) : mWidth(width), mHeight(height) {
-
-  mPrevFrameBuf = (uint16_t*)aligned_alloc (128, width * height * 2);
-  mSpans = (sSpan*)malloc (kMaxSpans * sizeof(sSpan));
-  }
-//}}}
-//{{{
 cFrameDiff::~cFrameDiff() {
 
   free (mPrevFrameBuf);
@@ -45,6 +38,13 @@ void cFrameDiff::copy (uint16_t* frameBuf) {
 //}}}
 
 // cFrameDiff protected
+//{{{
+void cFrameDiff::allocateResources() {
+
+  mPrevFrameBuf = (uint16_t*)aligned_alloc (128, mWidth * mHeight * 2);
+  mSpans = (sSpan*)malloc (kMaxSpans * sizeof(sSpan));
+  }
+//}}}
 //{{{
 void cFrameDiff::merge (int pixelThreshold) {
 // !!!! need to recalc mNumSpans !!!!
@@ -87,6 +87,15 @@ void cFrameDiff::merge (int pixelThreshold) {
         prev = j;
       }
     }
+  }
+//}}}
+
+
+// cAllFrameDiff - fake class to just return whole screen, allocates no prevFrameBuf, uses single span
+//{{{
+sSpan* cAllFrameDiff::diff (uint16_t* frameBuf) {
+
+  return &mSpanAll;
   }
 //}}}
 

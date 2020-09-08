@@ -116,18 +116,19 @@ bool cLcd::initialise() {
   mSpanAll = (sSpan*)malloc (sizeof (sSpan));
   *mSpanAll = { getRect(), mWidth, getNumPixels(), nullptr};
 
+  // allocate frameDiff
   switch (mMode) {
+    case eAll:
+      mFrameDiff = new cAllFrameDiff (mWidth, mHeight);
+      break;
     case eSingle:
       mFrameDiff = new cSingleFrameDiff (mWidth, mHeight);
       break;
     case eCoarse:
-      break;
       mFrameDiff = new cCoarseFrameDiff (mWidth, mHeight);
+      break;
     case eExact:
       mFrameDiff = new cExactFrameDiff (mWidth, mHeight);
-      break;
-    case eAll:
-      mFrameDiff = nullptr;
       break;
     }
 
@@ -167,30 +168,27 @@ void cLcd::snapshot() {
 bool cLcd::present() {
 // present update
 
-  sSpan* mSpans =  mSpanAll;
-  if (mFrameDiff) {
-    // make diff spans list
-    double diffStartTime = timeUs();
-    mSpans = mFrameDiff->diff (mFrameBuf);
-    mDiffUs = int((timeUs() - diffStartTime) * 1000000.0);
-    }
+  double diffStartTime = timeUs();
+  sSpan* spans = mFrameDiff->diff (mFrameBuf);
+  mDiffUs = int((timeUs() - diffStartTime) * 1000000.0);
 
-  if (!mSpans) {// nothing changed
+  if (!spans) {
+    // nothing changed
     mUpdateUs = 0;
     return false;
     }
 
-  if ((mInfo == eOverlay) && (mMode != eAll)) // copy frameBuf to prevFrameBuf without overlays
+  if (mInfo == eOverlay) // copy frameBuf to prevFrameBuf without overlays
     mFrameDiff->copy (mFrameBuf);
 
   // updateLcd with diff spans list
   double updateStartTime = timeUs();
-  mUpdatePixels = updateLcd (mSpans);
+  mUpdatePixels = updateLcd (spans);
   mUpdateUs = int((timeUs() - updateStartTime) * 1000000.0);
 
   if (mInfo == eOverlay) {
     // draw span and info overlays
-    sSpan* it = mSpans;
+    sSpan* it = spans;
     while (it) {
       rect (kGreen, 100, it->r);
       it = it->next;
@@ -203,7 +201,7 @@ bool cLcd::present() {
 
   cLog::log (LOGINFO1, getInfoString());
 
-  if ((mMode != eAll) && (mInfo != eOverlay))
+  if (mInfo != eOverlay)
     mFrameBuf = mFrameDiff->swap (mFrameBuf);
 
   return true;

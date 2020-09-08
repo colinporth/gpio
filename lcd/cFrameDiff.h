@@ -5,18 +5,20 @@
 // cFrameDiff - base class
 class cFrameDiff {
 public:
-  cFrameDiff (const int width, const int height);
+  cFrameDiff (const uint16_t width, const uint16_t height) : mWidth(width), mHeight(height){}
   virtual ~cFrameDiff();
 
   int getNumSpans() { return mNumSpans; }
 
-  uint16_t* swap (uint16_t* frameBuf);
-  void copy (uint16_t* frameBuf);
+  virtual uint16_t* swap (uint16_t* frameBuf);
+  virtual void copy (uint16_t* frameBuf);
 
   // diff
   virtual sSpan* diff (uint16_t* frameBuf) = 0;
 
 protected:
+  void allocateResources();
+
   void merge (int pixelThreshold);
 
   const uint16_t mWidth;
@@ -27,32 +29,65 @@ protected:
   int mNumSpans = 0;
   };
 
-// cSingleFrameDiff
+//{{{
+class cAllFrameDiff : public cFrameDiff {
+// slightly fake version to return whole screen, allocates no resources
+public:
+  //{{{
+  cAllFrameDiff (const uint16_t width, const uint16_t height) : cFrameDiff (width, height) {
+    mSpanAll = { { 0,0, (int16_t)width, (int16_t)height }, width, uint32_t(width * height), nullptr };
+    }
+  //}}}
+  virtual ~cAllFrameDiff() {}
+
+  virtual uint16_t* swap (uint16_t* frameBuf) { return frameBuf; }
+  virtual void copy (uint16_t* frameBuf) {}
+  virtual sSpan* diff (uint16_t* frameBuf);
+
+private:
+  sSpan mSpanAll;
+  };
+//}}}
+//{{{
 class cSingleFrameDiff : public cFrameDiff {
 public:
-  cSingleFrameDiff (const int width, const int height) : cFrameDiff (width, height) {}
+  //{{{
+  cSingleFrameDiff (const int width, const int height) : cFrameDiff (width, height) {
+    allocateResources();
+    }
+  //}}}
   virtual ~cSingleFrameDiff() {}
 
-  sSpan* diff (uint16_t* frameBuf);
+  virtual sSpan* diff (uint16_t* frameBuf);
 
 private:
   static int coarseLinearDiff (uint16_t* frameBuf, uint16_t* prevFrameBuf, uint16_t* frameBufEnd);
   static int coarseLinearDiffBack (uint16_t* frameBuf, uint16_t* prevFrameBuf, uint16_t* frameBufEnd);
   };
-
-// cCoarseFrameDiff
+//}}}
+//{{{
 class cCoarseFrameDiff : public cFrameDiff {
 public:
-  cCoarseFrameDiff (const int width, const int height) : cFrameDiff (width, height) {}
-  virtual ~cCoarseFrameDiff();
-  sSpan* diff (uint16_t* frameBuf);
-  };
+  //{{{
+  cCoarseFrameDiff (const int width, const int height) : cFrameDiff (width, height) {
+    allocateResources();
+    }
+  //}}}
+  virtual ~cCoarseFrameDiff() {}
 
-// cExactFrameDiff
+  virtual sSpan* diff (uint16_t* frameBuf);
+  };
+//}}}
+//{{{
 class cExactFrameDiff : public cFrameDiff {
 public:
-  cExactFrameDiff (const int width, const int height) : cFrameDiff (width, height) {}
+  //{{{
+  cExactFrameDiff (const int width, const int height) : cFrameDiff (width, height) {
+    allocateResources();
+    }
+  //}}}
   virtual ~cExactFrameDiff() {}
 
-  sSpan* diff (uint16_t* frameBuf);
+  virtual sSpan* diff (uint16_t* frameBuf);
   };
+//}}}
