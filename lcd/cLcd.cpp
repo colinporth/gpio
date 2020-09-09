@@ -1347,6 +1347,8 @@ void cLcdSpiHeader::writeDataWord (const uint16_t data) {
 //}}}
 //}}}
 //{{{  cLcdIli9320 : public cLcdSpiHeader
+// 2.8 inch 240x320 - HY28A - touchcreen XT2046P
+// spi - no rs - use headers, backlight
 constexpr int16_t kWidth9320 = 240;
 constexpr int16_t kHeight9320 = 320;
 constexpr int kSpiClock9320 = 24000000;
@@ -1416,16 +1418,16 @@ bool cLcdIli9320::initialise() {
 
   switch (mRotate) {
     case e0:
-      writeCommandData (0x03, 0x1030); // Entry Mode - BGR, HV inc, vert write,
+      writeCommandData (0x03, 0x1030); // Entry Mode - BGR, HV inc - AM H
       break;
     case e90:
-      writeCommandData (0x03, 0x1018); // Entry Mode - BGR, HV inc, vert write,
+      writeCommandData (0x03, 0x1018); // Entry Mode - BGR, H inc V dec - AM V
       break;
     case e180:
-      writeCommandData (0x03, 0x1000); // Entry Mode - BGR, HV inc, vert write,
+      writeCommandData (0x03, 0x1000); // Entry Mode - BGR, HV dec - AM H
       break;
     case e270:
-      writeCommandData (0x03, 0x1028); // Entry Mode - BGR, HV inc, vert write,
+      writeCommandData (0x03, 0x1028); // Entry Mode - BGR, H dec V inc - AM V
       break;
     }
 
@@ -1446,72 +1448,77 @@ uint32_t cLcdIli9320::updateLcd (sSpan* spans) {
   uint16_t dataHeaderBuf [320+1];
   dataHeaderBuf[0] = 0x7272;
 
-  writeCommandData (0x0050, 0x0000);        // H GRAM start address
-  writeCommandData (0x0051, kWidth9320-1);  // H GRAM end address
-  writeCommandData (0x0052, 0x0000);        // V GRAM start address
-  writeCommandData (0x0053, kHeight9320-1); // V GRAM end address
-
   int numPixels = 0;
 
   sSpan* it = spans;
   while (it) {
-    uint16_t xstart;
-    uint16_t ystart;
-    uint16_t yinc;
     switch (mRotate) {
-      default:
       //{{{
       case e0:
-        xstart = it->r.left;
-        ystart = it->r.top;
-        yinc = 1;
+        writeCommandData (0x50, it->r.left);     // H GRAM start address
+        writeCommandData (0x51, it->r.right-1);  // H GRAM end address
+
+        writeCommandData (0x52, it->r.top);      // V GRAM start address
+        writeCommandData (0x53, it->r.bottom-1); // V GRAM end address
+
+        writeCommandData (0x20, it->r.left);     // H GRAM start
+        writeCommandData (0x21, it->r.top);      // V GRAM start
+
         break;
       //}}}
       //{{{
       case e90:
-        xstart = kHeight9320 - 1 - it->r.left;
-        ystart = it->r.top;
-        yinc = 1;
+        writeCommandData (0x50, it->r.top);     // H GRAM start address
+        writeCommandData (0x51, it->r.bottom-1);  // H GRAM end address
+
+        writeCommandData (0x52, kHeight9320 - it->r.right);      // V GRAM start address
+        writeCommandData (0x53, kHeight9320-1 - it->r.left); // V GRAM end address
+
+        writeCommandData (0x20, it->r.top);     // H GRAM start
+        writeCommandData (0x21, kHeight9320 - 1 - it->r.left);      // V GRAM start
+
         break;
       //}}}
       //{{{
       case e180:
-        xstart = kWidth9320 - 1 - it->r.left;
-        ystart = kHeight9320 - 1 - it->r.top;
-        yinc = -1;
+        writeCommandData (0x50, kWidth9320 - it->r.right);    // H GRAM start address
+        writeCommandData (0x51, kWidth9320 - 1 - it->r.left); // H GRAM end address
+
+        writeCommandData (0x52, kHeight9320- it->r.bottom);   // V GRAM start address
+        writeCommandData (0x53, kHeight9320-1 - it->r.top);   // V GRAM end address
+
+        writeCommandData (0x20, kWidth9320-1 - it->r.left);   // H GRAM start
+        writeCommandData (0x21, kHeight9320-1 - it->r.top);   // V GRAM start
+
         break;
       //}}}
       //{{{
       case e270:
-        xstart = it->r.left;
-        ystart = kWidth9320 - 1 - it->r.top;
-        yinc = -1;
+        writeCommandData (0x50, kWidth9320 - it->r.bottom);     // H GRAM start address
+        writeCommandData (0x51, kWidth9320-1 - it->r.top);  // H GRAM end address
+
+        writeCommandData (0x52, it->r.left);      // V GRAM start address
+        writeCommandData (0x53, it->r.right-1); // V GRAM end address
+
+        writeCommandData (0x20, kWidth9320-1 - it->r.top);     // H GRAM start
+        writeCommandData (0x21, it->r.left);      // V GRAM start
+
         break;
       //}}}
       }
 
+    writeCommand (0x22);  // GRAM write
+    uint16_t* src = mFrameBuf + (it->r.top * getWidth()) + it->r.left;
     for (int y = it->r.top; y < it->r.bottom; y++) {
-      if ((mRotate == e0) || (mRotate == e180)) {
-        writeCommandData (0x20, xstart); // GRAM V start
-        writeCommandData (0x21, ystart); // GRAM H start
-        }
-      else {
-        writeCommandData (0x20, ystart); // GRAM V start
-        writeCommandData (0x21, xstart); // GRAM H start
-        }
-
-      writeCommand (0x22); // send GRAM write
-      uint16_t* src = mFrameBuf + (y * mWidth) + it->r.left;
       // 2 header bytes, alignment for data bswap_16, send spi data from second header byte
       uint16_t* dst = dataHeaderBuf + 1;
-      for (int i = 0; i < it->r.getWidth(); i++)
+      for (int x = it->r.left; x < it->r.right; x++)
         *dst++ = bswap_16 (*src++);
       spiWrite (mSpiHandle, ((char*)(dataHeaderBuf))+1, (it->r.getWidth() * 2) + 1);
-
-      ystart += yinc;
-      numPixels += it->r.getWidth();
+      src += getWidth() - it->r.getWidth();
       }
 
+    numPixels += it->r.getNumPixels();
     it = it->next;
     }
 

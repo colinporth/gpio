@@ -308,7 +308,7 @@ int main (int numArgs, char* args[]) {
   for (int argIndex = 1; argIndex < numArgs; argIndex++) {
     string str (args[argIndex]);
     if (str == "0") rotate = cLcd::e0;
-    else if (str == "90") rotate = cLcd::e180;
+    else if (str == "90") rotate = cLcd::e90;
     else if (str == "180") rotate = cLcd::e180;
     else if (str == "270") rotate = cLcd::e270;
     else if (str == "o") info = cLcd::eOverlay;
@@ -325,8 +325,8 @@ int main (int numArgs, char* args[]) {
 
   cLog::init (logLevel, false, "", "gpio");
 
-  //cLcd* lcd = new cLcdIli9320 (rotate, info, mode);
-  cLcd* lcd = new cLcdTa7601 (rotate, info, mode);
+  cLcd* lcd = new cLcdIli9320 (rotate, info, mode);
+  //cLcd* lcd = new cLcdTa7601 (rotate, info, mode);
   if (!lcd->initialise())
     return 0;
 
