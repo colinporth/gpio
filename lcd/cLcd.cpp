@@ -1063,32 +1063,32 @@ uint32_t cLcdSsd1289::updateLcd (sSpan* spans) {
       //}}}
       //{{{
       case e90:
-        writeCommandData (0x44, ((it->r.bottom-1) << 8) | it->r.top); // H_RAM_ADR END | START
+        writeCommandData (0x44, ((it->r.bottom - 1) << 8) | it->r.top); // H_RAM_ADR END | START
         writeCommandData (0x45, kHeight1289 - it->r.right);  // V_RAM_ADR_START
         writeCommandData (0x46, kHeight1289-1 - it->r.left); // V_RAM_ADR_END
 
-        writeCommandData (0x4e, it->r.top); // H address counter
-        writeCommandData (0x4f, kHeight1289 - 1 - it->r.left); // V address counter
+        writeCommandData (0x4e, it->r.top);                  // H address counter
+        writeCommandData (0x4f, kHeight1289-1 - it->r.left); // V address counter
         break;
       //}}}
       //{{{
       case e180:
-        writeCommandData (0x44, ((kWidth1289 - 1 - it->r.left) << 8) | (kWidth1289 - it->r.right)); // H_RAM_ADR END | START
-        writeCommandData (0x45, kHeight1289- it->r.bottom); // V_RAM_ADR_START
-        writeCommandData (0x46, kHeight1289-1 - it->r.top); // V_RAM_ADR_END
+        writeCommandData (0x44, ((kWidth1289-1 - it->r.left) << 8) | (kWidth1289 - it->r.right)); // H_RAM_ADR END | START
+        writeCommandData (0x45, kHeight1289 - it->r.bottom); // V_RAM_ADR_START
+        writeCommandData (0x46, kHeight1289-1 - it->r.top);  // V_RAM_ADR_END
 
-        writeCommandData (0x4e, kWidth1289-1 - it->r.left); // X address counter
-        writeCommandData (0x4f, kHeight1289-1 - it->r.top); // Y address counter
+        writeCommandData (0x4e, kWidth1289-1 - it->r.left);  // X address counter
+        writeCommandData (0x4f, kHeight1289-1 - it->r.top);  // Y address counter
         break;
       //}}}
       //{{{
       case e270:
         writeCommandData (0x44, ((kWidth1289-1 - it->r.top) << 8) | (kWidth1289 - it->r.bottom)); // H_RAM_ADR END | START
-        writeCommandData (0x45, it->r.left);    // V_RAM_ADR_START
-        writeCommandData (0x46, it->r.right-1); // V_RAM_ADR_END
+        writeCommandData (0x45, it->r.left);      // V_RAM_ADR_START
+        writeCommandData (0x46, it->r.right - 1); // V_RAM_ADR_END
 
         writeCommandData (0x4e, kWidth1289-1 - it->r.top); // H address counter
-        writeCommandData (0x4f, it->r.left); // V address counter
+        writeCommandData (0x4f, it->r.left);               // V address counter
         break;
       //}}}
       }
