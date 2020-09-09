@@ -1086,7 +1086,6 @@ void cLcdSpiRegister::writeDataWord (const uint16_t data) {
   spiWrite (mSpiHandle, (char*)(&swappedData), 2);
   }
 //}}}
-
 //{{{
 void cLcdSpiRegister::writeCommandMultiData (const uint8_t command, const uint8_t* dataPtr, const int len) {
 
@@ -1107,7 +1106,7 @@ void cLcdSpiRegister::writeCommandMultiData (const uint8_t command, const uint8_
 //{{{  cLcdSt7735r : public cLcdSpiRegister
 constexpr int16_t kWidth7735 = 128;
 constexpr int16_t kHeight7735 = 160;
-constexpr int kSpiClock7735 = 24000000;
+constexpr int kSpiClock7735 = 16000000;
 
 cLcdSt7735r::cLcdSt7735r (const cLcd::eRotate rotate, const cLcd::eInfo info, const eMode mode)
   : cLcdSpiRegister (kWidth7735, kHeight7735, rotate, info, mode) {}
@@ -1125,78 +1124,63 @@ bool cLcdSt7735r::initialise() {
   // mode 0, spi manages ce0 active lo
   mSpiHandle = spiOpen (0, kSpiClock7735, 0);
 
-  //{{{  command constexpr
-  constexpr uint8_t k7335_SLPOUT  = 0x11; // no data
-  constexpr uint8_t k7335_DISPON  = 0x29; // no data
-  //constexpr uint8_t k7335_DISPOFF = 0x28; // no data
-
-  constexpr uint8_t k7335_CASET = 0x2A;
-  constexpr uint8_t k7335_caSetData[4] = { 0, 0, 0, kWidth7735 - 1 };
-
-  constexpr uint8_t k7335_RASET = 0x2B;
-  constexpr uint8_t k7335_raSetData[4] = { 0, 0, 0, kHeight7735 - 1 };
-
-  constexpr uint8_t k7335_MADCTL = 0x36;
-  constexpr uint8_t k7735_MADCTLData[1] = { 0xc0 };
-
-  constexpr uint8_t k7335_COLMOD  = 0x3A;
-  constexpr uint8_t k7335_COLMODData[1] = { 0x05 };
-
-  constexpr uint8_t k7335_FRMCTR1 = 0xB1;
-  constexpr uint8_t k7335_FRMCTR2 = 0xB2;
-  constexpr uint8_t k7335_FRMCTR3 = 0xB3;
-  constexpr uint8_t k7335_FRMCTRData[6] = { 0x01, 0x2c, 0x2d, 0x01, 0x2c, 0x2d };
-
-  constexpr uint8_t k7335_INVCTR  = 0xB4;
-  constexpr uint8_t k7335_INVCTRData[1] = { 0x07 };
-
-  constexpr uint8_t k7335_PWCTR1  = 0xC0;
-  constexpr uint8_t k7335_PowerControlData1[3] = { 0xA2, 0x02 /* -4.6V */, 0x84 /* AUTO mode */ };
-  constexpr uint8_t k7335_PWCTR2  = 0xC1;
-  constexpr uint8_t k7335_PowerControlData2[1] = { 0xc5 }; // VGH25 = 2.4C VGSEL =-10 VGH = 3*AVDD
-  constexpr uint8_t k7335_PWCTR3  = 0xC2;
-  constexpr uint8_t k7335_PowerControlData3[2] = { 0x0A /* Opamp current small */, 0x00 /* Boost freq */ };
-  constexpr uint8_t k7335_PWCTR4  = 0xC3;
-  constexpr uint8_t k7335_PowerControlData4[2] = { 0x8A /* BCLK/2, Opamp current small/medium low */, 0x2A };
-  constexpr uint8_t k7335_PWCTR5  = 0xC4;
-  constexpr uint8_t k7335_PowerControlData5[2] = { 0x8A /* BCLK/2, Opamp current small/medium low */, 0xEE };
-
-  constexpr uint8_t k7335_VMCTR1  = 0xC5;
-  constexpr uint8_t k7335_VMCTR1Data[1] = { 0x0E };
-
-  constexpr uint8_t k7335_GMCTRP1 = 0xE0;
-  constexpr uint8_t k7335_GMCTRP1Data[16] = { 0x02, 0x1c, 0x07, 0x12, 0x37, 0x32, 0x29, 0x2d,
-                                              0x29, 0x25, 0x2B, 0x39, 0x00, 0x01, 0x03, 0x10 } ;
-
-  constexpr uint8_t k7335_GMCTRN1 = 0xE1;
-  constexpr uint8_t k7335_GMCTRN1Data[16] = { 0x03, 0x1d, 0x07, 0x06, 0x2E, 0x2C, 0x29, 0x2D,
-                                              0x2E, 0x2E, 0x37, 0x3F, 0x00, 0x00, 0x02, 0x10 } ;
-  //}}}
-  writeCommand (k7335_SLPOUT);
+  writeCommand (0x11); // SLPOUT
   delayUs (120000);
 
-  writeCommandMultiData (k7335_FRMCTR1, k7335_FRMCTRData, 3); // frameRate normal mode
-  writeCommandMultiData (k7335_FRMCTR2, k7335_FRMCTRData, 3); // frameRate idle mode
-  writeCommandMultiData (k7335_FRMCTR3, k7335_FRMCTRData, 6); // frameRate partial mode
-  writeCommandMultiData (k7335_INVCTR, k7335_INVCTRData, sizeof(k7335_INVCTRData)); // Inverted mode off
+  constexpr uint8_t k7335_FRMCTRData[6] = { 0x01, 0x2c, 0x2d, 0x01, 0x2c, 0x2d };
+  writeCommandMultiData (0xB1, k7335_FRMCTRData, 3); // frameRate normal mode
+  writeCommandMultiData (0xB2, k7335_FRMCTRData, 3); // frameRate idle mode
+  writeCommandMultiData (0xB3, k7335_FRMCTRData, 6); // frameRate partial mode
 
-  writeCommandMultiData (k7335_PWCTR1, k7335_PowerControlData1, sizeof(k7335_PowerControlData1)); // POWER CONTROL 1
-  writeCommandMultiData (k7335_PWCTR2, k7335_PowerControlData2, sizeof(k7335_PowerControlData2)); // POWER CONTROL 2
-  writeCommandMultiData (k7335_PWCTR3, k7335_PowerControlData3, sizeof(k7335_PowerControlData3)); // POWER CONTROL 3
-  writeCommandMultiData (k7335_PWCTR4, k7335_PowerControlData4, sizeof(k7335_PowerControlData4)); // POWER CONTROL 4
-  writeCommandMultiData (k7335_PWCTR5, k7335_PowerControlData5, sizeof(k7335_PowerControlData5)); // POWER CONTROL 5
+  constexpr uint8_t k7335_INVCTRData[1] = { 0x07 };
+  writeCommandMultiData (0xB4, k7335_INVCTRData, sizeof(k7335_INVCTRData)); // Inverted mode off
 
-  writeCommandMultiData (k7335_VMCTR1, k7335_VMCTR1Data, sizeof(k7335_VMCTR1Data)); // POWER CONTROL 6
-  writeCommandMultiData (k7335_MADCTL, k7735_MADCTLData, sizeof(k7735_MADCTLData)); // ORIENTATION
-  writeCommandMultiData (k7335_COLMOD, k7335_COLMODData, sizeof(k7335_COLMODData)); // COLOR MODE - 16bit per pixel
+  //{{{  power control
+  constexpr uint8_t k7335_PowerControlData1[3] = { 0xA2, 0x02 /* -4.6V */, 0x84 /* AUTO mode */ };
+  writeCommandMultiData (0xC0, k7335_PowerControlData1, sizeof(k7335_PowerControlData1)); // POWER CONTROL 1
+  constexpr uint8_t k7335_PowerControlData2[1] = { 0xc5 }; // VGH25 = 2.4C VGSEL =-10 VGH = 3*AVDD
+  writeCommandMultiData (0xC1, k7335_PowerControlData2, sizeof(k7335_PowerControlData2)); // POWER CONTROL 2
+  constexpr uint8_t k7335_PowerControlData3[2] = { 0x0A /* Opamp current small */, 0x00 /* Boost freq */ };
+  writeCommandMultiData (0xC2, k7335_PowerControlData3, sizeof(k7335_PowerControlData3)); // POWER CONTROL 3
+  constexpr uint8_t k7335_PowerControlData4[2] = { 0x8A /* BCLK/2, Opamp current small/medium low */, 0x2A };
+  writeCommandMultiData (0xC3, k7335_PowerControlData4, sizeof(k7335_PowerControlData4)); // POWER CONTROL 4
+  constexpr uint8_t k7335_PowerControlData5[2] = { 0x8A /* BCLK/2, Opamp current small/medium low */, 0xEE };
+  writeCommandMultiData (0xC4, k7335_PowerControlData5, sizeof(k7335_PowerControlData5)); // POWER CONTROL 5
+  constexpr uint8_t k7335_VMCTR1Data[1] = { 0x0E };
+  writeCommandMultiData (0xC5, k7335_VMCTR1Data, sizeof(k7335_VMCTR1Data)); // VMCTR1 POWER CONTROL 6
+  //}}}
 
-  writeCommandMultiData (k7335_GMCTRP1, k7335_GMCTRP1Data, sizeof(k7335_GMCTRP1Data)); // gamma GMCTRP1
-  writeCommandMultiData (k7335_GMCTRN1, k7335_GMCTRN1Data, sizeof(k7335_GMCTRN1Data)); // Gamma GMCTRN1
 
-  writeCommandMultiData (k7335_CASET, k7335_caSetData, sizeof(k7335_caSetData));
-  writeCommandMultiData (k7335_RASET, k7335_raSetData, sizeof(k7335_raSetData));
+  const uint8_t colModData = 0x05;
+  writeCommandMultiData (0x3A, &colModData, 1); // COLOR MODE - 16bit per pixel
 
-  writeCommand (k7335_DISPON); // display ON
+  uint8_t madCtlData;
+  switch (mRotate) {
+    case e0:
+      madCtlData = 0xC0;
+      break;
+    case e90:
+      madCtlData = 0x60;
+      break;
+    case e180:
+      madCtlData = 0x00;
+      break;
+    case e270:
+      madCtlData = 0xA0;
+      break;
+    }
+  writeCommandMultiData (0x36, &madCtlData, 1); // MADCTL ORIENTATION
+
+  //{{{  gamma
+  constexpr uint8_t k7335_GMCTRP1Data[16] = { 0x02, 0x1c, 0x07, 0x12, 0x37, 0x32, 0x29, 0x2d,
+                                              0x29, 0x25, 0x2B, 0x39, 0x00, 0x01, 0x03, 0x10 } ;
+  writeCommandMultiData (0xE0, k7335_GMCTRP1Data, sizeof(k7335_GMCTRP1Data)); // gamma GMCTRP1
+
+  constexpr uint8_t k7335_GMCTRN1Data[16] = { 0x03, 0x1d, 0x07, 0x06, 0x2E, 0x2C, 0x29, 0x2D,
+                                              0x2E, 0x2E, 0x37, 0x3F, 0x00, 0x00, 0x02, 0x10 } ;
+  writeCommandMultiData (0xE1, k7335_GMCTRN1Data, sizeof(k7335_GMCTRN1Data)); // Gamma GMCTRN1
+  //}}}
+  writeCommand (0x29); // display ON
 
   updateLcd (mSpanAll);
 
@@ -1206,17 +1190,87 @@ bool cLcdSt7735r::initialise() {
 
 //{{{
 uint32_t cLcdSt7735r::updateLcd (sSpan* spans) {
-// ignore spans, just send everything for now
+// ignore spans, send everything
 
-  uint16_t swappedFrameBuf [kWidth7735 * kHeight7735];
+  uint16_t swappedFrameBuf [kWidth7735];
+  uint8_t data[4] = { 0,0, 0,0 };
 
-  uint16_t* src = mFrameBuf;
-  uint16_t* dst = swappedFrameBuf;
-  for (uint32_t i = 0; i < getNumPixels(); i++)
-    *dst++ = bswap_16 (*src++);
+  int numPixels = 0;
+  sSpan* it = spans;
+  while (it) {
+    switch (mRotate) {
+      //{{{
+      case e0: {
+        // caSet
+        data[1] = (uint8_t)(it->r.left);
+        data[3] = (uint8_t)(it->r.right - 1);
+        writeCommandMultiData (0x2A, data, 4);
 
-  writeCommandMultiData (0x2C, (const uint8_t*)swappedFrameBuf, getNumPixels() * 2); // RAMRW command
-  return getNumPixels();
+        // raSet
+        data[1] = (uint8_t)(it->r.top);
+        data[3] = (uint8_t)(it->r.bottom - 1);
+        writeCommandMultiData (0x2B, data, 4);
+
+        break;
+        }
+      //}}}
+      //{{{
+      case e90:
+        // caSet
+        data[1] = (uint8_t)(it->r.left);
+        data[3] = (uint8_t)(it->r.right - 1);
+        writeCommandMultiData (0x2A, data, 4);
+
+        // raSet
+        data[1] = (uint8_t)(it->r.top);
+        data[3] = (uint8_t)(it->r.bottom - 1);
+        writeCommandMultiData (0x2B, data, 4);
+        break;
+      //}}}
+      //{{{
+      case e180:
+        // caSet
+        data[1] = (uint8_t)(it->r.left);
+        data[3] = (uint8_t)(it->r.right - 1);
+        writeCommandMultiData (0x2A, data, 4);
+
+        // raSet
+        data[1] = (uint8_t)(it->r.top);
+        data[3] = (uint8_t)(it->r.bottom - 1);
+        writeCommandMultiData (0x2B, data, 4);
+        break;
+      //}}}
+      //{{{
+      case e270:
+        // caSet
+        data[1] = (uint8_t)(it->r.left);
+        data[3] = (uint8_t)(it->r.right - 1);
+        writeCommandMultiData (0x2A, data, 4);
+
+        // raSet
+        data[1] = (uint8_t)(it->r.top);
+        data[3] = (uint8_t)(it->r.bottom - 1);
+        writeCommandMultiData (0x2B, data, 4);
+        break;
+      //}}}
+      }
+
+    writeCommand (0x2C);  // GRAM write
+
+    uint16_t* src = mFrameBuf + (it->r.top * getWidth()) + it->r.left;
+    for (int y = it->r.top; y < it->r.bottom; y++) {
+      uint16_t* dst = swappedFrameBuf;
+      for (int x = it->r.left; x < it->r.right; x++)
+        *dst++ = bswap_16 (*src++);
+      spiWrite (mSpiHandle, (char*)swappedFrameBuf, it->r.getWidth() * 2);
+      src += getWidth() - it->r.getWidth();
+      }
+
+    numPixels += it->r.getNumPixels();
+    it = it->next;
+    }
+
+  return numPixels;
   }
 //}}}
 //}}}
@@ -1289,14 +1343,6 @@ bool cLcdIli9225b::initialise() {
   //}}}
 
   writeCommandData (0x07, 0x1017);
-  //{{{  set ram area
-  writeCommandData (0x36, mWidth-1);
-  writeCommandData (0x37, 0);
-  writeCommandData (0x38, mHeight-1);
-  writeCommandData (0x39, 0);
-  writeCommandData (0x20, 0);
-  writeCommandData (0x21, 0);
-  //}}}
 
   updateLcd (mSpanAll);
 
@@ -1308,14 +1354,23 @@ bool cLcdIli9225b::initialise() {
 uint32_t cLcdIli9225b::updateLcd (sSpan* spans) {
 // ignore spans, just send everything for now
 
+  //  set ram area
+  writeCommandData (0x36, mWidth-1);  // H GRAM end address
+  writeCommandData (0x37, 0);         // H GRAM start address
+  writeCommandData (0x38, mHeight-1); // V GRAM endt address
+  writeCommandData (0x39, 0);         // V GRAM start address
+
+  writeCommandData (0x20, 0);         // H GRAM start
+  writeCommandData (0x21, 0);         // V GRAM start
+
   uint16_t swappedFrameBuf [kWidth9225b * kHeight9225b];
 
   uint16_t* src = mFrameBuf;
   uint16_t* dst = swappedFrameBuf;
-  for (uint32_t i = 0; i < getNumPixels(); i++)
+  for (uint16_t i = 0; i < getNumPixels(); i++)
     *dst++ = bswap_16 (*src++);
 
-  writeCommandMultiData (0x22, (const uint8_t*)swappedFrameBuf, getNumPixels() * 2); // RAMRW command
+  writeCommandMultiData (0x22, (const uint8_t*)swappedFrameBuf, getNumPixels() * 2); // GRAM write command
   return getNumPixels();
   }
 //}}}
