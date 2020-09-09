@@ -179,9 +179,6 @@ protected:
 
   virtual bool initialise();
   virtual uint32_t updateLcd (sSpan* spans);
-
-private:
-  void writeCommandMultiData (const uint8_t command, const uint8_t* data, const int len);
   };
 //}}}
 
