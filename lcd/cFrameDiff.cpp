@@ -90,15 +90,6 @@ void cFrameDiff::merge (int pixelThreshold) {
   }
 //}}}
 
-
-// cAllFrameDiff - fake class to just return whole screen, allocates no prevFrameBuf, uses single span
-//{{{
-sSpan* cAllFrameDiff::diff (uint16_t* frameBuf) {
-
-  return &mSpanAll;
-  }
-//}}}
-
 // cSingleFrameDiff
 //{{{
 sSpan* cSingleFrameDiff::diff (uint16_t* frameBuf) {

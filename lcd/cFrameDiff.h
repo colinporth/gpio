@@ -31,21 +31,20 @@ protected:
 
 //{{{
 class cAllFrameDiff : public cFrameDiff {
-// slightly fake version to return whole screen, allocates no resources
+// slightly fake version to return whole screen, allocate single wholeScreen sSpan
 public:
   //{{{
   cAllFrameDiff (const uint16_t width, const uint16_t height) : cFrameDiff (width, height) {
-    mSpanAll = { { 0,0, (int16_t)width, (int16_t)height }, width, uint32_t(width * height), nullptr };
+
+    mSpans = (sSpan*)malloc (sizeof(sSpan));
+    *mSpans = { { 0,0, (int16_t)width, (int16_t)height }, width, uint32_t(width * height), nullptr };
     }
   //}}}
   virtual ~cAllFrameDiff() {}
 
   virtual uint16_t* swap (uint16_t* frameBuf) { return frameBuf; }
   virtual void copy (uint16_t* frameBuf) {}
-  virtual sSpan* diff (uint16_t* frameBuf);
-
-private:
-  sSpan mSpanAll;
+  virtual sSpan* diff (uint16_t* frameBuf) { return mSpans; };
   };
 //}}}
 //{{{
