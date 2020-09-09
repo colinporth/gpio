@@ -632,6 +632,9 @@ void cLcd::setFont (const uint8_t* font, const int fontSize)  {
 
 // parallel 16bit classes
 //{{{  cLcdTa7601 : public cLcd
+// 16 bit parallel, rs pin, no gram write HV swap, gram H start/end must be even
+// - could use direction bits for 180 but not worth it
+// - slow down writes, clocks ok but data not ready
 constexpr int16_t kWidthTa7601 = 320;
 constexpr int16_t kHeightTa7601 = 480;
 

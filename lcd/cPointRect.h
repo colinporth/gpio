@@ -239,8 +239,8 @@ public:
 //{{{
 struct sSpan {
   cRect r;
-  uint16_t lastScanRight; // scanline bottom-1 can be partial, ends in lastScanRight.
-  uint32_t size;
+  uint16_t lastScanRight; // scanline bottom-1 can be partial, ends in lastScanRight, ??? where is this used ???
+  uint32_t size;          // ??? where is this used, speedup for merge ???
   sSpan* next;   // linked skip list in array for fast pruning
   };
 //}}}
