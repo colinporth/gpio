@@ -42,7 +42,7 @@ static FT_Face mFace;
 //     d5  gpio5 - 29  30 - 0v
 //     d6  gpio6 - 31  32 - gpio12 d12
 //    d13 gpio13 - 33  34 - 0v
-// unused gpio19 - 35  36 - gpio16 wr
+// unused gpio19 - 35  36 - gpio16 unused
 // unused gpio26 - 37  38 - gpio20 unused
 //            0v - 39  40 - gpio21 unused
 
@@ -52,6 +52,9 @@ static FT_Face mFace;
 //          miso - 21  22 - gpio25 reset
 //          sclk - 23  24 - Ce0
 
+constexpr uint8_t kSpiTouchCeGpio = 7;
+constexpr uint8_t kSpiLcdCeGpio = 8;
+
 constexpr uint8_t kRegisterGpio = 24;  // parallel and spi
 constexpr uint8_t kResetGpio = 25;     // parallel and spi
 
@@ -60,11 +63,12 @@ constexpr uint8_t k16ReadGpio       = 22;
 constexpr uint8_t k16ChipSelectGpio = 23;
 constexpr uint8_t k16BacklightGpio  = 27;
 
-constexpr uint32_t k16DataMask     = 0xFFFF;
-constexpr uint32_t k16WriteMask    = 1 << k16WriteGpio;
-constexpr uint32_t k16WriteClrMask = k16WriteMask | k16DataMask;
+constexpr uint32_t k16DataMask     = 0x0000FFFF;
+constexpr uint32_t k16WriteMask    = 0x00020000;
+constexpr uint32_t k16WriteClrMask = 0x0002FFFF;
 
 constexpr uint8_t kSpiBacklightGpio = 24;
+constexpr uint8_t kSpiCe0Gpio = 8;
 //}}}
 
 // cLcd public
@@ -1436,25 +1440,77 @@ cLcdSpiHeader::~cLcdSpiHeader() {
 void cLcdSpiHeader::writeCommand (const uint8_t command) {
 
   // send command
+  gpioWrite (kSpiLcdCeGpio, 0);
+
   const uint8_t kCommand[3] = { 0x70, 0, command };
   spiWrite (mSpiHandle, (char*)kCommand, 3);
+
+  gpioWrite (kSpiLcdCeGpio, 1);
   }
 //}}}
 //{{{
 void cLcdSpiHeader::writeDataWord (const uint16_t data) {
 // send data
 
+  gpioWrite (kSpiLcdCeGpio, 0);
+
   const uint8_t kData[3] = { 0x72, uint8_t(data >> 8), uint8_t(data & 0xFF) };
   spiWrite (mSpiHandle, (char*)kData, 3);
+
+  gpioWrite (kSpiLcdCeGpio, 1);
   }
 //}}}
+
+//{{{
+uint16_t cLcdSpiHeader::readId() {
+
+  gpioWrite (kSpiLcdCeGpio, 0);
+  const uint8_t kCommand[3] = { 0x70, 0, 0 };
+  int count = spiWrite (mSpiHandle, (char*)kCommand, 3);
+  gpioWrite (kSpiLcdCeGpio, 1);
+
+
+  uint8_t command1[4] = { 0x73, 0, 0, 0 };
+  gpioWrite (kSpiLcdCeGpio, 0);
+  count = spiXfer (mSpiHandle, (char*)command1, (char*)command1, 4);
+  gpioWrite (kSpiLcdCeGpio, 1);
+
+  int b0 = command1[0];
+  int b1 = command1[1];
+  int b2 = command1[2];
+  int b3 = command1[3];
+
+  cLog::log (LOGINFO, "readId:", dec(count) + " " +
+                                 hex(b0,2) + " " + hex(b1,2) + " " + hex(b2,2) + " " +hex(b3,2));
+  return 0xFFFF;
+  }
+//}}}
+uint16_t cLcdSpiHeader::readStatus() {
+
+  uint8_t command1[4] = { 0x71, 0, 0, 0 };
+
+  gpioWrite (kSpiLcdCeGpio, 0);
+  int count = spiXfer (mSpiHandle, (char*)command1, (char*)command1, 4);
+  gpioWrite (kSpiLcdCeGpio, 1);
+
+  int b0 = command1[0];
+  int b1 = command1[1];
+  int b2 = command1[2];
+  int b3 = command1[3];
+
+  cLog::log (LOGINFO, "readStatus:", dec(count) + " " +
+                                 hex(b0,2) + " " + hex(b1,2) + " " + hex(b2,2) + " " +hex(b3,2));
+  return 0xFFFF;
+  }
+
 //}}}
 //{{{  cLcdIli9320 : public cLcdSpiHeader
 // 2.8 inch 240x320 - HY28A - touchcreen XT2046P
 // spi - no rs - use headers, backlight
 constexpr int16_t kWidth9320 = 240;
 constexpr int16_t kHeight9320 = 320;
-constexpr int kSpiClock9320 = 24000000;
+//constexpr int kSpiClock9320 = 24000000;
+constexpr int kSpiClock9320 = 1000000;
 
 cLcdIli9320::cLcdIli9320 (const cLcd::eRotate rotate, const cLcd::eInfo info, const eMode mode)
   : cLcdSpiHeader(kWidth9320, kHeight9320, rotate, info, mode) {}
@@ -1469,8 +1525,16 @@ bool cLcdIli9320::initialise() {
   gpioSetMode (kSpiBacklightGpio, PI_OUTPUT);
   gpioWrite (kSpiBacklightGpio, 0);
 
-  // spi mode 3, spi manages ce0 active lo
-  mSpiHandle = spiOpen (0, kSpiClock9320, 3);
+  gpioSetMode (kSpiTouchCeGpio, PI_OUTPUT);
+  gpioWrite (kSpiTouchCeGpio, 1);
+  gpioSetMode (kSpiLcdCeGpio, PI_OUTPUT);
+  gpioWrite (kSpiLcdCeGpio, 1);
+
+  // spi mode 3, we manage ce active lo
+  mSpiHandle = spiOpen (0, kSpiClock9320, 0xE3);
+
+  readId();
+  //readStatus();
 
   writeCommandData (0xE5, 0x8000); // Set the Vcore voltage
   writeCommandData (0x00, 0x0000); // start oscillation - stopped?
@@ -1534,6 +1598,7 @@ bool cLcdIli9320::initialise() {
       break;
     }
 
+  readId();
   updateLcd (mSpanAll);
 
   return true;
@@ -1611,15 +1676,22 @@ uint32_t cLcdIli9320::updateLcd (sSpan* spans) {
       }
 
     writeCommand (0x22);  // GRAM write
+
+
     uint16_t* src = mFrameBuf + (it->r.top * getWidth()) + it->r.left;
     for (int y = it->r.top; y < it->r.bottom; y++) {
       // 2 header bytes, alignment for data bswap_16, send spi data from second header byte
       uint16_t* dst = dataHeaderBuf + 1;
       for (int x = it->r.left; x < it->r.right; x++)
         *dst++ = bswap_16 (*src++);
+
+      gpioWrite (kSpiLcdCeGpio, 0);
       spiWrite (mSpiHandle, ((char*)(dataHeaderBuf))+1, (it->r.getWidth() * 2) + 1);
+      gpioWrite (kSpiLcdCeGpio, 1);
+
       src += getWidth() - it->r.getWidth();
       }
+
 
     numPixels += it->r.getNumPixels();
     it = it->next;

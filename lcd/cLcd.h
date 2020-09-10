@@ -105,6 +105,9 @@ protected:
     }
   //}}}
 
+  virtual uint16_t readId() = 0;
+  virtual uint16_t readStatus() = 0;
+
   virtual uint32_t updateLcd (sSpan* spans) = 0;
 
   // vars
@@ -163,6 +166,8 @@ public:
 protected:
   virtual void writeCommand (const uint8_t command);
   virtual void writeDataWord (const uint16_t data);
+  virtual uint16_t readId() { return 0xFAFF; }
+  virtual uint16_t readStatus() { return 0xAA; }
 
   virtual uint32_t updateLcd (sSpan* spans);
   };
@@ -176,6 +181,8 @@ public:
 protected:
   virtual void writeCommand (const uint8_t command);
   virtual void writeDataWord (const uint16_t data);
+  virtual uint16_t readId() { return 0xFAFF; }
+  virtual uint16_t readStatus() { return 0xAA; }
 
   virtual bool initialise();
   virtual uint32_t updateLcd (sSpan* spans);
@@ -194,6 +201,9 @@ protected:
   virtual void writeCommand (const uint8_t command);
   virtual void writeDataWord (const uint16_t data);
   void writeCommandMultiData (const uint8_t command, const uint8_t* dataPtr, const int len);
+
+  virtual uint16_t readId() { return 0xFAFF; }
+  virtual uint16_t readStatus() { return 0xAA; }
 
   int mSpiHandle = 0;
   };
@@ -236,6 +246,9 @@ public:
 protected:
   virtual void writeCommand (const uint8_t command);
   virtual void writeDataWord (const uint16_t data);
+
+  virtual uint16_t readId();
+  virtual uint16_t readStatus();
 
   int mSpiHandle = 0;
   };

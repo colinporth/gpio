@@ -1,6 +1,7 @@
 // test.cpp
 //{{{  includes
 #include "lcd/cLcd.h"
+#include "cTouchscreen.h"
 
 #include "../shared/utils/utils.h"
 #include "../shared/utils/cLog.h"
@@ -325,10 +326,25 @@ int main (int numArgs, char* args[]) {
 
   cLog::init (logLevel, false, "", "gpio");
 
-  cLcd* lcd = new cLcdSsd1289 (rotate, info, mode);
+  if (false) {
+    cTouchscreen* ts = new cTouchscreen();
+    ts->init();
+    while (true) {
+      if (ts->getTouchDown()) {
+        int16_t x;
+        int16_t y;
+        int16_t z;
+        //ts->getTouchPos (&x,&y,&z, lcd->getWidth(), lcd->getHeight());
+        ts->getTouchPos (&x,&y,&z, 240, 320);
+        cLog::log (LOGINFO, "x:" + dec(x) + " y: " + dec(y));
+        }
+      }
+    }
+
+  //cLcd* lcd = new cLcdSsd1289 (rotate, info, mode);
   //cLcd* lcd = new cLcdSt7735r (rotate, info, mode);
   //cLcd* lcd = new cLcdIli9225b (rotate, info, mode);
-  //cLcd* lcd = new cLcdIli9320 (rotate, info, mode);
+  cLcd* lcd = new cLcdIli9320 (rotate, info, mode);
   //cLcd* lcd = new cLcdTa7601 (rotate, info, mode);
   if (!lcd->initialise())
     return 0;
