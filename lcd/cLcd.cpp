@@ -52,9 +52,6 @@ static FT_Face mFace;
 //          miso - 21  22 - gpio25 reset
 //          sclk - 23  24 - Ce0
 
-constexpr uint8_t kSpiTouchCeGpio = 7;
-constexpr uint8_t kSpiLcdCeGpio = 8;
-
 constexpr uint8_t kRegisterGpio = 24;  // parallel and spi
 constexpr uint8_t kResetGpio = 25;     // parallel and spi
 
@@ -1430,6 +1427,8 @@ uint32_t cLcdIli9225b::updateLcd (sSpan* spans) {
 
 // spi no data/command pin classes
 //{{{  cLcdSpiHeader : public cLcdSpi
+constexpr uint8_t kSpiLcdCeGpio = 8;
+//constexpr uint8_t kSpiTimingGpio = 23;
 //{{{
 cLcdSpiHeader::~cLcdSpiHeader() {
   spiClose (mSpiHandle);
@@ -1485,6 +1484,7 @@ uint16_t cLcdSpiHeader::readId() {
   return 0xFFFF;
   }
 //}}}
+//{{{
 uint16_t cLcdSpiHeader::readStatus() {
 
   uint8_t command1[4] = { 0x71, 0, 0, 0 };
@@ -1502,15 +1502,14 @@ uint16_t cLcdSpiHeader::readStatus() {
                                  hex(b0,2) + " " + hex(b1,2) + " " + hex(b2,2) + " " +hex(b3,2));
   return 0xFFFF;
   }
-
+//}}}
 //}}}
 //{{{  cLcdIli9320 : public cLcdSpiHeader
 // 2.8 inch 240x320 - HY28A - touchcreen XT2046P
-// spi - no rs - use headers, backlight
+// spi - gpio ce0, no rs - use headers, backlight, can't get readStatus,readId to work, sent but not rxed
 constexpr int16_t kWidth9320 = 240;
 constexpr int16_t kHeight9320 = 320;
-//constexpr int kSpiClock9320 = 24000000;
-constexpr int kSpiClock9320 = 1000000;
+constexpr int kSpiClock9320 = 24000000;
 
 cLcdIli9320::cLcdIli9320 (const cLcd::eRotate rotate, const cLcd::eInfo info, const eMode mode)
   : cLcdSpiHeader(kWidth9320, kHeight9320, rotate, info, mode) {}
@@ -1525,16 +1524,15 @@ bool cLcdIli9320::initialise() {
   gpioSetMode (kSpiBacklightGpio, PI_OUTPUT);
   gpioWrite (kSpiBacklightGpio, 0);
 
-  gpioSetMode (kSpiTouchCeGpio, PI_OUTPUT);
-  gpioWrite (kSpiTouchCeGpio, 1);
   gpioSetMode (kSpiLcdCeGpio, PI_OUTPUT);
   gpioWrite (kSpiLcdCeGpio, 1);
 
-  // spi mode 3, we manage ce active lo
-  mSpiHandle = spiOpen (0, kSpiClock9320, 0xE3);
+  //gpioSetMode (kSpiTimingGpio, PI_OUTPUT);
+  //gpioWrite (kSpiTimingGpio, 1);
 
+  // spi - we manage (ce2),(ce1),ce0 active lo, mode 3
+  mSpiHandle = spiOpen (0, kSpiClock9320, 0xE3);
   readId();
-  //readStatus();
 
   writeCommandData (0xE5, 0x8000); // Set the Vcore voltage
   writeCommandData (0x00, 0x0000); // start oscillation - stopped?
@@ -1598,7 +1596,6 @@ bool cLcdIli9320::initialise() {
       break;
     }
 
-  readId();
   updateLcd (mSpanAll);
 
   return true;
@@ -1613,6 +1610,7 @@ void cLcdIli9320::setBacklight (bool on) {
 //{{{
 uint32_t cLcdIli9320::updateLcd (sSpan* spans) {
 
+  //gpioWrite (kSpiTimingGpio, 0);
   uint16_t dataHeaderBuf [320+1];
   dataHeaderBuf[0] = 0x7272;
 
@@ -1677,7 +1675,6 @@ uint32_t cLcdIli9320::updateLcd (sSpan* spans) {
 
     writeCommand (0x22);  // GRAM write
 
-
     uint16_t* src = mFrameBuf + (it->r.top * getWidth()) + it->r.left;
     for (int y = it->r.top; y < it->r.bottom; y++) {
       // 2 header bytes, alignment for data bswap_16, send spi data from second header byte
@@ -1697,6 +1694,7 @@ uint32_t cLcdIli9320::updateLcd (sSpan* spans) {
     it = it->next;
     }
 
+  //gpioWrite (kSpiTimingGpio, 1);
   return numPixels;
   }
 //}}}

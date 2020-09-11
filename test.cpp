@@ -300,6 +300,7 @@ void radial (cLcd* lcd, int dim) {
 int main (int numArgs, char* args[]) {
 
   bool draw = false;
+  bool touch = false;
   cLcd::eRotate rotate = cLcd::e0;
   cLcd::eInfo info = cLcd::eNone;
   cLcd::eMode mode = cLcd::eCoarse;
@@ -319,6 +320,7 @@ int main (int numArgs, char* args[]) {
     else if (str == "e") mode = cLcd::eExact;
     else if (str == "1") logLevel = LOGINFO1;
     else if (str == "2") logLevel = LOGINFO2;
+    else if (str == "t") touch = true;
     else if (str == "d") draw = true;
     else
       cLog::log (LOGERROR, "unrecognised option " + str);
@@ -326,7 +328,8 @@ int main (int numArgs, char* args[]) {
 
   cLog::init (logLevel, false, "", "gpio");
 
-  if (false) {
+  if (touch) {
+    //{{{  touch test
     cTouchscreen* ts = new cTouchscreen();
     ts->init();
     while (true) {
@@ -340,6 +343,7 @@ int main (int numArgs, char* args[]) {
         }
       }
     }
+    //}}}
 
   //cLcd* lcd = new cLcdSsd1289 (rotate, info, mode);
   //cLcd* lcd = new cLcdSt7735r (rotate, info, mode);

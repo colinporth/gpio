@@ -11,11 +11,11 @@
 // aux miso gpio19 - 35  36 - gpi16 aux ce2
 //     pirq gpio26 - 37  38 - gpi20 aux mosi
 //              0v - 39  40 - gpi21 aux sclk
-constexpr uint8_t kSpiTouchCeGpio = 7;
+constexpr uint8_t kSpiTouchCeGpio = 16;
 constexpr uint8_t kSpiLcdCeGpio = 8;
 constexpr uint8_t kPirqGpio = 26;
 
-constexpr int kSpiClockXT2406 = 100000;
+constexpr int kSpiClockXT2406 = 400000;
 
 #define ADS_CTRL_START          0x80 // Start Bit
 #define ADS_CTRL_EIGHT_BITS_MOD 0x08 // Mode
@@ -51,7 +51,8 @@ public:
 
     gpioSetMode (kPirqGpio, PI_INPUT);
 
-    mSpiHandle = spiOpen (0, kSpiClockXT2406, 0x00E3);
+    //mSpiHandle = spiOpen (1, kSpiClockXT2406, 0x00E0);
+    mSpiHandle = spiOpen (2, kSpiClockXT2406, 0x01E3);
 
     touchCommand (CMD_ENABLE_PENIRQ);
     }
