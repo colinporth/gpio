@@ -300,7 +300,7 @@ void radial (cLcd* lcd, int dim) {
 int main (int numArgs, char* args[]) {
 
   bool draw = false;
-  bool touch = false;
+  bool drawRadial = false;
   cLcd::eRotate rotate = cLcd::e0;
   cLcd::eInfo info = cLcd::eNone;
   cLcd::eMode mode = cLcd::eCoarse;
@@ -320,7 +320,7 @@ int main (int numArgs, char* args[]) {
     else if (str == "e") mode = cLcd::eExact;
     else if (str == "1") logLevel = LOGINFO1;
     else if (str == "2") logLevel = LOGINFO2;
-    else if (str == "t") touch = true;
+    else if (str == "r") drawRadial = true;
     else if (str == "d") draw = true;
     else
       cLog::log (LOGERROR, "unrecognised option " + str);
@@ -328,65 +328,59 @@ int main (int numArgs, char* args[]) {
 
   cLog::init (logLevel, false, "", "gpio");
 
-  if (touch) {
-    //{{{  touch test
-    cTouchscreen* ts = new cTouchscreen();
-    ts->init();
-    while (true) {
-      if (ts->getTouchDown()) {
-        int16_t x;
-        int16_t y;
-        int16_t z;
-        //ts->getTouchPos (&x,&y,&z, lcd->getWidth(), lcd->getHeight());
-        ts->getTouchPos (&x,&y,&z, 240, 320);
-        cLog::log (LOGINFO, "x:" + dec(x) + " y: " + dec(y));
-        }
-      }
-    }
-    //}}}
-
   //cLcd* lcd = new cLcdSsd1289 (rotate, info, mode);
   //cLcd* lcd = new cLcdSt7735r (rotate, info, mode);
   //cLcd* lcd = new cLcdIli9225b (rotate, info, mode);
-  cLcd* lcd = new cLcdIli9320 (rotate, info, mode);
-  //cLcd* lcd = new cLcdTa7601 (rotate, info, mode);
+  //cLcd* lcd = new cLcdIli9320 (rotate, info, mode);
+  cLcd* lcd = new cLcdTa7601 (rotate, info, mode);
   if (!lcd->initialise())
     return 0;
 
-  if (draw) {
-    lcd->setBacklightOn();
+  cTouchscreen* ts = new cTouchscreen();
+  ts->init();
+
+  lcd->setBacklightOn();
+  if (drawRadial) {
+    //{{{  draw radial
     for (int i = 2; i < 320; i += 2)
       radial (lcd, i);
      }
+    //}}}
 
   while (true) {
     if (draw) {
       //{{{  draw test
-      float height = 6.f;
+      float height = 30.f;
       float maxHeight = 60.f;
 
-      while (height < maxHeight) {
-        lcd->snapshot();
-        lcd->grad (kBlack, kRed, kYellow, kWhite, cRect (0,0, lcd->getWidth(), int(height)));
+      lcd->snapshot();
+      lcd->grad (kBlack, kRed, kYellow, kWhite, cRect (0,0, lcd->getWidth(), int(height)));
 
-        lcd->ellipseAA (cPointF(height/2.f, height/2.f), cPointF(height/2.f, height/2.f), 16);
-        lcd->renderAA (kYellow, true);
-
-        lcd->ellipseOutlineAA (cPointF(height/2.f, height/2.f), cPointF(height/2.f, height/2.f), height / 4.f, 16);
-        lcd->renderAA (kBlue, true);
-
-        cPoint point (int(maxHeight), 0);
-        for (char ch = 'A'; ch < 0x7f; ch++) {
-          point.x = lcd->text (kWhite, point, height, string(1,ch));
-          if (point.x > lcd->getWidth())
-            break;
-          }
-        height += 1;
-
-        lcd->present();
-        lcd->setBacklightOn();
-        lcd->delayUs (5000);
+      cPoint point (int(maxHeight), 0);
+      for (char ch = 'A'; ch < 0x7f; ch++) {
+        point.x = lcd->text (kWhite, point, height, string(1,ch));
+        if (point.x > lcd->getWidth())
+          break;
         }
+
+      if (ts->getTouchDown()) {
+        int16_t x;
+        int16_t y;
+        int16_t z;
+        if (ts->getTouchPos (&x,&y,&z, lcd->getWidth(), lcd->getHeight())) {
+          cPointF p (x-2,y-2);
+          lcd->ellipseAA (p, cPointF(height/2.f, height/2.f), 16);
+          lcd->renderAA (kYellow, true);
+          lcd->ellipseOutlineAA (p, cPointF(height/2.f, height/2.f), height / 4.f, 16);
+          lcd->renderAA (kBlue, true);
+          }
+        else
+          cLog::log (LOGERROR, "lifted");
+        }
+
+      lcd->present();
+      lcd->setBacklightOn();
+      lcd->delayUs (5000);
       }
       //}}}
     else {

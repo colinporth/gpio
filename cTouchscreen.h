@@ -12,20 +12,14 @@
 //     pirq gpio26 - 37  38 - gpi20 aux mosi
 //              0v - 39  40 - gpi21 aux sclk
 constexpr uint8_t kSpiTouchCeGpio = 16;
-constexpr uint8_t kSpiLcdCeGpio = 8;
 constexpr uint8_t kPirqGpio = 26;
+constexpr int kSpiClockXT2406 = 500000;
 
-constexpr int kSpiClockXT2406 = 400000;
-
-#define ADS_CTRL_START          0x80 // Start Bit
-#define ADS_CTRL_EIGHT_BITS_MOD 0x08 // Mode
-#define ADS_CTRL_DFR            0x04 // SER/DFR
-#define ADS_CTRL_PD1            0x02 // PD1
-#define ADS_CTRL_PD0            0x01 // PD0
-
-#define CMD_ENABLE_PENIRQ  ADS_CTRL_START | 0x10
-#define CMD_X_POSITION     ADS_CTRL_START | 0x10 | ADS_CTRL_PD1 | ADS_CTRL_PD0
-#define CMD_Y_POSITION     ADS_CTRL_START | 0x50 | ADS_CTRL_PD1 | ADS_CTRL_PD0
+#define CTRL_START          0x80 // start Bit
+#define CTRL_EIGHT_BITS_MOD 0x08 // mode
+#define CTRL_DFR            0x04 // ser/dfr
+#define CTRL_PD1            0x02 // pd1
+#define CTRL_PD0            0x01 // pd0
 
 class cTouchscreen {
 public:
@@ -41,20 +35,15 @@ public:
 
   //{{{
   void init() {
-    gpioInitialise();
 
     gpioSetMode (kSpiTouchCeGpio, PI_OUTPUT);
-    gpioWrite (kSpiTouchCeGpio, 1);
-
-    gpioSetMode (kSpiLcdCeGpio, PI_OUTPUT);
-    gpioWrite (kSpiLcdCeGpio, 1);
+    //gpioWrite (kSpiTouchCeGpio, 1);
 
     gpioSetMode (kPirqGpio, PI_INPUT);
 
-    //mSpiHandle = spiOpen (1, kSpiClockXT2406, 0x00E0);
-    mSpiHandle = spiOpen (2, kSpiClockXT2406, 0x01E3);
+    mSpiHandle = spiOpen (2, kSpiClockXT2406, 0x0160);
 
-    touchCommand (CMD_ENABLE_PENIRQ);
+    touchCommand (CTRL_START | 0x10);
     }
   //}}}
 
@@ -65,39 +54,36 @@ public:
     }
   //}}}
   //{{{
-  void getTouchPos (int16_t* x, int16_t* y, int16_t* z, int16_t xlen, uint16_t ylen) {
+  bool getTouchPos (int16_t* x, int16_t* y, int16_t* z, int16_t xlen, uint16_t ylen) {
 
     #define maxSamples 7
+
     uint16_t xsamples[maxSamples];
     uint16_t ysamples[maxSamples];
 
     uint16_t samples = 0;
-    while (samples < maxSamples) {
-      xsamples[samples] = touchCommand (CMD_X_POSITION);
-      ysamples[samples] = touchCommand (CMD_Y_POSITION);
+    while (getTouchDown() && (samples < maxSamples)) {
+      int x =  touchCommand (CTRL_START | 0x10 | CTRL_PD1 | CTRL_PD0);
+      int y =  touchCommand (CTRL_START | 0x50 | CTRL_PD1 | CTRL_PD0);
+      //cLog::log (LOGINFO, "x:" + dec(x) + " y: " + dec(y));
+      xsamples[samples] = x;
+      ysamples[samples] = y;
       samples++;
       }
 
     int16_t xsample = torben (xsamples, samples);
     int16_t ysample = torben (ysamples, samples);
 
-    //*x = -10 +  (ysample * xlen) / 1900;
-    //*y = -10 + ((2048 - xsample) * ylen)/ 1900;
-    cLog::log (LOGINFO,
-               "x:" + dec(xsample) + " y: " + dec(ysample) + " " +
-               dec(xsamples[0]) + ", " + dec(ysamples[0]) + " " +
-               dec(xsamples[1]) + ", " + dec(ysamples[1]) + " " +
-               dec(xsamples[2]) + ", " + dec(ysamples[2]) + " " +
-               dec(xsamples[3]) + ", " + dec(ysamples[3]) + " " +
-               dec(xsamples[4]) + ", " + dec(ysamples[4]) + " " +
-               dec(xsamples[5]) + ", " + dec(ysamples[5]) + " " +
-               dec(xsamples[6]) + ", " + dec(ysamples[6]));
-
-    *x = xsample;
-    *y = ysample;
+    *x = ((xsample - 170) * xlen) / (1920-170);
+    *y = ((ysample - 140) * ylen) / (1930-140);
+    if ((*x) < 0)
+      *x = 0;
+    if ((*y) < 0)
+      *y = 0;
     *z = 0;
 
-    touchCommand (CMD_ENABLE_PENIRQ);
+    touchCommand (CTRL_START | 0x10);
+    return samples == maxSamples;
     }
   //}}}
 
@@ -105,18 +91,12 @@ private:
   //{{{
   uint32_t touchCommand (uint8_t command) {
 
-    gpioWrite (kSpiTouchCeGpio, 0);
-
+    //gpioWrite (kSpiTouchCeGpio, 0);
     uint8_t buf[3] = { command, 0, 0 };
     spiXfer (mSpiHandle, (char*)buf, (char*)buf, 3);
+    //gpioWrite (kSpiTouchCeGpio, 1);
 
-    gpioWrite (kSpiTouchCeGpio, 1);
-
-    int b0 = buf[0];
-    int b1 = buf[1];
-    int b2 = buf[2];
-    cLog::log (LOGINFO, hex(int(b0),2) + " " +  hex(int(b1),2)  +" " + hex(int(b2),2));
-
+    //cLog::log (LOGINFO, hex(int(buf2[0]),2) + " " +  hex(int(buf2[1]),2)  +" " + hex(int(buf2[2]),2));
     return ((buf[1] << 8) | buf[2]) >> 4;
     }
   //}}}
