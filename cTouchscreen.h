@@ -15,11 +15,11 @@ constexpr uint8_t kSpiTouchCeGpio = 16;
 constexpr uint8_t kPirqGpio = 26;
 constexpr int kSpiClockXT2406 = 500000;
 
-#define CTRL_START          0x80 // start Bit
-#define CTRL_EIGHT_BITS_MOD 0x08 // mode
-#define CTRL_DFR            0x04 // ser/dfr
-#define CTRL_PD1            0x02 // pd1
-#define CTRL_PD0            0x01 // pd0
+#define CTRL_START 0x80 // start Bit
+#define CTRL_8BIT  0x08 // mode
+#define CTRL_DFR   0x04 // ser/dfr
+#define CTRL_PD1   0x02 // pd1
+#define CTRL_PD0   0x01 // pd0
 
 class cTouchscreen {
 public:
@@ -102,53 +102,59 @@ private:
   //}}}
   //{{{
   uint16_t torben (uint16_t m[], int n) {
+  // torben median
 
-    int i, less, greater, equal;
-    uint16_t  min, max, guess, maxltguess, mingtguess;
+    uint16_t min = m[0];
+    uint16_t max = m[0];
 
-    min = max = m[0] ;
-    for (i = 1 ; i < n ; i++) {
+    for (int i = 1 ; i < n ; i++) {
       if (m[i] < min)
         min = m[i];
       if (m[i] > max)
         max = m[i];
       }
 
-    while (1) {
-      guess = (min+max)/2;
+    int less;
+    int greater;
+    int equal;
+    uint16_t guess;
+    uint16_t maxltguess;
+    uint16_t mingtguess;
+    while (true) {
+      guess = (min + max) / 2;
 
       less = 0;
       greater = 0;
       equal = 0;
-      maxltguess = min ;
-      mingtguess = max ;
+      maxltguess = min;
+      mingtguess = max;
 
-      for (i = 0; i < n; i++) {
+      for (int i = 0; i < n; i++) {
         if (m[i] < guess) {
           less++;
           if (m[i]>maxltguess)
-            maxltguess = m[i] ;
+            maxltguess = m[i];
           }
         else if (m[i]>guess) {
           greater++;
           if (m[i]<mingtguess)
-            mingtguess = m[i] ;
+            mingtguess = m[i];
           }
         else
           equal++;
         }
 
-      if (less <= (n+1)/2 && greater <= (n+1)/2)
+      if ((less <= (n+1)/2) && (greater <= (n+1)/2))
         break ;
-      else if (less>greater)
-        max = maxltguess ;
+      else if (less > greater)
+        max = maxltguess;
       else
         min = mingtguess;
       }
 
     if (less >= (n+1)/2)
       return maxltguess;
-    else if (less+equal >= (n+1)/2)
+    else if (less + equal >= (n+1)/2)
       return guess;
     else
       return mingtguess;
