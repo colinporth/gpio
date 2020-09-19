@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <string>
 
+#include "../pigpio/pigpio.h"
 #include "../../shared/utils/utils.h"
 #include "../../shared/utils/cLog.h"
 
@@ -11,34 +12,33 @@ using namespace std;
 
 int main (int numArgs, char* args[]) {
 
-  bool draw = false;
-  bool drawRadial = false;
-  cLcd::eRotate rotate = cLcd::e0;
-  cLcd::eInfo info = cLcd::eNone;
-  cLcd::eMode mode = cLcd::eCoarse;
-  eLogLevel logLevel = LOGINFO;
+  cLog::init (LOGINFO, false, "", "gpio");
+  cLog::log (LOGINFO, "initialise hwRev:" + hex (gpioHardwareRevision(),8) +
+                      " version:" + dec (gpioVersion()));
 
-  // dumb command line option parser
-  for (int argIndex = 1; argIndex < numArgs; argIndex++) {
-    string str (args[argIndex]);
-    if (str == "0") rotate = cLcd::e0;
-    else if (str == "90") rotate = cLcd::e90;
-    else if (str == "180") rotate = cLcd::e180;
-    else if (str == "270") rotate = cLcd::e270;
-    else if (str == "o") info = cLcd::eOverlay;
-    else if (str == "a") mode = cLcd::eAll;
-    else if (str == "s") mode = cLcd::eSingle;
-    else if (str == "c") mode = cLcd::eCoarse;
-    else if (str == "e") mode = cLcd::eExact;
-    else if (str == "1") logLevel = LOGINFO1;
-    else if (str == "2") logLevel = LOGINFO2;
-    else if (str == "r") drawRadial = true;
-    else if (str == "d") draw = true;
-    else
-      cLog::log (LOGERROR, "unrecognised option " + str);
+  if (gpioInitialise() <= 0)
+    return false;
+
+  cLog::log (LOGINFO, "test");
+
+  int handle = i2cOpen (1, 0x50, 0);
+  cLog::log (LOGINFO, "open %x", handle);
+
+  int res = i2cWriteByte (handle, 0);
+  int res1 = i2cReadByte (handle);
+  cLog::log (LOGINFO, "write %x %x", res, res1);
+
+  //uint8_t buf[256];
+  //int res2 = i2cReadI2CBlockData (handle, 0, (char*)buf, 32);
+
+  for (int j = 0; j < 8; j++) {
+    string nnn;
+    for (int i = 0; i < 32; i++) {
+      int value = i2cReadByte (handle);
+      nnn += hex(value,2) + " ";
+      }
+    cLog::log (LOGINFO, nnn);
     }
-
-  cLog::init (logLevel, false, "", "gpio");
 
   return 0;
   }
