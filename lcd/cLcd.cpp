@@ -98,6 +98,8 @@ bool cLcd::initialise() {
 
   // reset lcd
   gpioSetMode (kResetGpio, PI_OUTPUT);
+  gpioWrite (kResetGpio, 1);
+  gpioDelay (1000);
   gpioWrite (kResetGpio, 0);
   gpioDelay (10000);
   gpioWrite (kResetGpio, 1);
@@ -639,6 +641,7 @@ void cLcd::setFont (const uint8_t* font, const int fontSize)  {
 constexpr int16_t kWidthTa7601 = 320;
 constexpr int16_t kHeightTa7601 = 480;
 
+// public
 cLcdTa7601::cLcdTa7601 (const cLcd::eRotate rotate, const cLcd::eInfo info, const cLcd::eMode mode)
   : cLcd(kWidthTa7601, kHeightTa7601, rotate, info, mode) {}
 
@@ -738,6 +741,7 @@ void cLcdTa7601::setBacklight (bool on) {
   }
 //}}}
 
+// protected
 //{{{
 void cLcdTa7601::writeCommand (const uint8_t command) {
 // slow down write
@@ -913,45 +917,9 @@ uint32_t cLcdTa7601::updateLcd (sSpan* spans) {
 constexpr int16_t kWidth1289 = 240;
 constexpr int16_t kHeight1289 = 320;
 
+// public
 cLcdSsd1289::cLcdSsd1289 (const cLcd::eRotate rotate, const cLcd::eInfo info, const cLcd::eMode mode)
   : cLcd(kWidth1289, kHeight1289, rotate, info, mode) {}
-
-//{{{
-void cLcdSsd1289::writeCommand (const uint8_t command) {
-// slow down write
-
-  gpioWrite (kRegisterGpio, 0);
-
-  gpioWrite_Bits_0_31_Clear (~command & k16WriteClrMask); // clear lo data bits + k16WrGpio bit lo
-  //gpioWrite_Bits_0_31_Clear (~command & k16WriteClrMask); // clear lo data bits + k16WrGpio bit lo
-  //gpioWrite_Bits_0_31_Clear (~command & k16WriteClrMask); // clear lo data bits + k16WrGpio bit lo
-
-  gpioWrite_Bits_0_31_Set (command);                      // set hi data bits
-  gpioWrite_Bits_0_31_Set (command);                      // set hi data bits
-  gpioWrite_Bits_0_31_Set (command);                      // set hi data bits
-
-  gpioWrite_Bits_0_31_Set (k16WriteMask);                 // write on k16WrGpio rising edge
-  gpioWrite_Bits_0_31_Set (k16WriteMask);                 // write on k16WrGpio rising edge
-
-  gpioWrite (kRegisterGpio, 1);
-  }
-//}}}
-//{{{
-void cLcdSsd1289::writeDataWord (const uint16_t data) {
-// slow down write
-
-  fastGpioWrite_Bits_0_31_Clear (~data & k16WriteClrMask); // clear lo data bits + k16WrGpio bit lo
-  //gpioWrite_Bits_0_31_Clear (~command & k16WriteClrMask); // clear lo data bits + k16WrGpio bit lo
-  //gpioWrite_Bits_0_31_Clear (~command & k16WriteClrMask); // clear lo data bits + k16WrGpio bit lo
-
-  fastGpioWrite_Bits_0_31_Set (data);                      // set hi data bits
-  fastGpioWrite_Bits_0_31_Set (data);                      // set hi data bits
-  fastGpioWrite_Bits_0_31_Set (data);                      // set hi data bits
-
-  fastGpioWrite_Bits_0_31_Set (k16WriteMask);              // write on k16WrGpio rising edge
-  fastGpioWrite_Bits_0_31_Set (k16WriteMask);              // write on k16WrGpio rising edge
-  }
-//}}}
 
 //{{{
 bool cLcdSsd1289::initialise() {
@@ -1046,6 +1014,45 @@ bool cLcdSsd1289::initialise() {
   return true;
   }
 //}}}
+
+// protected
+//{{{
+void cLcdSsd1289::writeCommand (const uint8_t command) {
+// slow down write
+
+  gpioWrite (kRegisterGpio, 0);
+
+  gpioWrite_Bits_0_31_Clear (~command & k16WriteClrMask); // clear lo data bits + k16WrGpio bit lo
+  //gpioWrite_Bits_0_31_Clear (~command & k16WriteClrMask); // clear lo data bits + k16WrGpio bit lo
+  //gpioWrite_Bits_0_31_Clear (~command & k16WriteClrMask); // clear lo data bits + k16WrGpio bit lo
+
+  gpioWrite_Bits_0_31_Set (command);                      // set hi data bits
+  gpioWrite_Bits_0_31_Set (command);                      // set hi data bits
+  gpioWrite_Bits_0_31_Set (command);                      // set hi data bits
+
+  gpioWrite_Bits_0_31_Set (k16WriteMask);                 // write on k16WrGpio rising edge
+  gpioWrite_Bits_0_31_Set (k16WriteMask);                 // write on k16WrGpio rising edge
+
+  gpioWrite (kRegisterGpio, 1);
+  }
+//}}}
+//{{{
+void cLcdSsd1289::writeDataWord (const uint16_t data) {
+// slow down write
+
+  fastGpioWrite_Bits_0_31_Clear (~data & k16WriteClrMask); // clear lo data bits + k16WrGpio bit lo
+  //gpioWrite_Bits_0_31_Clear (~command & k16WriteClrMask); // clear lo data bits + k16WrGpio bit lo
+  //gpioWrite_Bits_0_31_Clear (~command & k16WriteClrMask); // clear lo data bits + k16WrGpio bit lo
+
+  fastGpioWrite_Bits_0_31_Set (data);                      // set hi data bits
+  fastGpioWrite_Bits_0_31_Set (data);                      // set hi data bits
+  fastGpioWrite_Bits_0_31_Set (data);                      // set hi data bits
+
+  fastGpioWrite_Bits_0_31_Set (k16WriteMask);              // write on k16WrGpio rising edge
+  fastGpioWrite_Bits_0_31_Set (k16WriteMask);              // write on k16WrGpio rising edge
+  }
+//}}}
+
 //{{{
 uint32_t cLcdSsd1289::updateLcd (sSpan* spans) {
 
@@ -1113,12 +1120,14 @@ uint32_t cLcdSsd1289::updateLcd (sSpan* spans) {
 
 // spi data/command pin classes
 //{{{  cLcdSpiRegister : public cLcdSpi
+// public
 //{{{
 cLcdSpiRegister::~cLcdSpiRegister() {
   spiClose (mSpiHandle);
   }
 //}}}
 
+// protected
 //{{{
 void cLcdSpiRegister::writeCommand (const uint8_t command) {
 
@@ -1160,6 +1169,7 @@ constexpr int kSpiClock7735 = 16000000;
 cLcdSt7735r::cLcdSt7735r (const cLcd::eRotate rotate, const cLcd::eInfo info, const eMode mode)
   : cLcdSpiRegister (kWidth7735, kHeight7735, rotate, info, mode) {}
 
+// public
 //{{{
 bool cLcdSt7735r::initialise() {
 
@@ -1237,6 +1247,7 @@ bool cLcdSt7735r::initialise() {
   }
 //}}}
 
+// protected
 //{{{
 uint32_t cLcdSt7735r::updateLcd (sSpan* spans) {
 // ignore spans, send everything
@@ -1326,8 +1337,9 @@ uint32_t cLcdSt7735r::updateLcd (sSpan* spans) {
 //{{{  cLcdIli9225b : public cLcdSpiRegister
 constexpr int16_t kWidth9225b = 176;
 constexpr int16_t kHeight9225b = 220;
-constexpr int kSpiClock9225b = 16000000;
+constexpr int kSpiClock9225b = 24000000;
 
+// public
 cLcdIli9225b::cLcdIli9225b (const cLcd::eRotate rotate, const cLcd::eInfo info, const eMode mode)
   : cLcdSpiRegister(kWidth9225b, kHeight9225b, rotate, info, mode) {}
 
@@ -1342,7 +1354,7 @@ bool cLcdIli9225b::initialise() {
   gpioWrite (kRegisterGpio, 1);
 
   // mode 0, spi manages ce0 active lo
-  mSpiHandle = spiOpen (0, kSpiClock9225b, 0);
+  mSpiHandle = spiOpen (0, kSpiClock9225b, 0x00);
 
   writeCommandData (0x01, 0x011C); // set SS and NL bit
 
@@ -1399,6 +1411,7 @@ bool cLcdIli9225b::initialise() {
   }
 //}}}
 
+// protected
 //{{{
 uint32_t cLcdIli9225b::updateLcd (sSpan* spans) {
 // ignore spans, just send everything for now
@@ -1511,6 +1524,7 @@ constexpr int16_t kWidth9320 = 240;
 constexpr int16_t kHeight9320 = 320;
 constexpr int kSpiClock9320 = 24000000;
 
+// public
 cLcdIli9320::cLcdIli9320 (const cLcd::eRotate rotate, const cLcd::eInfo info, const eMode mode)
   : cLcdSpiHeader(kWidth9320, kHeight9320, rotate, info, mode) {}
 
@@ -1607,6 +1621,7 @@ void cLcdIli9320::setBacklight (bool on) {
   }
 //}}}
 
+// protected
 //{{{
 uint32_t cLcdIli9320::updateLcd (sSpan* spans) {
 

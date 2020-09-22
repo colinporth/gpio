@@ -99,7 +99,8 @@ protected:
   virtual void writeCommand (const uint8_t command) = 0;
   virtual void writeDataWord (const uint16_t data) = 0;
   //{{{
-  void writeCommandData (const uint8_t command, const uint16_t data) {
+  virtual void writeCommandData (const uint8_t command, const uint16_t data) {
+
     writeCommand (command);
     writeDataWord (data);
     }
