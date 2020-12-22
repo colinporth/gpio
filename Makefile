@@ -11,6 +11,7 @@ SRCS      = test.cpp \
 	    lcd/cSnapshot.cpp \
 	    fonts/FreeSansBold.cpp \
 	    ../shared/utils/cLog.cpp \
+	    ../shared/fmt/format.cpp \
 	    pigpio/pigpio.c \
 	    pigpio/command.c \
 
