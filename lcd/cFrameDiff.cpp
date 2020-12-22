@@ -6,8 +6,9 @@
 
 using namespace std;
 
+//#define COARSE_DIFF_ALLOWED
+
 constexpr int kMaxSpans = 10000;
-constexpr bool kCoarseDiff = true;
 constexpr int kSpanExactThreshold = 8;
 constexpr int kSpanMergeThreshold = 16;
 
@@ -108,8 +109,9 @@ sSpan* cSingleFrameDiff::diff (uint16_t* frameBuf) {
   uint16_t* scanline = frameBuf;
   uint16_t* prevFrameScanline = mPrevFrameBuf;
 
-  if (kCoarseDiff) {
+  #ifdef COARSE_DIFF_ALLOWED
     //{{{  coarse diff
+    {
     // Coarse diff computes a diff at 8 adjacent pixels at a time
     // returns the point to the 8-pixel aligned coordinate where the pixels began to differ.
 
@@ -126,8 +128,9 @@ sSpan* cSingleFrameDiff::diff (uint16_t* frameBuf) {
     minY = firstDiff / mWidth;
     }
     //}}}
-  else {
+  #else
     //{{{  fine diff
+    {
     while (minY < mHeight) {
       int x = 0;
       // diff 4 pixels at a time
@@ -157,13 +160,15 @@ sSpan* cSingleFrameDiff::diff (uint16_t* frameBuf) {
     return nullptr;
     }
     //}}}
+  #endif
 
 foundTop:
   int maxX = -1;
   int maxY = mHeight - 1;
 
-  if (kCoarseDiff) {
+  #ifdef COARSE_DIFF_ALLOWED
     //{{{  coarse diff
+    {
     int numPixels = mWidth * mHeight;
 
     // coarse diff computes a diff at 8 adjacent pixels at a time
@@ -178,8 +183,9 @@ foundTop:
     maxY = firstDiff / mWidth;
     }
     //}}}
-  else {
+  #else
     //{{{  fine diff
+    {
     scanline = frameBuf + (mHeight - 1)*stride;
     prevFrameScanline = mPrevFrameBuf + (mHeight - 1)*stride;
 
@@ -209,6 +215,7 @@ foundTop:
       }
     }
     //}}}
+  #endif
 
 foundBottom:
   //{{{  found bottom
@@ -272,6 +279,7 @@ foundRight:
   return mSpans;
   }
 //}}}
+#ifdef COARSE_DIFF_ALLOWED
 //{{{
 int cSingleFrameDiff::coarseLinearDiff (uint16_t* frameBuf, uint16_t* prevFrameBuf, uint16_t* frameBufEnd) {
 // Coarse diffing of two frameBufs with tight stride, 16 pixels at a time
@@ -374,6 +382,7 @@ int cSingleFrameDiff::coarseLinearDiffBack (uint16_t* frameBuf, uint16_t* prevFr
   return endPtr - frameBuf;
   }
 //}}}
+#endif
 
 // cCoarseFrameDiff
 //{{{
