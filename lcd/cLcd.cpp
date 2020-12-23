@@ -1485,7 +1485,7 @@ bool cLcd9341::initialise() {
   writeCommand (0x01); // software reset
   delayUs (5000);
 
-  writeCommand (0x11); // sleep???
+  writeCommand (0x11); // sleep out
   delayUs (120000);
 
   uint8_t k9341xCF[] = { 0x00, 0x83, 0x30 };
@@ -1572,7 +1572,7 @@ bool cLcd9341::initialise() {
   uint8_t k9341xE1[] = { 0x00, 0x25, 0x27, 0x05, 0x10, 0x09, 0x3a, 0x78, 0x4d, 0x05, 0x18, 0x0d, 0x38, 0x3a, 0x1f };
   writeCommandMultiData (0xE1, k9341xE1, sizeof(k9341xE1)); // negative gamma correction
 
-  writeCommand (0x11); // Exit Sleep
+  writeCommand (0x11); // Sleep out
   delayUs (120000);
 
   writeCommand (0x29); // Display on
