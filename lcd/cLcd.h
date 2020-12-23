@@ -192,16 +192,16 @@ protected:
 
 // spi data/command register pin screens
 //{{{
-class cLcdSpiRegister : public cLcd {
+class cLcdSpi : public cLcd {
 public:
-  cLcdSpiRegister (const int16_t width, const int16_t height, const eRotate rotate, const eInfo info, const eMode mode)
+  cLcdSpi (const int16_t width, const int16_t height, const eRotate rotate, const eInfo info, const eMode mode)
     : cLcd (width, height, rotate, info, mode) {}
-  virtual ~cLcdSpiRegister();
+  virtual ~cLcdSpi();
 
 protected:
   virtual void writeCommand (const uint8_t command);
   virtual void writeDataWord (const uint16_t data);
-  void writeCommandMultiData (const uint8_t command, const uint8_t* dataPtr, const int len);
+  void writeCommandMultiData (const uint8_t command, uint8_t* data, int length);
 
   virtual uint16_t readId() { return 0xFAFF; }
   virtual uint16_t readStatus() { return 0xAA; }
@@ -210,7 +210,7 @@ protected:
   };
 //}}}
 //{{{
-class cLcd7735 : public cLcdSpiRegister {
+class cLcd7735 : public cLcdSpi {
 // 1.8 inch 128x160
 public:
   cLcd7735 (const cLcd::eRotate rotate = e0, const cLcd::eInfo info = eNone, const eMode mode = eCoarse);
@@ -223,7 +223,7 @@ protected:
   };
 //}}}
 //{{{
-class cLcd9225 : public cLcdSpiRegister {
+class cLcd9225 : public cLcdSpi {
 // 2.2 inch 186x220
 public:
   cLcd9225 (const cLcd::eRotate rotate = e0, const cLcd::eInfo info = eNone, const eMode mode = eCoarse);
@@ -236,8 +236,7 @@ protected:
   };
 //}}}
 //{{{
-class cLcd9341 : public cLcdSpiRegister {
-// 2.2 inch 186x220
+class cLcd9341 : public cLcdSpi {
 public:
   cLcd9341 (const cLcd::eRotate rotate = e0, const cLcd::eInfo info = eNone, const eMode mode = eCoarse);
   virtual ~cLcd9341() {}

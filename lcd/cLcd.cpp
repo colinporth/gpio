@@ -1119,17 +1119,17 @@ uint32_t cLcd1289::updateLcd (sSpan* spans) {
 //}}}
 
 // spi data/command pin classes
-//{{{  cLcdSpiRegister : public cLcdSpi
+//{{{  cLcdSpi : public cLcdSpi
 // public
 //{{{
-cLcdSpiRegister::~cLcdSpiRegister() {
+cLcdSpi::~cLcdSpi() {
   spiClose (mSpiHandle);
   }
 //}}}
 
 // protected
 //{{{
-void cLcdSpiRegister::writeCommand (const uint8_t command) {
+void cLcdSpi::writeCommand (const uint8_t command) {
 
   gpioWrite (kRegisterGpio, 0);
   spiWrite (mSpiHandle, (char*)(&command), 1);
@@ -1137,7 +1137,7 @@ void cLcdSpiRegister::writeCommand (const uint8_t command) {
   }
 //}}}
 //{{{
-void cLcdSpiRegister::writeDataWord (const uint16_t data) {
+void cLcdSpi::writeDataWord (const uint16_t data) {
 // send data
 
   uint16_t swappedData = bswap_16 (data);
@@ -1145,29 +1145,27 @@ void cLcdSpiRegister::writeDataWord (const uint16_t data) {
   }
 //}}}
 //{{{
-void cLcdSpiRegister::writeCommandMultiData (const uint8_t command, const uint8_t* dataPtr, const int len) {
+void cLcdSpi::writeCommandMultiData (const uint8_t command, uint8_t* data, int length) {
 
   writeCommand (command);
 
   // send data
-  int bytesLeft = len;
-  auto ptr = (char*)dataPtr;
-  while (bytesLeft > 0) {
-   int sendBytes = (bytesLeft > 0xFFFF) ? 0xFFFF : bytesLeft;
-    spiWrite (mSpiHandle, ptr, sendBytes);
-    ptr += sendBytes;
-    bytesLeft -= sendBytes;
+  while (length > 0) {
+   int sendBytes = (length > 0xFFFF) ? 0xFFFF : length;
+    spiWrite (mSpiHandle, (char*)data, sendBytes);
+    data += sendBytes;
+    length -= sendBytes;
     }
   }
 //}}}
 //}}}
-//{{{  cLcd7735 : public cLcdSpiRegister
+//{{{  cLcd7735 : public cLcdSpi
 constexpr int16_t kWidth7735 = 128;
 constexpr int16_t kHeight7735 = 160;
 constexpr int kSpiClock7735 = 16000000;
 
 cLcd7735::cLcd7735 (const cLcd::eRotate rotate, const cLcd::eInfo info, const eMode mode)
-  : cLcdSpiRegister (kWidth7735, kHeight7735, rotate, info, mode) {}
+  : cLcdSpi (kWidth7735, kHeight7735, rotate, info, mode) {}
 
 // public
 //{{{
@@ -1186,31 +1184,31 @@ bool cLcd7735::initialise() {
   writeCommand (0x11); // SLPOUT
   delayUs (120000);
 
-  constexpr uint8_t k7335_FRMCTRData[6] = { 0x01, 0x2c, 0x2d, 0x01, 0x2c, 0x2d };
+  uint8_t k7335_FRMCTRData[6] = { 0x01, 0x2c, 0x2d, 0x01, 0x2c, 0x2d };
   writeCommandMultiData (0xB1, k7335_FRMCTRData, 3); // frameRate normal mode
   writeCommandMultiData (0xB2, k7335_FRMCTRData, 3); // frameRate idle mode
   writeCommandMultiData (0xB3, k7335_FRMCTRData, 6); // frameRate partial mode
 
-  constexpr uint8_t k7335_INVCTRData[1] = { 0x07 };
+  uint8_t k7335_INVCTRData[1] = { 0x07 };
   writeCommandMultiData (0xB4, k7335_INVCTRData, sizeof(k7335_INVCTRData)); // Inverted mode off
 
   //{{{  power control
-  constexpr uint8_t k7335_PowerControlData1[3] = { 0xA2, 0x02 /* -4.6V */, 0x84 /* AUTO mode */ };
+  uint8_t k7335_PowerControlData1[3] = { 0xA2, 0x02 /* -4.6V */, 0x84 /* AUTO mode */ };
   writeCommandMultiData (0xC0, k7335_PowerControlData1, sizeof(k7335_PowerControlData1)); // POWER CONTROL 1
-  constexpr uint8_t k7335_PowerControlData2[1] = { 0xc5 }; // VGH25 = 2.4C VGSEL =-10 VGH = 3*AVDD
+  uint8_t k7335_PowerControlData2[1] = { 0xc5 }; // VGH25 = 2.4C VGSEL =-10 VGH = 3*AVDD
   writeCommandMultiData (0xC1, k7335_PowerControlData2, sizeof(k7335_PowerControlData2)); // POWER CONTROL 2
-  constexpr uint8_t k7335_PowerControlData3[2] = { 0x0A /* Opamp current small */, 0x00 /* Boost freq */ };
+  uint8_t k7335_PowerControlData3[2] = { 0x0A /* Opamp current small */, 0x00 /* Boost freq */ };
   writeCommandMultiData (0xC2, k7335_PowerControlData3, sizeof(k7335_PowerControlData3)); // POWER CONTROL 3
-  constexpr uint8_t k7335_PowerControlData4[2] = { 0x8A /* BCLK/2, Opamp current small/medium low */, 0x2A };
+  uint8_t k7335_PowerControlData4[2] = { 0x8A /* BCLK/2, Opamp current small/medium low */, 0x2A };
   writeCommandMultiData (0xC3, k7335_PowerControlData4, sizeof(k7335_PowerControlData4)); // POWER CONTROL 4
-  constexpr uint8_t k7335_PowerControlData5[2] = { 0x8A /* BCLK/2, Opamp current small/medium low */, 0xEE };
+  uint8_t k7335_PowerControlData5[2] = { 0x8A /* BCLK/2, Opamp current small/medium low */, 0xEE };
   writeCommandMultiData (0xC4, k7335_PowerControlData5, sizeof(k7335_PowerControlData5)); // POWER CONTROL 5
-  constexpr uint8_t k7335_VMCTR1Data[1] = { 0x0E };
+  uint8_t k7335_VMCTR1Data[1] = { 0x0E };
   writeCommandMultiData (0xC5, k7335_VMCTR1Data, sizeof(k7335_VMCTR1Data)); // VMCTR1 POWER CONTROL 6
   //}}}
 
 
-  const uint8_t colModData = 0x05;
+  uint8_t colModData = 0x05;
   writeCommandMultiData (0x3A, &colModData, 1); // COLOR MODE - 16bit per pixel
 
   uint8_t madCtlData;
@@ -1231,12 +1229,12 @@ bool cLcd7735::initialise() {
   writeCommandMultiData (0x36, &madCtlData, 1); // MADCTL ORIENTATION
 
   //{{{  gamma
-  constexpr uint8_t k7335_GMCTRP1Data[16] = { 0x02, 0x1c, 0x07, 0x12, 0x37, 0x32, 0x29, 0x2d,
-                                              0x29, 0x25, 0x2B, 0x39, 0x00, 0x01, 0x03, 0x10 } ;
+  uint8_t k7335_GMCTRP1Data[16] = { 0x02, 0x1c, 0x07, 0x12, 0x37, 0x32, 0x29, 0x2d,
+                                    0x29, 0x25, 0x2B, 0x39, 0x00, 0x01, 0x03, 0x10 } ;
   writeCommandMultiData (0xE0, k7335_GMCTRP1Data, sizeof(k7335_GMCTRP1Data)); // gamma GMCTRP1
 
-  constexpr uint8_t k7335_GMCTRN1Data[16] = { 0x03, 0x1d, 0x07, 0x06, 0x2E, 0x2C, 0x29, 0x2D,
-                                              0x2E, 0x2E, 0x37, 0x3F, 0x00, 0x00, 0x02, 0x10 } ;
+  uint8_t k7335_GMCTRN1Data[16] = { 0x03, 0x1d, 0x07, 0x06, 0x2E, 0x2C, 0x29, 0x2D,
+                                    0x2E, 0x2E, 0x37, 0x3F, 0x00, 0x00, 0x02, 0x10 } ;
   writeCommandMultiData (0xE1, k7335_GMCTRN1Data, sizeof(k7335_GMCTRN1Data)); // Gamma GMCTRN1
   //}}}
   writeCommand (0x29); // display ON
@@ -1334,14 +1332,14 @@ uint32_t cLcd7735::updateLcd (sSpan* spans) {
   }
 //}}}
 //}}}
-//{{{  cLcd9225 : public cLcdSpiRegister
+//{{{  cLcd9225 : public cLcdSpi
 constexpr int16_t kWidth9225 = 176;
 constexpr int16_t kHeight9225 = 220;
 constexpr int kSpiClock9225= 24000000;
 
 // public
 cLcd9225::cLcd9225 (const cLcd::eRotate rotate, const cLcd::eInfo info, const eMode mode)
-  : cLcdSpiRegister(kWidth9225, kHeight9225, rotate, info, mode) {}
+  : cLcdSpi(kWidth9225, kHeight9225, rotate, info, mode) {}
 
 //{{{
 bool cLcd9225::initialise() {
@@ -1429,22 +1427,22 @@ uint32_t cLcd9225::updateLcd (sSpan* spans) {
 
   uint16_t* src = mFrameBuf;
   uint16_t* dst = swappedFrameBuf;
-  for (uint16_t i = 0; i < getNumPixels(); i++)
+  for (uint32_t i = 0; i < getNumPixels(); i++)
     *dst++ = bswap_16 (*src++);
 
-  writeCommandMultiData (0x22, (const uint8_t*)swappedFrameBuf, getNumPixels() * 2); // GRAM write command
+  writeCommandMultiData (0x22, (uint8_t*)swappedFrameBuf, getNumPixels() * 2); // GRAM write command
   return getNumPixels();
   }
 //}}}
 //}}}
-//{{{  cLcd9341 : public cLcdSpiRegister
+//{{{  cLcd9341 : public cLcdSpi
 constexpr int16_t kWidth9341 = 240;
 constexpr int16_t kHeight9341 = 320;
-constexpr int kSpiClock9341 = 10000000;
+constexpr int kSpiClock9341 = 28000000;
 
 // public
 cLcd9341::cLcd9341 (const cLcd::eRotate rotate, const cLcd::eInfo info, const eMode mode)
-  : cLcdSpiRegister(kWidth9341, kHeight9341, rotate, info, mode) {}
+  : cLcdSpi(kWidth9341, kHeight9341, rotate, info, mode) {}
 
 //{{{
 bool cLcd9341::initialise() {
@@ -1465,58 +1463,58 @@ bool cLcd9341::initialise() {
   writeCommand (0x11);
   delayUs (120000);
 
-  constexpr uint8_t k9341xCF[3] = { 0x00, 0x83, 0x30 };
+  uint8_t k9341xCF[3] = { 0x00, 0x83, 0x30 };
   writeCommandMultiData (0xCF, k9341xCF, 3);
 
-  constexpr uint8_t k9341xED[4] = { 0x64, 0x03, 0x12, 0x81 };
+  uint8_t k9341xED[4] = { 0x64, 0x03, 0x12, 0x81 };
   writeCommandMultiData (0xED, k9341xED, 4);
 
-  constexpr uint8_t k9341xE8[3] = { 0x85, 0x01, 0x79 };
+  uint8_t k9341xE8[3] = { 0x85, 0x01, 0x79 };
   writeCommandMultiData (0xE8, k9341xE8, 3);
 
-  constexpr uint8_t k9341xCB[5] = { 0x39, 0x2C, 0x00, 0x34, 0x02 };
+  uint8_t k9341xCB[5] = { 0x39, 0x2C, 0x00, 0x34, 0x02 };
   writeCommandMultiData (0xCB, k9341xCB, 5);
 
-  constexpr uint8_t k9341xF7[1] = { 0x20 };
+  uint8_t k9341xF7[1] = { 0x20 };
   writeCommandMultiData (0xF7, k9341xF7, 1);
 
-  constexpr uint8_t k9341xEA[2] = { 0x00, 0x00 };
+  uint8_t k9341xEA[2] = { 0x00, 0x00 };
   writeCommandMultiData (0xEA, k9341xEA, 2);
 
-  constexpr uint8_t k9341xC1[1] = { 0x11 };
+  uint8_t k9341xC1[1] = { 0x11 };
   writeCommandMultiData (0xC1, k9341xC1, 1); // Power control SAP[2:0];BT[3:0]
 
-  constexpr uint8_t k9341xC5[2] = { 0x34, 0x3D };
+  uint8_t k9341xC5[2] = { 0x34, 0x3D };
   writeCommandMultiData (0xC5, k9341xC5, 2); // VCM control 1
 
-  constexpr uint8_t k9341xC7[1] = { 0xC0 };
+  uint8_t k9341xC7[1] = { 0xC0 };
   writeCommandMultiData (0xC7, k9341xC7, 1); // VCM control 2
 
-  constexpr uint8_t k9341x36[1] = { 0x08 };
+  uint8_t k9341x36[1] = { 0x08 };
   writeCommandMultiData (0x36, k9341x36, 1); // Memory Access Control ;
 
-  constexpr uint8_t k9341x3A[1] = { 0x55 };
+  uint8_t k9341x3A[1] = { 0x55 };
   writeCommandMultiData (0x3A, k9341x3A, 1); // Pixel format 16bit
 
-  constexpr uint8_t k9341xB1[2] = { 0x00, 0x1D };
+  uint8_t k9341xB1[2] = { 0x00, 0x1D };
   writeCommandMultiData (0xB1, k9341xB1, 2); // Frame rate 65Hz
 
-  constexpr uint8_t k9341xB6[4] = { 0x0A, 0xA2, 0x27, 0x00 };
+  uint8_t k9341xB6[4] = { 0x0A, 0xA2, 0x27, 0x00 };
   writeCommandMultiData (0xB6, k9341xB6, 4); // Display Function Control
 
-  constexpr uint8_t k9341xB7[1] = { 0x07 };
+  uint8_t k9341xB7[1] = { 0x07 };
   writeCommandMultiData (0xB7, k9341xB7, 1); //Entry mode
 
-  constexpr uint8_t k9341xF2[1] = { 0x08 };
+  uint8_t k9341xF2[1] = { 0x08 };
   writeCommandMultiData (0xF2, k9341xF2, 1); // 3Gamma Function Disable
 
-  constexpr uint8_t k9341x26[1] = { 0x01 };
+  uint8_t k9341x26[1] = { 0x01 };
   writeCommandMultiData (0x26, k9341x26, 1); //Gamma curve selected
 
-  constexpr uint8_t k9341xE0[15] = { 0x1f, 0x1a, 0x18, 0x0a, 0x0f, 0x06, 0x45, 0x87, 0x32, 0x0a, 0x07, 0x02, 0x07, 0x05, 0x00 };
+  uint8_t k9341xE0[15] = { 0x1f, 0x1a, 0x18, 0x0a, 0x0f, 0x06, 0x45, 0x87, 0x32, 0x0a, 0x07, 0x02, 0x07, 0x05, 0x00 };
   writeCommandMultiData (0xE0, k9341xE0, 15); //positive gamma correction
 
-  constexpr uint8_t k9341xE1[15] = { 0x00, 0x25, 0x27, 0x05, 0x10, 0x09, 0x3a, 0x78, 0x4d, 0x05, 0x18, 0x0d, 0x38, 0x3a, 0x1f };
+  uint8_t k9341xE1[15] = { 0x00, 0x25, 0x27, 0x05, 0x10, 0x09, 0x3a, 0x78, 0x4d, 0x05, 0x18, 0x0d, 0x38, 0x3a, 0x1f };
   writeCommandMultiData (0xE1, k9341xE1, 15); //negamma correction
 
   writeCommand (0x11); // Exit Sleep
@@ -1537,21 +1535,20 @@ uint32_t cLcd9341::updateLcd (sSpan* spans) {
 // ignore spans, just send everything for now
 
   // 0, xstart, 0,xend
-  uint8_t k9341x2A[4] = { 0x00, 0x00, 0x00, uint8_t((mWidth-1) & 0xFF) }; 
+  uint8_t k9341x2A[4] = { 0x00, 0x00, 0x00, uint8_t((mWidth-1) & 0xFF) };
   writeCommandMultiData (0x2A, k9341x2A, 4);
 
   // yst hi, yst lo, yend hi yend lo
-  uint8_t k9341x2B[4] = { 0x00, 0x00, uint8_t(((mHeight-1) >> 8)), uint8_t((mHeight-1) & 0xFF) }; 
+  uint8_t k9341x2B[4] = { 0x00, 0x00, uint8_t(((mHeight-1) >> 8)), uint8_t((mHeight-1) & 0xFF) };
   writeCommandMultiData (0x2B, k9341x2B, 4);
 
   uint16_t swappedFrameBuf [kWidth9341 * kHeight9341];
-
   uint16_t* src = mFrameBuf;
   uint16_t* dst = swappedFrameBuf;
-  for (uint16_t i = 0; i < getNumPixels(); i++)
+  for (uint32_t i = 0; i < getNumPixels(); i++)
     *dst++ = bswap_16 (*src++);
+  writeCommandMultiData (0x2C, (uint8_t*)swappedFrameBuf, getNumPixels() * 2); // LCD_WriteCMD(GRAMWR)
 
-  writeCommandMultiData (0x2C, (const uint8_t*)swappedFrameBuf, getNumPixels() * 2); // LCD_WriteCMD(GRAMWR)
   return getNumPixels();
   }
 //}}}

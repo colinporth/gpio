@@ -33,7 +33,7 @@ CFLAGS = -Wall \
 	 -I../opt/vc/include/interface/vmcs_host/linux \
 	 -fomit-frame-pointer \
 	 -g \
-	 -O2 \
+	 -O3 \
 
 LD_VERSION = $(shell ld -v 2>&1 | sed -ne 's/.*\([0-9]\+\.[0-9]\+\).*/\1/p')
 ifeq "$(LD_VERSION)" "2.34"
