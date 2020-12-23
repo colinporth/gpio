@@ -156,10 +156,10 @@ private:
 
 // parallel 16bit screens
 //{{{
-class cLcdTa7601 : public cLcd {
+class cLcd7601 : public cLcd {
 public:
-  cLcdTa7601 (const eRotate rotate = e0, const eInfo info = eNone, const eMode mode = eCoarse);
-  virtual ~cLcdTa7601() {}
+  cLcd7601 (const eRotate rotate = e0, const eInfo info = eNone, const eMode mode = eCoarse);
+  virtual ~cLcd7601() {}
 
   virtual bool initialise();
   virtual void setBacklight (bool on);
@@ -174,10 +174,10 @@ protected:
   };
 //}}}
 //{{{
-class cLcdSsd1289 : public cLcd {
+class cLcd1289 : public cLcd {
 public:
-  cLcdSsd1289 (const eRotate rotate = e0, const eInfo info = eNone, const eMode mode = eCoarse);
-  virtual ~cLcdSsd1289() {}
+  cLcd1289 (const eRotate rotate = e0, const eInfo info = eNone, const eMode mode = eCoarse);
+  virtual ~cLcd1289() {}
 
 protected:
   virtual void writeCommand (const uint8_t command);
@@ -210,11 +210,11 @@ protected:
   };
 //}}}
 //{{{
-class cLcdSt7735r : public cLcdSpiRegister {
+class cLcd7735 : public cLcdSpiRegister {
 // 1.8 inch 128x160
 public:
-  cLcdSt7735r (const cLcd::eRotate rotate = e0, const cLcd::eInfo info = eNone, const eMode mode = eCoarse);
-  virtual ~cLcdSt7735r() {}
+  cLcd7735 (const cLcd::eRotate rotate = e0, const cLcd::eInfo info = eNone, const eMode mode = eCoarse);
+  virtual ~cLcd7735() {}
 
   virtual bool initialise();
 
@@ -223,11 +223,24 @@ protected:
   };
 //}}}
 //{{{
-class cLcdIli9225b : public cLcdSpiRegister {
+class cLcd9225 : public cLcdSpiRegister {
 // 2.2 inch 186x220
 public:
-  cLcdIli9225b (const cLcd::eRotate rotate = e0, const cLcd::eInfo info = eNone, const eMode mode = eCoarse);
-  virtual ~cLcdIli9225b() {}
+  cLcd9225 (const cLcd::eRotate rotate = e0, const cLcd::eInfo info = eNone, const eMode mode = eCoarse);
+  virtual ~cLcd9225() {}
+
+  virtual bool initialise();
+
+protected:
+  virtual uint32_t updateLcd (sSpan* spans);
+  };
+//}}}
+//{{{
+class cLcd9341 : public cLcdSpiRegister {
+// 2.2 inch 186x220
+public:
+  cLcd9341 (const cLcd::eRotate rotate = e0, const cLcd::eInfo info = eNone, const eMode mode = eCoarse);
+  virtual ~cLcd9341() {}
 
   virtual bool initialise();
 
@@ -255,11 +268,11 @@ protected:
   };
 //}}}
 //{{{
-class cLcdIli9320 : public cLcdSpiHeader {
+class cLcd9320 : public cLcdSpiHeader {
 // 2.8 inch 1240x320 - HY28A
 public:
-  cLcdIli9320 (const cLcd::eRotate rotate = e0, const cLcd::eInfo info = eNone, const eMode mode = eCoarse);
-  virtual ~cLcdIli9320() {}
+  cLcd9320 (const cLcd::eRotate rotate = e0, const cLcd::eInfo info = eNone, const eMode mode = eCoarse);
+  virtual ~cLcd9320() {}
 
   virtual void setBacklight (bool on);
 

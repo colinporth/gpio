@@ -328,11 +328,12 @@ int main (int numArgs, char* args[]) {
 
   cLog::init (logLevel, false, "", "gpio");
 
-  cLcd* lcd = new cLcdSsd1289 (rotate, info, mode);
-  //cLcd* lcd = new cLcdSt7735r (rotate, info, mode);
-  //cLcd* lcd = new cLcdIli9225b (rotate, info, mode);
-  //cLcd* lcd = new cLcdIli9320 (rotate, info, mode);
-  //cLcd* lcd = new cLcdTa7601 (rotate, info, mode);
+  //cLcd* lcd = new cLcd1289 (rotate, info, mode);
+  //cLcd* lcd = new cLcd7735 (rotate, info, mode);
+  //cLcd* lcd = new cLcd9225 (rotate, info, mode);
+  //cLcd* lcd = new cLcd9320 (rotate, info, mode);
+  //cLcd* lcd = new cLcd7601 (rotate, info, mode);
+  cLcd* lcd = new cLcd9341 (rotate, info, mode);
   if (!lcd->initialise())
     return 0;
 
