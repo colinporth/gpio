@@ -34,13 +34,7 @@ public:
   enum eInfo { eNone, eOverlay };
   enum eMode { eAll, eSingle, eCoarse, eExact };
 
-  //{{{
-  cLcd (const int16_t width, const int16_t height, const eRotate rotate, const eInfo info, const eMode mode)
-      : mRotate(rotate), mInfo(info), mMode(mode),
-        mWidth(((rotate == e90) || (rotate == e270)) ? height : width),
-        mHeight(((rotate == e90) || (rotate == e270)) ? width : height),
-        mSnapshotEnabled(true), mTypeEnabled(true) {}
-  //}}}
+  cLcd (const int16_t width, const int16_t height, const eRotate rotate, const eInfo info, const eMode mode);
   virtual ~cLcd();
 
   virtual bool initialise();
@@ -96,6 +90,8 @@ public:
 
 //{{{
 protected:
+  void reset();
+
   virtual void writeCommand (const uint8_t command) = 0;
   virtual void writeDataWord (const uint16_t data) = 0;
   //{{{
@@ -194,8 +190,7 @@ protected:
 //{{{
 class cLcdSpi : public cLcd {
 public:
-  cLcdSpi (const int16_t width, const int16_t height, const eRotate rotate, const eInfo info, const eMode mode)
-    : cLcd (width, height, rotate, info, mode) {}
+  cLcdSpi (const int16_t width, const int16_t height, const eRotate rotate, const eInfo info, const eMode mode);
   virtual ~cLcdSpi();
 
 protected:
@@ -252,8 +247,7 @@ protected:
 //{{{
 class cLcdSpiHeader : public cLcd {
 public:
-  cLcdSpiHeader (const int16_t width, const int16_t height, const eRotate rotate, const eInfo info, const eMode mode)
-    : cLcd (width, height, rotate, info, mode) {}
+  cLcdSpiHeader (const int16_t width, const int16_t height, const eRotate rotate, const eInfo info, const eMode mode);
   virtual ~cLcdSpiHeader();
 
 protected:

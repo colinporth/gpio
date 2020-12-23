@@ -305,7 +305,9 @@ int main (int numArgs, char* args[]) {
   cLcd::eInfo info = cLcd::eNone;
   cLcd::eMode mode = cLcd::eCoarse;
   eLogLevel logLevel = LOGINFO;
+  int lcdType = 9341;
 
+  //{{{
   // dumb command line option parser
   for (int argIndex = 1; argIndex < numArgs; argIndex++) {
     string str (args[argIndex]);
@@ -322,18 +324,30 @@ int main (int numArgs, char* args[]) {
     else if (str == "2") logLevel = LOGINFO2;
     else if (str == "r") drawRadial = true;
     else if (str == "d") draw = true;
+    else if (str == "1289") lcdType = 1289;
+    else if (str == "7601") lcdType = 7601;
+    else if (str == "7735") lcdType = 7735;
+    else if (str == "9225") lcdType = 9225;
+    else if (str == "9320") lcdType = 9320;
+    else if (str == "9341") lcdType = 9341;
     else
       cLog::log (LOGERROR, "unrecognised option " + str);
     }
+  //}}}
 
   cLog::init (logLevel, false, "", "gpio");
 
-  //cLcd* lcd = new cLcd1289 (rotate, info, mode);
-  //cLcd* lcd = new cLcd7735 (rotate, info, mode);
-  //cLcd* lcd = new cLcd9225 (rotate, info, mode);
-  //cLcd* lcd = new cLcd9320 (rotate, info, mode);
-  //cLcd* lcd = new cLcd7601 (rotate, info, mode);
-  cLcd* lcd = new cLcd9341 (rotate, info, mode);
+  cLcd* lcd;
+  switch (lcdType) {
+    case 1289: lcd = new cLcd1289 (rotate, info, mode); break;
+    case 7601: lcd = new cLcd7601 (rotate, info, mode); break;
+    case 7735: lcd = new cLcd7735 (rotate, info, mode); break;
+    case 9225: lcd = new cLcd9225 (rotate, info, mode); break;
+    case 9320: lcd = new cLcd9320 (rotate, info, mode); break;
+    case 9341: lcd = new cLcd9341 (rotate, info, mode); break;
+    default: exit(1);
+    }
+
   if (!lcd->initialise())
     return 0;
 

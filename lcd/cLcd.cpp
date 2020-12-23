@@ -10,11 +10,13 @@
 
 #include "../pigpio/pigpio.h"
 
+#include "../../shared/fmt/format.h"
 #include "../../shared/utils/utils.h"
 #include "../../shared/utils/cLog.h"
 #include "../fonts/FreeSansBold.h"
 
 using namespace std;
+using namespace fmt;
 //}}}
 //{{{  include static freetype - assumes singleton cLcd
 #include <ft2build.h>
@@ -70,6 +72,13 @@ constexpr uint8_t kSpiCe0Gpio = 8;
 
 // cLcd public
 //{{{
+cLcd::cLcd (const int16_t width, const int16_t height, const eRotate rotate, const eInfo info, const eMode mode)
+    : mRotate(rotate), mInfo(info), mMode(mode),
+      mWidth(((rotate == e90) || (rotate == e270)) ? height : width),
+      mHeight(((rotate == e90) || (rotate == e270)) ? width : height),
+      mSnapshotEnabled(true), mTypeEnabled(true) {}
+//}}}
+//{{{
 cLcd::~cLcd() {
 
   gpioTerminate();
@@ -95,15 +104,6 @@ bool cLcd::initialise() {
 
   if (gpioInitialise() <= 0)
     return false;
-
-  // reset lcd
-  gpioSetMode (kResetGpio, PI_OUTPUT);
-  gpioWrite (kResetGpio, 1);
-  gpioDelay (1000);
-  gpioWrite (kResetGpio, 0);
-  gpioDelay (10000);
-  gpioWrite (kResetGpio, 1);
-  gpioDelay (120000);
 
   // allocate and clear frameBufs, align to data cache
   mFrameBuf = (uint16_t*)aligned_alloc (128, getNumPixels() * 2);
@@ -605,23 +605,34 @@ double cLcd::timeUs() {
   }
 //}}}
 
+// cLcd protected
+//{{{
+void cLcd::reset() {
+// reset lcd
+
+  gpioSetMode (kResetGpio, PI_OUTPUT);
+  gpioWrite (kResetGpio, 1);
+  gpioDelay (1000);
+  gpioWrite (kResetGpio, 0);
+  gpioDelay (10000);
+  gpioWrite (kResetGpio, 1);
+  gpioDelay (120000);
+  }
+//}}}
+
 // cLcd private
 //{{{
 string cLcd::getInfoString() {
 // return info string for log display
 
-  return dec(getUpdatePixels()) + "px took:" +
-         dec(getUpdateUs()) + "uS diff took" +
-         dec(getDiffUs()) + "uS";
+  return format ("{} px took:{}uS diff took {}uS", getUpdatePixels(), getUpdateUs(), getDiffUs());
   }
 //}}}
 //{{{
 string cLcd::getPaddedInfoString() {
 // return info string with padded format for on screen display
 
-  return dec(getUpdatePixels(),5,'0') + " " +
-         dec(getUpdateUs(),5,'0') + "uS diff:" +
-         dec(getDiffUs(),3,'0') + "uS";
+  return format ("{} {}uS diff:{}uS", getUpdatePixels(), getUpdateUs(), getDiffUs());
   }
 //}}}
 
@@ -642,14 +653,17 @@ constexpr int16_t kWidth7601 = 320;
 constexpr int16_t kHeight7601 = 480;
 
 // public
+//{{{
 cLcd7601::cLcd7601 (const cLcd::eRotate rotate, const cLcd::eInfo info, const cLcd::eMode mode)
   : cLcd(kWidth7601, kHeight7601, rotate, info, mode) {}
+//}}}
 
 //{{{
 bool cLcd7601::initialise() {
 
   if (!cLcd::initialise())
     return false;
+  reset();
 
   // wr
   gpioSetMode (k16WriteGpio, PI_OUTPUT);
@@ -926,6 +940,7 @@ bool cLcd1289::initialise() {
 
   if (!cLcd::initialise())
     return false;
+  reset();
 
   // wr
   gpioSetMode (k16WriteGpio, PI_OUTPUT);
@@ -1119,8 +1134,12 @@ uint32_t cLcd1289::updateLcd (sSpan* spans) {
 //}}}
 
 // spi data/command pin classes
-//{{{  cLcdSpi : public cLcdSpi
-// public
+//{{{
+//{{{
+cLcdSpi::cLcdSpi (const int16_t width, const int16_t height,
+                  const eRotate rotate, const eInfo info, const eMode mode)
+  : cLcd (width, height, rotate, info, mode) {}
+//}}}
 //{{{
 cLcdSpi::~cLcdSpi() {
   spiClose (mSpiHandle);
@@ -1173,6 +1192,7 @@ bool cLcd7735::initialise() {
 
   if (!cLcd::initialise())
     return false;
+  reset();
 
   // rs
   gpioSetMode (kRegisterGpio, PI_OUTPUT);
@@ -1346,6 +1366,7 @@ bool cLcd9225::initialise() {
 
   if (!cLcd::initialise())
     return false;
+  reset();
 
   // rs
   gpioSetMode (kRegisterGpio, PI_OUTPUT);
@@ -1457,7 +1478,7 @@ bool cLcd9341::initialise() {
   // mode 0, spi manages ce0 active lo
   mSpiHandle = spiOpen (0, kSpiClock9341, 0x00);
 
-  writeCommand (0x01); //software reset
+  writeCommand (0x01); // software reset
   delayUs (5000);
 
   writeCommand (0x11);
@@ -1503,19 +1524,19 @@ bool cLcd9341::initialise() {
   writeCommandMultiData (0xB6, k9341xB6, 4); // Display Function Control
 
   uint8_t k9341xB7[1] = { 0x07 };
-  writeCommandMultiData (0xB7, k9341xB7, 1); //Entry mode
+  writeCommandMultiData (0xB7, k9341xB7, 1); // Entry mode
 
   uint8_t k9341xF2[1] = { 0x08 };
   writeCommandMultiData (0xF2, k9341xF2, 1); // 3Gamma Function Disable
 
   uint8_t k9341x26[1] = { 0x01 };
-  writeCommandMultiData (0x26, k9341x26, 1); //Gamma curve selected
+  writeCommandMultiData (0x26, k9341x26, 1); // Gamma curve selected
 
   uint8_t k9341xE0[15] = { 0x1f, 0x1a, 0x18, 0x0a, 0x0f, 0x06, 0x45, 0x87, 0x32, 0x0a, 0x07, 0x02, 0x07, 0x05, 0x00 };
-  writeCommandMultiData (0xE0, k9341xE0, 15); //positive gamma correction
+  writeCommandMultiData (0xE0, k9341xE0, 15); // positive gamma correction
 
   uint8_t k9341xE1[15] = { 0x00, 0x25, 0x27, 0x05, 0x10, 0x09, 0x3a, 0x78, 0x4d, 0x05, 0x18, 0x0d, 0x38, 0x3a, 0x1f };
-  writeCommandMultiData (0xE1, k9341xE1, 15); //negamma correction
+  writeCommandMultiData (0xE1, k9341xE1, 15); // negamma correction
 
   writeCommand (0x11); // Exit Sleep
   delayUs (120000);
@@ -1555,14 +1576,20 @@ uint32_t cLcd9341::updateLcd (sSpan* spans) {
 //}}}
 
 // spi no data/command pin classes
-//{{{  cLcdSpiHeader : public cLcdSpi
-constexpr uint8_t kSpiLcdCeGpio = 8;
-//constexpr uint8_t kSpiTimingGpio = 23;
+//{{{
+//{{{
+cLcdSpiHeader::cLcdSpiHeader (const int16_t width, const int16_t height,
+                              const eRotate rotate, const eInfo info, const eMode mode)
+  : cLcd (width, height, rotate, info, mode) {}
+//}}}
 //{{{
 cLcdSpiHeader::~cLcdSpiHeader() {
   spiClose (mSpiHandle);
   }
 //}}}
+
+constexpr uint8_t kSpiLcdCeGpio = 8;
+//constexpr uint8_t kSpiTimingGpio = 23;
 
 //{{{
 void cLcdSpiHeader::writeCommand (const uint8_t command) {
@@ -1649,6 +1676,7 @@ bool cLcd9320::initialise() {
 
   if (!cLcd::initialise())
     return false;
+  reset();
 
   // backlight off - active hi
   gpioSetMode (kSpiBacklightGpio, PI_OUTPUT);
