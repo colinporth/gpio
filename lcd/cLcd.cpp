@@ -1162,17 +1162,22 @@ void cLcdSpi::writeDataWord (const uint16_t data) {
   }
 //}}}
 //{{{
-void cLcdSpi::writeCommandMultiData (const uint8_t command, uint8_t* data, int length) {
+void cLcdSpi::writeMultiData (uint8_t* data, int length) {
+// send data
 
-  writeCommand (command);
-
-  // send data
   while (length > 0) {
    int sendBytes = (length > 0xFFFF) ? 0xFFFF : length;
     spiWrite (mSpiHandle, (char*)data, sendBytes);
     data += sendBytes;
     length -= sendBytes;
     }
+  }
+//}}}
+//{{{
+void cLcdSpi::writeCommandMultiData (const uint8_t command, uint8_t* data, int length) {
+
+  writeCommand (command);
+  writeMultiData (data, length);
   }
 //}}}
 //}}}
@@ -1592,12 +1597,12 @@ uint32_t cLcd9341::updateLcd (sSpan* spans) {
       case e90:
       case e0: {
         // xstart hi,lo  xend hi,lo
-        uint8_t k9341x2A[4] = { 0x00, uint8_t(it->r.left & 0xFF), 0x00, uint8_t((it->r.right-1) & 0xFF) };
+        uint8_t k9341x2A[4] = { 0x00, uint8_t(it->r.left), 0x00, uint8_t((it->r.right-1)) };
         writeCommandMultiData (0x2A, k9341x2A, 4);
 
         // ystart hi,lo  yend hi,lo
-        uint8_t k9341x2B[4] = { uint8_t((it->r.top >> 8)), uint8_t(it->r.top & 0xFF),
-                                uint8_t(((it->r.bottom-1) >> 8)), uint8_t((it->r.bottom-1) & 0xFF) };
+        uint8_t k9341x2B[4] = { uint8_t((it->r.top >> 8)), uint8_t(it->r.top),
+                                uint8_t(((it->r.bottom-1) >> 8)), uint8_t(it->r.bottom-1) };
         writeCommandMultiData (0x2B, k9341x2B, 4);
 
         break;

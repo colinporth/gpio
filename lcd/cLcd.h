@@ -196,6 +196,7 @@ public:
 protected:
   virtual void writeCommand (const uint8_t command);
   virtual void writeDataWord (const uint16_t data);
+  void writeMultiData (uint8_t* data, int length);
   void writeCommandMultiData (const uint8_t command, uint8_t* data, int length);
 
   virtual uint16_t readId() { return 0xFAFF; }
