@@ -307,8 +307,7 @@ int main (int numArgs, char* args[]) {
   eLogLevel logLevel = LOGINFO;
   int lcdType = 9341;
 
-  //{{{
-  // dumb command line option parser
+  //{{{  dumb command line option parser
   for (int argIndex = 1; argIndex < numArgs; argIndex++) {
     string str (args[argIndex]);
     if (str == "0") rotate = cLcd::e0;
