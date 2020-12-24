@@ -1,33 +1,43 @@
 // cLcd - rgb565 display classes
 #pragma once
+//{{{  includes
 #include <cstdint>
 #include <string>
 #include "cPointRect.h"
+
+struct sSpan;
+class cDrawAA;
+class cFrameDiff;
+class cSnapshot;
+//}}}
+
 //{{{  colours - uint16 RGB565
 constexpr uint16_t kBlue        =  0x001F;  //   0,   0, 255
 constexpr uint16_t kNavy        =  0x000F;  //   0,   0, 128
+
 constexpr uint16_t kGreen       =  0x07E0;  //   0, 255,   0
 constexpr uint16_t kDarkGreen   =  0x03E0;  //   0, 128,   0
+
 constexpr uint16_t kCyan        =  0x07FF;  //   0, 255, 255
 constexpr uint16_t kDarkCyan    =  0x03EF;  //   0, 128, 128
+
 constexpr uint16_t kRed         =  0xF800;  // 255,   0,   0
 constexpr uint16_t kMaroon      =  0x7800;  // 128,   0,   0
 constexpr uint16_t kMagenta     =  0xF81F;  // 255,   0, 255
 constexpr uint16_t kPurple      =  0x780F;  // 128,   0, 128
 constexpr uint16_t kOrange      =  0xFD20;  // 255, 165,   0
 constexpr uint16_t kYellow      =  0xFFE0;  // 255, 255,   0
+
 constexpr uint16_t kOlive       =  0x7BE0;  // 128, 128,   0
 constexpr uint16_t kGreenYellow =  0xAFE5;  // 173, 255,  47
+
 constexpr uint16_t kBlack       =  0x0000;  //   0,   0,   0
 constexpr uint16_t kLightGrey   =  0xC618;  // 192, 192, 192
 constexpr uint16_t kDarkGrey    =  0x7BEF;  // 128, 128, 128
 constexpr uint16_t kWhite       =  0xFFFF;  // 255, 255, 255
 //}}}
 
-struct sSpan;
-class cDrawAA;
-class cFrameDiff;
-class cSnapshot;
+//{{{
 class cLcd {
 public:
   enum eRotate { e0, e90, e180, e270 };
@@ -149,12 +159,13 @@ private:
   cSnapshot* mSnapshot = nullptr;
 //}}}
   };
+//}}}
 
-// parallel 16bit screens
+// parallel 16bit
 //{{{
 class cLcd7601 : public cLcd {
 public:
-  cLcd7601 (const eRotate rotate = e0, const eInfo info = eNone, const eMode mode = eCoarse);
+  cLcd7601 (eRotate rotate, eInfo info, eMode mode);
   virtual ~cLcd7601() {}
 
   virtual bool initialise();
@@ -172,7 +183,7 @@ protected:
 //{{{
 class cLcd1289 : public cLcd {
 public:
-  cLcd1289 (const eRotate rotate = e0, const eInfo info = eNone, const eMode mode = eCoarse);
+  cLcd1289 (eRotate rotate, eInfo info, eMode mode);
   virtual ~cLcd1289() {}
 
 protected:
@@ -186,11 +197,11 @@ protected:
   };
 //}}}
 
-// spi data/command register pin screens
+// spi data/command register
 //{{{
 class cLcdSpi : public cLcd {
 public:
-  cLcdSpi (const int16_t width, const int16_t height, const eRotate rotate, const eInfo info, const eMode mode);
+  cLcdSpi (int16_t width, int16_t height, eRotate rotate, eInfo info, eMode mode, int spiSpeed);
   virtual ~cLcdSpi();
 
 protected:
@@ -202,6 +213,7 @@ protected:
   virtual uint16_t readId() { return 0xFAFF; }
   virtual uint16_t readStatus() { return 0xAA; }
 
+  int mSpiSpeed = 0;
   int mSpiHandle = 0;
   };
 //}}}
@@ -209,7 +221,7 @@ protected:
 class cLcd7735 : public cLcdSpi {
 // 1.8 inch 128x160
 public:
-  cLcd7735 (const cLcd::eRotate rotate = e0, const cLcd::eInfo info = eNone, const eMode mode = eCoarse);
+  cLcd7735 (cLcd::eRotate rotate, cLcd::eInfo info, eMode mode, int spiSpeed);
   virtual ~cLcd7735() {}
 
   virtual bool initialise();
@@ -222,7 +234,7 @@ protected:
 class cLcd9225 : public cLcdSpi {
 // 2.2 inch 186x220
 public:
-  cLcd9225 (const cLcd::eRotate rotate = e0, const cLcd::eInfo info = eNone, const eMode mode = eCoarse);
+  cLcd9225 (cLcd::eRotate rotate, cLcd::eInfo info, eMode mode, int spiSpeed);
   virtual ~cLcd9225() {}
 
   virtual bool initialise();
@@ -234,7 +246,7 @@ protected:
 //{{{
 class cLcd9341 : public cLcdSpi {
 public:
-  cLcd9341 (const cLcd::eRotate rotate = e0, const cLcd::eInfo info = eNone, const eMode mode = eCoarse);
+  cLcd9341 (cLcd::eRotate rotate, cLcd::eInfo info, eMode mode, int spiSpeed);
   virtual ~cLcd9341() {}
 
   virtual bool initialise();
@@ -244,7 +256,7 @@ protected:
   };
 //}}}
 
-// spi no data/command register pin screens
+// spi header only
 //{{{
 class cLcdSpiHeader : public cLcd {
 public:
@@ -265,7 +277,7 @@ protected:
 class cLcd9320 : public cLcdSpiHeader {
 // 2.8 inch 1240x320 - HY28A
 public:
-  cLcd9320 (const cLcd::eRotate rotate = e0, const cLcd::eInfo info = eNone, const eMode mode = eCoarse);
+  cLcd9320 (cLcd::eRotate rotate, cLcd::eInfo info, eMode mode);
   virtual ~cLcd9320() {}
 
   virtual void setBacklight (bool on);

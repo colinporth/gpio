@@ -648,7 +648,7 @@ constexpr int16_t kWidth1289 = 240;
 constexpr int16_t kHeight1289 = 320;
 
 // public
-cLcd1289::cLcd1289 (const cLcd::eRotate rotate, const cLcd::eInfo info, const cLcd::eMode mode)
+cLcd1289::cLcd1289 (eRotate rotate, eInfo info, eMode mode)
   : cLcd(kWidth1289, kHeight1289, rotate, info, mode) {}
 
 //{{{
@@ -857,7 +857,7 @@ constexpr int16_t kHeight7601 = 480;
 
 // public
 //{{{
-cLcd7601::cLcd7601 (const cLcd::eRotate rotate, const cLcd::eInfo info, const cLcd::eMode mode)
+cLcd7601::cLcd7601 (const eRotate rotate, const eInfo info, const eMode mode)
   : cLcd(kWidth7601, kHeight7601, rotate, info, mode) {}
 //}}}
 
@@ -1134,9 +1134,8 @@ uint32_t cLcd7601::updateLcd (sSpan* spans) {
 // spi data/command pin classes
 //{{{
 //{{{
-cLcdSpi::cLcdSpi (const int16_t width, const int16_t height,
-                  const eRotate rotate, const eInfo info, const eMode mode)
-  : cLcd (width, height, rotate, info, mode) {}
+cLcdSpi::cLcdSpi (int16_t width, int16_t height, eRotate rotate, eInfo info, eMode mode, int spiSpeed)
+  : cLcd (width, height, rotate, info, mode), mSpiSpeed(spiSpeed) {}
 //}}}
 //{{{
 cLcdSpi::~cLcdSpi() {
@@ -1184,10 +1183,9 @@ void cLcdSpi::writeCommandMultiData (const uint8_t command, uint8_t* data, int l
 //{{{  cLcd7735
 constexpr int16_t kWidth7735 = 128;
 constexpr int16_t kHeight7735 = 160;
-constexpr int kSpiClock7735 = 16000000;
 
-cLcd7735::cLcd7735 (const cLcd::eRotate rotate, const cLcd::eInfo info, const eMode mode)
-  : cLcdSpi (kWidth7735, kHeight7735, rotate, info, mode) {}
+cLcd7735::cLcd7735 (eRotate rotate, eInfo info, eMode mode, int spiSpeed)
+  : cLcdSpi (kWidth7735, kHeight7735, rotate, info, mode, spiSpeed) {}
 
 // public
 //{{{
@@ -1202,7 +1200,7 @@ bool cLcd7735::initialise() {
   gpioWrite (kRegisterGpio, 1);
 
   // mode 0, spi manages ce0 active lo
-  mSpiHandle = spiOpen (0, kSpiClock7735, 0);
+  mSpiHandle = spiOpen (0, mSpiSpeed, 0);
 
   writeCommand (0x11); // SLPOUT
   delayUs (120000);
@@ -1358,11 +1356,10 @@ uint32_t cLcd7735::updateLcd (sSpan* spans) {
 //{{{  cLcd9225
 constexpr int16_t kWidth9225 = 176;
 constexpr int16_t kHeight9225 = 220;
-constexpr int kSpiClock9225= 24000000;
 
 // public
-cLcd9225::cLcd9225 (const cLcd::eRotate rotate, const cLcd::eInfo info, const eMode mode)
-  : cLcdSpi(kWidth9225, kHeight9225, rotate, info, mode) {}
+cLcd9225::cLcd9225 (eRotate rotate, eInfo info, eMode mode, int spiSpeed)
+  : cLcdSpi(kWidth9225, kHeight9225, rotate, info, mode, spiSpeed) {}
 
 //{{{
 bool cLcd9225::initialise() {
@@ -1376,7 +1373,7 @@ bool cLcd9225::initialise() {
   gpioWrite (kRegisterGpio, 1);
 
   // mode 0, spi manages ce0 active lo
-  mSpiHandle = spiOpen (0, kSpiClock9225, 0x00);
+  mSpiHandle = spiOpen (0, mSpiSpeed, 0x00);
 
   writeCommandData (0x01, 0x011C); // set SS and NL bit
 
@@ -1462,11 +1459,10 @@ uint32_t cLcd9225::updateLcd (sSpan* spans) {
 //{{{  cLcd9341
 constexpr int16_t kWidth9341 = 240;
 constexpr int16_t kHeight9341 = 320;
-constexpr int kSpiClock9341 = 28000000;
 
 // public
-cLcd9341::cLcd9341 (const cLcd::eRotate rotate, const cLcd::eInfo info, const eMode mode)
-  : cLcdSpi(kWidth9341, kHeight9341, rotate, info, mode) {}
+cLcd9341::cLcd9341 (eRotate rotate, eInfo info, eMode mode, int spiSpeed)
+  : cLcdSpi(kWidth9341, kHeight9341, rotate, info, mode, spiSpeed) {}
 
 //{{{
 bool cLcd9341::initialise() {
@@ -1480,7 +1476,7 @@ bool cLcd9341::initialise() {
   gpioWrite (kRegisterGpio, 1);
 
   // mode 0, spi manages ce0 active lo
-  mSpiHandle = spiOpen (0, kSpiClock9341, 0x00);
+  mSpiHandle = spiOpen (0, mSpiSpeed, 0x00);
 
   writeCommand (0x01); // software reset
   delayUs (5000);
@@ -1579,6 +1575,16 @@ bool cLcd9341::initialise() {
   delayUs (50000);
 
   updateLcd (mSpanAll);
+
+  writeCommand (0x04); // Read display identification information
+  uint8_t buf[4] = { 0, 0, 0, 0 };
+  spiXfer (mSpiHandle, (char*)buf, (char*)buf, 4);
+  cLog::log (LOGINFO, format ("04h - {} {} {} {}", buf[0], buf[1], buf[2], buf[3]));
+
+  writeCommand (0x09); // Read display identification information
+  uint8_t buf1[5] = { 0, 0, 0, 0, 0 };
+  spiXfer (mSpiHandle, (char*)buf1, (char*)buf1, 5);
+  cLog::log (LOGINFO, format ("09h - {} {} {} {} {}", buf1[0], buf1[1], buf1[2], buf1[3], buf[4]));
 
   return true;
   }
@@ -1710,7 +1716,7 @@ constexpr int16_t kHeight9320 = 320;
 constexpr int kSpiClock9320 = 24000000;
 
 // public
-cLcd9320::cLcd9320 (const cLcd::eRotate rotate, const cLcd::eInfo info, const eMode mode)
+cLcd9320::cLcd9320 (eRotate rotate, eInfo info, eMode mode)
   : cLcdSpiHeader(kWidth9320, kHeight9320, rotate, info, mode) {}
 
 //{{{

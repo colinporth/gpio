@@ -306,6 +306,7 @@ int main (int numArgs, char* args[]) {
   cLcd::eMode mode = cLcd::eCoarse;
   eLogLevel logLevel = LOGINFO;
   int lcdType = 9341;
+  int spiSpeed = 16000000;
 
   //{{{  dumb command line option parser
   for (int argIndex = 1; argIndex < numArgs; argIndex++) {
@@ -329,6 +330,14 @@ int main (int numArgs, char* args[]) {
     else if (str == "9225") lcdType = 9225;
     else if (str == "9320") lcdType = 9320;
     else if (str == "9341") lcdType = 9341;
+    else if (str == "1000000") spiSpeed = 1000000;
+    else if (str == "2000000") spiSpeed = 2000000;
+    else if (str == "4000000") spiSpeed = 4000000;
+    else if (str == "8000000") spiSpeed = 8000000;
+    else if (str == "16000000") spiSpeed = 16000000;
+    else if (str == "24000000") spiSpeed = 24000000;
+    else if (str == "30000000") spiSpeed = 30000000;
+    else if (str == "32000000") spiSpeed = 32000000;
     else
       cLog::log (LOGERROR, "unrecognised option " + str);
     }
@@ -340,10 +349,10 @@ int main (int numArgs, char* args[]) {
   switch (lcdType) {
     case 1289: lcd = new cLcd1289 (rotate, info, mode); break;
     case 7601: lcd = new cLcd7601 (rotate, info, mode); break;
-    case 7735: lcd = new cLcd7735 (rotate, info, mode); break;
-    case 9225: lcd = new cLcd9225 (rotate, info, mode); break;
+    case 7735: lcd = new cLcd7735 (rotate, info, mode, spiSpeed); break; // 16000000
+    case 9225: lcd = new cLcd9225 (rotate, info, mode, spiSpeed); break; // 24000000
     case 9320: lcd = new cLcd9320 (rotate, info, mode); break;
-    case 9341: lcd = new cLcd9341 (rotate, info, mode); break;
+    case 9341: lcd = new cLcd9341 (rotate, info, mode, spiSpeed); break; // 30000000
     default: exit(1);
     }
 
