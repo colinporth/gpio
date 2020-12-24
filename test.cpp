@@ -330,14 +330,19 @@ int main (int numArgs, char* args[]) {
     else if (str == "9225") lcdType = 9225;
     else if (str == "9320") lcdType = 9320;
     else if (str == "9341") lcdType = 9341;
-    else if (str == "1000000") spiSpeed = 1000000;
-    else if (str == "2000000") spiSpeed = 2000000;
-    else if (str == "4000000") spiSpeed = 4000000;
-    else if (str == "8000000") spiSpeed = 8000000;
-    else if (str == "16000000") spiSpeed = 16000000;
-    else if (str == "24000000") spiSpeed = 24000000;
-    else if (str == "30000000") spiSpeed = 30000000;
-    else if (str == "32000000") spiSpeed = 32000000;
+    else if (str == "100k") spiSpeed = 100000;
+    else if (str == "400k") spiSpeed = 400000;
+    else if (str == "1m")   spiSpeed = 1000000;
+    else if (str == "2m")   spiSpeed = 2000000;
+    else if (str == "4m")   spiSpeed = 4000000;
+    else if (str == "8m")   spiSpeed = 8000000;
+    else if (str == "16m")  spiSpeed = 16000000;
+    else if (str == "24m")  spiSpeed = 24000000;
+    else if (str == "30m")  spiSpeed = 30000000;
+    else if (str == "32m")  spiSpeed = 32000000;
+    else if (str == "36m")  spiSpeed = 36000000;
+    else if (str == "40m")  spiSpeed = 40000000;
+    else if (str == "48m")  spiSpeed = 48000000;
     else
       cLog::log (LOGERROR, "unrecognised option " + str);
     }
