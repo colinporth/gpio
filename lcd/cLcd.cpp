@@ -1165,7 +1165,7 @@ void cLcdSpi::writeMultiData (uint8_t* data, int length) {
 // send data
 
   while (length > 0) {
-   int sendBytes = (length > 0xFFFF) ? 0xFFFF : length;
+    int sendBytes = (length > 0xFFFF) ? 0xFFFF : length;
     spiWrite (mSpiHandle, (char*)data, sendBytes);
     data += sendBytes;
     length -= sendBytes;
@@ -1512,27 +1512,26 @@ bool cLcd9341::initialise() {
   uint8_t k9341xC7[] = { 0xC0 };
   writeCommandMultiData (0xC7, k9341xC7, sizeof(k9341xC7)); // VCM control 2
 
-  //{{{  madctl bits
-  //#define MADCTL_BGR_PIXEL_ORDER (1<<3)
-  //#define MADCTL_ROW_COLUMN_EXCHANGE (1<<5)
-  //#define MADCTL_COLUMN_ADDRESS_ORDER_SWAP (1<<6)
-  //#define MADCTL_ROW_ADDRESS_ORDER_SWAP (1<<7)
-  //#define MADCTL_ROTATE_180_DEGREES (MADCTL_COLUMN_ADDRESS_ORDER_SWAP | MADCTL_ROW_ADDRESS_ORDER_SWAP)
-  //#ifndef DISPLAY_SWAP_BGR
-  //madctl |= MADCTL_BGR_PIXEL_ORDER;
-  //#endif
-  //#if defined(DISPLAY_FLIP_ORIENTATION_IN_HARDWARE)
-  //madctl |= MADCTL_ROW_COLUMN_EXCHANGE;
-  //#endif
-  //#ifdef DISPLAY_ROTATE_180_DEGREES
-  //madctl ^= MADCTL_ROTATE_180_DEGREES;
-  //#endif
-  //}}}
-  uint8_t k9341x36[] = { 0x08 };
-  writeCommandMultiData (0x36, k9341x36, sizeof(k9341x36)); // MADCTL Memory Access Control ;
+  //{{{  madctl param
+  constexpr uint8_t kMY  = 0x80; // memory row address order swap
+  constexpr uint8_t kMX  = 0x40; // memory column address order swap
+  constexpr uint8_t kMV  = 0x20; // memory row column exchange
+  //constexpr uint8_t kML  = 0x10; // lcd vertical refresh
+  constexpr uint8_t kBgr = 0x08;
+  //constexpr uint8_t kMH  = 0x04; // lcd horizontal refresh
 
-  uint8_t k9341x3A[] = { 0x55 };
-  writeCommandMultiData (0x3A, k9341x3A, sizeof(k9341x3A)); // Pixel format set DPI=16bits/pixel DBI=16bits/pixel
+  uint8_t madParam = kBgr;
+  switch (mRotate) {
+    case e0:   break;
+    case e180: madParam |= kMY | kMX; break;
+    case e90:  madParam |= kMX | kMV; break;
+    case e270: madParam |= kMY | kMV ; break;
+    }
+  //}}}
+  writeCommandMultiData (0x36, &madParam, 1); // MADCTL Memory Access Control ;
+
+  uint8_t k9341x3A = { 0x55 };
+  writeCommandMultiData (0x3A, &k9341x3A, 1); // Pixel format set DPI=16bits/pixel DBI=16bits/pixel
 
   //{{{
   // display frame rate in 4-wire SPI "internal clock mode" is computed with the following formula:
@@ -1553,14 +1552,14 @@ bool cLcd9341::initialise() {
   uint8_t k9341xB6[] = { 0x0A, 0xA2, 0x27, 0x00 };
   writeCommandMultiData (0xB6, k9341xB6, sizeof(k9341xB6)); // Display Function Control
 
-  uint8_t k9341xB7[] = { 0x07 };
-  writeCommandMultiData (0xB7, k9341xB7, sizeof(k9341xB7)); // Entry mode
+  uint8_t k9341xB7 = 0x07;
+  writeCommandMultiData (0xB7, &k9341xB7, 1); // Entry mode
 
-  uint8_t k9341xF2[] = { 0x08 };
-  writeCommandMultiData (0xF2, k9341xF2, sizeof(k9341xF2)); // 3Gamma Function Disable
+  uint8_t k9341xF2 = 0x08;
+  writeCommandMultiData (0xF2, &k9341xF2, 1); // 3Gamma Function Disable
 
-  uint8_t k9341x26[] = { 0x01 };
-  writeCommandMultiData (0x26, k9341x26, sizeof(k9341x26)); // Gamma curve selected - Gamma curve 1 (G2.2)
+  uint8_t k9341x26 = 0x01;
+  writeCommandMultiData (0x26, &k9341x26, 1); // Gamma curve selected - Gamma curve 1 (G2.2)
 
   uint8_t k9341xE0[] = { 0x1f, 0x1a, 0x18, 0x0a, 0x0f, 0x06, 0x45, 0x87, 0x32, 0x0a, 0x07, 0x02, 0x07, 0x05, 0x00 };
   writeCommandMultiData (0xE0, k9341xE0, sizeof(k9341xE0)); // positive gamma correction
@@ -1593,41 +1592,56 @@ bool cLcd9341::initialise() {
 // protected
 //{{{
 uint32_t cLcd9341::updateLcd (sSpan* spans) {
+// probably many small spans, with the occasional large span
 // only 0 rotate
 
+  constexpr uint8_t kColumnAddressSetCommand = 0x2A;
+  constexpr uint8_t kPageAddressSetCommand = 0x2B;
+  constexpr uint8_t kMemoryWriteCommand = 0x2C;
+
   int numPixels = 0;
-  for (sSpan* it = spans; it; it = it->next) {
+  for (sSpan* span = spans; span; span = span->next) {
+    uint16_t columnAddressSetParams[2] = { bswap_16(span->r.left), bswap_16(span->r.right-1) };
+    uint16_t pageAddressSetParams[2] = { bswap_16(span->r.top), bswap_16(span->r.bottom-1) };
+
     switch (mRotate) {
       case e270:
-      case e180:
       case e90:
-      case e0: {
-        // xstart hi,lo  xend hi,lo
-        uint8_t k9341x2A[4] = { 0x00, uint8_t(it->r.left), 0x00, uint8_t((it->r.right-1)) };
-        writeCommandMultiData (0x2A, k9341x2A, 4);
+      case e0:
+      case e180:
+        //writeCommandMultiData (kColumnAddressSetCommand, (uint8_t*)columnAddressSetParams, 4);
+        gpioWrite (kRegisterGpio, 0);
+        spiWrite (mSpiHandle, (char*)&kColumnAddressSetCommand, 1);
+        gpioWrite (kRegisterGpio, 1);
+        spiWrite (mSpiHandle, (char*)columnAddressSetParams, 4);
 
-        // ystart hi,lo  yend hi,lo
-        uint8_t k9341x2B[4] = { uint8_t((it->r.top >> 8)), uint8_t(it->r.top),
-                                uint8_t(((it->r.bottom-1) >> 8)), uint8_t(it->r.bottom-1) };
-        writeCommandMultiData (0x2B, k9341x2B, 4);
-
+        //writeCommandMultiData (kPageAddressSetCommand, (uint8_t*)pageAddressSetParams, 4);
+        gpioWrite (kRegisterGpio, 0);
+        spiWrite (mSpiHandle, (char*)&kPageAddressSetCommand, 1);
+        gpioWrite (kRegisterGpio, 1);
+        spiWrite (mSpiHandle, (char*)pageAddressSetParams, 4);
         break;
-        }
       }
 
     uint16_t swappedFrameBuf [kWidth9341 * kHeight9341];
     uint16_t* dst = swappedFrameBuf;
-    uint16_t* src = mFrameBuf + (it->r.top * getWidth()) + it->r.left;
-    for (int16_t y = it->r.top; y < it->r.bottom; y++) {
-      for (int16_t x = it->r.left; x < it->r.right; x++)
+    uint16_t* src = mFrameBuf + (span->r.top * getWidth()) + span->r.left;
+    for (int y = span->r.top; y < span->r.bottom; y++) {
+      for (int x = span->r.left; x < span->r.right; x++)
         *dst++ = bswap_16 (*src++);
-      src += getWidth() - it->r.getWidth();
+      src += getWidth() - span->r.getWidth();
       }
 
-    // LCD_WriteCMD(GRAMWR)
-    writeCommandMultiData (0x2C, (uint8_t*)swappedFrameBuf, (it->r.bottom - it->r.top) * (it->r.right - it->r.left)* 2);
-
-    numPixels += it->r.getNumPixels();
+    numPixels += span->r.getNumPixels();
+    int length = span->r.getNumPixels() * 2;
+    if (length < 0x10000) {
+      gpioWrite (kRegisterGpio, 0);
+      spiWrite (mSpiHandle, (char*)&kMemoryWriteCommand, 1);
+      gpioWrite (kRegisterGpio, 1);
+      spiWrite (mSpiHandle, (char*)swappedFrameBuf, length);
+      }
+    else
+      writeCommandMultiData (kMemoryWriteCommand, (uint8_t*)swappedFrameBuf, length);
     }
 
   return numPixels;
