@@ -146,6 +146,14 @@
 //eventSetFuncEx             Request an event callback, extended
 //eventTrigger               Trigger an event
 
+//Scripts
+//gpioStoreScript            Store a script
+//gpioRunScript              Run a stored script
+//gpioUpdateScript           Set a scripts parameters
+//gpioScriptStatus           Get script status and parameters
+//gpioStopScript             Stop a running script
+//gpioDeleteScript           Delete a stored script
+
 //I2C
 //i2cOpen                    Opens an I2C device
 //i2cClose                   Closes an I2C device
@@ -273,6 +281,7 @@
 //rawWaveSetIn               Not intended for general use
 //rawWaveInfo                Not intended for general use
 //rawDumpWave                Not intended for general use
+//rawDumpScript              Not intended for general use
 //}}}
 //{{{  params
 //active :: 0-1000000
@@ -5005,6 +5014,266 @@ The thread to be stopped should have been started with [*gpioStartThread*].
 D*/
 //}}}
 //}}}
+//{{{  script
+//{{{
+int gpioStoreScript (char* script);
+/*D
+This function stores a null terminated script for later execution.
+
+See [[http://abyz.me.uk/rpi/pigpio/pigs.html#Scripts]] for details.
+
+. .
+script: the text of the script
+. .
+
+The function returns a script id if the script is valid,
+otherwise PI_BAD_SCRIPT.
+D*/
+//}}}
+
+//{{{
+int gpioRunScript (unsigned script_id, unsigned numPar, uint32_t* param);
+/*D
+This function runs a stored script.
+
+. .
+script_id: >=0, as returned by [*gpioStoreScript*]
+   numPar: 0-10, the number of parameters
+    param: an array of parameters
+. .
+
+The function returns 0 if OK, otherwise PI_BAD_SCRIPT_ID, or
+PI_TOO_MANY_PARAM.
+
+param is an array of up to 10 parameters which may be referenced in
+the script as p0 to p9.
+D*/
+//}}}
+//{{{
+int gpioRunScript (unsigned script_id, unsigned numPar, uint32_t* param);
+/*D
+This function runs a stored script.
+
+. .
+script_id: >=0, as returned by [*gpioStoreScript*]
+   numPar: 0-10, the number of parameters
+    param: an array of parameters
+. .
+
+The function returns 0 if OK, otherwise PI_BAD_SCRIPT_ID, or
+PI_TOO_MANY_PARAM.
+
+param is an array of up to 10 parameters which may be referenced in
+the script as p0 to p9.
+D*/
+//}}}
+//{{{
+int gpioUpdateScript (unsigned script_id, unsigned numPar, uint32_t* param);
+/*D
+This function sets the parameters of a script.  The script may or
+may not be running.  The first numPar parameters of the script are
+overwritten with the new values.
+
+. .
+script_id: >=0, as returned by [*gpioStoreScript*]
+   numPar: 0-10, the number of parameters
+    param: an array of parameters
+. .
+
+The function returns 0 if OK, otherwise PI_BAD_SCRIPT_ID, or
+PI_TOO_MANY_PARAM.
+
+param is an array of up to 10 parameters which may be referenced in
+the script as p0 to p9.
+D*/
+//}}}
+//{{{
+int gpioScriptStatus (unsigned script_id, uint32_t* param);
+/*D
+This function returns the run status of a stored script as well as
+the current values of parameters 0 to 9.
+
+. .
+script_id: >=0, as returned by [*gpioStoreScript*]
+    param: an array to hold the returned 10 parameters
+. .
+
+The function returns greater than or equal to 0 if OK,
+otherwise PI_BAD_SCRIPT_ID.
+
+The run status may be
+
+. .
+PI_SCRIPT_INITING
+PI_SCRIPT_HALTED
+PI_SCRIPT_RUNNING
+PI_SCRIPT_WAITING
+PI_SCRIPT_FAILED
+. .
+
+The current value of script parameters 0 to 9 are returned in param.
+D*/
+//}}}
+//{{{
+int gpioStopScript (unsigned script_id);
+/*D
+This function stops a running script.
+
+. .
+script_id: >=0, as returned by [*gpioStoreScript*]
+. .
+
+The function returns 0 if OK, otherwise PI_BAD_SCRIPT_ID.
+D*/
+//}}}
+//{{{
+int gpioDeleteScript (unsigned script_id);
+/*D
+This function deletes a stored script.
+
+. .
+script_id: >=0, as returned by [*gpioStoreScript*]
+. .
+
+The function returns 0 if OK, otherwise PI_BAD_SCRIPT_ID.
+D*/
+//}}}
+
+//{{{
+int gpioSetSignalFunc (unsigned signum, gpioSignalFunc_t f);
+/*D
+Registers a function to be called (a callback) when a signal occurs.
+
+. .
+signum: 0-63
+     f: the callback function
+. .
+
+Returns 0 if OK, otherwise PI_BAD_SIGNUM.
+
+The function is passed the signal number.
+
+One function may be registered per signal.
+
+The callback may be cancelled by passing NULL.
+
+By default all signals are treated as fatal and cause the library
+to call gpioTerminate and then exit.
+D*/
+//}}}
+//{{{
+int gpioSetSignalFuncEx (unsigned signum, gpioSignalFuncEx_t f, void* userdata);
+/*D
+Registers a function to be called (a callback) when a signal occurs.
+
+. .
+  signum: 0-63
+       f: the callback function
+userdata: a pointer to arbitrary user data
+. .
+
+Returns 0 if OK, otherwise PI_BAD_SIGNUM.
+
+The function is passed the signal number and the userdata pointer.
+
+Only one of gpioSetSignalFunc or gpioSetSignalFuncEx can be
+registered per signal.
+
+See gpioSetSignalFunc for further details.
+D*/
+//}}}
+
+//{{{
+int gpioHardwareClock (unsigned gpio, unsigned clkfreq);
+/*D
+Starts a hardware clock on a GPIO at the specified frequency.
+Frequencies above 30MHz are unlikely to work.
+
+. .
+   gpio: see description
+clkfreq: 0 (off) or 4689-250M (13184-375M for the BCM2711)
+. .
+
+Returns 0 if OK, otherwise PI_BAD_GPIO, PI_NOT_HCLK_GPIO,
+PI_BAD_HCLK_FREQ,or PI_BAD_HCLK_PASS.
+
+The same clock is available on multiple GPIO.  The latest
+frequency setting will be used by all GPIO which share a clock.
+
+The GPIO must be one of the following.
+
+. .
+4   clock 0  All models
+5   clock 1  All models but A and B (reserved for system use)
+6   clock 2  All models but A and B
+20  clock 0  All models but A and B
+21  clock 1  All models but A and Rev.2 B (reserved for system use)
+
+32  clock 0  Compute module only
+34  clock 0  Compute module only
+42  clock 1  Compute module only (reserved for system use)
+43  clock 2  Compute module only
+44  clock 1  Compute module only (reserved for system use)
+. .
+
+Access to clock 1 is protected by a password as its use will likely
+crash the Pi.  The password is given by or'ing 0x5A000000 with the
+GPIO number.
+D*/
+//}}}
+//{{{
+int gpioHardwarePWM (unsigned gpio, unsigned PWMfreq, unsigned PWMduty);
+/*D
+Starts hardware PWM on a GPIO at the specified frequency and dutycycle.
+Frequencies above 30MHz are unlikely to work.
+
+NOTE: Any waveform started by [*gpioWaveTxSend*], or
+[*gpioWaveChain*] will be cancelled.
+
+This function is only valid if the pigpio main clock is PCM.  The
+main clock defaults to PCM but may be overridden by a call to
+[*gpioCfgClock*].
+
+. .
+   gpio: see description
+PWMfreq: 0 (off) or 1-125M (1-187.5M for the BCM2711)
+PWMduty: 0 (off) to 1000000 (1M)(fully on)
+. .
+
+Returns 0 if OK, otherwise PI_BAD_GPIO, PI_NOT_HPWM_GPIO,
+PI_BAD_HPWM_DUTY, PI_BAD_HPWM_FREQ, or PI_HPWM_ILLEGAL.
+
+The same PWM channel is available on multiple GPIO.  The latest
+frequency and dutycycle setting will be used by all GPIO which
+share a PWM channel.
+
+The GPIO must be one of the following.
+
+. .
+12  PWM channel 0  All models but A and B
+13  PWM channel 1  All models but A and B
+18  PWM channel 0  All models
+19  PWM channel 1  All models but A and B
+
+40  PWM channel 0  Compute module only
+41  PWM channel 1  Compute module only
+45  PWM channel 1  Compute module only
+52  PWM channel 0  Compute module only
+53  PWM channel 1  Compute module only
+. .
+
+The actual number of steps beween off and fully on is the
+integral part of 250M/PWMfreq (375M/PWMfreq for the BCM2711).
+
+The actual frequency set is 250M/steps (375M/steps for the BCM2711).
+
+There will only be a million steps for a PWMfreq of 250 (375 for
+the BCM2711). Lower frequencies will have more steps and higher
+frequencies will have fewer steps.  PWMduty is
+automatically scaled to take this into account.
+D*/
+//}}}
+//}}}
 //{{{  time
 //{{{
 int gpioTime (unsigned timetype, int* seconds, int* micros);
@@ -5233,6 +5502,297 @@ with an event.
 D*/
 //}}}
 //}}}
+//{{{  shell
+//{{{
+int shell (char* scriptName, char* scriptString);
+/*D
+This function uses the system call to execute a shell script
+with the given string as its parameter.
+
+. .
+  scriptName: the name of the script, only alphanumeric characters,
+              '-' and '_' are allowed in the name
+scriptString: the string to pass to the script
+. .
+
+The exit status of the system call is returned if OK, otherwise
+PI_BAD_SHELL_STATUS.
+
+scriptName must exist in /opt/pigpio/cgi and must be executable.
+
+The returned exit status is normally 256 times that set by the
+shell script exit function.  If the script can't be found 32512 will
+be returned.
+
+The following table gives some example returned statuses.
+
+Script exit status @ Returned system call status
+1                  @ 256
+5                  @ 1280
+10                 @ 2560
+200                @ 51200
+script not found   @ 32512
+
+...
+// pass two parameters, hello and world
+status = shell("scr1", "hello world");
+
+// pass three parameters, hello, string with spaces, and world
+status = shell("scr1", "hello 'string with spaces' world");
+
+// pass one parameter, hello string with spaces world
+status = shell("scr1", "\"hello string with spaces world\"");
+...
+D*/
+//}}}
+//}}}
+//{{{  file
+//{{{
+int fileOpen (char* file, unsigned mode);
+//This function returns a handle to a file opened in a specified mode.
+//. .
+//file: the file to open
+//mode: the file open mode
+//. .
+
+//Returns a handle (>=0) if OK, otherwise PI_NO_HANDLE, PI_NO_FILE_ACCESS,
+//PI_BAD_FILE_MODE, PI_FILE_OPEN_FAILED, or PI_FILE_IS_A_DIR.
+
+//File
+
+//A file may only be opened if permission is granted by an entry in
+///opt/pigpio/access.  This is intended to allow remote access to files
+//in a more or less controlled manner.
+
+//Each entry in /opt/pigpio/access takes the form of a file path
+//which may contain wildcards followed by a single letter permission.
+//The permission may be R for read, W for write, U for read/write,
+//and N for no access.
+
+//Where more than one entry matches a file the most specific rule
+//applies.  If no entry matches a file then access is denied.
+
+//Suppose /opt/pigpio/access contains the following entries
+
+//. .
+///home/* n
+///home/pi/shared/dir_1/* w
+///home/pi/shared/dir_2/* r
+///home/pi/shared/dir_3/* u
+///home/pi/shared/dir_1/file.txt n
+//. .
+
+//Files may be written in directory dir_1 with the exception
+//of file.txt.
+
+//Files may be read in directory dir_2.
+
+//Files may be read and written in directory dir_3.
+
+//If a directory allows read, write, or read/write access then files may
+//be created in that directory.
+
+//In an attempt to prevent risky permissions the following paths are
+//ignored in /opt/pigpio/access.
+
+//. .
+//a path containing ..
+//a path containing only wildcards (*?)
+//a path containing less than two non-wildcard parts
+//. .
+
+//Mode
+
+//The mode may have the following values.
+
+//Macro         @ Value @ Meaning
+//PI_FILE_READ  @   1   @ open file for reading
+//PI_FILE_WRITE @   2   @ open file for writing
+//PI_FILE_RW    @   3   @ open file for reading and writing
+
+//The following values may be or'd into the mode.
+
+//Macro          @ Value @ Meaning
+//PI_FILE_APPEND @ 4     @ Writes append data to the end of the file
+//PI_FILE_CREATE @ 8     @ The file is created if it doesn't exist
+//PI_FILE_TRUNC  @ 16    @ The file is truncated
+
+//Newly created files are owned by root with permissions owner read and write.
+
+//...
+//#include <stdio.h>
+//#include <pigpio.h>
+
+//int main(int argc, char *argv[])
+//{
+   //int handle, c;
+   //char buf[60000];
+
+   //if (gpioInitialise() < 0) return 1;
+
+   //// assumes /opt/pigpio/access contains the following line
+   //// /ram/*.c r
+
+   //handle = fileOpen("/ram/pigpio.c", PI_FILE_READ);
+
+   //if (handle >= 0)
+   //{
+      //while ((c=fileRead(handle, buf, sizeof(buf)-1)))
+      //{
+         //buf[c] = 0;
+         //printf("%s", buf);
+      //}
+
+      //fileClose(handle);
+   //}
+
+   //gpioTerminate();
+//}
+//...
+//}}}
+//{{{
+int fileClose (unsigned handle);
+/*D
+This function closes the file associated with handle.
+
+. .
+handle: >=0, as returned by a call to [*fileOpen*]
+. .
+
+Returns 0 if OK, otherwise PI_BAD_HANDLE.
+
+...
+fileClose(h);
+...
+D*/
+//}}}
+
+//{{{
+int fileWrite (unsigned handle, char* buf, unsigned count);
+/*D
+This function writes count bytes from buf to the the file
+associated with handle.
+
+. .
+handle: >=0, as returned by a call to [*fileOpen*]
+   buf: the array of bytes to write
+ count: the number of bytes to write
+. .
+
+Returns 0 if OK, otherwise PI_BAD_HANDLE, PI_BAD_PARAM,
+PI_FILE_NOT_WOPEN, or PI_BAD_FILE_WRITE.
+
+...
+status = fileWrite(h, buf, count);
+if (status == 0)
+{
+   // okay
+}
+else
+{
+   // error
+}
+...
+D*/
+//}}}
+//{{{
+int fileRead (unsigned handle, char* buf, unsigned count);
+/*D
+This function reads up to count bytes from the the file
+associated with handle and writes them to buf.
+
+. .
+handle: >=0, as returned by a call to [*fileOpen*]
+   buf: an array to receive the read data
+ count: the maximum number of bytes to read
+. .
+
+Returns the number of bytes read (>=0) if OK, otherwise PI_BAD_HANDLE, PI_BAD_PARAM, PI_FILE_NOT_ROPEN, or PI_BAD_FILE_WRITE.
+
+...
+if (fileRead(h, buf, sizeof(buf)) > 0)
+{
+   // process read data
+}
+...
+D*/
+//}}}
+//{{{
+int fileSeek (unsigned handle, int32_t seekOffset, int seekFrom);
+/*D
+This function seeks to a position within the file associated
+with handle.
+
+. .
+    handle: >=0, as returned by a call to [*fileOpen*]
+seekOffset: the number of bytes to move.  Positive offsets
+            move forward, negative offsets backwards.
+  seekFrom: one of PI_FROM_START (0), PI_FROM_CURRENT (1),
+            or PI_FROM_END (2)
+. .
+
+Returns the new byte position within the file (>=0) if OK, otherwise PI_BAD_HANDLE, or PI_BAD_FILE_SEEK.
+
+...
+fileSeek(0, 20, PI_FROM_START); // Seek to start plus 20
+
+size = fileSeek(0, 0, PI_FROM_END); // Seek to end, return size
+
+pos = fileSeek(0, 0, PI_FROM_CURRENT); // Return current position
+...
+D*/
+//}}}
+
+//{{{
+int fileList (char* fpat, char* buf, unsigned count);
+//This function returns a list of files which match a pattern.  The
+//pattern may contain wildcards.
+
+//. .
+ //fpat: file pattern to match
+  //buf: an array to receive the matching file names
+//count: the maximum number of bytes to read
+//. .
+
+//Returns the number of returned bytes if OK, otherwise PI_NO_FILE_ACCESS,
+//or PI_NO_FILE_MATCH.
+
+//The pattern must match an entry in /opt/pigpio/access.  The pattern
+//may contain wildcards.  See [*fileOpen*].
+
+//NOTE
+
+//The returned value is not the number of files, it is the number
+//of bytes in the buffer.  The file names are separated by newline
+//characters.
+
+//...
+//#include <stdio.h>
+//#include <pigpio.h>
+
+//int main(int argc, char *argv[])
+//{
+   //int c;
+   //char buf[1000];
+
+   //if (gpioInitialise() < 0) return 1;
+
+   //// assumes /opt/pigpio/access contains the following line
+   //// /ram/*.c r
+
+   //c = fileList("/ram/p*.c", buf, sizeof(buf));
+
+   //if (c >= 0)
+   //{
+      //// terminate string
+      //buf[c] = 0;
+      //printf("%s", buf);
+   //}
+
+   //gpioTerminate();
+//}
+//}}}
+//}}}
 //{{{  config
 //{{{
 int gpioCfgBufferSize (unsigned cfgMillis);
@@ -5268,6 +5828,7 @@ sample   4       8  12  18   31   55  107  ---
 . .
 D*/
 //}}}
+
 //{{{
 int gpioCfgClock (unsigned cfgMicros, unsigned cfgPeripheral, unsigned cfgSource);
 /*D
@@ -5303,6 +5864,21 @@ sample  cpu
 A sample rate of 5 microseconds seeems to be the sweet spot.
 D*/
 //}}}
+
+//{{{
+int gpioCfgDMAchannel (unsigned DMAchannel); /* DEPRECATED */
+/*D
+Configures pigpio to use the specified DMA channel.
+
+This function is only effective if called before [*gpioInitialise*].
+
+. .
+DMAchannel: 0-14
+. .
+
+The default setting is to use channel 14.
+D*/
+//}}}
 //{{{
 int gpioCfgDMAchannels (unsigned primaryChannel, unsigned secondaryChannel);
 /*D
@@ -5336,6 +5912,69 @@ a 10 second pulse delay requires one control block on a full channel
 and 611 control blocks on a lite channel.
 D*/
 //}}}
+
+//{{{
+int gpioCfgPermissions (uint64_t updateMask);
+/*D
+Configures pigpio to restrict GPIO updates via the socket or pipe
+interfaces to the GPIO specified by the mask.  Programs directly
+calling the pigpio library (i.e. linked with -lpigpio are not
+affected).  A GPIO update is a write to a GPIO or a GPIO mode
+change or any function which would force such an action.
+
+This function is only effective if called before [*gpioInitialise*].
+
+. .
+updateMask: bit (1<<n) is set for each GPIO n which may be updated
+. .
+
+The default setting depends upon the Pi model. The user GPIO are
+added to the mask.
+
+If the board revision is not recognised then GPIO 2-27 are allowed.
+
+Unknown board @ PI_DEFAULT_UPDATE_MASK_UNKNOWN @ 0x0FFFFFFC
+Type 1 board  @ PI_DEFAULT_UPDATE_MASK_B1 @ 0x03E6CF93
+Type 2 board  @ PI_DEFAULT_UPDATE_MASK_A_B2 @ 0xFBC6CF9C
+Type 3 board  @ PI_DEFAULT_UPDATE_MASK_R3 @ 0x0FFFFFFC
+D*/
+//}}}
+//{{{
+int gpioCfgSocketPort (unsigned port);
+/*D
+Configures pigpio to use the specified socket port.
+
+This function is only effective if called before [*gpioInitialise*].
+
+. .
+port: 1024-32000
+. .
+
+The default setting is to use port 8888.
+D*/
+//}}}
+//{{{
+int gpioCfgInterfaces (unsigned ifFlags);
+/*D
+Configures pigpio support of the fifo and socket interfaces.
+
+This function is only effective if called before [*gpioInitialise*].
+
+. .
+ifFlags: 0-7
+. .
+
+The default setting (0) is that both interfaces are enabled.
+
+Or in PI_DISABLE_FIFO_IF to disable the pipe interface.
+
+Or in PI_DISABLE_SOCK_IF to disable the socket interface.
+
+Or in PI_LOCALHOST_SOCK_IF to disable remote socket
+access (this means that the socket interface is only
+usable from the local Pi).
+D*/
+//}}}
 //{{{
 int gpioCfgMemAlloc (unsigned memAllocMode);
 /*D
@@ -5353,6 +5992,20 @@ method uses the mailbox property interface to allocate bus memory.
 
 Auto will use the mailbox method unless a larger than default buffer
 size is requested with [*gpioCfgBufferSize*].
+D*/
+//}}}
+//{{{
+int gpioCfgNetAddr (int numSockAddr, uint32_t *sockAddr);
+/*D
+Sets the network addresses which are allowed to talk over the
+socket interface.
+
+This function is only effective if called before [*gpioInitialise*].
+
+. .
+numSockAddr: 0-256 (0 means all addresses allowed)
+   sockAddr: an array of permitted network addresses.
+. .
 D*/
 //}}}
 
@@ -5623,6 +6276,18 @@ D*/
 void rawDumpWave();
 /*D
 Used to print a readable version of the current waveform to stderr.
+
+Not intended for general use.
+D*/
+//}}}
+//{{{
+void rawDumpScript (unsigned script_id);
+/*
+Used to print a readable version of a script to stderr.
+
+. .
+script_id: >=0, a script_id returned by [*gpioStoreScript*]
+. .
 
 Not intended for general use.
 D*/

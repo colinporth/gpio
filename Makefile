@@ -13,7 +13,6 @@ SRCS      = test.cpp \
 	    ../shared/utils/cLog.cpp \
 	    ../shared/fmt/format.cpp \
 	    pigpio/pigpio.c \
-	    pigpio/command.c \
 
 BUILD_DIR = ./build
 CLEAN_DIRS = $(BUILD_DIR)

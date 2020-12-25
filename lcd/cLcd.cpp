@@ -1466,7 +1466,6 @@ cLcd9341::cLcd9341 (eRotate rotate, eInfo info, eMode mode, int spiSpeed)
 
 //{{{
 bool cLcd9341::initialise() {
-// no hw reset
 
   if (!cLcd::initialise())
     return false;
@@ -1478,7 +1477,7 @@ bool cLcd9341::initialise() {
   // mode 0, spi manages ce0 active lo
   mSpiHandle = spiOpen (0, mSpiSpeed, 0x00);
 
-  writeCommand (0x01); // software reset
+  writeCommand (0x01); // rely on software reset, no hw reset
   delayUs (5000);
 
   writeCommand (0x11); // sleep out
@@ -1496,8 +1495,8 @@ bool cLcd9341::initialise() {
   uint8_t k9341xCB[] = { 0x39, 0x2C, 0x00, 0x34, 0x02 };
   writeCommandMultiData (0xCB, k9341xCB, sizeof(k9341xCB)); // Driver Timing Control B
 
-  uint8_t k9341xF7[] = { 0x20 };
-  writeCommandMultiData (0xF7, k9341xF7, sizeof(k9341xF7));  // Pump Ratio Control
+  uint8_t k9341xF7 = 0x20;
+  writeCommandMultiData (0xF7, &k9341xF7, 1);  // Pump Ratio Control
 
   uint8_t k9341xEA[] = { 0x00, 0x00 };
   writeCommandMultiData (0xEA, k9341xEA, sizeof(k9341xEA)); // Driver Timing Control B
@@ -1516,16 +1515,17 @@ bool cLcd9341::initialise() {
   constexpr uint8_t kMY  = 0x80; // memory row address order swap
   constexpr uint8_t kMX  = 0x40; // memory column address order swap
   constexpr uint8_t kMV  = 0x20; // memory row column exchange
-  //constexpr uint8_t kML  = 0x10; // lcd vertical refresh
   constexpr uint8_t kBgr = 0x08;
+
+  //constexpr uint8_t kML  = 0x10; // lcd vertical refresh
   //constexpr uint8_t kMH  = 0x04; // lcd horizontal refresh
 
-  uint8_t madParam = kBgr;
+  uint8_t madParam;
   switch (mRotate) {
-    case e0:   break;
-    case e180: madParam |= kMY | kMX; break;
-    case e90:  madParam |= kMX | kMV; break;
-    case e270: madParam |= kMY | kMV ; break;
+    case e0:   madParam = kBgr; break;
+    case e180: madParam = kMY | kMX | kBgr; break;
+    case e90:  madParam = kMX | kMV | kBgr; break;
+    case e270: madParam = kMY | kMV | kBgr; break;
     }
   //}}}
   writeCommandMultiData (0x36, &madParam, 1); // MADCTL Memory Access Control ;
@@ -1583,7 +1583,7 @@ bool cLcd9341::initialise() {
   writeCommand (0x09); // Read display identification information
   uint8_t buf1[5] = { 0, 0, 0, 0, 0 };
   spiXfer (mSpiHandle, (char*)buf1, (char*)buf1, 5);
-  cLog::log (LOGINFO, format ("09h - {} {} {} {} {}", buf1[0], buf1[1], buf1[2], buf1[3], buf[4]));
+  cLog::log (LOGINFO, format ("09h - {} {} {} {} {}", buf1[0], buf1[1], buf1[2], buf1[3], buf1[4]));
 
   return true;
   }
@@ -1592,12 +1592,11 @@ bool cLcd9341::initialise() {
 // protected
 //{{{
 uint32_t cLcd9341::updateLcd (sSpan* spans) {
-// probably many small spans, with the occasional large span
-// only 0 rotate
+// usually many small spans, with the occasional large spans
 
-  constexpr uint8_t kColumnAddressSetCommand = 0x2A;
-  constexpr uint8_t kPageAddressSetCommand = 0x2B;
-  constexpr uint8_t kMemoryWriteCommand = 0x2C;
+  constexpr uint8_t k9341ColumnAddressSetCommand = 0x2A;
+  constexpr uint8_t k9341PageAddressSetCommand = 0x2B;
+  constexpr uint8_t k9341MemoryWriteCommand = 0x2C;
 
   int numPixels = 0;
   for (sSpan* span = spans; span; span = span->next) {
@@ -1609,15 +1608,15 @@ uint32_t cLcd9341::updateLcd (sSpan* spans) {
       case e90:
       case e0:
       case e180:
-        //writeCommandMultiData (kColumnAddressSetCommand, (uint8_t*)columnAddressSetParams, 4);
+        //writeCommandMultiData (k9341ColumnAddressSetCommand, (uint8_t*)columnAddressSetParams, 4);
         gpioWrite (kRegisterGpio, 0);
-        spiWrite (mSpiHandle, (char*)&kColumnAddressSetCommand, 1);
+        spiWrite (mSpiHandle, (char*)&k9341ColumnAddressSetCommand, 1);
         gpioWrite (kRegisterGpio, 1);
         spiWrite (mSpiHandle, (char*)columnAddressSetParams, 4);
 
-        //writeCommandMultiData (kPageAddressSetCommand, (uint8_t*)pageAddressSetParams, 4);
+        //writeCommandMultiData (k9341PageAddressSetCommand, (uint8_t*)pageAddressSetParams, 4);
         gpioWrite (kRegisterGpio, 0);
-        spiWrite (mSpiHandle, (char*)&kPageAddressSetCommand, 1);
+        spiWrite (mSpiHandle, (char*)&k9341PageAddressSetCommand, 1);
         gpioWrite (kRegisterGpio, 1);
         spiWrite (mSpiHandle, (char*)pageAddressSetParams, 4);
         break;
@@ -1636,12 +1635,12 @@ uint32_t cLcd9341::updateLcd (sSpan* spans) {
     int length = span->r.getNumPixels() * 2;
     if (length < 0x10000) {
       gpioWrite (kRegisterGpio, 0);
-      spiWrite (mSpiHandle, (char*)&kMemoryWriteCommand, 1);
+      spiWrite (mSpiHandle, (char*)&k9341MemoryWriteCommand, 1);
       gpioWrite (kRegisterGpio, 1);
       spiWrite (mSpiHandle, (char*)swappedFrameBuf, length);
       }
     else
-      writeCommandMultiData (kMemoryWriteCommand, (uint8_t*)swappedFrameBuf, length);
+      writeCommandMultiData (k9341MemoryWriteCommand, (uint8_t*)swappedFrameBuf, length);
     }
 
   return numPixels;
