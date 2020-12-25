@@ -3045,6 +3045,38 @@ PI_BAD_HANDLE, PI_BAD_SPI_COUNT, or PI_SPI_XFER_FAILED.
 D*/
 //}}}
 //{{{
+int spiWriteMain4wire (unsigned handle, char* buf, unsigned count);
+/*D
+This function writes count bytes of data from buf to the SPI
+device associated with the handle.
+
+. .
+handle: >=0, as returned by a call to [*spiOpen*]
+   buf: the data bytes to write
+ count: the number of bytes to write
+. .
+
+Returns the number of bytes transferred if OK, otherwise
+PI_BAD_HANDLE, PI_BAD_SPI_COUNT, or PI_SPI_XFER_FAILED.
+D*/
+//}}}
+//{{{
+int spiWriteAux (unsigned handle, char* buf, unsigned count);
+/*D
+This function writes count bytes of data from buf to the SPI
+device associated with the handle.
+
+. .
+handle: >=0, as returned by a call to [*spiOpen*]
+   buf: the data bytes to write
+ count: the number of bytes to write
+. .
+
+Returns the number of bytes transferred if OK, otherwise
+PI_BAD_HANDLE, PI_BAD_SPI_COUNT, or PI_SPI_XFER_FAILED.
+D*/
+//}}}
+//{{{
 int spiWrite (unsigned handle, char* buf, unsigned count);
 /*D
 This function writes count bytes of data from buf to the SPI

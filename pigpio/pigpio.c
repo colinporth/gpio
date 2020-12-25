@@ -1444,25 +1444,23 @@ static void closeOrphanedNotifications (int slot, int fd);
 //}}}
 //{{{  helpers
 //{{{
-static char* myTimeStamp()
-{
-   static struct timeval last;
-   static char buf[32];
-   struct timeval now;
+static char* myTimeStamp() {
 
-   struct tm tmp;
+  static struct timeval last;
+  static char buf[32];
 
-   gettimeofday(&now, NULL);
+  struct timeval now;
+  gettimeofday(&now, NULL);
 
-   if (now.tv_sec != last.tv_sec)
-   {
-      localtime_r(&now.tv_sec, &tmp);
-      strftime(buf, sizeof(buf), "%F %T", &tmp);
-      last.tv_sec = now.tv_sec;
-   }
+  if (now.tv_sec != last.tv_sec) {
+    struct tm tmp;
+    localtime_r(&now.tv_sec, &tmp);
+    strftime(buf, sizeof(buf), "%F %T", &tmp);
+    last.tv_sec = now.tv_sec;
+    }
 
-   return buf;
-}
+  return buf;
+  }
 //}}}
 //{{{
 int myPathBad (char* name)
@@ -8009,7 +8007,7 @@ static void spiGoS (unsigned speed, uint32_t flags, char* txBuf, char* rxBuf, un
   }
 //}}}
 //{{{
-static void spiGo (unsigned speed, uint32_t flags, char *txBuf, char *rxBuf, unsigned count) {
+static void spiGo (unsigned speed, uint32_t flags, char* txBuf, char* rxBuf, unsigned count) {
 
   if (PI_SPI_FLAGS_GET_AUX_SPI (flags))
     spiGoA (speed, flags, txBuf, rxBuf, count);
@@ -8019,46 +8017,40 @@ static void spiGo (unsigned speed, uint32_t flags, char *txBuf, char *rxBuf, uns
 //}}}
 
 //{{{
-static void spiTerminate (uint32_t flags)
-{
-   int resvd;
+static void spiTerminate (uint32_t flags) {
 
-   resvd = PI_SPI_FLAGS_GET_RESVD(flags);
+  int resvd = PI_SPI_FLAGS_GET_RESVD(flags);
 
-   if (PI_SPI_FLAGS_GET_AUX_SPI(flags))
-   {
-      /* disable module and access to registers */
+  if (PI_SPI_FLAGS_GET_AUX_SPI(flags)) {
+    /* disable module and access to registers */
+    auxReg[AUX_ENABLES] &= (~AUXENB_SPI1);
 
-      auxReg[AUX_ENABLES] &= (~AUXENB_SPI1);
+    /* restore original state */
+    if (!(resvd&1)) myGpioSetMode(PI_ASPI_CE0,  old_mode_ace0);
+    if (!(resvd&2)) myGpioSetMode(PI_ASPI_CE1,  old_mode_ace1);
+    if (!(resvd&4)) myGpioSetMode(PI_ASPI_CE2,  old_mode_ace2);
 
-      /* restore original state */
+    myGpioSetMode(PI_ASPI_SCLK, old_mode_asclk);
+    myGpioSetMode(PI_ASPI_MISO, old_mode_amiso);
+    myGpioSetMode(PI_ASPI_MOSI, old_mode_amosi);
 
-      if (!(resvd&1)) myGpioSetMode(PI_ASPI_CE0,  old_mode_ace0);
-      if (!(resvd&2)) myGpioSetMode(PI_ASPI_CE1,  old_mode_ace1);
-      if (!(resvd&4)) myGpioSetMode(PI_ASPI_CE2,  old_mode_ace2);
+    auxReg[AUX_SPI0_CNTL0_REG] = old_spi_cntl0;
+    auxReg[AUX_SPI0_CNTL1_REG] = old_spi_cntl1;
+    }
 
-      myGpioSetMode(PI_ASPI_SCLK, old_mode_asclk);
-      myGpioSetMode(PI_ASPI_MISO, old_mode_amiso);
-      myGpioSetMode(PI_ASPI_MOSI, old_mode_amosi);
+  else {
+    /* restore original state */
+   if (!(resvd&1)) myGpioSetMode(PI_SPI_CE0,  old_mode_ce0);
+   if (!(resvd&2)) myGpioSetMode(PI_SPI_CE1,  old_mode_ce1);
 
-      auxReg[AUX_SPI0_CNTL0_REG] = old_spi_cntl0;
-      auxReg[AUX_SPI0_CNTL1_REG] = old_spi_cntl1;
-   }
-   else
-   {
-      /* restore original state */
+    myGpioSetMode(PI_SPI_SCLK, old_mode_sclk);
+    myGpioSetMode(PI_SPI_MISO, old_mode_miso);
+    myGpioSetMode(PI_SPI_MOSI, old_mode_mosi);
 
-      if (!(resvd&1)) myGpioSetMode(PI_SPI_CE0,  old_mode_ce0);
-      if (!(resvd&2)) myGpioSetMode(PI_SPI_CE1,  old_mode_ce1);
-
-      myGpioSetMode(PI_SPI_SCLK, old_mode_sclk);
-      myGpioSetMode(PI_SPI_MISO, old_mode_miso);
-      myGpioSetMode(PI_SPI_MOSI, old_mode_mosi);
-
-      spiReg[SPI_CS]  = old_spi_cs;
-      spiReg[SPI_CLK] = old_spi_clk;
-   }
-}
+    spiReg[SPI_CS]  = old_spi_cs;
+    spiReg[SPI_CLK] = old_spi_clk;
+    }
+  }
 //}}}
 
 // external hw spi, main & aux
@@ -8143,9 +8135,64 @@ int spiRead (unsigned handle, char* buf, unsigned count)
 }
 //}}}
 //{{{
+int spiWriteAux (unsigned handle, char* buf, unsigned count) {
+
+  spiGoA (spiInfo[handle].speed, spiInfo[handle].flags, buf, NULL, count);
+  return count;
+  }
+//}}}
+//{{{
+int spiWriteMain4wire (unsigned handle, char* buf, unsigned count) {
+
+  unsigned flags = spiInfo[handle].flags;
+
+  unsigned channel = PI_SPI_FLAGS_GET_CHANNEL (flags);
+  unsigned mode   =  PI_SPI_FLAGS_GET_MODE (flags);
+  unsigned cspols =  PI_SPI_FLAGS_GET_CSPOLS (flags);
+  unsigned cspol  =  (cspols >> channel) & 1;
+
+  uint32_t spiDefaults = SPI_CS_MODE(mode) | SPI_CS_CSPOLS(cspols) |
+                         SPI_CS_CS(channel) | SPI_CS_CSPOL(cspol) | SPI_CS_CLEAR(3);
+
+  // undocumented, stops inter-byte gap
+  spiReg[SPI_DLEN] = 2;
+
+  // stop
+  spiReg[SPI_CS] = spiDefaults;
+  spiReg[SPI_CLK] = 250000000 / spiInfo[handle].speed;;
+
+  // start
+  spiReg[SPI_CS] = spiDefaults | SPI_CS_TA;
+
+  uint32_t txCnt = 0;
+  uint32_t rxCnt = 0;
+  uint32_t spiDummy = 0;
+  while ((txCnt < count) || (rxCnt < count)) {
+    while ((rxCnt < count) && ((spiReg[SPI_CS] & SPI_CS_RXD))) {
+      spiDummy = spiReg[SPI_FIFO];
+      rxCnt++;
+      }
+    while ((txCnt < count) && ((spiReg[SPI_CS] & SPI_CS_TXD))) {
+      spiReg[SPI_FIFO] = *buf++;
+      txCnt++;
+      }
+    }
+
+  while (!(spiReg[SPI_CS] & SPI_CS_DONE)) {}
+
+  // stop
+  spiReg[SPI_CS] = spiDefaults;
+
+  return count;
+  }
+//}}}
+//{{{
 int spiWrite (unsigned handle, char* buf, unsigned count) {
 
-  spiGo (spiInfo[handle].speed, spiInfo[handle].flags, buf, NULL, count);
+  if (PI_SPI_FLAGS_GET_AUX_SPI (spiInfo[handle].flags))
+    spiGoA (spiInfo[handle].speed, spiInfo[handle].flags, buf, NULL, count);
+  else
+    spiGoS (spiInfo[handle].speed, spiInfo[handle].flags, buf, NULL, count);
 
   return count;
   }
@@ -8193,7 +8240,6 @@ int spiClose (unsigned handle) {
   return 0;
   }
 //}}}
-
 
 // internal bitbang spi
 //{{{
