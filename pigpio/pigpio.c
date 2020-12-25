@@ -2743,551 +2743,6 @@ static uint8_t I2CGetByte (wfRx_t* w, int nack)
 }
 //}}}
 //}}}
-//{{{  spi
-//{{{
-static uint32_t _spiTXBits (char *buf, int pos, int bitlen, int msbf)
-{
-   uint32_t bits=0;
-
-   if (buf)
-   {
-      if      (bitlen <=  8) bits = *((( uint8_t*)buf)+pos);
-      else if (bitlen <= 16) bits = *(((uint16_t*)buf)+pos);
-      else                   bits = *(((uint32_t*)buf)+pos);
-
-      if (msbf) bits <<= (32-bitlen);
-   }
-
-   return bits;
-}
-//}}}
-//{{{
-static void _spiRXBits (char *buf, int pos, int bitlen, int msbf, uint32_t bits)
-{
-   if (buf)
-   {
-      if (!msbf) bits >>= (32-bitlen);
-
-      if      (bitlen <=  8) *((( uint8_t*)buf)+pos) = bits;
-      else if (bitlen <= 16) *(((uint16_t*)buf)+pos) = bits;
-      else                   *(((uint32_t*)buf)+pos) = bits;
-   }
-}
-//}}}
-
-//{{{
-static void spiACS (int channel, int on)
-{
-   int gpio;
-
-   switch (channel)
-   {
-       case  0: gpio = PI_ASPI_CE0; break;
-       case  1: gpio = PI_ASPI_CE1; break;
-       default: gpio = PI_ASPI_CE2; break;
-   }
-   myGpioWrite(gpio, on);
-}
-//}}}
-//{{{
-static void spiGoA (unsigned speed, uint32_t flags, char* txBuf, char* rxBuf, unsigned count)
-{
-   int cs;
-   char bit_ir[4] = {1, 0, 0, 1}; /* read on rising edge */
-   char bit_or[4] = {0, 1, 1, 0}; /* write on rising edge */
-   char bit_ic[4] = {0, 0, 1, 1}; /* invert clock */
-
-   int mode, bitlen, txmsbf, rxmsbf, channel;
-   unsigned txCnt=0;
-   unsigned rxCnt=0;
-   uint32_t spiDefaults;
-   uint32_t statusReg;
-   int txFull, rxEmpty;
-
-   channel = PI_SPI_FLAGS_GET_CHANNEL(flags);
-   mode   =  PI_SPI_FLAGS_GET_MODE   (flags);
-
-   bitlen =  PI_SPI_FLAGS_GET_BITLEN (flags);
-
-   if (!bitlen) bitlen = 8;
-
-   /* correct count for word size */
-
-   if (bitlen >  8) count /= 2;
-   if (bitlen > 16) count /= 2;
-
-   txmsbf = !PI_SPI_FLAGS_GET_TX_LSB (flags);
-   rxmsbf = !PI_SPI_FLAGS_GET_RX_LSB (flags);
-
-   cs = PI_SPI_FLAGS_GET_CSPOLS(flags) & (1<<channel);
-
-   spiDefaults = AUXSPI_CNTL0_SPEED((125000000/speed)-1)|
-                 AUXSPI_CNTL0_IN_RISING(bit_ir[mode])  |
-                 AUXSPI_CNTL0_OUT_RISING(bit_or[mode]) |
-                 AUXSPI_CNTL0_INVERT_CLK(bit_ic[mode]) |
-                 AUXSPI_CNTL0_MSB_FIRST(txmsbf)        |
-                 AUXSPI_CNTL0_SHIFT_LEN(bitlen);
-
-   if (!count)
-   {
-      auxReg[AUX_SPI0_CNTL0_REG] =
-         AUXSPI_CNTL0_ENABLE | AUXSPI_CNTL0_CLR_FIFOS;
-
-      myGpioDelay(10);
-
-      auxReg[AUX_SPI0_CNTL0_REG] = AUXSPI_CNTL0_ENABLE  | spiDefaults;
-
-      auxReg[AUX_SPI0_CNTL1_REG] = AUXSPI_CNTL1_MSB_FIRST(rxmsbf);
-
-      return;
-   }
-
-   auxReg[AUX_SPI0_CNTL0_REG] = AUXSPI_CNTL0_ENABLE  | spiDefaults;
-
-   auxReg[AUX_SPI0_CNTL1_REG] = AUXSPI_CNTL1_MSB_FIRST(rxmsbf);
-
-   spiACS(channel, cs);
-
-   while ((txCnt < count) || (rxCnt < count))
-   {
-      statusReg = auxReg[AUX_SPI0_STAT_REG];
-
-      rxEmpty = statusReg & AUXSPI_STAT_RX_EMPTY;
-
-      txFull = (((statusReg>>28)&15) > 2);
-
-      if (rxCnt < count)
-      {
-         if (!rxEmpty)
-         {
-            _spiRXBits(
-               rxBuf, rxCnt++, bitlen, rxmsbf, auxReg[AUX_SPI0_IO_REG]);
-         }
-      }
-
-      if (txCnt < count)
-      {
-         if (!txFull)
-         {
-            if (txCnt != (count-1))
-            {
-               auxReg[AUX_SPI0_TX_HOLD] =
-                  _spiTXBits(txBuf, txCnt++, bitlen, txmsbf);
-            }
-            else
-            {
-               auxReg[AUX_SPI0_IO_REG] =
-                  _spiTXBits(txBuf, txCnt++, bitlen, txmsbf);
-            }
-         }
-      }
-   }
-
-   while ((auxReg[AUX_SPI0_STAT_REG] & AUXSPI_STAT_BUSY)) ;
-
-   spiACS(channel, !cs);
-}
-//}}}
-//{{{
-static void spiGoS (unsigned speed, uint32_t flags, char *txBuf, char *rxBuf, unsigned count)
-{
-   unsigned txCnt=0;
-   unsigned rxCnt=0;
-   unsigned cnt, cnt4w, cnt3w;
-   uint32_t spiDefaults;
-   unsigned mode, channel, cspol, cspols, flag3w, ren3w;
-
-   channel = PI_SPI_FLAGS_GET_CHANNEL(flags);
-   mode   =  PI_SPI_FLAGS_GET_MODE   (flags);
-   cspols =  PI_SPI_FLAGS_GET_CSPOLS(flags);
-   cspol  =  (cspols>>channel) & 1;
-   flag3w =  PI_SPI_FLAGS_GET_3WIRE(flags);
-   ren3w =   PI_SPI_FLAGS_GET_3WREN(flags);
-
-   spiDefaults = SPI_CS_MODE(mode)     |
-                 SPI_CS_CSPOLS(cspols) |
-                 SPI_CS_CS(channel)    |
-                 SPI_CS_CSPOL(cspol)   |
-                 SPI_CS_CLEAR(3);
-
-   spiReg[SPI_DLEN] = 2; /* undocumented, stops inter-byte gap */
-
-   spiReg[SPI_CS] = spiDefaults; /* stop */
-
-   if (!count) return;
-
-   if (flag3w)
-   {
-      if (ren3w < count)
-      {
-         cnt4w = ren3w;
-         cnt3w = count - ren3w;
-      }
-      else
-      {
-         cnt4w = count;
-         cnt3w = 0;
-      }
-   }
-   else
-   {
-      cnt4w = count;
-      cnt3w = 0;
-   }
-
-   spiReg[SPI_CLK] = 250000000/speed;
-
-   spiReg[SPI_CS] = spiDefaults | SPI_CS_TA; /* start */
-
-   cnt = cnt4w;
-
-   while((txCnt < cnt) || (rxCnt < cnt))
-   {
-      while((rxCnt < cnt) && ((spiReg[SPI_CS] & SPI_CS_RXD)))
-      {
-         if (rxBuf) rxBuf[rxCnt] = spiReg[SPI_FIFO];
-         else       spi_dummy    = spiReg[SPI_FIFO];
-         rxCnt++;
-      }
-
-      while((txCnt < cnt) && ((spiReg[SPI_CS] & SPI_CS_TXD)))
-      {
-         if (txBuf) spiReg[SPI_FIFO] = txBuf[txCnt];
-         else       spiReg[SPI_FIFO] = 0;
-         txCnt++;
-      }
-   }
-
-   while (!(spiReg[SPI_CS] & SPI_CS_DONE)) ;
-
-   /* now switch to 3-wire bus */
-
-   cnt += cnt3w;
-
-   spiReg[SPI_CS] |= SPI_CS_REN;
-
-   while((txCnt < cnt) || (rxCnt < cnt))
-   {
-      while((rxCnt < cnt) && ((spiReg[SPI_CS] & SPI_CS_RXD)))
-      {
-         if (rxBuf) rxBuf[rxCnt] = spiReg[SPI_FIFO];
-         else       spi_dummy    = spiReg[SPI_FIFO];
-         rxCnt++;
-      }
-
-      while((txCnt < cnt) && ((spiReg[SPI_CS] & SPI_CS_TXD)))
-      {
-         if (txBuf) spiReg[SPI_FIFO] = txBuf[txCnt];
-         else       spiReg[SPI_FIFO] = 0;
-         txCnt++;
-      }
-   }
-
-   while (!(spiReg[SPI_CS] & SPI_CS_DONE)) ;
-
-   spiReg[SPI_CS] = spiDefaults; /* stop */
-}
-//}}}
-//{{{
-static void spiGo (unsigned speed, uint32_t flags, char *txBuf, char *rxBuf, unsigned count)
-{
-   static pthread_mutex_t main_mutex = PTHREAD_MUTEX_INITIALIZER;
-   static pthread_mutex_t aux_mutex = PTHREAD_MUTEX_INITIALIZER;
-
-   if (PI_SPI_FLAGS_GET_AUX_SPI(flags))
-   {
-      pthread_mutex_lock(&aux_mutex);
-      spiGoA(speed, flags, txBuf, rxBuf, count);
-      pthread_mutex_unlock(&aux_mutex);
-   }
-   else
-   {
-      pthread_mutex_lock(&main_mutex);
-      spiGoS(speed, flags, txBuf, rxBuf, count);
-      pthread_mutex_unlock(&main_mutex);
-   }
-}
-//}}}
-
-//{{{
-static int spiAnyOpen (uint32_t flags)
-{
-   int i, aux;
-
-   aux = PI_SPI_FLAGS_GET_AUX_SPI(flags);
-
-   for (i=0; i<PI_SPI_SLOTS; i++)
-   {
-      if ((spiInfo[i].state == PI_SPI_OPENED) &&
-         (PI_SPI_FLAGS_GET_AUX_SPI(spiInfo[i].flags) == aux))
-            return 1;
-   }
-   return 0;
-}
-//}}}
-//{{{
-static void spiInit (uint32_t flags)
-{
-   uint32_t resvd, cspols;
-
-   resvd  = PI_SPI_FLAGS_GET_RESVD(flags);
-   cspols = PI_SPI_FLAGS_GET_CSPOLS(flags);
-
-   if (PI_SPI_FLAGS_GET_AUX_SPI(flags))
-   {
-      /* enable module and access to registers */
-
-      auxReg[AUX_ENABLES] |= AUXENB_SPI1;
-
-      /* save original state */
-
-      old_mode_ace0  = gpioGetMode(PI_ASPI_CE0);
-      old_mode_ace1  = gpioGetMode(PI_ASPI_CE1);
-      old_mode_ace2  = gpioGetMode(PI_ASPI_CE2);
-      old_mode_asclk = gpioGetMode(PI_ASPI_SCLK);
-      old_mode_amiso = gpioGetMode(PI_ASPI_MISO);
-      old_mode_amosi = gpioGetMode(PI_ASPI_MOSI);
-
-      old_spi_cntl0 = auxReg[AUX_SPI0_CNTL0_REG];
-      old_spi_cntl1 = auxReg[AUX_SPI0_CNTL1_REG];
-
-      /* manually control auxiliary SPI chip selects */
-
-      if (!(resvd&1))
-      {
-         myGpioSetMode(PI_ASPI_CE0,  PI_OUTPUT);
-         myGpioWrite(PI_ASPI_CE0, !(cspols&1));
-      }
-
-      if (!(resvd&2))
-      {
-         myGpioSetMode(PI_ASPI_CE1,  PI_OUTPUT);
-         myGpioWrite(PI_ASPI_CE1, !(cspols&2));
-      }
-
-      if (!(resvd&4))
-      {
-         myGpioSetMode(PI_ASPI_CE2,  PI_OUTPUT);
-         myGpioWrite(PI_ASPI_CE2, !(cspols&4));
-      }
-
-      /* set gpios to SPI mode */
-
-      myGpioSetMode(PI_ASPI_SCLK, PI_ALT4);
-      myGpioSetMode(PI_ASPI_MISO, PI_ALT4);
-      myGpioSetMode(PI_ASPI_MOSI, PI_ALT4);
-   }
-   else
-   {
-      /* save original state */
-
-      old_mode_ce0  = gpioGetMode(PI_SPI_CE0);
-      old_mode_ce1  = gpioGetMode(PI_SPI_CE1);
-      old_mode_sclk = gpioGetMode(PI_SPI_SCLK);
-      old_mode_miso = gpioGetMode(PI_SPI_MISO);
-      old_mode_mosi = gpioGetMode(PI_SPI_MOSI);
-
-      old_spi_cs  = spiReg[SPI_CS];
-      old_spi_clk = spiReg[SPI_CLK];
-
-      /* set gpios to SPI mode */
-
-      if (!(resvd&1)) myGpioSetMode(PI_SPI_CE0,  PI_ALT0);
-      if (!(resvd&2)) myGpioSetMode(PI_SPI_CE1,  PI_ALT0);
-
-      myGpioSetMode(PI_SPI_SCLK, PI_ALT0);
-      myGpioSetMode(PI_SPI_MISO, PI_ALT0);
-      myGpioSetMode(PI_SPI_MOSI, PI_ALT0);
-   }
-}
-//}}}
-//{{{
-static void spiTerm (uint32_t flags)
-{
-   int resvd;
-
-   resvd = PI_SPI_FLAGS_GET_RESVD(flags);
-
-   if (PI_SPI_FLAGS_GET_AUX_SPI(flags))
-   {
-      /* disable module and access to registers */
-
-      auxReg[AUX_ENABLES] &= (~AUXENB_SPI1);
-
-      /* restore original state */
-
-      if (!(resvd&1)) myGpioSetMode(PI_ASPI_CE0,  old_mode_ace0);
-      if (!(resvd&2)) myGpioSetMode(PI_ASPI_CE1,  old_mode_ace1);
-      if (!(resvd&4)) myGpioSetMode(PI_ASPI_CE2,  old_mode_ace2);
-
-      myGpioSetMode(PI_ASPI_SCLK, old_mode_asclk);
-      myGpioSetMode(PI_ASPI_MISO, old_mode_amiso);
-      myGpioSetMode(PI_ASPI_MOSI, old_mode_amosi);
-
-      auxReg[AUX_SPI0_CNTL0_REG] = old_spi_cntl0;
-      auxReg[AUX_SPI0_CNTL1_REG] = old_spi_cntl1;
-   }
-   else
-   {
-      /* restore original state */
-
-      if (!(resvd&1)) myGpioSetMode(PI_SPI_CE0,  old_mode_ce0);
-      if (!(resvd&2)) myGpioSetMode(PI_SPI_CE1,  old_mode_ce1);
-
-      myGpioSetMode(PI_SPI_SCLK, old_mode_sclk);
-      myGpioSetMode(PI_SPI_MISO, old_mode_miso);
-      myGpioSetMode(PI_SPI_MOSI, old_mode_mosi);
-
-      spiReg[SPI_CS]  = old_spi_cs;
-      spiReg[SPI_CLK] = old_spi_clk;
-   }
-}
-//}}}
-
-//}}}
-//{{{  bitbang spi
-//{{{
-static void set_CS (wfRx_t *w)
-{
-   myGpioWrite(w->S.CS, PI_SPI_FLAGS_GET_CSPOL(w->S.spiFlags));
-}
-//}}}
-//{{{
-static void clear_CS (wfRx_t *w)
-{
-   myGpioWrite(w->S.CS, !PI_SPI_FLAGS_GET_CSPOL(w->S.spiFlags));
-}
-//}}}
-//{{{
-static void set_SCLK (wfRx_t *w)
-{
-   myGpioWrite(w->S.SCLK, !PI_SPI_FLAGS_GET_CPOL(w->S.spiFlags));
-}
-//}}}
-//{{{
-static void clear_SCLK (wfRx_t *w)
-{
-   myGpioWrite(w->S.SCLK, PI_SPI_FLAGS_GET_CPOL(w->S.spiFlags));
-}
-//}}}
-//{{{
-static void SPI_delay (wfRx_t *w)
-{
-   myGpioDelay(w->S.delay);
-}
-//}}}
-//{{{
-static void bbSPIStart (wfRx_t *w)
-{
-   clear_SCLK(w);
-
-   SPI_delay(w);
-
-   set_CS(w);
-
-   SPI_delay(w);
-}
-//}}}
-//{{{
-static void bbSPIStop (wfRx_t *w)
-{
-   SPI_delay(w);
-
-   clear_CS(w);
-
-   SPI_delay(w);
-
-   clear_SCLK(w);
-}
-//}}}
-//{{{
-static uint8_t bbSPIXferByte (wfRx_t *w, char txByte)
-{
-   uint8_t bit, rxByte=0;
-
-   if (PI_SPI_FLAGS_GET_CPHA(w->S.spiFlags))
-   {
-      /*
-      CPHA = 1
-      write on set clock
-      read on clear clock
-      */
-
-      for (bit=0; bit<8; bit++)
-      {
-         set_SCLK(w);
-
-         if (PI_SPI_FLAGS_GET_TX_LSB(w->S.spiFlags))
-         {
-            myGpioWrite(w->S.MOSI, txByte & 0x01);
-            txByte >>= 1;
-         }
-         else
-         {
-            myGpioWrite(w->S.MOSI, txByte & 0x80);
-            txByte <<= 1;
-         }
-
-         SPI_delay(w);
-
-         clear_SCLK(w);
-
-         if (PI_SPI_FLAGS_GET_RX_LSB(w->S.spiFlags))
-         {
-            rxByte = (rxByte >> 1) | myGpioRead(w->S.MISO) << 7;
-         }
-         else
-         {
-            rxByte = (rxByte << 1) | myGpioRead(w->S.MISO);
-         }
-
-         SPI_delay(w);
-      }
-   }
-   else
-   {
-      /*
-      CPHA = 0
-      read on set clock
-      write on clear clock
-      */
-
-      for (bit=0; bit<8; bit++)
-      {
-         if (PI_SPI_FLAGS_GET_TX_LSB(w->S.spiFlags))
-         {
-            myGpioWrite(w->S.MOSI, txByte & 0x01);
-            txByte >>= 1;
-         }
-         else
-         {
-            myGpioWrite(w->S.MOSI, txByte & 0x80);
-            txByte <<= 1;
-         }
-
-         SPI_delay(w);
-
-         set_SCLK(w);
-
-         if (PI_SPI_FLAGS_GET_RX_LSB(w->S.spiFlags))
-         {
-            rxByte = (rxByte >> 1) | myGpioRead(w->S.MISO) << 7;
-         }
-         else
-         {
-            rxByte = (rxByte << 1) | myGpioRead(w->S.MISO);
-         }
-
-         SPI_delay(w);
-
-         clear_SCLK(w);
-      }
-   }
-
-   return rxByte;
-}
-//}}}
-//}}}
 //{{{  dma
 //{{{
 static rawCbs_t * dmaCB2adr(int pos)
@@ -4957,7 +4412,7 @@ void gpioTerminate() {
 }
 //}}}
 
-// utils
+//{{{  utils
 //{{{
 int getBitInBytes (int bitPos, char* buf, int numBits) {
 
@@ -5077,8 +4532,8 @@ void rawDumpWave() {
     }
   }
 //}}}
-
-// time
+//}}}
+//{{{  time
 //{{{
 double time_time()
 {
@@ -5195,8 +4650,8 @@ uint32_t gpioTick() {
   return systReg[SYST_CLO];
   }
 //}}}
-
-// gpio
+//}}}
+//{{{  gpio
 //{{{
 int gpioSetMode (unsigned gpio, unsigned mode)
 {
@@ -7006,7 +6461,7 @@ int gpioGetPad (unsigned pad)
    return strength;
 }
 //}}}
-
+//}}}
 //{{{  i2c
 //{{{
 int i2cWriteQuick(unsigned handle, unsigned bit)
@@ -8263,69 +7718,410 @@ int bscXfer (bsc_xfer_t* xfer)
 //}}}
 //}}}
 //{{{  spi
+// internal hw spi
 //{{{
-int spiOpen (unsigned spiChan, unsigned baud, unsigned spiFlags)
+static int spiAnyOpen (uint32_t flags) {
+
+  int aux = PI_SPI_FLAGS_GET_AUX_SPI(flags);
+
+  for (int i = 0; i<PI_SPI_SLOTS; i++) {
+    if ((spiInfo[i].state == PI_SPI_OPENED) &&
+        (PI_SPI_FLAGS_GET_AUX_SPI(spiInfo[i].flags) == aux))
+      return 1;
+    }
+
+  return 0;
+  }
+//}}}
+//{{{
+static void spiInit (uint32_t flags)
 {
-   static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-   int i, slot;
+   uint32_t resvd, cspols;
 
-   DBG(DBG_USER, "spiChan=%d baud=%d spiFlags=0x%X",
-      spiChan, baud, spiFlags);
+   resvd  = PI_SPI_FLAGS_GET_RESVD(flags);
+   cspols = PI_SPI_FLAGS_GET_CSPOLS(flags);
 
-   CHECK_INITED;
-
-   if (PI_SPI_FLAGS_GET_AUX_SPI(spiFlags))
+   if (PI_SPI_FLAGS_GET_AUX_SPI(flags))
    {
-      if (gpioHardwareRevision() < 16)
-         SOFT_ERROR(PI_NO_AUX_SPI, "no auxiliary SPI on Pi A or B");
+      /* enable module and access to registers */
 
-      i = PI_NUM_AUX_SPI_CHANNEL;
+      auxReg[AUX_ENABLES] |= AUXENB_SPI1;
+
+      /* save original state */
+
+      old_mode_ace0  = gpioGetMode(PI_ASPI_CE0);
+      old_mode_ace1  = gpioGetMode(PI_ASPI_CE1);
+      old_mode_ace2  = gpioGetMode(PI_ASPI_CE2);
+      old_mode_asclk = gpioGetMode(PI_ASPI_SCLK);
+      old_mode_amiso = gpioGetMode(PI_ASPI_MISO);
+      old_mode_amosi = gpioGetMode(PI_ASPI_MOSI);
+
+      old_spi_cntl0 = auxReg[AUX_SPI0_CNTL0_REG];
+      old_spi_cntl1 = auxReg[AUX_SPI0_CNTL1_REG];
+
+      /* manually control auxiliary SPI chip selects */
+
+      if (!(resvd&1))
+      {
+         myGpioSetMode(PI_ASPI_CE0,  PI_OUTPUT);
+         myGpioWrite(PI_ASPI_CE0, !(cspols&1));
+      }
+
+      if (!(resvd&2))
+      {
+         myGpioSetMode(PI_ASPI_CE1,  PI_OUTPUT);
+         myGpioWrite(PI_ASPI_CE1, !(cspols&2));
+      }
+
+      if (!(resvd&4))
+      {
+         myGpioSetMode(PI_ASPI_CE2,  PI_OUTPUT);
+         myGpioWrite(PI_ASPI_CE2, !(cspols&4));
+      }
+
+      /* set gpios to SPI mode */
+
+      myGpioSetMode(PI_ASPI_SCLK, PI_ALT4);
+      myGpioSetMode(PI_ASPI_MISO, PI_ALT4);
+      myGpioSetMode(PI_ASPI_MOSI, PI_ALT4);
    }
    else
-      i = PI_NUM_STD_SPI_CHANNEL;
-
-   if (spiChan >= i)
-      SOFT_ERROR(PI_BAD_SPI_CHANNEL, "bad spiChan (%d)", spiChan);
-
-   if ((baud < PI_SPI_MIN_BAUD) || (baud > PI_SPI_MAX_BAUD))
-      SOFT_ERROR(PI_BAD_SPI_SPEED, "bad baud (%d)", baud);
-
-   if (spiFlags > (1<<22))
-      SOFT_ERROR(PI_BAD_FLAGS, "bad spiFlags (0x%X)", spiFlags);
-
-   if (!spiAnyOpen(spiFlags)) /* initialise on first open */
    {
-      spiInit(spiFlags);
-      spiGo(baud, spiFlags, NULL, NULL, 0);
+      /* save original state */
+
+      old_mode_ce0  = gpioGetMode(PI_SPI_CE0);
+      old_mode_ce1  = gpioGetMode(PI_SPI_CE1);
+      old_mode_sclk = gpioGetMode(PI_SPI_SCLK);
+      old_mode_miso = gpioGetMode(PI_SPI_MISO);
+      old_mode_mosi = gpioGetMode(PI_SPI_MOSI);
+
+      old_spi_cs  = spiReg[SPI_CS];
+      old_spi_clk = spiReg[SPI_CLK];
+
+      /* set gpios to SPI mode */
+
+      if (!(resvd&1)) myGpioSetMode(PI_SPI_CE0,  PI_ALT0);
+      if (!(resvd&2)) myGpioSetMode(PI_SPI_CE1,  PI_ALT0);
+
+      myGpioSetMode(PI_SPI_SCLK, PI_ALT0);
+      myGpioSetMode(PI_SPI_MISO, PI_ALT0);
+      myGpioSetMode(PI_SPI_MOSI, PI_ALT0);
+   }
+}
+//}}}
+
+//{{{
+static uint32_t _spiTXBits (char *buf, int pos, int bitlen, int msbf)
+{
+   uint32_t bits=0;
+
+   if (buf)
+   {
+      if      (bitlen <=  8) bits = *((( uint8_t*)buf)+pos);
+      else if (bitlen <= 16) bits = *(((uint16_t*)buf)+pos);
+      else                   bits = *(((uint32_t*)buf)+pos);
+
+      if (msbf) bits <<= (32-bitlen);
    }
 
-   slot = -1;
-
-   pthread_mutex_lock(&mutex);
-
-   for (i=0; i<PI_SPI_SLOTS; i++)
+   return bits;
+}
+//}}}
+//{{{
+static void _spiRXBits (char *buf, int pos, int bitlen, int msbf, uint32_t bits)
+{
+   if (buf)
    {
-      if (spiInfo[i].state == PI_SPI_CLOSED)
-      {
-         slot = i;
-         spiInfo[slot].state = PI_SPI_RESERVED;
-         break;
+      if (!msbf) bits >>= (32-bitlen);
+
+      if      (bitlen <=  8) *((( uint8_t*)buf)+pos) = bits;
+      else if (bitlen <= 16) *(((uint16_t*)buf)+pos) = bits;
+      else                   *(((uint32_t*)buf)+pos) = bits;
+   }
+}
+//}}}
+//{{{
+static void spiACS (int channel, int on) {
+
+  int gpio;
+  switch (channel) {
+    case  0: gpio = PI_ASPI_CE0; break;
+    case  1: gpio = PI_ASPI_CE1; break;
+    default: gpio = PI_ASPI_CE2; break;
+    }
+
+  myGpioWrite (gpio, on);
+  }
+//}}}
+//{{{
+static void spiGoA (unsigned speed, uint32_t flags, char* txBuf, char* rxBuf, unsigned count) {
+
+  char bit_ir[4] = {1, 0, 0, 1}; // read on rising edge
+  char bit_or[4] = {0, 1, 1, 0}; // write on rising edge
+  char bit_ic[4] = {0, 0, 1, 1}; // invert clock
+
+  int channel = PI_SPI_FLAGS_GET_CHANNEL(flags);
+  int mode = PI_SPI_FLAGS_GET_MODE (flags);
+  int bitlen = PI_SPI_FLAGS_GET_BITLEN (flags);
+  if (!bitlen)
+    bitlen = 8;
+  if (bitlen >  8)
+    count /= 2;
+  if (bitlen > 16)
+    count /= 2;
+
+  int txmsbf = !PI_SPI_FLAGS_GET_TX_LSB (flags);
+  int rxmsbf = !PI_SPI_FLAGS_GET_RX_LSB (flags);
+  int cs = PI_SPI_FLAGS_GET_CSPOLS(flags) & (1<<channel);
+
+  uint32_t spiDefaults = AUXSPI_CNTL0_SPEED((125000000/speed)-1)|
+                         AUXSPI_CNTL0_IN_RISING(bit_ir[mode])  |
+                         AUXSPI_CNTL0_OUT_RISING(bit_or[mode]) |
+                         AUXSPI_CNTL0_INVERT_CLK(bit_ic[mode]) |
+                         AUXSPI_CNTL0_MSB_FIRST(txmsbf)        |
+                         AUXSPI_CNTL0_SHIFT_LEN(bitlen);
+
+  if (!count) {
+    auxReg[AUX_SPI0_CNTL0_REG] = AUXSPI_CNTL0_ENABLE | AUXSPI_CNTL0_CLR_FIFOS;
+    myGpioDelay (10);
+    auxReg[AUX_SPI0_CNTL0_REG] = AUXSPI_CNTL0_ENABLE  | spiDefaults;
+    auxReg[AUX_SPI0_CNTL1_REG] = AUXSPI_CNTL1_MSB_FIRST(rxmsbf);
+    return;
+    }
+
+  auxReg[AUX_SPI0_CNTL0_REG] = AUXSPI_CNTL0_ENABLE  | spiDefaults;
+  auxReg[AUX_SPI0_CNTL1_REG] = AUXSPI_CNTL1_MSB_FIRST(rxmsbf);
+  spiACS(channel, cs);
+
+  unsigned txCnt = 0;
+  unsigned rxCnt = 0;
+  while ((txCnt < count) || (rxCnt < count)) {
+     uint32_t statusReg = auxReg[AUX_SPI0_STAT_REG];
+     int rxEmpty = statusReg & AUXSPI_STAT_RX_EMPTY;
+     int txFull = (((statusReg>>28)&15) > 2);
+     if (rxCnt < count)
+       if (!rxEmpty)
+         _spiRXBits (rxBuf, rxCnt++, bitlen, rxmsbf, auxReg[AUX_SPI0_IO_REG]);
+
+     if (txCnt < count) {
+       if (!txFull) {
+         if (txCnt != (count-1))
+           auxReg[AUX_SPI0_TX_HOLD] = _spiTXBits(txBuf, txCnt++, bitlen, txmsbf);
+         else
+           auxReg[AUX_SPI0_IO_REG] = _spiTXBits(txBuf, txCnt++, bitlen, txmsbf);
+         }
       }
+    }
+
+  while ((auxReg[AUX_SPI0_STAT_REG] & AUXSPI_STAT_BUSY)) {}
+  spiACS (channel, !cs);
+  }
+//}}}
+//{{{
+static void spiGoS (unsigned speed, uint32_t flags, char* txBuf, char* rxBuf, unsigned count) {
+
+  unsigned channel = PI_SPI_FLAGS_GET_CHANNEL (flags);
+  unsigned mode   =  PI_SPI_FLAGS_GET_MODE (flags);
+  unsigned cspols =  PI_SPI_FLAGS_GET_CSPOLS (flags);
+  unsigned cspol  =  (cspols >> channel) & 1;
+  unsigned flag3w =  PI_SPI_FLAGS_GET_3WIRE (flags);
+  unsigned ren3w  =  PI_SPI_FLAGS_GET_3WREN (flags);
+
+  uint32_t spiDefaults = SPI_CS_MODE(mode) | SPI_CS_CSPOLS(cspols) |
+                         SPI_CS_CS(channel) | SPI_CS_CSPOL(cspol) | SPI_CS_CLEAR(3);
+
+  // undocumented, stops inter-byte gap
+  spiReg[SPI_DLEN] = 2;
+
+  // stop
+  spiReg[SPI_CS] = spiDefaults;
+
+  if (!count)
+    return;
+
+  unsigned cnt4w;
+  unsigned cnt3w;
+  if (flag3w) {
+    if (ren3w < count) {
+      cnt4w = ren3w;
+      cnt3w = count - ren3w;
+      }
+    else {
+      cnt4w = count;
+      cnt3w = 0;
+      }
+    }
+  else {
+    cnt4w = count;
+    cnt3w = 0;
+    }
+
+  spiReg[SPI_CLK] = 250000000 / speed;
+  spiReg[SPI_CS] = spiDefaults | SPI_CS_TA; /* start */
+
+  unsigned cnt = cnt4w;
+  unsigned txCnt = 0;
+  unsigned rxCnt = 0;
+  while ((txCnt < cnt) || (rxCnt < cnt)) {
+    while ((rxCnt < cnt) && ((spiReg[SPI_CS] & SPI_CS_RXD))) {
+      if (rxBuf)
+        rxBuf[rxCnt] = spiReg[SPI_FIFO];
+      else
+        spi_dummy = spiReg[SPI_FIFO];
+      rxCnt++;
+      }
+
+    while ((txCnt < cnt) && ((spiReg[SPI_CS] & SPI_CS_TXD))) {
+      if (txBuf)
+        spiReg[SPI_FIFO] = txBuf[txCnt];
+      else
+        spiReg[SPI_FIFO] = 0;
+      txCnt++;
+      }
+    }
+
+  while (!(spiReg[SPI_CS] & SPI_CS_DONE)) {}
+
+  // switch to 3-wire bus
+  cnt += cnt3w;
+  spiReg[SPI_CS] |= SPI_CS_REN;
+  while ((txCnt < cnt) || (rxCnt < cnt)) {
+    while((rxCnt < cnt) && ((spiReg[SPI_CS] & SPI_CS_RXD))) {
+      if (rxBuf)
+        rxBuf[rxCnt] = spiReg[SPI_FIFO];
+      else
+        spi_dummy = spiReg[SPI_FIFO];
+      rxCnt++;
+      }
+
+    while ((txCnt < cnt) && ((spiReg[SPI_CS] & SPI_CS_TXD))) {
+      if (txBuf)
+        spiReg[SPI_FIFO] = txBuf[txCnt];
+      else
+        spiReg[SPI_FIFO] = 0;
+      txCnt++;
+      }
+    }
+
+  while (!(spiReg[SPI_CS] & SPI_CS_DONE)) {}
+  // stop
+  spiReg[SPI_CS] = spiDefaults;
+  }
+//}}}
+//{{{
+static void spiGo (unsigned speed, uint32_t flags, char *txBuf, char *rxBuf, unsigned count) {
+
+  if (PI_SPI_FLAGS_GET_AUX_SPI (flags))
+    spiGoA (speed, flags, txBuf, rxBuf, count);
+  else
+    spiGoS (speed, flags, txBuf, rxBuf, count);
+  }
+//}}}
+
+//{{{
+static void spiTerminate (uint32_t flags)
+{
+   int resvd;
+
+   resvd = PI_SPI_FLAGS_GET_RESVD(flags);
+
+   if (PI_SPI_FLAGS_GET_AUX_SPI(flags))
+   {
+      /* disable module and access to registers */
+
+      auxReg[AUX_ENABLES] &= (~AUXENB_SPI1);
+
+      /* restore original state */
+
+      if (!(resvd&1)) myGpioSetMode(PI_ASPI_CE0,  old_mode_ace0);
+      if (!(resvd&2)) myGpioSetMode(PI_ASPI_CE1,  old_mode_ace1);
+      if (!(resvd&4)) myGpioSetMode(PI_ASPI_CE2,  old_mode_ace2);
+
+      myGpioSetMode(PI_ASPI_SCLK, old_mode_asclk);
+      myGpioSetMode(PI_ASPI_MISO, old_mode_amiso);
+      myGpioSetMode(PI_ASPI_MOSI, old_mode_amosi);
+
+      auxReg[AUX_SPI0_CNTL0_REG] = old_spi_cntl0;
+      auxReg[AUX_SPI0_CNTL1_REG] = old_spi_cntl1;
    }
+   else
+   {
+      /* restore original state */
 
-   pthread_mutex_unlock(&mutex);
+      if (!(resvd&1)) myGpioSetMode(PI_SPI_CE0,  old_mode_ce0);
+      if (!(resvd&2)) myGpioSetMode(PI_SPI_CE1,  old_mode_ce1);
 
-   if (slot < 0) SOFT_ERROR(PI_NO_HANDLE, "no SPI handles");
+      myGpioSetMode(PI_SPI_SCLK, old_mode_sclk);
+      myGpioSetMode(PI_SPI_MISO, old_mode_miso);
+      myGpioSetMode(PI_SPI_MOSI, old_mode_mosi);
 
-   spiInfo[slot].speed = baud;
-   spiInfo[slot].flags = spiFlags | PI_SPI_FLAGS_CHANNEL(spiChan);
-   spiInfo[slot].state = PI_SPI_OPENED;
-
-   return slot;
+      spiReg[SPI_CS]  = old_spi_cs;
+      spiReg[SPI_CLK] = old_spi_clk;
+   }
 }
 //}}}
+
+// external hw spi, main & aux
 //{{{
-int spiRead (unsigned handle, char *buf, unsigned count)
+int spiOpen (unsigned spiChan, unsigned baud, unsigned spiFlags) {
+
+  static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+  int i, slot;
+
+  DBG (DBG_USER, "spiChan=%d baud=%d spiFlags=0x%X", spiChan, baud, spiFlags);
+
+  CHECK_INITED;
+
+  if (PI_SPI_FLAGS_GET_AUX_SPI(spiFlags)) {
+    if (gpioHardwareRevision() < 16)
+      SOFT_ERROR(PI_NO_AUX_SPI, "no auxiliary SPI on Pi A or B");
+
+    i = PI_NUM_AUX_SPI_CHANNEL;
+    }
+  else
+    i = PI_NUM_STD_SPI_CHANNEL;
+
+  if (spiChan >= i)
+    SOFT_ERROR(PI_BAD_SPI_CHANNEL, "bad spiChan (%d)", spiChan);
+
+  if ((baud < PI_SPI_MIN_BAUD) || (baud > PI_SPI_MAX_BAUD))
+    SOFT_ERROR(PI_BAD_SPI_SPEED, "bad baud (%d)", baud);
+
+  if (spiFlags > (1<<22))
+    SOFT_ERROR(PI_BAD_FLAGS, "bad spiFlags (0x%X)", spiFlags);
+
+  if (!spiAnyOpen(spiFlags)) {
+    // initialise on first open
+    spiInit (spiFlags);
+    spiGo (baud, spiFlags, NULL, NULL, 0);
+    }
+
+  slot = -1;
+
+  pthread_mutex_lock(&mutex);
+
+  for (i=0; i<PI_SPI_SLOTS; i++) {
+    if (spiInfo[i].state == PI_SPI_CLOSED) {
+      slot = i;
+      spiInfo[slot].state = PI_SPI_RESERVED;
+      break;
+      }
+    }
+
+  pthread_mutex_unlock(&mutex);
+
+  if (slot < 0)
+    SOFT_ERROR(PI_NO_HANDLE, "no SPI handles");
+
+  spiInfo[slot].speed = baud;
+  spiInfo[slot].flags = spiFlags | PI_SPI_FLAGS_CHANNEL(spiChan);
+  spiInfo[slot].state = PI_SPI_OPENED;
+
+  return slot;
+  }
+//}}}
+//{{{
+int spiRead (unsigned handle, char* buf, unsigned count)
 {
    DBG(DBG_USER, "handle=%d count=%d [%s]",
       handle, count, myBuf2Str(count, buf));
@@ -8341,35 +8137,21 @@ int spiRead (unsigned handle, char *buf, unsigned count)
    if (count > PI_MAX_SPI_DEVICE_COUNT)
       SOFT_ERROR(PI_BAD_SPI_COUNT, "bad count (%d)", count);
 
-   spiGo(spiInfo[handle].speed, spiInfo[handle].flags, NULL, buf, count);
+   spiGo (spiInfo[handle].speed, spiInfo[handle].flags, NULL, buf, count);
 
    return count;
 }
 //}}}
 //{{{
-int spiWrite (unsigned handle, char *buf, unsigned count)
-{
-   DBG(DBG_USER, "handle=%d count=%d [%s]",
-      handle, count, myBuf2Str(count, buf));
+int spiWrite (unsigned handle, char* buf, unsigned count) {
 
-   CHECK_INITED;
+  spiGo (spiInfo[handle].speed, spiInfo[handle].flags, buf, NULL, count);
 
-   if (handle >= PI_SPI_SLOTS)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if (spiInfo[handle].state != PI_SPI_OPENED)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if (count > PI_MAX_SPI_DEVICE_COUNT)
-      SOFT_ERROR(PI_BAD_SPI_COUNT, "bad count (%d)", count);
-
-   spiGo(spiInfo[handle].speed, spiInfo[handle].flags, buf, NULL, count);
-
-   return count;
-}
+  return count;
+  }
 //}}}
 //{{{
-int spiXfer (unsigned handle, char *txBuf, char *rxBuf, unsigned count)
+int spiXfer (unsigned handle, char* txBuf, char* rxBuf, unsigned count)
 {
    DBG(DBG_USER, "handle=%d count=%d [%s]",
       handle, count, myBuf2Str(count, txBuf));
@@ -8391,188 +8173,309 @@ int spiXfer (unsigned handle, char *txBuf, char *rxBuf, unsigned count)
 }
 //}}}
 //{{{
-int spiClose (unsigned handle)
+int spiClose (unsigned handle) {
+
+  DBG(DBG_USER, "handle=%d", handle);
+
+  CHECK_INITED;
+
+  if (handle >= PI_SPI_SLOTS)
+    SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+  if (spiInfo[handle].state != PI_SPI_OPENED)
+    SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+
+  spiInfo[handle].state = PI_SPI_CLOSED;
+
+  if (!spiAnyOpen(spiInfo[handle].flags))
+    spiTerminate (spiInfo[handle].flags); /* terminate on last close */
+
+  return 0;
+  }
+//}}}
+
+
+// internal bitbang spi
+//{{{
+static void set_CS (wfRx_t* w)
 {
-   DBG(DBG_USER, "handle=%d", handle);
+   myGpioWrite(w->S.CS, PI_SPI_FLAGS_GET_CSPOL(w->S.spiFlags));
+}
+//}}}
+//{{{
+static void clear_CS (wfRx_t* w)
+{
+   myGpioWrite(w->S.CS, !PI_SPI_FLAGS_GET_CSPOL(w->S.spiFlags));
+}
+//}}}
+//{{{
+static void set_SCLK (wfRx_t* w)
+{
+   myGpioWrite(w->S.SCLK, !PI_SPI_FLAGS_GET_CPOL(w->S.spiFlags));
+}
+//}}}
+//{{{
+static void clear_SCLK (wfRx_t* w)
+{
+   myGpioWrite(w->S.SCLK, PI_SPI_FLAGS_GET_CPOL(w->S.spiFlags));
+}
+//}}}
+//{{{
+static void SPI_delay (wfRx_t* w)
+{
+   myGpioDelay(w->S.delay);
+}
+//}}}
+//{{{
+static void bbSPIStart (wfRx_t* w)
+{
+   clear_SCLK(w);
 
-   CHECK_INITED;
+   SPI_delay(w);
 
-   if (handle >= PI_SPI_SLOTS)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+   set_CS(w);
 
-   if (spiInfo[handle].state != PI_SPI_OPENED)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+   SPI_delay(w);
+}
+//}}}
+//{{{
+static void bbSPIStop (wfRx_t* w)
+{
+   SPI_delay(w);
 
-   spiInfo[handle].state = PI_SPI_CLOSED;
+   clear_CS(w);
 
-   if (!spiAnyOpen(spiInfo[handle].flags))
-      spiTerm(spiInfo[handle].flags); /* terminate on last close */
+   SPI_delay(w);
 
-   return 0;
+   clear_SCLK(w);
+}
+//}}}
+//{{{
+static uint8_t bbSPIXferByte (wfRx_t* w, char txByte)
+{
+   uint8_t bit, rxByte=0;
+
+   if (PI_SPI_FLAGS_GET_CPHA(w->S.spiFlags))
+   {
+      /*
+      CPHA = 1
+      write on set clock
+      read on clear clock
+      */
+
+      for (bit=0; bit<8; bit++)
+      {
+         set_SCLK(w);
+
+         if (PI_SPI_FLAGS_GET_TX_LSB(w->S.spiFlags))
+         {
+            myGpioWrite(w->S.MOSI, txByte & 0x01);
+            txByte >>= 1;
+         }
+         else
+         {
+            myGpioWrite(w->S.MOSI, txByte & 0x80);
+            txByte <<= 1;
+         }
+
+         SPI_delay(w);
+
+         clear_SCLK(w);
+
+         if (PI_SPI_FLAGS_GET_RX_LSB(w->S.spiFlags))
+         {
+            rxByte = (rxByte >> 1) | myGpioRead(w->S.MISO) << 7;
+         }
+         else
+         {
+            rxByte = (rxByte << 1) | myGpioRead(w->S.MISO);
+         }
+
+         SPI_delay(w);
+      }
+   }
+   else
+   {
+      /*
+      CPHA = 0
+      read on set clock
+      write on clear clock
+      */
+
+      for (bit=0; bit<8; bit++)
+      {
+         if (PI_SPI_FLAGS_GET_TX_LSB(w->S.spiFlags))
+         {
+            myGpioWrite(w->S.MOSI, txByte & 0x01);
+            txByte >>= 1;
+         }
+         else
+         {
+            myGpioWrite(w->S.MOSI, txByte & 0x80);
+            txByte <<= 1;
+         }
+
+         SPI_delay(w);
+
+         set_SCLK(w);
+
+         if (PI_SPI_FLAGS_GET_RX_LSB(w->S.spiFlags))
+         {
+            rxByte = (rxByte >> 1) | myGpioRead(w->S.MISO) << 7;
+         }
+         else
+         {
+            rxByte = (rxByte << 1) | myGpioRead(w->S.MISO);
+         }
+
+         SPI_delay(w);
+
+         clear_SCLK(w);
+      }
+   }
+
+   return rxByte;
 }
 //}}}
 
-// bitBang spi
+// external bitBang spi
 //{{{
-int bbSPIOpen  (unsigned CS, unsigned MISO, unsigned MOSI, unsigned SCLK, unsigned baud, unsigned spiFlags)
-{
-   int valid;
-   uint32_t bits;
+int bbSPIOpen (unsigned CS, unsigned MISO, unsigned MOSI, unsigned SCLK, unsigned baud, unsigned spiFlags) {
 
-   DBG(DBG_USER, "CS=%d MISO=%d MOSI=%d SCLK=%d baud=%d flags=%d",
+  int valid;
+  uint32_t bits;
+
+  DBG (DBG_USER, "CS=%d MISO=%d MOSI=%d SCLK=%d baud=%d flags=%d",
       CS, MISO, MOSI, SCLK, baud, spiFlags);
 
-   CHECK_INITED;
+  CHECK_INITED;
 
-   if (CS > PI_MAX_USER_GPIO)
-      SOFT_ERROR(PI_BAD_USER_GPIO, "bad CS (%d)", CS);
+  if (CS > PI_MAX_USER_GPIO)
+    SOFT_ERROR(PI_BAD_USER_GPIO, "bad CS (%d)", CS);
 
-   if (MISO > PI_MAX_USER_GPIO)
-      SOFT_ERROR(PI_BAD_USER_GPIO, "bad MISO (%d)", MISO);
+  if (MISO > PI_MAX_USER_GPIO)
+    SOFT_ERROR(PI_BAD_USER_GPIO, "bad MISO (%d)", MISO);
 
-   if (MOSI > PI_MAX_USER_GPIO)
-      SOFT_ERROR(PI_BAD_USER_GPIO, "bad MOSI (%d)", MOSI);
+  if (MOSI > PI_MAX_USER_GPIO)
+    SOFT_ERROR(PI_BAD_USER_GPIO, "bad MOSI (%d)", MOSI);
 
-   if (SCLK > PI_MAX_USER_GPIO)
-      SOFT_ERROR(PI_BAD_USER_GPIO, "bad SCLK (%d)", SCLK);
+  if (SCLK > PI_MAX_USER_GPIO)
+    SOFT_ERROR(PI_BAD_USER_GPIO, "bad SCLK (%d)", SCLK);
 
-   if ((baud < PI_BB_SPI_MIN_BAUD) || (baud > PI_BB_SPI_MAX_BAUD))
-      SOFT_ERROR(PI_BAD_SPI_BAUD, "CS %d, bad baud (%d)", CS, baud);
+  if ((baud < PI_BB_SPI_MIN_BAUD) || (baud > PI_BB_SPI_MAX_BAUD))
+    SOFT_ERROR(PI_BAD_SPI_BAUD, "CS %d, bad baud (%d)", CS, baud);
 
-   if (wfRx[CS].mode != PI_WFRX_NONE)
-      SOFT_ERROR(PI_GPIO_IN_USE,
-         "CS %d is already being used, mode %d", CS, wfRx[CS].mode);
+  if (wfRx[CS].mode != PI_WFRX_NONE)
+    SOFT_ERROR(PI_GPIO_IN_USE, "CS %d is already being used, mode %d", CS, wfRx[CS].mode);
 
-   valid = 0;
+  valid = 0;
 
-   /* check all GPIO unique */
+  /* check all GPIO unique */
+  bits = (1<<CS) | (1<<MISO) | (1<<MOSI) | (1<<SCLK);
 
-   bits = (1<<CS) | (1<<MISO) | (1<<MOSI) | (1<<SCLK);
-
-   if (__builtin_popcount(bits) == 4)
-   {
-      if ((wfRx[MISO].mode == PI_WFRX_NONE) &&
-          (wfRx[MOSI].mode == PI_WFRX_NONE) &&
-          (wfRx[SCLK].mode == PI_WFRX_NONE))
-      {
-         valid = 1; /* first time GPIO used for SPI */
+  if (__builtin_popcount(bits) == 4) {
+    if ((wfRx[MISO].mode == PI_WFRX_NONE) &&
+        (wfRx[MOSI].mode == PI_WFRX_NONE) &&
+        (wfRx[SCLK].mode == PI_WFRX_NONE)) {
+      valid = 1; /* first time GPIO used for SPI */
       }
-      else
-      {
-         if ((wfRx[MISO].mode == PI_WFRX_SPI_MISO) &&
-             (wfRx[MOSI].mode == PI_WFRX_SPI_MOSI) &&
-             (wfRx[SCLK].mode == PI_WFRX_SPI_SCLK))
-         {
-            valid = 2; /* new CS for existing SPI GPIO */
-         }
+    else {
+      if ((wfRx[MISO].mode == PI_WFRX_SPI_MISO) &&
+          (wfRx[MOSI].mode == PI_WFRX_SPI_MOSI) &&
+          (wfRx[SCLK].mode == PI_WFRX_SPI_SCLK)) {
+        valid = 2; /* new CS for existing SPI GPIO */
+        }
       }
-   }
+    }
 
-   if (!valid)
-   {
-      SOFT_ERROR(PI_GPIO_IN_USE,
-         "GPIO already being used (%d=%d %d=%d, %d=%d %d=%d)",
-          CS,   wfRx[CS].mode,
-          MISO, wfRx[MISO].mode,
-          MOSI, wfRx[MOSI].mode,
-          SCLK, wfRx[SCLK].mode);
-   }
+  if (!valid) {
+    SOFT_ERROR(PI_GPIO_IN_USE,
+        "GPIO already being used (%d=%d %d=%d, %d=%d %d=%d)",
+         CS,   wfRx[CS].mode,
+         MISO, wfRx[MISO].mode,
+         MOSI, wfRx[MOSI].mode,
+         SCLK, wfRx[SCLK].mode);
+    }
 
-   wfRx[CS].mode = PI_WFRX_SPI_CS;
-   wfRx[CS].baud = baud;
+  wfRx[CS].mode = PI_WFRX_SPI_CS;
+  wfRx[CS].baud = baud;
 
-   wfRx[CS].S.CS = CS;
-   wfRx[CS].S.SCLK = SCLK;
+  wfRx[CS].S.CS = CS;
+  wfRx[CS].S.SCLK = SCLK;
 
-   wfRx[CS].S.CSMode = gpioGetMode(CS);
-   wfRx[CS].S.delay = (500000 / baud) - 1;
-   wfRx[CS].S.spiFlags = spiFlags;
+  wfRx[CS].S.CSMode = gpioGetMode(CS);
+  wfRx[CS].S.delay = (500000 / baud) - 1;
+  wfRx[CS].S.spiFlags = spiFlags;
 
-   /* preset CS to off */
+  /* preset CS to off */
+  if (PI_SPI_FLAGS_GET_CSPOL(spiFlags))
+    gpioWrite(CS, 0); /* active high */
+  else
+    gpioWrite(CS, 1); /* active low */
 
-   if (PI_SPI_FLAGS_GET_CSPOL(spiFlags))
-      gpioWrite(CS, 0); /* active high */
-   else
-      gpioWrite(CS, 1); /* active low */
+  /* The SCLK entry is used to store full information */
+  if (valid == 1) { /* first time GPIO for SPI */
+    wfRx[SCLK].S.usage = 1;
 
-   /* The SCLK entry is used to store full information */
+    wfRx[SCLK].S.SCLKMode = gpioGetMode(SCLK);
+    wfRx[SCLK].S.MISOMode = gpioGetMode(MISO);
+    wfRx[SCLK].S.MOSIMode = gpioGetMode(MOSI);
 
-   if (valid == 1) /* first time GPIO for SPI */
-   {
-      wfRx[SCLK].S.usage = 1;
+    wfRx[SCLK].mode = PI_WFRX_SPI_SCLK;
+    wfRx[MISO].mode = PI_WFRX_SPI_MISO;
+    wfRx[MOSI].mode = PI_WFRX_SPI_MOSI;
 
-      wfRx[SCLK].S.SCLKMode = gpioGetMode(SCLK);
-      wfRx[SCLK].S.MISOMode = gpioGetMode(MISO);
-      wfRx[SCLK].S.MOSIMode = gpioGetMode(MOSI);
+    wfRx[SCLK].S.SCLK = SCLK;
+    wfRx[SCLK].S.MISO = MISO;
+    wfRx[SCLK].S.MOSI = MOSI;
 
-      wfRx[SCLK].mode = PI_WFRX_SPI_SCLK;
-      wfRx[MISO].mode = PI_WFRX_SPI_MISO;
-      wfRx[MOSI].mode = PI_WFRX_SPI_MOSI;
+    myGpioSetMode(MISO, PI_INPUT);
+    myGpioSetMode(SCLK, PI_OUTPUT);
+    gpioWrite(MOSI, 0); /* low output */
+    }
+  else
+    wfRx[SCLK].S.usage++;
 
-      wfRx[SCLK].S.SCLK = SCLK;
-      wfRx[SCLK].S.MISO = MISO;
-      wfRx[SCLK].S.MOSI = MOSI;
-
-      myGpioSetMode(MISO, PI_INPUT);
-      myGpioSetMode(SCLK, PI_OUTPUT);
-      gpioWrite(MOSI, 0); /* low output */
-   }
-   else
-   {
-      wfRx[SCLK].S.usage++;
-   }
-
-   return 0;
-}
+  return 0;
+  }
 //}}}
 //{{{
-int bbSPIXfer (unsigned CS, char *inBuf, char *outBuf, unsigned count)
-{
-   int SCLK;
-   int pos;
-   wfRx_t *w;
+int bbSPIXfer (unsigned CS, char* inBuf, char* outBuf, unsigned count) {
 
-   DBG(DBG_USER, "CS=%d inBuf=%s outBuf=%08"PRIXPTR" count=%d",
-      CS, myBuf2Str(count, (char *)inBuf), (uintptr_t)outBuf, count);
+  DBG (DBG_USER, "CS=%d inBuf=%s outBuf=%08"PRIXPTR" count=%d",
+       CS, myBuf2Str(count, (char *)inBuf), (uintptr_t)outBuf, count);
 
-   CHECK_INITED;
+  CHECK_INITED;
 
-   if (CS > PI_MAX_USER_GPIO)
-      SOFT_ERROR(PI_BAD_USER_GPIO, "bad gpio (%d)", CS);
+  if (CS > PI_MAX_USER_GPIO)
+    SOFT_ERROR(PI_BAD_USER_GPIO, "bad gpio (%d)", CS);
 
-   if (wfRx[CS].mode != PI_WFRX_SPI_CS)
-      SOFT_ERROR(PI_NOT_SPI_GPIO, "no SPI on gpio (%d)", CS);
+  if (wfRx[CS].mode != PI_WFRX_SPI_CS)
+    SOFT_ERROR(PI_NOT_SPI_GPIO, "no SPI on gpio (%d)", CS);
 
-   if (!inBuf || !count)
-      SOFT_ERROR(PI_BAD_POINTER, "input buffer can't be NULL");
+  if (!inBuf || !count)
+    SOFT_ERROR(PI_BAD_POINTER, "input buffer can't be NULL");
 
-   if (!outBuf && count)
-      SOFT_ERROR(PI_BAD_POINTER, "output buffer can't be NULL");
+  if (!outBuf && count)
+    SOFT_ERROR(PI_BAD_POINTER, "output buffer can't be NULL");
 
-   SCLK = wfRx[CS].S.SCLK;
+  int SCLK = wfRx[CS].S.SCLK;
+  wfRx[SCLK].S.CS = CS;
+  wfRx[SCLK].baud = wfRx[CS].baud;
+  wfRx[SCLK].S.delay = wfRx[CS].S.delay;
+  wfRx[SCLK].S.spiFlags = wfRx[CS].S.spiFlags;
 
-   wfRx[SCLK].S.CS = CS;
-   wfRx[SCLK].baud = wfRx[CS].baud;
-   wfRx[SCLK].S.delay = wfRx[CS].S.delay;
-   wfRx[SCLK].S.spiFlags = wfRx[CS].S.spiFlags;
+  wfRx_t* w = &wfRx[SCLK];
 
-   w = &wfRx[SCLK];
+  wfRx_lock (SCLK);
+  bbSPIStart (w);
+  for (int pos = 0; pos < count; pos++)
+    outBuf[pos] = bbSPIXferByte(w, inBuf[pos]);
+  bbSPIStop(w);
+  wfRx_unlock(SCLK);
 
-   wfRx_lock(SCLK);
-
-   bbSPIStart(w);
-
-   for (pos=0; pos < count; pos++)
-   {
-      outBuf[pos] = bbSPIXferByte(w, inBuf[pos]);
-   }
-
-   bbSPIStop(w);
-
-   wfRx_unlock(SCLK);
-
-   return count;
-}
+  return count;
+  }
 //}}}
 //{{{
 int bbSPIClose (unsigned CS)
@@ -8620,7 +8523,7 @@ int bbSPIClose (unsigned CS)
 }
 //}}}
 //}}}
-//{{{  ser
+//{{{  serial
 //{{{
 int serOpen (char *tty, unsigned serBaud, unsigned serFlags)
 {
@@ -9127,6 +9030,7 @@ int eventTrigger (unsigned event)
    return 0;
 }
 //}}}
+
 //{{{
 static int intGpioSetAlertFunc (unsigned gpio, void* f, int user, void* userdata)
 {
@@ -9384,6 +9288,7 @@ int gpioSetISRFuncEx (unsigned gpio, unsigned edge, int timeout, gpioAlertFuncEx
 }
 //}}}
 
+//{{{  notify
 //{{{
 static void closeOrphanedNotifications (int slot, int fd)
 {
@@ -9591,6 +9496,8 @@ int gpioNotifyClose (unsigned handle)
    return 0;
 }
 //}}}
+//}}}
+
 //{{{
 int gpioTrigger (unsigned gpio, unsigned pulseLen, unsigned level)
 {
