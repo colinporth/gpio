@@ -480,17 +480,6 @@
 #endif
 //}}}
 
-//{{{  struct rawCbs_t
-typedef struct { /* linux/arch/arm/mach-bcm2708/include/mach/dma.h */
-  uint32_t info;
-  uint32_t src;
-  uint32_t dst;
-  uint32_t length;
-  uint32_t stride;
-  uint32_t next;
-  uint32_t pad[2];
-  } rawCbs_t;
-//}}}
 //{{{  struct pi_i2c_msg_t
 typedef struct {
   uint16_t addr;  // slave address
@@ -511,108 +500,111 @@ typedef struct {
   } bsc_xfer_t;
 //}}}
 
-unsigned gpioHardwareRevision();
+uint32_t gpioHardwareRevision();
 int gpioInitialise();
 void gpioTerminate();
 
-// time
-int gpioTime (unsigned timetype, int* seconds, int* micros);
-int gpioSleep (unsigned timetype, int seconds, int micros);
+//{{{  time
+int gpioTime (uint32_t timetype, int* seconds, int* micros);
+int gpioSleep (uint32_t timetype, int seconds, int micros);
 uint32_t gpioDelay (uint32_t micros);
 uint32_t gpioTick();
 double timeTime();
 void timeSleep (double seconds);
-
+//}}}
 //{{{  gpio
-int gpioSetMode (unsigned gpio, unsigned mode);
-int gpioGetMode (unsigned gpio);
-int gpioGetPad (unsigned pad);
-int gpioSetPad (unsigned pad, unsigned padStrength);
-int gpioSetPullUpDown (unsigned gpio, unsigned pud);
+int gpioGetMode (uint32_t gpio);
+void gpioSetMode (uint32_t gpio, uint32_t mode);
 
-int gpioRead (unsigned gpio);
+int gpioGetPad (uint32_t pad);
+void gpioSetPad (uint32_t pad, uint32_t padStrength);
+void gpioSetPullUpDown (uint32_t gpio, uint32_t pud);
+
+int gpioRead (uint32_t gpio);
 uint32_t gpioRead_Bits_0_31();
 uint32_t gpioRead_Bits_32_53();
 
-void gpioWrite (unsigned gpio, unsigned level);
+void gpioWrite (uint32_t gpio, uint32_t level);
 void gpioWrite_Bits_0_31_Clear (uint32_t bits);
 void gpioWrite_Bits_32_53_Clear (uint32_t bits);
 void gpioWrite_Bits_0_31_Set (uint32_t bits);
 void gpioWrite_Bits_32_53_Set (uint32_t bits);
 
-int gpioPWM (unsigned user_gpio, unsigned dutycycle);
-int gpioGetPWMdutycycle (unsigned user_gpio);
-int gpioSetPWMrange (unsigned user_gpio, unsigned range);
-int gpioGetPWMrange (unsigned user_gpio);
-int gpioGetPWMrealRange (unsigned user_gpio);
-int gpioSetPWMfrequency (unsigned user_gpio, unsigned frequency);
-int gpioGetPWMfrequency (unsigned user_gpio);
+void gpioPWM (uint32_t user_gpio, uint32_t dutycycle);
 
-int gpioServo (unsigned user_gpio, unsigned pulsewidth);
-int gpioGetServoPulsewidth (unsigned user_gpio);
+int gpioGetPWMdutycycle (uint32_t user_gpio);
+int gpioGetPWMrange (uint32_t user_gpio);
+int gpioGetPWMrealRange (uint32_t user_gpio);
+void gpioSetPWMrange (uint32_t user_gpio, uint32_t range);
+
+int gpioGetPWMfrequency (uint32_t user_gpio);
+void gpioSetPWMfrequency (uint32_t user_gpio, uint32_t frequency);
+
+int gpioGetServoPulsewidth (uint32_t user_gpio);
+void gpioServo (uint32_t user_gpio, uint32_t pulsewidth);
 //}}}
 //{{{  spi
-int spiOpen (unsigned spiChan, unsigned baud, unsigned spiFlags);
+int spiOpen (uint32_t spiChan, uint32_t baud, uint32_t spiFlags);
 
-int spiRead (unsigned handle, char* buf, unsigned count);
-int spiWrite (unsigned handle, char* buf, unsigned count);
-void spiWriteMainFast (unsigned handle, const uint8_t* buf, unsigned count);
-int spiXfer (unsigned handle, char* txBuf, char* rxBuf, unsigned count);
+int spiRead (uint32_t handle, char* buf, uint32_t count);
+int spiWrite (uint32_t handle, char* buf, uint32_t count);
+void spiWriteMainFast (uint32_t handle, const uint8_t* buf, uint32_t count);
+int spiXfer (uint32_t handle, char* txBuf, char* rxBuf, uint32_t count);
 
-int spiClose (unsigned handle);
+int spiClose (uint32_t handle);
 
 // bitbang
-int bbSPIOpen (unsigned CS, unsigned MISO, unsigned MOSI, unsigned SCLK, unsigned baud, unsigned spiFlags);
-int bbSPIXfer (unsigned CS, char* inBuf, char* outBuf, unsigned count);
-int bbSPIClose (unsigned CS);
+int bbSPIOpen (uint32_t CS, uint32_t MISO, uint32_t MOSI, uint32_t SCLK, uint32_t baud, uint32_t spiFlags);
+int bbSPIXfer (uint32_t CS, char* inBuf, char* outBuf, uint32_t count);
+int bbSPIClose (uint32_t CS);
 //}}}
 //{{{  i2c
-int i2cOpen (unsigned i2cBus, unsigned i2cAddr, unsigned i2cFlags);
-int i2cClose (unsigned handle);
+int i2cOpen (uint32_t i2cBus, uint32_t i2cAddr, uint32_t i2cFlags);
+int i2cClose (uint32_t handle);
 
-int i2cWriteQuick (unsigned handle, unsigned bit);
-int i2cWriteByte (unsigned handle, unsigned bVal);
-int i2cWriteByteData (unsigned handle, unsigned i2cReg, unsigned bVal);
-int i2cWriteWordData (unsigned handle, unsigned i2cReg, unsigned wVal);
-int i2cWriteBlockData (unsigned handle, unsigned i2cReg, char* buf, unsigned count);
-int i2cWriteI2CBlockData (unsigned handle, unsigned i2cReg, char* buf, unsigned count);
+int i2cWriteQuick (uint32_t handle, uint32_t bit);
+int i2cWriteByte (uint32_t handle, uint32_t bVal);
+int i2cWriteByteData (uint32_t handle, uint32_t i2cReg, uint32_t bVal);
+int i2cWriteWordData (uint32_t handle, uint32_t i2cReg, uint32_t wVal);
+int i2cWriteBlockData (uint32_t handle, uint32_t i2cReg, char* buf, uint32_t count);
+int i2cWriteI2CBlockData (uint32_t handle, uint32_t i2cReg, char* buf, uint32_t count);
 
-int i2cReadByte (unsigned handle);
-int i2cReadByteData (unsigned handle, unsigned i2cReg);
-int i2cReadWordData (unsigned handle, unsigned i2cReg);
-int i2cReadBlockData (unsigned handle, unsigned i2cReg, char* buf);
-int i2cReadI2CBlockData (unsigned handle, unsigned i2cReg, char* buf, unsigned count);
+int i2cReadByte (uint32_t handle);
+int i2cReadByteData (uint32_t handle, uint32_t i2cReg);
+int i2cReadWordData (uint32_t handle, uint32_t i2cReg);
+int i2cReadBlockData (uint32_t handle, uint32_t i2cReg, char* buf);
+int i2cReadI2CBlockData (uint32_t handle, uint32_t i2cReg, char* buf, uint32_t count);
 
-int i2cProcessCall (unsigned handle, unsigned i2cReg, unsigned wVal);
-int i2cBlockProcessCall (unsigned handle, unsigned i2cReg, char* buf, unsigned count);
+int i2cProcessCall (uint32_t handle, uint32_t i2cReg, uint32_t wVal);
+int i2cBlockProcessCall (uint32_t handle, uint32_t i2cReg, char* buf, uint32_t count);
 
-int i2cReadDevice (unsigned handle, char* buf, unsigned count);
-int i2cWriteDevice (unsigned handle, char* buf, unsigned count);
+int i2cReadDevice (uint32_t handle, char* buf, uint32_t count);
+int i2cWriteDevice (uint32_t handle, char* buf, uint32_t count);
 
 void i2cSwitchCombined (int setting);
-int i2cSegments(unsigned handle, pi_i2c_msg_t* segs, unsigned numSegs);
-int i2cZip (unsigned handle, char* inBuf, unsigned inLen, char* outBuf, unsigned outLen);
+int i2cSegments (uint32_t handle, pi_i2c_msg_t* segs, uint32_t numSegs);
+int i2cZip (uint32_t handle, char* inBuf, uint32_t inLen, char* outBuf, uint32_t outLen);
 
-int bbI2COpen (unsigned SDA, unsigned SCL, unsigned baud);
-int bbI2CClose (unsigned SDA);
-int bbI2CZip (unsigned SDA, char* inBuf, unsigned inLen, char* outBuf, unsigned outLen);
+int bbI2COpen (uint32_t SDA, uint32_t SCL, uint32_t baud);
+int bbI2CClose (uint32_t SDA);
+int bbI2CZip (uint32_t SDA, char* inBuf, uint32_t inLen, char* outBuf, uint32_t outLen);
 
 int bscXfer (bsc_xfer_t* bsc_xfer);
 //}}}
 //{{{  serial
-int serOpen (char* sertty, unsigned baud, unsigned serFlags);
-int serClose (unsigned handle);
+int serOpen (char* sertty, uint32_t baud, uint32_t serFlags);
+int serClose (uint32_t handle);
 
-int serWriteByte (unsigned handle, unsigned bVal);
-int serReadByte (unsigned handle);
-int serWrite (unsigned handle, char *buf, unsigned count);
-int serRead (unsigned handle, char *buf, unsigned count);
-int serDataAvailable (unsigned handle);
+int serWriteByte (uint32_t handle, uint32_t bVal);
+int serReadByte (uint32_t handle);
+int serWrite (uint32_t handle, char* buf, uint32_t count);
+int serRead (uint32_t handle, char* buf, uint32_t count);
+int serDataAvailable (uint32_t handle);
 
-int gpioSerialReadOpen (unsigned user_gpio, unsigned baud, unsigned data_bits);
-int gpioSerialReadInvert (unsigned user_gpio, unsigned invert);
-int gpioSerialRead (unsigned user_gpio, void *buf, size_t bufSize);
-int gpioSerialReadClose (unsigned user_gpio);
+int gpioSerialReadOpen (uint32_t user_gpio, uint32_t baud, uint32_t data_bits);
+int gpioSerialReadInvert (uint32_t user_gpio, uint32_t invert);
+int gpioSerialRead (uint32_t user_gpio, void* buf, size_t bufSize);
+int gpioSerialReadClose (uint32_t user_gpio);
 //}}}
 
 //{{{
