@@ -1598,42 +1598,41 @@ bool cLcd9341::initialise() {
 uint32_t cLcd9341::updateLcd (sSpan* spans) {
 // usually many small spans, with the occasional large spans
 
-  constexpr uint8_t k9341ColumnAddressSetCommand = 0x2A;
-  constexpr uint8_t k9341PageAddressSetCommand = 0x2B;
-  constexpr uint8_t k9341MemoryWriteCommand = 0x2C;
+  constexpr uint8_t kColumnAddressSetCommand = 0x2A;
+  constexpr uint8_t kPageAddressSetCommand = 0x2B;
+  constexpr uint8_t kMemoryWriteCommand = 0x2C;
 
   int numPixels = 0;
   for (sSpan* span = spans; span; span = span->next) {
-    uint16_t columnAddressSetParams[2] = { bswap_16(span->r.left), bswap_16(span->r.right-1) };
-    uint16_t pageAddressSetParams[2] = { bswap_16(span->r.top), bswap_16(span->r.bottom-1) };
+    int16_t columnAddressSetParams[2] = { span->r.left, int16_t(span->r.right-1) };
+    int16_t pageAddressSetParams[2] = { span->r.top, int16_t(span->r.bottom-1) };
 
-    //writeCommandMultiData (k9341ColumnAddressSetCommand, (uint8_t*)columnAddressSetParams, 4);
+    //writeCommandMultiData (kColumnAddressSetCommand, (uint8_t*)columnAddressSetParams, 4);
     gpioWrite (kRegisterGpio, 0);
-    spiWriteMainFast (mSpiHandle, &k9341ColumnAddressSetCommand, 1);
+    spiWriteMainFast (mSpiHandle, &kColumnAddressSetCommand, 1);
     gpioWrite (kRegisterGpio, 1);
     spiWriteMainFast (mSpiHandle, (uint8_t*)columnAddressSetParams, 4);
 
-    //writeCommandMultiData (k9341PageAddressSetCommand, (uint8_t*)pageAddressSetParams, 4);
+    //writeCommandMultiData (kPageAddressSetCommand, (uint8_t*)pageAddressSetParams, 4);
     gpioWrite (kRegisterGpio, 0);
-    spiWriteMainFast (mSpiHandle, &k9341PageAddressSetCommand, 1);
+    spiWriteMainFast (mSpiHandle, &kPageAddressSetCommand, 1);
     gpioWrite (kRegisterGpio, 1);
     spiWriteMainFast (mSpiHandle, (uint8_t*)pageAddressSetParams, 4);
 
+    //gpioWrite_Bits_0_31_Clear (kRegisterGpio);
+    //gpioWrite_Bits_0_31_Set (kRegisterGpio);
+
     gpioWrite (kRegisterGpio, 0);
-    spiWriteMainFast (mSpiHandle, &k9341MemoryWriteCommand, 1);
+    spiWriteMainFast (mSpiHandle, &kMemoryWriteCommand, 1);
     gpioWrite (kRegisterGpio, 1);
 
-    uint16_t swappedFrameBuf [kWidth9341 * kHeight9341];
     uint16_t* src = mFrameBuf + (span->r.top * getWidth()) + span->r.left;
-    int width = span->r.getWidth();
-    for (int y = span->r.top; y < span->r.bottom; y++) {
-      uint16_t* dst = swappedFrameBuf;
-      for (int x = 0; x < width; x++)
-        *dst++ = bswap_16 (*src++);
-      spiWriteMainFast (mSpiHandle, (uint8_t*)swappedFrameBuf, width * 2);
-      src += getWidth() - width;
-      numPixels += width;
+    for (int y = 0; y < span->r.getHeight(); y++) {
+      spiWriteMainFast (mSpiHandle, (uint8_t*)src, span->r.getWidth() * 2);
+      src += getWidth();
       }
+
+    numPixels += span->r.getNumPixels();
     }
 
   return numPixels;

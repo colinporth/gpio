@@ -1199,6 +1199,7 @@ static uint32_t old_spi_cntl1;
 
 static uint32_t bscFR;
 //}}}
+static uint32_t spiDummyRead;
 //}}}
 //{{{  static const
 //{{{
@@ -1459,208 +1460,6 @@ static uint32_t myGpioDelay (uint32_t micros) {
 
   return (systReg[SYST_CLO] - start);
   }
-//}}}
-
-//{{{
-static void myGpioSetMode (unsigned gpio, unsigned mode) {
-
-  int reg   =  gpio/10;
-  int shift = (gpio%10) * 3;
-  gpioReg[reg] = (gpioReg[reg] & ~(7<<shift)) | (mode<<shift);
-  }
-//}}}
-//{{{
-static int myGpioRead (unsigned gpio) {
-
-  if ((*(gpioReg + GPLEV0 + BANK) & BIT) != 0)
-    return PI_ON;
-  else
-    return PI_OFF;
-  }
-//}}}
-//{{{
-static void myGpioWrite (unsigned gpio, unsigned level) {
-
-  if (level == PI_OFF)
-    *(gpioReg + GPCLR0 + BANK) = BIT;
-  else
-    *(gpioReg + GPSET0 + BANK) = BIT;
-  }
-//}}}
-//{{{
-static void mySetGpioOff (unsigned gpio, int pos) {
-
-  int page, slot;
-  myOffPageSlot (pos, &page, &slot);
-
-  dmaIVirt[page]->gpioOff[slot] |= (1<<gpio);
-  }
-//}}}
-//{{{
-static void myClearGpioOff (unsigned gpio, int pos) {
-
-  int page, slot;
-  myOffPageSlot (pos, &page, &slot);
-  dmaIVirt[page]->gpioOff[slot] &= ~(1<<gpio);
-  }
-//}}}
-//{{{
-static void mySetGpioOn (unsigned gpio, int pos) {
-
-  int page = pos / ON_PER_IPAGE;
-  int slot = pos % ON_PER_IPAGE;
-
-  dmaIVirt[page]->gpioOn[slot] |= (1<<gpio);
-  }
-//}}}
-//{{{
-static void myClearGpioOn (unsigned gpio, int pos) {
-  int page = pos/ON_PER_IPAGE;
-  int slot = pos%ON_PER_IPAGE;
-  dmaIVirt[page]->gpioOn[slot] &= ~(1<<gpio);
-  }
-//}}}
-//{{{
-static void myGpioSetPwm (unsigned gpio, int oldVal, int newVal) {
-
-  int switchGpioOff;
-  int newOff, oldOff, realRange, cycles, i;
-  int deferOff, deferRng;
-
-  DBG (DBG_INTERNAL, "myGpioSetPwm %d from %d to %d", gpio, oldVal, newVal);
-
-  switchGpioOff = 0;
-
-  realRange = pwmRealRange[gpioInfo[gpio].freqIdx];
-  cycles    = pwmCycles   [gpioInfo[gpio].freqIdx];
-  newOff = (newVal * realRange) / gpioInfo[gpio].range;
-  oldOff = (oldVal * realRange) / gpioInfo[gpio].range;
-  deferOff = gpioInfo[gpio].deferOff;
-  deferRng = gpioInfo[gpio].deferRng;
-
-  if (gpioInfo[gpio].deferOff) {
-    for (i=0; i < SUPERLEVEL; i += deferRng)
-      myClearGpioOff (gpio, i + deferOff);
-    gpioInfo[gpio].deferOff = 0;
-    }
-
-  if (newOff != oldOff) {
-    if (newOff && oldOff)  {
-      /* PWM CHANGE */
-      if (newOff != realRange)
-        for (i = 0; i < SUPERLEVEL; i += realRange)
-          mySetGpioOff(gpio, i+newOff);
-
-      if (newOff > oldOff) {
-        for (i = 0; i < SUPERLEVEL; i += realRange)
-          myClearGpioOff (gpio, i+oldOff);
-        }
-      else {
-        gpioInfo[gpio].deferOff = oldOff;
-        gpioInfo[gpio].deferRng = realRange;
-        }
-      }
-    else if (newOff) {
-      /* PWM START */
-      if (newOff != realRange)
-        for (i = 0; i < SUPERLEVEL; i += realRange)
-          mySetGpioOff (gpio, i+newOff);
-
-      /* schedule new gpio on */
-      for (i = 0; i < SUPERCYCLE; i += cycles)
-        mySetGpioOn (gpio, i);
-      }
-    else  {
-      /* PWM STOP */
-      /* deschedule gpio on */
-      for (i = 0; i < SUPERCYCLE; i += cycles)
-        myClearGpioOn (gpio, i);
-
-      for (i = 0; i < SUPERLEVEL; i += realRange)
-        myClearGpioOff (gpio, i + oldOff);
-
-     switchGpioOff = 1;
-     }
-
-    if (switchGpioOff) {
-      *(gpioReg + GPCLR0) = (1 << gpio);
-      *(gpioReg + GPCLR0) = (1 << gpio);
-      }
-    }
-  }
-//}}}
-//{{{
-static void myGpioSetServo (unsigned gpio, int oldVal, int newVal)
-{
-   int newOff, oldOff, realRange, cycles, i;
-   int deferOff, deferRng;
-
-   DBG(DBG_INTERNAL,
-      "myGpioSetServo %d from %d to %d", gpio, oldVal, newVal);
-
-   realRange = pwmRealRange[clkCfg[gpioCfg.clockMicros].servoIdx];
-   cycles    = pwmCycles   [clkCfg[gpioCfg.clockMicros].servoIdx];
-
-   newOff = (newVal * realRange)/20000;
-   oldOff = (oldVal * realRange)/20000;
-
-   deferOff = gpioInfo[gpio].deferOff;
-   deferRng = gpioInfo[gpio].deferRng;
-
-   if (gpioInfo[gpio].deferOff)
-   {
-      for (i=0; i<SUPERLEVEL; i+=deferRng)
-      {
-         myClearGpioOff(gpio, i+deferOff);
-      }
-      gpioInfo[gpio].deferOff = 0;
-   }
-
-   if (newOff != oldOff)
-   {
-      if (newOff && oldOff)                       /* SERVO CHANGE */
-      {
-         for (i=0; i<SUPERLEVEL; i+=realRange)
-            mySetGpioOff(gpio, i+newOff);
-
-         if (newOff > oldOff)
-         {
-            for (i=0; i<SUPERLEVEL; i+=realRange)
-               myClearGpioOff(gpio, i+oldOff);
-         }
-         else
-         {
-            gpioInfo[gpio].deferOff = oldOff;
-            gpioInfo[gpio].deferRng = realRange;
-         }
-      }
-      else if (newOff)                            /* SERVO START */
-      {
-         for (i=0; i<SUPERLEVEL; i+=realRange)
-            mySetGpioOff(gpio, i+newOff);
-
-         /* schedule new gpio on */
-
-         for (i=0; i<SUPERCYCLE; i+=cycles) mySetGpioOn(gpio, i);
-      }
-      else                                        /* SERVO STOP */
-      {
-         /* deschedule gpio on */
-
-         for (i=0; i<SUPERCYCLE; i+=cycles)
-            myClearGpioOn(gpio, i);
-
-         /* if in pulse then delay for the last cycle to complete */
-
-         if (myGpioRead(gpio)) myGpioDelay(PI_MAX_SERVO_PULSEWIDTH);
-
-         /* deschedule gpio off */
-
-         for (i=0; i<SUPERLEVEL; i+=realRange)
-            myClearGpioOff(gpio, i+oldOff);
-      }
-   }
-}
 //}}}
 
 //{{{
@@ -3164,66 +2963,266 @@ uint32_t gpioTick() {
 
 //{{{  gpio
 //{{{
-static void switchFunctionOff (unsigned gpio)
-{
-   switch (gpioInfo[gpio].is)
-   {
-      case GPIO_SERVO:
-         /* switch servo off */
-         myGpioSetServo(gpio, gpioInfo[gpio].width, 0);
-         gpioInfo[gpio].width = 0;
-         break;
+static void myGpioSetMode (unsigned gpio, unsigned mode) {
 
-      case GPIO_PWM:
-         /* switch pwm off */
-         myGpioSetPwm(gpio, gpioInfo[gpio].width, 0);
-         gpioInfo[gpio].width = 0;
-         break;
-
-      case GPIO_HW_CLK:
-         /* No longer disable clock hardware, doing that was a bug. */
-         gpioInfo[gpio].width = 0;
-         break;
-
-      case GPIO_HW_PWM:
-         /* No longer disable PWM hardware, doing that was a bug. */
-         gpioInfo[gpio].width = 0;
-         break;
-   }
-}
+  int reg =  gpio / 10;
+  int shift = (gpio % 10) * 3;
+  gpioReg[reg] = (gpioReg[reg] & ~(7 << shift)) | (mode << shift);
+  }
 //}}}
 
 //{{{
-int gpioSetMode (unsigned gpio, unsigned mode)
-{
-   int reg, shift, old_mode;
+static int myGpioRead (unsigned gpio) {
 
-   DBG(DBG_USER, "gpio=%d mode=%d", gpio, mode);
+  if ((*(gpioReg + GPLEV0 + BANK) & BIT) != 0)
+    return PI_ON;
+  else
+    return PI_OFF;
+  }
+//}}}
 
-   CHECK_INITED;
+//{{{
+static void myGpioWrite (unsigned gpio, unsigned level) {
 
-   if (gpio > PI_MAX_GPIO)
-      SOFT_ERROR(PI_BAD_GPIO, "bad gpio (%d)", gpio);
+  if (level == PI_OFF)
+    *(gpioReg + GPCLR0 + BANK) = BIT;
+  else
+    *(gpioReg + GPSET0 + BANK) = BIT;
+  }
+//}}}
+//{{{
+static void mySetGpioOff (unsigned gpio, int pos) {
 
-   if (mode > PI_ALT3)
-      SOFT_ERROR(PI_BAD_MODE, "gpio %d, bad mode (%d)", gpio, mode);
+  int page, slot;
+  myOffPageSlot (pos, &page, &slot);
 
-   reg   =  gpio/10;
-   shift = (gpio%10) * 3;
+  dmaIVirt[page]->gpioOff[slot] |= (1<<gpio);
+  }
+//}}}
+//{{{
+static void myClearGpioOff (unsigned gpio, int pos) {
 
-   old_mode = (gpioReg[reg] >> shift) & 7;
+  int page, slot;
+  myOffPageSlot (pos, &page, &slot);
+  dmaIVirt[page]->gpioOff[slot] &= ~(1<<gpio);
+  }
+//}}}
+//{{{
+static void mySetGpioOn (unsigned gpio, int pos) {
 
-   if (mode != old_mode)
+  int page = pos / ON_PER_IPAGE;
+  int slot = pos % ON_PER_IPAGE;
+
+  dmaIVirt[page]->gpioOn[slot] |= (1<<gpio);
+  }
+//}}}
+//{{{
+static void myClearGpioOn (unsigned gpio, int pos) {
+
+  int page = pos/ON_PER_IPAGE;
+  int slot = pos%ON_PER_IPAGE;
+  dmaIVirt[page]->gpioOn[slot] &= ~(1<<gpio);
+  }
+//}}}
+
+//{{{
+static void myGpioSetPwm (unsigned gpio, int oldVal, int newVal) {
+
+  int switchGpioOff;
+  int newOff, oldOff, realRange, cycles, i;
+  int deferOff, deferRng;
+
+  DBG (DBG_INTERNAL, "myGpioSetPwm %d from %d to %d", gpio, oldVal, newVal);
+
+  switchGpioOff = 0;
+
+  realRange = pwmRealRange[gpioInfo[gpio].freqIdx];
+  cycles    = pwmCycles   [gpioInfo[gpio].freqIdx];
+  newOff = (newVal * realRange) / gpioInfo[gpio].range;
+  oldOff = (oldVal * realRange) / gpioInfo[gpio].range;
+  deferOff = gpioInfo[gpio].deferOff;
+  deferRng = gpioInfo[gpio].deferRng;
+
+  if (gpioInfo[gpio].deferOff) {
+    for (i=0; i < SUPERLEVEL; i += deferRng)
+      myClearGpioOff (gpio, i + deferOff);
+    gpioInfo[gpio].deferOff = 0;
+    }
+
+  if (newOff != oldOff) {
+    if (newOff && oldOff)  {
+      /* PWM CHANGE */
+      if (newOff != realRange)
+        for (i = 0; i < SUPERLEVEL; i += realRange)
+          mySetGpioOff(gpio, i+newOff);
+
+      if (newOff > oldOff) {
+        for (i = 0; i < SUPERLEVEL; i += realRange)
+          myClearGpioOff (gpio, i+oldOff);
+        }
+      else {
+        gpioInfo[gpio].deferOff = oldOff;
+        gpioInfo[gpio].deferRng = realRange;
+        }
+      }
+    else if (newOff) {
+      /* PWM START */
+      if (newOff != realRange)
+        for (i = 0; i < SUPERLEVEL; i += realRange)
+          mySetGpioOff (gpio, i+newOff);
+
+      /* schedule new gpio on */
+      for (i = 0; i < SUPERCYCLE; i += cycles)
+        mySetGpioOn (gpio, i);
+      }
+    else  {
+      /* PWM STOP */
+      /* deschedule gpio on */
+      for (i = 0; i < SUPERCYCLE; i += cycles)
+        myClearGpioOn (gpio, i);
+
+      for (i = 0; i < SUPERLEVEL; i += realRange)
+        myClearGpioOff (gpio, i + oldOff);
+
+     switchGpioOff = 1;
+     }
+
+    if (switchGpioOff) {
+      *(gpioReg + GPCLR0) = (1 << gpio);
+      *(gpioReg + GPCLR0) = (1 << gpio);
+      }
+    }
+  }
+//}}}
+//{{{
+static void myGpioSetServo (unsigned gpio, int oldVal, int newVal) {
+
+   int newOff, oldOff, realRange, cycles, i;
+   int deferOff, deferRng;
+
+   DBG(DBG_INTERNAL,
+      "myGpioSetServo %d from %d to %d", gpio, oldVal, newVal);
+
+   realRange = pwmRealRange[clkCfg[gpioCfg.clockMicros].servoIdx];
+   cycles    = pwmCycles   [clkCfg[gpioCfg.clockMicros].servoIdx];
+
+   newOff = (newVal * realRange)/20000;
+   oldOff = (oldVal * realRange)/20000;
+
+   deferOff = gpioInfo[gpio].deferOff;
+   deferRng = gpioInfo[gpio].deferRng;
+
+   if (gpioInfo[gpio].deferOff)
    {
-      switchFunctionOff(gpio);
-
-      gpioInfo[gpio].is = GPIO_UNDEFINED;
+      for (i=0; i<SUPERLEVEL; i+=deferRng)
+      {
+         myClearGpioOff(gpio, i+deferOff);
+      }
+      gpioInfo[gpio].deferOff = 0;
    }
 
-   gpioReg[reg] = (gpioReg[reg] & ~(7<<shift)) | (mode<<shift);
+   if (newOff != oldOff)
+   {
+      if (newOff && oldOff)                       /* SERVO CHANGE */
+      {
+         for (i=0; i<SUPERLEVEL; i+=realRange)
+            mySetGpioOff(gpio, i+newOff);
 
-   return 0;
+         if (newOff > oldOff)
+         {
+            for (i=0; i<SUPERLEVEL; i+=realRange)
+               myClearGpioOff(gpio, i+oldOff);
+         }
+         else
+         {
+            gpioInfo[gpio].deferOff = oldOff;
+            gpioInfo[gpio].deferRng = realRange;
+         }
+      }
+      else if (newOff)                            /* SERVO START */
+      {
+         for (i=0; i<SUPERLEVEL; i+=realRange)
+            mySetGpioOff(gpio, i+newOff);
+
+         /* schedule new gpio on */
+
+         for (i=0; i<SUPERCYCLE; i+=cycles) mySetGpioOn(gpio, i);
+      }
+      else                                        /* SERVO STOP */
+      {
+         /* deschedule gpio on */
+
+         for (i=0; i<SUPERCYCLE; i+=cycles)
+            myClearGpioOn(gpio, i);
+
+         /* if in pulse then delay for the last cycle to complete */
+
+         if (myGpioRead(gpio)) myGpioDelay(PI_MAX_SERVO_PULSEWIDTH);
+
+         /* deschedule gpio off */
+
+         for (i=0; i<SUPERLEVEL; i+=realRange)
+            myClearGpioOff(gpio, i+oldOff);
+      }
+   }
 }
+//}}}
+//{{{
+static void switchFunctionOff (unsigned gpio) {
+
+  switch (gpioInfo[gpio].is) {
+    case GPIO_SERVO:
+      /* switch servo off */
+      myGpioSetServo(gpio, gpioInfo[gpio].width, 0);
+      gpioInfo[gpio].width = 0;
+      break;
+
+    case GPIO_PWM:
+      /* switch pwm off */
+      myGpioSetPwm(gpio, gpioInfo[gpio].width, 0);
+      gpioInfo[gpio].width = 0;
+      break;
+
+    case GPIO_HW_CLK:
+      /* No longer disable clock hardware, doing that was a bug. */
+      gpioInfo[gpio].width = 0;
+      break;
+
+    case GPIO_HW_PWM:
+      /* No longer disable PWM hardware, doing that was a bug. */
+      gpioInfo[gpio].width = 0;
+      break;
+    }
+  }
+//}}}
+
+//{{{
+int gpioSetMode (unsigned gpio, unsigned mode) {
+
+  int reg, shift, old_mode;
+
+  DBG(DBG_USER, "gpio=%d mode=%d", gpio, mode);
+  CHECK_INITED;
+
+  if (gpio > PI_MAX_GPIO)
+    SOFT_ERROR(PI_BAD_GPIO, "bad gpio (%d)", gpio);
+
+  if (mode > PI_ALT3)
+    SOFT_ERROR(PI_BAD_MODE, "gpio %d, bad mode (%d)", gpio, mode);
+
+  reg   =  gpio/10;
+  shift = (gpio%10) * 3;
+
+  old_mode = (gpioReg[reg] >> shift) & 7;
+  if (mode != old_mode) {
+    switchFunctionOff(gpio);
+    gpioInfo[gpio].is = GPIO_UNDEFINED;
+    }
+
+  gpioReg[reg] = (gpioReg[reg] & ~(7<<shift)) | (mode<<shift);
+
+  return 0;
+  }
 //}}}
 //{{{
 int gpioGetMode (unsigned gpio) {
@@ -3318,7 +3317,7 @@ uint32_t gpioRead_Bits_32_53() {
 //{{{
 int gpioWrite (unsigned gpio, unsigned level) {
 
-  DBG(DBG_USER, "gpio=%d level=%d", gpio, level);
+  DBG (DBG_USER, "gpio=%d level=%d", gpio, level);
   CHECK_INITED;
 
   if (gpio > PI_MAX_GPIO)
@@ -3329,7 +3328,7 @@ int gpioWrite (unsigned gpio, unsigned level) {
 
   if (gpio <= PI_MAX_GPIO) {
     if (gpioInfo[gpio].is != GPIO_WRITE) {
-      /* stop a glitch between setting mode then level */
+      // stop a glitch between setting mode then level
       if (level == PI_OFF)
         *(gpioReg + GPCLR0 + BANK) = BIT;
       else
@@ -4128,51 +4127,6 @@ int spiRead (unsigned handle, char* buf, unsigned count)
 }
 //}}}
 //{{{
-int spiWriteMainFast (unsigned handle, const uint8_t* buf, unsigned count) {
-
-  unsigned flags = spiInfo[handle].flags;
-
-  unsigned channel = PI_SPI_FLAGS_GET_CHANNEL (flags);
-  unsigned mode   =  PI_SPI_FLAGS_GET_MODE (flags);
-  unsigned cspols =  PI_SPI_FLAGS_GET_CSPOLS (flags);
-  unsigned cspol  =  (cspols >> channel) & 1;
-
-  uint32_t spiDefaults = SPI_CS_MODE(mode) | SPI_CS_CSPOLS(cspols) |
-                         SPI_CS_CS(channel) | SPI_CS_CSPOL(cspol) | SPI_CS_CLEAR(3);
-
-  // undocumented, stops inter-byte gap
-  spiReg[SPI_DLEN] = 2;
-
-  // stop
-  spiReg[SPI_CS] = spiDefaults;
-  spiReg[SPI_CLK] = 250000000 / spiInfo[handle].speed;;
-
-  // start
-  spiReg[SPI_CS] = spiDefaults | SPI_CS_TA;
-
-  uint32_t txCnt = 0;
-  uint32_t rxCnt = 0;
-  uint32_t spiDummy = 0;
-  while ((txCnt < count) || (rxCnt < count)) {
-    while ((rxCnt < count) && ((spiReg[SPI_CS] & SPI_CS_RXD))) {
-      spiDummy = spiReg[SPI_FIFO];
-      rxCnt++;
-      }
-    while ((txCnt < count) && ((spiReg[SPI_CS] & SPI_CS_TXD))) {
-      spiReg[SPI_FIFO] = *buf++;
-      txCnt++;
-      }
-    }
-
-  while (!(spiReg[SPI_CS] & SPI_CS_DONE)) {}
-
-  // stop
-  spiReg[SPI_CS] = spiDefaults;
-
-  return count;
-  }
-//}}}
-//{{{
 int spiWrite (unsigned handle, char* buf, unsigned count) {
 
   if (PI_SPI_FLAGS_GET_AUX_SPI (spiInfo[handle].flags))
@@ -4181,6 +4135,40 @@ int spiWrite (unsigned handle, char* buf, unsigned count) {
     spiGoS (spiInfo[handle].speed, spiInfo[handle].flags, buf, NULL, count);
 
   return count;
+  }
+//}}}
+//{{{
+void spiWriteMainFast (unsigned handle, const uint8_t* buf, unsigned count) {
+
+  spiReg[SPI_CS] |= SPI_CS_TA;
+
+  if (count == 1) {
+    // single byte case
+    spiReg[SPI_FIFO] = *buf++;
+    while (!(spiReg[SPI_CS] & SPI_CS_RXD)) {}
+    spiDummyRead = spiReg[SPI_FIFO];
+    }
+
+  else {
+    // multiple bytes, byte swap words
+    uint32_t txCount = 0;
+    uint32_t rxCount = 0;
+    while ((txCount < count) || (rxCount < count)) {
+      while ((rxCount < count) && (spiReg[SPI_CS] & SPI_CS_RXD)) {
+        spiDummyRead = spiReg[SPI_FIFO];
+        rxCount++;
+        }
+      while ((txCount < count) && (spiReg[SPI_CS] & SPI_CS_TXD)) {
+        if (txCount & 1) {
+          spiReg[SPI_FIFO] = *buf;
+          buf += 2;
+          }
+        else
+          spiReg[SPI_FIFO] = *(buf+1);
+        txCount++;
+        }
+      }
+    }
   }
 //}}}
 //{{{
