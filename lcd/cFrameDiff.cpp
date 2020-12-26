@@ -144,7 +144,7 @@ sSpan* cSingleFrameDiff::diff (uint16_t* frameBuf) {
 
       // tail unaligned 0-3 pixels one by one
       for (; x < mWidth; ++x) {
-        uint16_t diff = *(scanline+x) ^ *(prevFrameScanline+x);
+        uint16_t diff = *(scanline + x) ^ *(prevFrameScanline + x);
         if (diff) {
           minX = x;
           goto foundTop;
@@ -186,8 +186,8 @@ foundTop:
   #else
     //{{{  fine diff
     {
-    scanline = frameBuf + (mHeight - 1)*stride;
-    prevFrameScanline = mPrevFrameBuf + (mHeight - 1)*stride;
+    scanline = frameBuf + (mHeight-1) * stride;
+    prevFrameScanline = mPrevFrameBuf + (mHeight-1) * stride;
 
     while (maxY >= minY) {
       int x = mWidth-1;
