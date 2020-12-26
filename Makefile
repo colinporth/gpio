@@ -9,10 +9,10 @@ SRCS      = test.cpp \
 	    lcd/cFrameDiff.cpp \
 	    lcd/cDrawAA.cpp \
 	    lcd/cSnapshot.cpp \
+	    lcd/pigpio.c \
 	    fonts/FreeSansBold.cpp \
 	    ../shared/utils/cLog.cpp \
 	    ../shared/fmt/format.cpp \
-	    pigpio/pigpio.c \
 
 BUILD_DIR = ./build
 CLEAN_DIRS = $(BUILD_DIR)

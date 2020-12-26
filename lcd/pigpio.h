@@ -607,8 +607,8 @@ int gpioTime (unsigned timetype, int* seconds, int* micros);
 int gpioSleep (unsigned timetype, int seconds, int micros);
 uint32_t gpioDelay (uint32_t micros);
 uint32_t gpioTick();
-double time_time();
-void time_sleep (double seconds);
+double timeTime();
+void timeSleep (double seconds);
 
 // config
 int gpioCfgBufferSize (unsigned cfgMillis);

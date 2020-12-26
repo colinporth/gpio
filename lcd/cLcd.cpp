@@ -8,7 +8,7 @@
 
 #include <byteswap.h>
 
-#include "../pigpio/pigpio.h"
+#include "pigpio.h"
 
 #include "../../shared/fmt/format.h"
 #include "../../shared/utils/cLog.h"
@@ -599,7 +599,7 @@ void cLcd::delayUs (const int us) {
 double cLcd::timeUs() {
 // return time in double microSeconds
 
-  return time_time();
+  return timeTime();
   }
 //}}}
 
