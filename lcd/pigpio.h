@@ -683,8 +683,7 @@ int spiOpen (unsigned spiChan, unsigned baud, unsigned spiFlags);
 int spiClose (unsigned handle);
 
 int spiRead (unsigned handle, char* buf, unsigned count);
-int spiWriteMain4wire (unsigned handle, char* buf, unsigned count);
-int spiWriteAux (unsigned handle, char* buf, unsigned count);
+int spiWriteMainFast (unsigned handle, const uint8_t* buf, unsigned count);
 int spiWrite (unsigned handle, char* buf, unsigned count);
 int spiXfer (unsigned handle, char* txBuf, char* rxBuf, unsigned count);
 

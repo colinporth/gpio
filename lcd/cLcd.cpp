@@ -1609,18 +1609,18 @@ uint32_t cLcd9341::updateLcd (sSpan* spans) {
 
     //writeCommandMultiData (k9341ColumnAddressSetCommand, (uint8_t*)columnAddressSetParams, 4);
     gpioWrite (kRegisterGpio, 0);
-    spiWriteMain4wire (mSpiHandle, (char*)&k9341ColumnAddressSetCommand, 1);
+    spiWriteMainFast (mSpiHandle, &k9341ColumnAddressSetCommand, 1);
     gpioWrite (kRegisterGpio, 1);
-    spiWriteMain4wire (mSpiHandle, (char*)columnAddressSetParams, 4);
+    spiWriteMainFast (mSpiHandle, (uint8_t*)columnAddressSetParams, 4);
 
     //writeCommandMultiData (k9341PageAddressSetCommand, (uint8_t*)pageAddressSetParams, 4);
     gpioWrite (kRegisterGpio, 0);
-    spiWriteMain4wire (mSpiHandle, (char*)&k9341PageAddressSetCommand, 1);
+    spiWriteMainFast (mSpiHandle, &k9341PageAddressSetCommand, 1);
     gpioWrite (kRegisterGpio, 1);
-    spiWriteMain4wire (mSpiHandle, (char*)pageAddressSetParams, 4);
+    spiWriteMainFast (mSpiHandle, (uint8_t*)pageAddressSetParams, 4);
 
     gpioWrite (kRegisterGpio, 0);
-    spiWriteMain4wire (mSpiHandle, (char*)&k9341MemoryWriteCommand, 1);
+    spiWriteMainFast (mSpiHandle, &k9341MemoryWriteCommand, 1);
     gpioWrite (kRegisterGpio, 1);
 
     uint16_t swappedFrameBuf [kWidth9341 * kHeight9341];
@@ -1630,7 +1630,7 @@ uint32_t cLcd9341::updateLcd (sSpan* spans) {
       uint16_t* dst = swappedFrameBuf;
       for (int x = 0; x < width; x++)
         *dst++ = bswap_16 (*src++);
-      spiWriteMain4wire (mSpiHandle, (char*)swappedFrameBuf, width * 2);
+      spiWriteMainFast (mSpiHandle, (uint8_t*)swappedFrameBuf, width * 2);
       src += getWidth() - width;
       numPixels += width;
       }

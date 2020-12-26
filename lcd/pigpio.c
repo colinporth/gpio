@@ -4128,14 +4128,7 @@ int spiRead (unsigned handle, char* buf, unsigned count)
 }
 //}}}
 //{{{
-int spiWriteAux (unsigned handle, char* buf, unsigned count) {
-
-  spiGoA (spiInfo[handle].speed, spiInfo[handle].flags, buf, NULL, count);
-  return count;
-  }
-//}}}
-//{{{
-int spiWriteMain4wire (unsigned handle, char* buf, unsigned count) {
+int spiWriteMainFast (unsigned handle, const uint8_t* buf, unsigned count) {
 
   unsigned flags = spiInfo[handle].flags;
 
