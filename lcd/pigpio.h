@@ -534,13 +534,11 @@ int gpioRead (unsigned gpio);
 uint32_t gpioRead_Bits_0_31();
 uint32_t gpioRead_Bits_32_53();
 
-int gpioWrite (unsigned gpio, unsigned level);
-int gpioWrite_Bits_0_31_Clear (uint32_t bits);
-int gpioWrite_Bits_32_53_Clear (uint32_t bits);
-int gpioWrite_Bits_0_31_Set (uint32_t bits);
-int gpioWrite_Bits_32_53_Set (uint32_t bits);
-void fastGpioWrite_Bits_0_31_Clear (uint32_t bits);
-void fastGpioWrite_Bits_0_31_Set (uint32_t bits);
+void gpioWrite (unsigned gpio, unsigned level);
+void gpioWrite_Bits_0_31_Clear (uint32_t bits);
+void gpioWrite_Bits_32_53_Clear (uint32_t bits);
+void gpioWrite_Bits_0_31_Set (uint32_t bits);
+void gpioWrite_Bits_32_53_Set (uint32_t bits);
 
 int gpioPWM (unsigned user_gpio, unsigned dutycycle);
 int gpioGetPWMdutycycle (unsigned user_gpio);

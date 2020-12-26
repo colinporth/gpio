@@ -771,16 +771,16 @@ void cLcd1289::writeCommand (const uint8_t command) {
 void cLcd1289::writeDataWord (const uint16_t data) {
 // slow down write
 
-  fastGpioWrite_Bits_0_31_Clear (~data & k16WriteClrMask); // clear lo data bits + k16WrGpio bit lo
+  gpioWrite_Bits_0_31_Clear (~data & k16WriteClrMask); // clear lo data bits + k16WrGpio bit lo
   //gpioWrite_Bits_0_31_Clear (~command & k16WriteClrMask); // clear lo data bits + k16WrGpio bit lo
   //gpioWrite_Bits_0_31_Clear (~command & k16WriteClrMask); // clear lo data bits + k16WrGpio bit lo
 
-  fastGpioWrite_Bits_0_31_Set (data);                      // set hi data bits
-  fastGpioWrite_Bits_0_31_Set (data);                      // set hi data bits
-  fastGpioWrite_Bits_0_31_Set (data);                      // set hi data bits
+  gpioWrite_Bits_0_31_Set (data);                      // set hi data bits
+  gpioWrite_Bits_0_31_Set (data);                      // set hi data bits
+  gpioWrite_Bits_0_31_Set (data);                      // set hi data bits
 
-  fastGpioWrite_Bits_0_31_Set (k16WriteMask);              // write on k16WrGpio rising edge
-  fastGpioWrite_Bits_0_31_Set (k16WriteMask);              // write on k16WrGpio rising edge
+  gpioWrite_Bits_0_31_Set (k16WriteMask);              // write on k16WrGpio rising edge
+  gpioWrite_Bits_0_31_Set (k16WriteMask);              // write on k16WrGpio rising edge
   }
 //}}}
 
@@ -983,16 +983,16 @@ void cLcd7601::writeCommand (const uint8_t command) {
 void cLcd7601::writeDataWord (const uint16_t data) {
 // slow down write
 
-  fastGpioWrite_Bits_0_31_Clear (~data & k16WriteClrMask); // clear lo data bits + k16WrGpio bit lo
-  fastGpioWrite_Bits_0_31_Clear (~data & k16WriteClrMask); // clear lo data bits + k16WrGpio bit lo
-  fastGpioWrite_Bits_0_31_Clear (~data & k16WriteClrMask); // clear lo data bits + k16WrGpio bit lo
+  gpioWrite_Bits_0_31_Clear (~data & k16WriteClrMask); // clear lo data bits + k16WrGpio bit lo
+  gpioWrite_Bits_0_31_Clear (~data & k16WriteClrMask); // clear lo data bits + k16WrGpio bit lo
+  gpioWrite_Bits_0_31_Clear (~data & k16WriteClrMask); // clear lo data bits + k16WrGpio bit lo
 
-  fastGpioWrite_Bits_0_31_Set (data);                      // set hi data bits
-  fastGpioWrite_Bits_0_31_Set (data);                      // set hi data bits
-  fastGpioWrite_Bits_0_31_Set (data);                      // set hi data bits
+  gpioWrite_Bits_0_31_Set (data);                      // set hi data bits
+  gpioWrite_Bits_0_31_Set (data);                      // set hi data bits
+  gpioWrite_Bits_0_31_Set (data);                      // set hi data bits
 
-  fastGpioWrite_Bits_0_31_Set (k16WriteMask);              // write on k16WrGpio rising edge
-  fastGpioWrite_Bits_0_31_Set (k16WriteMask);              // write on k16WrGpio rising edge
+  gpioWrite_Bits_0_31_Set (k16WriteMask);              // write on k16WrGpio rising edge
+  gpioWrite_Bits_0_31_Set (k16WriteMask);              // write on k16WrGpio rising edge
   }
 //}}}
 

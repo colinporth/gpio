@@ -2897,9 +2897,6 @@ int gpioSetPullUpDown (unsigned gpio, unsigned pud) {
 //{{{
 int gpioRead (unsigned gpio) {
 
-  if (gpio > PI_MAX_GPIO)
-    SOFT_ERROR(PI_BAD_GPIO, "bad gpio (%d)", gpio);
-
   if ((*(gpioReg + GPLEV0 + BANK) & BIT) != 0)
     return PI_ON;
   else
@@ -2910,25 +2907,17 @@ uint32_t gpioRead_Bits_0_31() { return (*(gpioReg + GPLEV0)); }
 uint32_t gpioRead_Bits_32_53() { return (*(gpioReg + GPLEV1)); }
 
 //{{{
-int gpioWrite (unsigned gpio, unsigned level) {
+void gpioWrite (unsigned gpio, unsigned level) {
 
-  if (gpio > PI_MAX_GPIO)
-    SOFT_ERROR(PI_BAD_GPIO, "bad gpio (%d)", gpio);
+  if (gpioInfo[gpio].is != GPIO_WRITE) {
+    // stop a glitch between setting mode then level
+    if (level == PI_OFF)
+      *(gpioReg + GPCLR0 + BANK) = BIT;
+    else
+      *(gpioReg + GPSET0 + BANK) = BIT;
 
-  if (level > PI_ON)
-    SOFT_ERROR(PI_BAD_LEVEL, "gpio %d, bad level (%d)", gpio, level);
-
-  if (gpio <= PI_MAX_GPIO) {
-    if (gpioInfo[gpio].is != GPIO_WRITE) {
-      // stop a glitch between setting mode then level
-      if (level == PI_OFF)
-        *(gpioReg + GPCLR0 + BANK) = BIT;
-      else
-        *(gpioReg + GPSET0 + BANK) = BIT;
-
-      switchFunctionOff (gpio);
-      gpioInfo[gpio].is = GPIO_WRITE;
-      }
+    switchFunctionOff (gpio);
+    gpioInfo[gpio].is = GPIO_WRITE;
     }
 
   myGpioSetMode (gpio, PI_OUTPUT);
@@ -2937,40 +2926,12 @@ int gpioWrite (unsigned gpio, unsigned level) {
     *(gpioReg + GPCLR0 + BANK) = BIT;
   else
     *(gpioReg + GPSET0 + BANK) = BIT;
-
-  return 0;
   }
 //}}}
-//{{{
-int gpioWrite_Bits_0_31_Clear (uint32_t bits) {
-
-  *(gpioReg + GPCLR0) = bits;
-  return 0;
-  }
-//}}}
-//{{{
-int gpioWrite_Bits_32_53_Clear (uint32_t bits) {
-
-  *(gpioReg + GPCLR1) = bits;
-  return 0;
-  }
-//}}}
-//{{{
-int gpioWrite_Bits_0_31_Set (uint32_t bits) {
-
-  *(gpioReg + GPSET0) = bits;
-  return 0;
-  }
-//}}}
-//{{{
-int gpioWrite_Bits_32_53_Set (uint32_t bits) {
-
-  *(gpioReg + GPSET1) = bits;
-  return 0;
-  }
-//}}}
-void fastGpioWrite_Bits_0_31_Clear (uint32_t bits) { *(gpioReg + GPCLR0) = bits; }
-void fastGpioWrite_Bits_0_31_Set (uint32_t bits) { *(gpioReg + GPSET0) = bits; }
+void gpioWrite_Bits_0_31_Clear (uint32_t bits) { *(gpioReg + GPCLR0) = bits; }
+void gpioWrite_Bits_0_31_Set (uint32_t bits) { *(gpioReg + GPSET0) = bits; }
+void gpioWrite_Bits_32_53_Clear (uint32_t bits) { *(gpioReg + GPCLR1) = bits; }
+void gpioWrite_Bits_32_53_Set (uint32_t bits) { *(gpioReg + GPSET1) = bits; }
 
 // pwm
 //{{{
