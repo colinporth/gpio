@@ -9,8 +9,8 @@
 
 // gpio: 0-53
 #define PI_MIN_GPIO       0
-#define PI_MAX_GPIO      53
 #define PI_MAX_USER_GPIO 31
+#define PI_MAX_GPIO      53
 
 // level: 0-1
 #define PI_OFF   0
@@ -65,12 +65,12 @@
 //}}}
 
 //{{{  notify
-#define PI_NOTIFY_SLOTS  32
+//#define PI_NOTIFY_SLOTS  32
 
-#define PI_NTFY_FLAGS_EVENT    (1 <<7)
-#define PI_NTFY_FLAGS_ALIVE    (1 <<6)
-#define PI_NTFY_FLAGS_WDOG     (1 <<5)
-#define PI_NTFY_FLAGS_BIT(x) (((x)<<0)&31)
+//#define PI_NTFY_FLAGS_EVENT    (1 <<7)
+//#define PI_NTFY_FLAGS_ALIVE    (1 <<6)
+//#define PI_NTFY_FLAGS_WDOG     (1 <<5)
+//#define PI_NTFY_FLAGS_BIT(x) (((x)<<0)&31)
 //}}}
 //{{{  wave
 #define PI_WAVE_BLOCKS     4
@@ -217,26 +217,15 @@
 #define BSC_MISO_2711      9
 #define BSC_CE_N_2711      8
 //}}}
-//{{{  Longest busy delay
-
+//{{{  pi defines
 #define PI_MAX_BUSY_DELAY 100
-//}}}
-//{{{  timeout 0-60000
-
 #define PI_MIN_WDOG_TIMEOUT 0
 #define PI_MAX_WDOG_TIMEOUT 60000
-//}}}
-//{{{  timer 0-9
-
 #define PI_MIN_TIMER 0
 #define PI_MAX_TIMER 9
-//}}}
-//{{{  millis 10-60000
 #define PI_MIN_MS 10
 #define PI_MAX_MS 60000
-//}}}
 
-//{{{  pi defines
 /* signum: 0-63 */
 #define PI_MIN_SIGNUM 0
 #define PI_MAX_SIGNUM 63
@@ -308,10 +297,6 @@
 #define PI_DEFAULT_DMA_PRIMARY_CH_2711     7
 #define PI_DEFAULT_DMA_SECONDARY_CH_2711   6
 #define PI_DEFAULT_DMA_NOT_SET             15
-
-#define PI_DEFAULT_SOCKET_PORT             8888
-#define PI_DEFAULT_SOCKET_PORT_STR         "8888"
-#define PI_DEFAULT_SOCKET_ADDR_STR         "localhost"
 
 #define PI_DEFAULT_UPDATE_MASK_UNKNOWN     0x0000000FFFFFFCLL
 #define PI_DEFAULT_UPDATE_MASK_B1          0x03E7CF93
@@ -494,112 +479,41 @@
   extern "C" {
 #endif
 //}}}
-//{{{  structs, typedefs
-//{{{  struct gpioHeader_t
-typedef struct
-{
-   uint16_t func;
-   uint16_t size;
-} gpioHeader_t;
-//}}}
-//{{{  struct gpioExtent_t
-typedef struct
-{
-   size_t size;
-   void *ptr;
-   uint32_t data;
-} gpioExtent_t;
-//}}}
-//{{{  struct gpioSample_t
-typedef struct
-{
-   uint32_t tick;
-   uint32_t level;
-} gpioSample_t;
-//}}}
-//{{{  struct gpioReport_t
-typedef struct
-{
-   uint16_t seqno;
-   uint16_t flags;
-   uint32_t tick;
-   uint32_t level;
-} gpioReport_t;
-//}}}
-//{{{  struct gpioPulse_t
-typedef struct
-{
-   uint32_t gpioOn;
-   uint32_t gpioOff;
-   uint32_t usDelay;
-} gpioPulse_t;
-//}}}
 
-//{{{  struct rawSPI_t
-typedef struct
-{
-   int clk;     /* GPIO for clock           */
-   int mosi;    /* GPIO for MOSI            */
-   int miso;    /* GPIO for MISO            */
-   int ss_pol;  /* slave select off state   */
-   int ss_us;   /* delay after slave select */
-   int clk_pol; /* clock off state          */
-   int clk_pha; /* clock phase              */
-   int clk_us;  /* clock micros             */
-} rawSPI_t;
-//}}}
 //{{{  struct rawCbs_t
 typedef struct { /* linux/arch/arm/mach-bcm2708/include/mach/dma.h */
-   uint32_t info;
-   uint32_t src;
-   uint32_t dst;
-   uint32_t length;
-   uint32_t stride;
-   uint32_t next;
-   uint32_t pad[2];
-} rawCbs_t;
+  uint32_t info;
+  uint32_t src;
+  uint32_t dst;
+  uint32_t length;
+  uint32_t stride;
+  uint32_t next;
+  uint32_t pad[2];
+  } rawCbs_t;
 //}}}
 //{{{  struct pi_i2c_msg_t
-typedef struct
-{
-   uint16_t addr;  /* slave address       */
-   uint16_t flags;
-   uint16_t len;   /* msg length          */
-   uint8_t  *buf;  /* pointer to msg data */
-} pi_i2c_msg_t;
+typedef struct {
+  uint16_t addr;  // slave address
+  uint16_t flags;
+  uint16_t len;   // msg length
+  uint8_t* buf;   // pointer to msg data
+  } pi_i2c_msg_t;
 //}}}
 
 #define BSC_FIFO_SIZE 512
 //{{{  struct bsc_xfer_t
-typedef struct
-{
-   uint32_t control;          /* Write */
-   int rxCnt;                 /* Read only */
-   char rxBuf[BSC_FIFO_SIZE]; /* Read only */
-   int txCnt;                 /* Write */
-   char txBuf[BSC_FIFO_SIZE]; /* Write */
-} bsc_xfer_t;
-//}}}
-
-// typedefs
-typedef void (*gpioTimerFunc_t) ();
-typedef void (*gpioTimerFuncEx_t) (void* userdata);
-
-typedef void (*gpioSignalFunc_t) (int signum);
-typedef void (*gpioSignalFuncEx_t) (int signum, void* userdata);
-
-typedef void *(gpioThreadFunc_t) (void*);
+typedef struct {
+  uint32_t control;          // Write
+  int rxCnt;                 // Read only
+  char rxBuf[BSC_FIFO_SIZE]; // Read only
+  int txCnt;                 // Write
+  char txBuf[BSC_FIFO_SIZE]; // Write
+  } bsc_xfer_t;
 //}}}
 
 unsigned gpioHardwareRevision();
 int gpioInitialise();
 void gpioTerminate();
-
-// utils
-int gpioTrigger (unsigned user_gpio, unsigned pulseLen, unsigned level);
-int gpioSetWatchdog (unsigned user_gpio, unsigned timeout);
-pthread_t* gpioStartThread (gpioThreadFunc_t f, void* userdata);
-void gpioStopThread (pthread_t *pth);
 
 // time
 int gpioTime (unsigned timetype, int* seconds, int* micros);
@@ -608,13 +522,6 @@ uint32_t gpioDelay (uint32_t micros);
 uint32_t gpioTick();
 double timeTime();
 void timeSleep (double seconds);
-
-// config
-int gpioCfgBufferSize (unsigned cfgMillis);
-int gpioCfgClock (unsigned cfgMicros, unsigned cfgPeripheral, unsigned cfgSource);
-int gpioCfgDMAchannels (unsigned primaryChannel, unsigned secondaryChannel);
-int gpioCfgMemAlloc (unsigned memAllocMode);
-uint32_t gpioCfgGetInternals();
 
 //{{{  gpio
 int gpioSetMode (unsigned gpio, unsigned mode);
@@ -646,6 +553,21 @@ int gpioGetPWMfrequency (unsigned user_gpio);
 int gpioServo (unsigned user_gpio, unsigned pulsewidth);
 int gpioGetServoPulsewidth (unsigned user_gpio);
 //}}}
+//{{{  spi
+int spiOpen (unsigned spiChan, unsigned baud, unsigned spiFlags);
+
+int spiRead (unsigned handle, char* buf, unsigned count);
+int spiWrite (unsigned handle, char* buf, unsigned count);
+void spiWriteMainFast (unsigned handle, const uint8_t* buf, unsigned count);
+int spiXfer (unsigned handle, char* txBuf, char* rxBuf, unsigned count);
+
+int spiClose (unsigned handle);
+
+// bitbang
+int bbSPIOpen (unsigned CS, unsigned MISO, unsigned MOSI, unsigned SCLK, unsigned baud, unsigned spiFlags);
+int bbSPIXfer (unsigned CS, char* inBuf, char* outBuf, unsigned count);
+int bbSPIClose (unsigned CS);
+//}}}
 //{{{  i2c
 int i2cOpen (unsigned i2cBus, unsigned i2cAddr, unsigned i2cFlags);
 int i2cClose (unsigned handle);
@@ -676,20 +598,8 @@ int i2cZip (unsigned handle, char* inBuf, unsigned inLen, char* outBuf, unsigned
 int bbI2COpen (unsigned SDA, unsigned SCL, unsigned baud);
 int bbI2CClose (unsigned SDA);
 int bbI2CZip (unsigned SDA, char* inBuf, unsigned inLen, char* outBuf, unsigned outLen);
-//}}}
-//{{{  spi
-int spiOpen (unsigned spiChan, unsigned baud, unsigned spiFlags);
-int spiClose (unsigned handle);
-
-int spiRead (unsigned handle, char* buf, unsigned count);
-void spiWriteMainFast (unsigned handle, const uint8_t* buf, unsigned count);
-int spiWrite (unsigned handle, char* buf, unsigned count);
-int spiXfer (unsigned handle, char* txBuf, char* rxBuf, unsigned count);
 
 int bscXfer (bsc_xfer_t* bsc_xfer);
-int bbSPIOpen (unsigned CS, unsigned MISO, unsigned MOSI, unsigned SCLK, unsigned baud, unsigned spiFlags);
-int bbSPIClose (unsigned CS);
-int bbSPIXfer (unsigned CS, char* inBuf, char* outBuf, unsigned count);
 //}}}
 //{{{  serial
 int serOpen (char* sertty, unsigned baud, unsigned serFlags);
