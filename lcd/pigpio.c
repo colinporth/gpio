@@ -47,8 +47,8 @@
 // 58 GPPUPPDN1 Pin pull-up/down for pins 31:16
 // 59 GPPUPPDN2 Pin pull-up/down for pins 47:32
 // 60 GPPUPPDN3 Pin pull-up/down for pins 57:48
-//}}}
-//{{{  dma
+
+// dma
 // 0 CS           DMA Channel 0 Control and Status
 // 1 CPI_ONBLK_AD DMA Channel 0 Control Block Address
 // 2 TI           DMA Channel 0 CB Word 0 (Transfer Information)
@@ -138,8 +138,8 @@
 #define MILLION  1000000
 #define BILLION  1000000000
 
-#define BANK (gpio>>5)
-#define BIT  (1<<(gpio&0x1F))
+#define BANK (gpio >> 5)
+#define BIT  (1 << (gpio & 0x1F))
 
 //{{{  dbg_level
 #define DBG_MIN_LEVEL 0
@@ -194,8 +194,9 @@
    while (0)
 //}}}
 
-#define PI_PERI_BUS 0x7E000000
 //{{{  base addresses
+#define PI_PERI_BUS 0x7E000000
+
 #define AUX_BASE   (pi_peri_phys + 0x00215000)
 #define BSCS_BASE  (pi_peri_phys + 0x00214000)
 #define CLK_BASE   (pi_peri_phys + 0x00101000)
@@ -207,8 +208,8 @@
 #define PWM_BASE   (pi_peri_phys + 0x0020C000)
 #define SPI_BASE   (pi_peri_phys + 0x00204000)
 #define SYST_BASE  (pi_peri_phys + 0x00003000)
-//}}}
-//{{{  lens
+
+// lens
 #define AUX_LEN   0xD8
 #define BSCS_LEN  0x40
 #define CLK_LEN   0xA8
@@ -251,8 +252,8 @@
 #define GPPUD     37
 #define GPPUDCLK0 38
 #define GPPUDCLK1 39
-//}}}
-//{{{  BCM2711 has different pulls
+
+// BCM2711 has different pulls
 #define GPPUPPDN0 57
 #define GPPUPPDN1 58
 #define GPPUPPDN2 59
@@ -473,14 +474,14 @@
 #define SPI_CS1     1
 #define SPI_CS2     2
 
-/* standard SPI gpios (ALT0) */
+// standard SPI gpios (ALT0) */
 #define PI_SPI_CE0   8
 #define PI_SPI_CE1   7
 #define PI_SPI_SCLK 11
 #define PI_SPI_MISO  9
 #define PI_SPI_MOSI 10
 
-/* auxiliary SPI gpios (ALT4) */
+// auxiliary SPI gpios (ALT4) */
 #define PI_ASPI_CE0  18
 #define PI_ASPI_CE1  17
 #define PI_ASPI_CE2  16
@@ -592,10 +593,8 @@
 #define SUPERLEVEL 20000
 
 #define BLOCK_SIZE (PAGES_PER_BLOCK*PAGE_SIZE)
-
 #define DMAI_PAGES (PAGES_PER_BLOCK * bufferBlocks)
 #define DMAO_PAGES (PAGES_PER_BLOCK * PI_WAVE_BLOCKS)
-
 #define TICKSLOTS 50
 #define SRX_BUF_SIZE 8192
 
@@ -1417,7 +1416,7 @@ static void wfRx_unlock (int i) {
 /*
 https://github.com/raspberrypi/firmware/wiki/Mailbox-property-interface
 */
-static int mbCreate (char *dev)
+static int mbCreate (char* dev)
 {
    /* <0 error */
 
@@ -1450,7 +1449,7 @@ static void mbClose (int fd)
 }
 //}}}
 //{{{
-static int mbProperty (int fd, void *buf)
+static int mbProperty (int fd, void* buf)
 {
    return ioctl(fd, MB_IOCTL, buf);
 }
@@ -1544,14 +1543,14 @@ static void* mbMapMem (unsigned base, unsigned size)
 }
 //}}}
 //{{{
-static int mbUnmapMem (void *addr, unsigned size)
+static int mbUnmapMem (void* addr, unsigned size)
 {
    /* 0 okay, -1 fail */
    return munmap(addr, size);
 }
 //}}}
 //{{{
-static void mbDMAFree (DMAMem_t *DMAMemP)
+static void mbDMAFree (DMAMem_t* DMAMemP)
 {
    if (DMAMemP->handle)
    {
@@ -1563,7 +1562,7 @@ static void mbDMAFree (DMAMem_t *DMAMemP)
 }
 //}}}
 //{{{
-static int mbDMAAlloc (DMAMem_t *DMAMemP, unsigned size, uint32_t pi_mem_flag)
+static int mbDMAAlloc (DMAMem_t* DMAMemP, unsigned size, uint32_t pi_mem_flag)
 {
    DMAMemP->size = size;
 
@@ -1585,29 +1584,26 @@ static int mbDMAAlloc (DMAMem_t *DMAMemP, unsigned size, uint32_t pi_mem_flag)
 
 // dma
 //{{{
-static rawCbs_t* dmaCB2adr(int pos)
-{
-   int page, slot;
+static rawCbs_t* dmaCB2adr (int pos) {
 
-   page = pos/CBS_PER_IPAGE;
-   slot = pos%CBS_PER_IPAGE;
-
-   return &dmaIVirt[page]->cb[slot];
-}
+  int page = pos / CBS_PER_IPAGE;
+  int slot = pos % CBS_PER_IPAGE;
+  return &dmaIVirt[page]->cb[slot];
+  }
 //}}}
 //{{{
-static uint32_t dmaPwmDataAdr(int pos)
-{
-   //cast twice to suppress compiler warning, I belive this cast is ok
-   //because dmaIbus contains bus addresses, not user addresses. --plugwash
-   return (uint32_t)(uintptr_t) &dmaIBus[pos]->periphData;
-}
+static uint32_t dmaPwmDataAdr (int pos) {
+//cast twice to suppress compiler warning, I belive this cast is ok
+//because dmaIbus contains bus addresses, not user addresses. --plugwash
+
+  return (uint32_t)(uintptr_t) &dmaIBus[pos]->periphData;
+  }
 //}}}
 //{{{
-static uint32_t dmaGpioOnAdr(int pos) {
+static uint32_t dmaGpioOnAdr (int pos) {
 
-  int page = pos/ON_PER_IPAGE;
-  int slot = pos%ON_PER_IPAGE;
+  int page = pos / ON_PER_IPAGE;
+  int slot = pos % ON_PER_IPAGE;
 
   //cast twice to suppress compiler warning, I belive this cast is ok
   //because dmaIbus contains bus addresses, not user addresses. --plugwash
@@ -1618,7 +1614,7 @@ static uint32_t dmaGpioOnAdr(int pos) {
 static uint32_t dmaGpioOffAdr (int pos) {
 
   int page, slot;
-  myOffPageSlot(pos, &page, &slot);
+  myOffPageSlot (pos, &page, &slot);
 
   //cast twice to suppress compiler warning, I belive this cast is ok
   //because dmaIbus contains bus addresses, not user addresses. --plugwash
@@ -1626,7 +1622,7 @@ static uint32_t dmaGpioOffAdr (int pos) {
   }
 //}}}
 //{{{
-static uint32_t dmaTickAdr(int pos) {
+static uint32_t dmaTickAdr (int pos) {
 
   int page, slot;
   myTckPageSlot (pos, &page, &slot);
@@ -1637,127 +1633,114 @@ static uint32_t dmaTickAdr(int pos) {
   }
 //}}}
 //{{{
-static uint32_t dmaReadLevelsAdr(int pos)
-{
-   int page, slot;
+static uint32_t dmaReadLevelsAdr (int pos) {
 
-   myLvsPageSlot(pos, &page, &slot);
+  int page, slot;
+  myLvsPageSlot (pos, &page, &slot);
 
-   //cast twice to suppress compiler warning, I belive this cast is ok
-   //because dmaIbus contains bus addresses, not user addresses. --plugwash
-   return (uint32_t)(uintptr_t) &dmaIBus[page]->level[slot];
-}
+  //cast twice to suppress compiler warning, I belive this cast is ok
+  //because dmaIbus contains bus addresses, not user addresses. --plugwash
+  return (uint32_t)(uintptr_t) &dmaIBus[page]->level[slot];
+  }
 //}}}
 //{{{
-static uint32_t dmaCbAdr(int pos)
-{
-   int page, slot;
+static uint32_t dmaCbAdr (int pos) {
 
-   page = (pos/CBS_PER_IPAGE);
-   slot = (pos%CBS_PER_IPAGE);
+  int page = (pos / CBS_PER_IPAGE);
+  int slot = (pos % CBS_PER_IPAGE);
 
-   //cast twice to suppress compiler warning, I belive this cast is ok
-   //because dmaIbus contains bus addresses, not user addresses. --plugwash
-   return (uint32_t)(uintptr_t) &dmaIBus[page]->cb[slot];
-}
+  //cast twice to suppress compiler warning, I belive this cast is ok
+  //because dmaIbus contains bus addresses, not user addresses. --plugwash
+  return (uint32_t)(uintptr_t) &dmaIBus[page]->cb[slot];
+  }
 //}}}
 
 //{{{
-static void dmaGpioOnCb(int b, int pos)
-{
-   rawCbs_t * p;
+static void dmaGpioOnCb (int b, int pos) {
 
-   p = dmaCB2adr(b);
+  rawCbs_t* p = dmaCB2adr (b);
 
-   p->info   = NORMAL_DMA;
-   p->src    = dmaGpioOnAdr(pos);
-   p->dst    = ((GPIO_BASE + (GPSET0*4)) & 0x00ffffff) | PI_PERI_BUS;
-   p->length = 4;
-   p->next   = dmaCbAdr(b+1);
-}
+  p->info   = NORMAL_DMA;
+  p->src    = dmaGpioOnAdr (pos);
+  p->dst    = ((GPIO_BASE + (GPSET0*4)) & 0x00ffffff) | PI_PERI_BUS;
+  p->length = 4;
+  p->next   = dmaCbAdr (b+1);
+  }
 //}}}
 //{{{
-static void dmaTickCb(int b, int pos)
-{
-   rawCbs_t * p;
+static void dmaTickCb (int b, int pos) {
 
-   p = dmaCB2adr(b);
+  rawCbs_t* p = dmaCB2adr (b);
 
-   p->info   = NORMAL_DMA;
-   p->src    = ((SYST_BASE + (SYST_CLO*4)) & 0x00ffffff) | PI_PERI_BUS;
-   p->dst    = dmaTickAdr(pos);
-   p->length = 4;
-   p->next   = dmaCbAdr(b+1);
-}
+  p->info   = NORMAL_DMA;
+  p->src    = ((SYST_BASE + (SYST_CLO*4)) & 0x00ffffff) | PI_PERI_BUS;
+  p->dst    = dmaTickAdr (pos);
+  p->length = 4;
+  p->next   = dmaCbAdr (b+1);
+  }
 //}}}
 //{{{
-static void dmaGpioOffCb(int b, int pos)
-{
-   rawCbs_t * p;
+static void dmaGpioOffCb (int b, int pos) {
 
-   p = dmaCB2adr(b);
+  rawCbs_t* p = dmaCB2adr (b);
 
-   p->info   = NORMAL_DMA;
-   p->src    = dmaGpioOffAdr(pos);
-   p->dst    = ((GPIO_BASE + (GPCLR0*4)) & 0x00ffffff) | PI_PERI_BUS;
-   p->length = 4;
-   p->next   = dmaCbAdr(b+1);
-}
+  p->info   = NORMAL_DMA;
+  p->src    = dmaGpioOffAdr (pos);
+  p->dst    = ((GPIO_BASE + (GPCLR0*4)) & 0x00ffffff) | PI_PERI_BUS;
+  p->length = 4;
+  p->next   = dmaCbAdr (b+1);
+  }
 //}}}
 //{{{
-static void dmaReadLevelsCb(int b, int pos)
-{
-   rawCbs_t * p;
+static void dmaReadLevelsCb (int b, int pos) {
 
-   p = dmaCB2adr(b);
+  rawCbs_t* p = dmaCB2adr (b);
 
-   p->info   = NORMAL_DMA;
-   p->src    = ((GPIO_BASE + (GPLEV0*4)) & 0x00ffffff) | PI_PERI_BUS;
-   p->dst    = dmaReadLevelsAdr(pos);
-   p->length = 4;
-   p->next   = dmaCbAdr(b+1);
-}
+  p->info   = NORMAL_DMA;
+  p->src    = ((GPIO_BASE + (GPLEV0*4)) & 0x00ffffff) | PI_PERI_BUS;
+  p->dst    = dmaReadLevelsAdr (pos);
+  p->length = 4;
+  p->next   = dmaCbAdr (b+1);
+  }
 //}}}
 //{{{
-static void dmaDelayCb(int b)
-{
-   rawCbs_t * p;
+static void dmaDelayCb (int b) {
 
-   p = dmaCB2adr(b);
+  rawCbs_t* p = dmaCB2adr (b);
 
-   if (gpioCfg.clockPeriph == PI_CLOCK_PCM)
-   {
-      p->info = NORMAL_DMA | TIMED_DMA(2);
-      p->dst  = PCM_TIMER;
-   }
-   else
-   {
-      p->info = NORMAL_DMA | TIMED_DMA(5);
-      p->dst  = PWM_TIMER;
-   }
+  if (gpioCfg.clockPeriph == PI_CLOCK_PCM) {
+    p->info = NORMAL_DMA | TIMED_DMA(2);
+    p->dst  = PCM_TIMER;
+    }
+  else {
+    p->info = NORMAL_DMA | TIMED_DMA(5);
+    p->dst  = PWM_TIMER;
+    }
 
-   p->src    = dmaPwmDataAdr(b%DMAI_PAGES);
-   p->length = 4;
-   p->next   = dmaCbAdr(b+1);
-}
+  p->src    = dmaPwmDataAdr (b % DMAI_PAGES);
+  p->length = 4;
+  p->next   = dmaCbAdr (b+1);
+  }
 //}}}
 //{{{
 static void dmaInitCbs() {
-
-
-  /* set up the DMA control blocks */
-  DBG (DBG_STARTUP, "");
+// set up the DMA control blocks
 
   int b = -1;
   int level = 0;
 
   for (int cycle = 0; cycle < bufferCycles; cycle++) {
-    b++; dmaGpioOnCb(b, cycle%SUPERCYCLE); /* gpio on slot */
-    b++; dmaTickCb(b, cycle);              /* tick slot */
+    b++;
+    dmaGpioOnCb (b, cycle%SUPERCYCLE); /* gpio on slot */
+    b++;
+    dmaTickCb (b, cycle);              /* tick slot */
     for (int pulse = 0; pulse < PULSE_PER_CYCLE; pulse++) {
-      b++; dmaReadLevelsCb(b, level);               /* read levels slot */
-      b++; dmaDelayCb(b);                           /* delay slot */
-      b++; dmaGpioOffCb(b, (level%SUPERLEVEL)+1);   /* gpio off slot */
+      b++;
+      dmaReadLevelsCb (b, level);               /* read levels slot */
+      b++;
+      dmaDelayCb (b);                           /* delay slot */
+      b++;
+      dmaGpioOffCb (b, (level%SUPERLEVEL)+1);   /* gpio off slot */
       ++level;
       }
     }
@@ -1765,9 +1748,6 @@ static void dmaInitCbs() {
   // point last cb back to first for continuous loop
   rawCbs_t* p = dmaCB2adr(b);
   p->next = dmaCbAdr(0);
-
-  DBG (DBG_STARTUP, "DMA page type count = %zd", sizeof(dmaIPage_t));
-  DBG (DBG_STARTUP, "%d control blocks (exp=%d)", b+1, NUM_CBS);
   }
 //}}}
 //}}}
@@ -1804,28 +1784,26 @@ static uint32_t myGpioDelay (uint32_t micros) {
 double timeTime() {
 
   struct timeval tv;
-  gettimeofday(&tv, 0);
+  gettimeofday (&tv, 0);
   return (double)tv.tv_sec + ((double)tv.tv_usec / 1E6);
   }
 //}}}
 //{{{
-void timeSleep (double seconds)
-{
-   struct timespec ts, rem;
+void timeSleep (double seconds) {
 
-   if (seconds > 0.0)
-   {
-      ts.tv_sec = seconds;
-      ts.tv_nsec = (seconds-(double)ts.tv_sec) * 1E9;
+  struct timespec ts, rem;
 
-      while (clock_nanosleep(CLOCK_REALTIME, 0, &ts, &rem))
-      {
-         /* copy remaining time to ts */
-         ts.tv_sec  = rem.tv_sec;
-         ts.tv_nsec = rem.tv_nsec;
+  if (seconds > 0.0) {
+    ts.tv_sec = seconds;
+    ts.tv_nsec = (seconds-(double)ts.tv_sec) * 1E9;
+
+    while (clock_nanosleep(CLOCK_REALTIME, 0, &ts, &rem)) {
+      // copy remaining time to ts
+      ts.tv_sec = rem.tv_sec;
+      ts.tv_nsec = rem.tv_nsec;
       }
-   }
-}
+    }
+  }
 //}}}
 //{{{
 int gpioTime (unsigned timetype, int* seconds, int* micros) {
@@ -1863,7 +1841,7 @@ int gpioSleep (unsigned timetype, int seconds, int micros) {
     SOFT_ERROR (PI_BAD_MICROS, "bad micros (%d)", micros);
 
   struct timespec ts;
-  ts.tv_sec  = seconds;
+  ts.tv_sec = seconds;
   ts.tv_nsec = micros * 1000;
 
   struct timespec rem;
@@ -1873,7 +1851,7 @@ int gpioSleep (unsigned timetype, int seconds, int micros) {
   else {
     while (clock_nanosleep (CLOCK_REALTIME, 0, &ts, &rem)) {
       // copy remaining time to ts
-      ts.tv_sec  = rem.tv_sec;
+      ts.tv_sec = rem.tv_sec;
       ts.tv_nsec = rem.tv_nsec;
       }
     }
@@ -1884,9 +1862,7 @@ int gpioSleep (unsigned timetype, int seconds, int micros) {
 //{{{
 uint32_t gpioDelay (uint32_t micros) {
 
-  uint32_t start;
-
-  start = systReg[SYST_CLO];
+  uint32_t start = systReg[SYST_CLO];
 
   if (micros <= PI_MAX_BUSY_DELAY)
     while ((systReg[SYST_CLO] - start) <= micros) {}
@@ -1922,10 +1898,10 @@ static void initClearGlobals() {
   wfStats.highCbs    = 0;
   wfStats.maxCbs     = (PI_WAVE_BLOCKS * PAGES_PER_BLOCK * CBS_PER_OPAGE);
 
-  gpioGetSamples.func     = NULL;
-  gpioGetSamples.ex       = 0;
+  gpioGetSamples.func = NULL;
+  gpioGetSamples.ex = 0;
   gpioGetSamples.userdata = NULL;
-  gpioGetSamples.bits     = 0;
+  gpioGetSamples.bits = 0;
 
   for (int i = 0; i <= PI_MAX_USER_GPIO; i++) {
     wfRx[i].mode = PI_WFRX_NONE;
@@ -1956,10 +1932,8 @@ static void initClearGlobals() {
     }
 
   // calculate the usable PWM frequencies */
-  for (int i = 0; i < PWM_FREQS; i++) {
+  for (int i = 0; i < PWM_FREQS; i++)
     pwmFreq[i]= (1000000.0 / ((float)PULSE_PER_CYCLE * gpioCfg.clockMicros * pwmCycles[i])) + 0.5;
-    DBG (DBG_STARTUP, "f%d is %d", i, pwmFreq[i]);
-    }
 
   fdMem = -1;
   dmaMboxBlk = MAP_FAILED;
@@ -2036,8 +2010,6 @@ static int initPeripherals() {
 
   dmaIn =  dmaReg + (gpioCfg.DMAprimaryChannel   * 0x40);
   dmaOut = dmaReg + (gpioCfg.DMAsecondaryChannel * 0x40);
-  DBG (DBG_STARTUP, "DMA #%d @ %08"PRIXPTR, gpioCfg.DMAprimaryChannel, (uintptr_t)dmaIn);
-  DBG (DBG_STARTUP, "debug reg is %08X", dmaIn[DMA_DEBUG]);
 
   clkReg  = initMapMem (fdMem, CLK_BASE,  CLK_LEN);
   if (clkReg == MAP_FAILED)
@@ -2092,13 +2064,11 @@ static int initZaps (int pmapFd, void* virtualBase, int  basePage, int  pages) {
     if (t != sizeof(pa))
       SOFT_ERROR (PI_INIT_FAILED, "read pagemap failed (%m)");
 
-    DBG (DBG_STARTUP, "pf%d=%016llX", n, pa);
-
     uint32_t physical = 0x3FFFFFFF & (PAGE_SIZE * (pa & 0xFFFFFFFF));
     if (physical) {
-      //cast twice to suppress warning, I belive this is ok as these
-      //are bus addresses, not virtual addresses. --plugwash
-      dmaBus[basePage+n] = (dmaPage_t *)(uintptr_t) (physical | pi_dram_bus);
+      // cast twice to suppress warning, I belive this is ok as these
+      // are bus addresses, not virtual addresses. --plugwash
+      dmaBus[basePage+n] = (dmaPage_t*)(uintptr_t) (physical | pi_dram_bus);
 
       dmaVirt[basePage+n] = mmap ((void*)pageAdr, PAGE_SIZE, PROT_READ|PROT_WRITE,
                                   MAP_SHARED|MAP_FIXED|MAP_LOCKED|MAP_NORESERVE, fdMem, physical);
@@ -2160,8 +2130,8 @@ static int initMboxBlock (int block) {
   uintptr_t busAdr = dmaMboxBlk[block].bus_addr;
 
   for (int n = 0; n < PAGES_PER_BLOCK; n++) {
-    dmaVirt[page+n] = (dmaPage_t*) virtualAdr;
-    dmaBus[page+n] = (dmaPage_t*) busAdr;
+    dmaVirt[page+n] = (dmaPage_t*)virtualAdr;
+    dmaBus[page+n] = (dmaPage_t*)busAdr;
     virtualAdr += PAGE_SIZE;
     busAdr += PAGE_SIZE;
     }
@@ -2350,8 +2320,6 @@ static void initClock (int mainClock) {
 
   const unsigned BITS = 10;
 
-  unsigned clkCtl, clkDiv, clkSrc, clkDivI, clkDivF, clkMash, clkBits;
-  char* per;
 
   unsigned micros;
   if (mainClock)
@@ -2359,33 +2327,30 @@ static void initClock (int mainClock) {
   else
     micros = PI_WF_MICROS;
 
-  int clockPWM;
-  clockPWM = mainClock ^ (gpioCfg.clockPeriph == PI_CLOCK_PCM);
+  unsigned clkCtl;
+  unsigned clkDiv;
+  int clockPWM = mainClock ^ (gpioCfg.clockPeriph == PI_CLOCK_PCM);
   if (clockPWM) {
     clkCtl = CLK_PWMCTL;
     clkDiv = CLK_PWMDIV;
-    per = "PWM";
     }
   else {
     clkCtl = CLK_PCMCTL;
     clkDiv = CLK_PCMDIV;
-    per = "PCM";
     }
 
-  clkSrc  = CLK_CTL_SRC_PLLD;
-  clkDivI = clk_plld_freq / (10000000 / micros); /* 10 MHz - 1 MHz */
-  clkBits = BITS;        /* 10/BITS MHz - 1/BITS MHz */
-  clkDivF = 0;
-  clkMash = 0;
-
-  DBG (DBG_STARTUP, "%s PLLD divi=%d divf=%d mash=%d bits=%d", per, clkDivI, clkDivF, clkMash, clkBits);
+  unsigned clkSrc  = CLK_CTL_SRC_PLLD;
+  unsigned clkDivI = clk_plld_freq / (10000000 / micros); /* 10 MHz - 1 MHz */
+  unsigned clkBits = BITS;        /* 10/BITS MHz - 1/BITS MHz */
+  unsigned clkDivF = 0;
+  unsigned clkMash = 0;
 
   initHWClk (clkCtl, clkDiv, clkSrc, clkDivI, clkDivF, clkMash);
 
   if (clockPWM)
-    initPWM (BITS);
+    initPWM (clkBits);
   else
-    initPCM (BITS);
+    initPCM (clkBits);
 
   myGpioDelay (2000);
   }
@@ -2418,75 +2383,90 @@ static void initReleaseResources() {
 
   for (int i = 0; i <= PI_MAX_TIMER; i++) {
     if (gpioTimer[i].running) {
-      //{{{  destroy thread
-      pthread_cancel(gpioTimer[i].pthId);
-      pthread_join(gpioTimer[i].pthId, NULL);
+      // destroy thread
+      pthread_cancel (gpioTimer[i].pthId);
+      pthread_join (gpioTimer[i].pthId, NULL);
       gpioTimer[i].running = 0;
       }
-      //}}}
     }
 
   //{{{  release mmap'd memory
-  if (auxReg  != MAP_FAILED) munmap((void*)auxReg,  AUX_LEN);
-  if (bscsReg != MAP_FAILED) munmap((void*)bscsReg, BSCS_LEN);
-  if (clkReg  != MAP_FAILED) munmap((void*)clkReg,  CLK_LEN);
-  if (dmaReg  != MAP_FAILED) munmap((void*)dmaReg,  DMA_LEN);
-  if (gpioReg != MAP_FAILED) munmap((void*)gpioReg, GPIO_LEN);
-  if (pcmReg  != MAP_FAILED) munmap((void*)pcmReg,  PCM_LEN);
-  if (pwmReg  != MAP_FAILED) munmap((void*)pwmReg,  PWM_LEN);
-  if (systReg != MAP_FAILED) munmap((void*)systReg, SYST_LEN);
-  if (spiReg  != MAP_FAILED) munmap((void*)spiReg,  SPI_LEN);
+  if (auxReg  != MAP_FAILED)
+    munmap((void*)auxReg,  AUX_LEN);
   auxReg  = MAP_FAILED;
+
+  if (bscsReg != MAP_FAILED)
+    munmap ((void*)bscsReg, BSCS_LEN);
   bscsReg = MAP_FAILED;
+
+  if (clkReg  != MAP_FAILED)
+    munmap ((void*)clkReg,  CLK_LEN);
   clkReg  = MAP_FAILED;
+
+  if (dmaReg  != MAP_FAILED)
+    munmap ((void*)dmaReg,  DMA_LEN);
   dmaReg  = MAP_FAILED;
+
+  if (gpioReg != MAP_FAILED)
+    munmap ((void*)gpioReg, GPIO_LEN);
   gpioReg = MAP_FAILED;
+
+  if (pcmReg  != MAP_FAILED)
+    munmap ((void*)pcmReg,  PCM_LEN);
   pcmReg  = MAP_FAILED;
+
+  if (pwmReg  != MAP_FAILED)
+    munmap ((void*)pwmReg,  PWM_LEN);
   pwmReg  = MAP_FAILED;
+
+  if (systReg != MAP_FAILED)
+    munmap ((void*)systReg, SYST_LEN);
   systReg = MAP_FAILED;
+
+  if (spiReg  != MAP_FAILED)
+    munmap ((void*)spiReg,  SPI_LEN);
   spiReg  = MAP_FAILED;
   //}}}
 
   if (dmaBus != MAP_FAILED)
-    munmap (dmaBus, PAGES_PER_BLOCK*(bufferBlocks+PI_WAVE_BLOCKS)*sizeof(dmaPage_t *));
+    munmap (dmaBus, PAGES_PER_BLOCK * (bufferBlocks + PI_WAVE_BLOCKS) * sizeof(dmaPage_t *));
   dmaBus = MAP_FAILED;
 
   if (dmaVirt != MAP_FAILED) {
-    for (int i = 0; i < PAGES_PER_BLOCK*(bufferBlocks+PI_WAVE_BLOCKS); i++)
+    for (int i = 0; i < PAGES_PER_BLOCK * (bufferBlocks + PI_WAVE_BLOCKS); i++)
       munmap(dmaVirt[i], PAGE_SIZE);
-    munmap (dmaVirt, PAGES_PER_BLOCK*(bufferBlocks+PI_WAVE_BLOCKS)*sizeof(dmaPage_t *));
+    munmap (dmaVirt, PAGES_PER_BLOCK * (bufferBlocks + PI_WAVE_BLOCKS) * sizeof(dmaPage_t *));
     }
   dmaVirt = MAP_FAILED;
 
   if (dmaPMapBlk != MAP_FAILED) {
-    for (int i = 0; i < (bufferBlocks+PI_WAVE_BLOCKS); i++)
-      munmap(dmaPMapBlk[i], PAGES_PER_BLOCK*PAGE_SIZE);
-
-    munmap(dmaPMapBlk, (bufferBlocks+PI_WAVE_BLOCKS)*sizeof(dmaPage_t *));
+    for (int i = 0; i < (bufferBlocks + PI_WAVE_BLOCKS); i++)
+      munmap(dmaPMapBlk[i], PAGES_PER_BLOCK * PAGE_SIZE);
+    munmap(dmaPMapBlk, (bufferBlocks + PI_WAVE_BLOCKS) * sizeof(dmaPage_t *));
     }
   dmaPMapBlk = MAP_FAILED;
 
   if (dmaMboxBlk != MAP_FAILED) {
     fdMbox = mbOpen();
     for (int i = 0; i < (bufferBlocks + PI_WAVE_BLOCKS); i++)
-      mbDMAFree (&dmaMboxBlk[bufferBlocks + PI_WAVE_BLOCKS-i-1]);
+      mbDMAFree (&dmaMboxBlk[bufferBlocks + PI_WAVE_BLOCKS - i - 1]);
     mbClose (fdMbox);
     munmap (dmaMboxBlk, (bufferBlocks + PI_WAVE_BLOCKS) * sizeof(DMAMem_t));
     }
   dmaMboxBlk = MAP_FAILED;
 
   if (fdMem != -1) {
-    close(fdMem);
+    close (fdMem);
     fdMem = -1;
     }
 
   if (fdPmap != -1) {
-    close(fdPmap);
+    close (fdPmap);
     fdPmap = -1;
     }
 
   if (fdMbox != -1) {
-    close(fdMbox);
+    close (fdMbox);
     fdMbox = -1;
     }
   }
@@ -2601,7 +2581,6 @@ static int initInitialise() {
   }
 //}}}
 //}}}
-unsigned gpioVersion() { return PIGPIO_VERSION; }
 //{{{
 unsigned gpioHardwareRevision() {
 //{{{  description
@@ -3818,14 +3797,14 @@ void spiWriteMainFast (unsigned handle, const uint8_t* buf, unsigned count) {
   spiReg[SPI_CS] |= SPI_CS_TA;
 
   if (count == 1) {
-    // single byte case
+    // single byte
     spiReg[SPI_FIFO] = *buf++;
     while (!(spiReg[SPI_CS] & SPI_CS_RXD)) {}
     spiDummyRead = spiReg[SPI_FIFO];
     }
 
   else {
-    // multiple bytes, byte swap words
+    // multiple bytes, byteSwap words
     uint32_t txCount = 0;
     uint32_t rxCount = 0;
     while ((txCount < count) || (rxCount < count)) {
@@ -4390,103 +4369,91 @@ int i2cWriteWordData (unsigned handle, unsigned reg, unsigned wVal)
 //}}}
 
 //{{{
-int i2cProcessCall (unsigned handle, unsigned reg, unsigned wVal)
-{
-   union my_smbus_data data;
-   int status;
+int i2cProcessCall (unsigned handle, unsigned reg, unsigned wVal) {
 
-   if (handle >= PI_I2C_SLOTS)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+  if (handle >= PI_I2C_SLOTS)
+    SOFT_ERROR (PI_BAD_HANDLE, "bad handle (%d)", handle);
 
-   if (i2cInfo[handle].state != PI_I2C_OPENED)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+  if (i2cInfo[handle].state != PI_I2C_OPENED)
+    SOFT_ERROR (PI_BAD_HANDLE, "bad handle (%d)", handle);
 
-   if ((i2cInfo[handle].funcs & PI_I2C_FUNC_SMBUS_PROC_CALL) == 0)
-      SOFT_ERROR(PI_BAD_SMBUS_CMD, "SMBUS command not supported by driver");
+  if ((i2cInfo[handle].funcs & PI_I2C_FUNC_SMBUS_PROC_CALL) == 0)
+    SOFT_ERROR (PI_BAD_SMBUS_CMD, "SMBUS command not supported by driver");
 
-   if (reg > 0xFF)
-      SOFT_ERROR(PI_BAD_PARAM, "bad reg (%d)", reg);
+  if (reg > 0xFF)
+    SOFT_ERROR (PI_BAD_PARAM, "bad reg (%d)", reg);
 
-   if (wVal > 0xFFFF)
-      SOFT_ERROR(PI_BAD_PARAM, "bad wVal (%d)", wVal);
+  if (wVal > 0xFFFF)
+    SOFT_ERROR (PI_BAD_PARAM, "bad wVal (%d)", wVal);
 
-   data.word = wVal;
+  union my_smbus_data data;
+  data.word = wVal;
+  int status = (my_smbus_access (i2cInfo[handle].fd, PI_I2C_SMBUS_WRITE, reg, PI_I2C_SMBUS_PROC_CALL, &data));
+  if (status < 0)
+    return PI_I2C_READ_FAILED;
 
-   status = (my_smbus_access( i2cInfo[handle].fd, PI_I2C_SMBUS_WRITE, reg, PI_I2C_SMBUS_PROC_CALL, &data));
-
-   if (status < 0)
-      return PI_I2C_READ_FAILED;
-
-   return 0xFFFF & data.word;
-}
+  return 0xFFFF & data.word;
+  }
 //}}}
 
 //{{{
-int i2cReadBlockData (unsigned handle, unsigned reg, char *buf)
-{
-   union my_smbus_data data;
+int i2cReadBlockData (unsigned handle, unsigned reg, char *buf) {
 
-   int i, status;
+  if (handle >= PI_I2C_SLOTS)
+    SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
 
-   if (handle >= PI_I2C_SLOTS)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+  if (i2cInfo[handle].state != PI_I2C_OPENED)
+    SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
 
-   if (i2cInfo[handle].state != PI_I2C_OPENED)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+  if ((i2cInfo[handle].funcs & PI_I2C_FUNC_SMBUS_READ_BLOCK_DATA) == 0)
+    SOFT_ERROR(PI_BAD_SMBUS_CMD, "SMBUS command not supported by driver");
 
-   if ((i2cInfo[handle].funcs & PI_I2C_FUNC_SMBUS_READ_BLOCK_DATA) == 0)
-      SOFT_ERROR(PI_BAD_SMBUS_CMD, "SMBUS command not supported by driver");
+  if (reg > 0xFF)
+    SOFT_ERROR(PI_BAD_PARAM, "bad reg (%d)", reg);
 
-   if (reg > 0xFF)
-      SOFT_ERROR(PI_BAD_PARAM, "bad reg (%d)", reg);
-
-   status = (my_smbus_access( i2cInfo[handle].fd, PI_I2C_SMBUS_READ, reg, PI_I2C_SMBUS_BLOCK_DATA, &data));
-
-   if (status < 0)
-      return PI_I2C_READ_FAILED;
-   else
-   {
-      if (data.block[0] <= PI_I2C_SMBUS_BLOCK_MAX)
-      {
-         for (i=0; i<data.block[0]; i++) buf[i] = data.block[i+1];
-         return data.block[0];
+  union my_smbus_data data;
+  int status = (my_smbus_access( i2cInfo[handle].fd, PI_I2C_SMBUS_READ, reg, PI_I2C_SMBUS_BLOCK_DATA, &data));
+  if (status < 0)
+    return PI_I2C_READ_FAILED;
+  else {
+    if (data.block[0] <= PI_I2C_SMBUS_BLOCK_MAX) {
+      for (int i = 0; i < data.block[0]; i++) buf[i] = data.block[i+1];
+      return data.block[0];
       }
-      else return PI_I2C_READ_FAILED;
-   }
-}
+    else
+      return PI_I2C_READ_FAILED;
+    }
+  }
 //}}}
 //{{{
-int i2cWriteBlockData (unsigned handle, unsigned reg, char *buf, unsigned count)
-{
-   union my_smbus_data data;
+int i2cWriteBlockData (unsigned handle, unsigned reg, char *buf, unsigned count) {
 
-   int i, status;
+  if (handle >= PI_I2C_SLOTS)
+    SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
 
-   if (handle >= PI_I2C_SLOTS)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+  if (i2cInfo[handle].state != PI_I2C_OPENED)
+    SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
 
-   if (i2cInfo[handle].state != PI_I2C_OPENED)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
+  if ((i2cInfo[handle].funcs & PI_I2C_FUNC_SMBUS_WRITE_BLOCK_DATA) == 0)
+    SOFT_ERROR(PI_BAD_SMBUS_CMD, "SMBUS command not supported by driver");
 
-   if ((i2cInfo[handle].funcs & PI_I2C_FUNC_SMBUS_WRITE_BLOCK_DATA) == 0)
-      SOFT_ERROR(PI_BAD_SMBUS_CMD, "SMBUS command not supported by driver");
+  if (reg > 0xFF)
+    SOFT_ERROR(PI_BAD_PARAM, "bad reg (%d)", reg);
 
-   if (reg > 0xFF)
-      SOFT_ERROR(PI_BAD_PARAM, "bad reg (%d)", reg);
+  if ((count < 1) || (count > 32))
+    SOFT_ERROR(PI_BAD_PARAM, "bad count (%d)", count);
 
-   if ((count < 1) || (count > 32))
-      SOFT_ERROR(PI_BAD_PARAM, "bad count (%d)", count);
+  union my_smbus_data data;
+  for (int i = 1; i <= count; i++)
+    data.block[i] = buf[i-1];
+  data.block[0] = count;
 
-   for (i=1; i<=count; i++) data.block[i] = buf[i-1];
-   data.block[0] = count;
+  int status = my_smbus_access( i2cInfo[handle].fd, PI_I2C_SMBUS_WRITE, reg, PI_I2C_SMBUS_BLOCK_DATA, &data);
+  if (status < 0)
+    return PI_I2C_WRITE_FAILED;
 
-   status = my_smbus_access( i2cInfo[handle].fd, PI_I2C_SMBUS_WRITE, reg, PI_I2C_SMBUS_BLOCK_DATA, &data);
-
-   if (status < 0)
-      return PI_I2C_WRITE_FAILED;
-
-   return status;
-}
+  return status;
+  }
 //}}}
 
 //{{{

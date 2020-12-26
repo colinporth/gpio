@@ -591,7 +591,6 @@ typedef void (*gpioSignalFuncEx_t) (int signum, void* userdata);
 typedef void *(gpioThreadFunc_t) (void*);
 //}}}
 
-unsigned gpioVersion();
 unsigned gpioHardwareRevision();
 int gpioInitialise();
 void gpioTerminate();

@@ -93,8 +93,8 @@ cLcd::~cLcd() {
 //{{{
 bool cLcd::initialise() {
 
-  cLog::log (LOGINFO, format ("initialise hwRev:{} version:{} rotate:{} {} {}",
-                      gpioHardwareRevision(), gpioVersion(), mRotate * 90,
+  cLog::log (LOGINFO, format ("initialise hwRev:{:x} rotate:{} {} {}",
+                      gpioHardwareRevision(), mRotate * 90,
                       (mInfo == cLcd::eOverlay ? "overlay" : ""),
                       (mMode == cLcd::eAll ? "all" :
                          mMode == cLcd::eSingle ? "single" :
