@@ -7,16 +7,9 @@
 #include <strings.h>
 #include <stdlib.h>
 #include <stdint.h>
-
 #include <inttypes.h>
-#include <stdarg.h>
-#include <ctype.h>
 
-#include <syslog.h>
-#include <poll.h>
 #include <unistd.h>
-
-#include <fcntl.h>
 #include <termios.h>
 #include <signal.h>
 #include <errno.h>
@@ -33,8 +26,6 @@
 #include <sys/sysmacros.h>
 
 #include <arpa/inet.h>
-#include <fnmatch.h>
-#include <glob.h>
 
 #include "pigpio.h"
 //}}}
@@ -142,7 +133,6 @@
 // 5 C2  System Timer Compare 2
 // 6 C3  System Timer Compare 3
 //}}}
-
 //{{{  defines
 #define THOUSAND 1000
 #define MILLION  1000000
@@ -151,20 +141,24 @@
 #define BANK (gpio>>5)
 #define BIT  (1<<(gpio&0x1F))
 
-#ifdef EMBEDDED_IN_VM
-  #define DBG(level, format, arg...)
-#else
-  #define DBG(level, format, arg...) DO_DBG(level, format, ## arg)
-#endif
-
+//{{{  dbg_level
+#define DBG_MIN_LEVEL 0
+#define DBG_ALWAYS    0
+#define DBG_STARTUP   1
+#define DBG_DMACBS    2
+#define DBG_SCRIPT    3
+#define DBG_USER      4
+#define DBG_INTERNAL  5
+#define DBG_SLOW_TICK 6
+#define DBG_FAST_TICK 7
+#define DBG_MAX_LEVEL 8
+//}}}
+#define DBG(level, format, arg...) DO_DBG(level, format, ## arg)
 //{{{
-#define DO_DBG(level, format, arg...)                              \
-   {                                                               \
-      if ((gpioCfg.dbgLevel >= level) &&                           \
-         (!(gpioCfg.internals & PI_CFG_NOSIGHANDLER)))             \
-         fprintf(stderr, "%s %s: " format "\n" ,                   \
-            myTimeStamp(), __FUNCTION__ , ## arg);                 \
-   }
+#define DO_DBG(level, format, arg...) { \
+  if ((gpioCfg.dbgLevel >= level) && (!(gpioCfg.internals & PI_CFG_NOSIGHANDLER)))  \
+    fprintf(stderr, "%s %s: " format "\n" , myTimeStamp(), __FUNCTION__ , ## arg);  \
+  }
 //}}}
 
 #ifndef DISABLE_SER_CHECK_INITED
@@ -615,25 +609,13 @@
 #define AUXSPI_STAT_BUSY         (1<<6)
 #define AUXSPI_STAT_BITS(x)    ((x)<<0)
 //}}}
+
 #define NORMAL_DMA (DMA_NO_WIDE_BURSTS | DMA_WAIT_RESP)
 #define TWO_BEAT_DMA (DMA_TDMODE | DMA_BURST_LENGTH(1))
 #define TIMED_DMA(x) (DMA_DEST_DREQ | DMA_PERIPHERAL_MAPPING(x))
-
 #define PCM_TIMER (((PCM_BASE + PCM_FIFO*4) & 0x00ffffff) | PI_PERI_BUS)
 #define PWM_TIMER (((PWM_BASE + PWM_FIFO*4) & 0x00ffffff) | PI_PERI_BUS)
 
-//{{{  dbg_level
-#define DBG_MIN_LEVEL 0
-#define DBG_ALWAYS    0
-#define DBG_STARTUP   1
-#define DBG_DMACBS    2
-#define DBG_SCRIPT    3
-#define DBG_USER      4
-#define DBG_INTERNAL  5
-#define DBG_SLOW_TICK 6
-#define DBG_FAST_TICK 7
-#define DBG_MAX_LEVEL 8
-//}}}
 //{{{  gpio type
 #define GPIO_UNDEFINED 0
 #define GPIO_WRITE     1
@@ -646,14 +628,9 @@
 //}}}
 
 #define STACK_SIZE (256*1024)
-
 #define PAGE_SIZE 4096
-
 #define PWM_FREQS 18
-
 #define CYCLES_PER_BLOCK 80
-#define PULSE_PER_CYCLE  25
-
 //{{{  pages
 #define PAGES_PER_BLOCK 53
 
@@ -667,29 +644,6 @@
 #define CBS_PER_OPAGE 118
 #define OOL_PER_OPAGE  79
 //}}}
-//{{{  Wave Count Block
-//Assumes two counters per block.  Each counter 4 * 16 (16^4=65536)
-//   0  CB [13]  13*8  104 CBs for counter 0
-// 104  CB [13]  13*8  104 CBs for counter 1
-// 208  CB [60]  60*8  480 CBs reserved to construct wave
-// 688 OOL [60]  60*1   60 OOL reserved to construct wave
-// 748 OOL[136] 136*1  136 OOL for counter 0
-// 884 OOL[136] 136*1  136 OOL for counter 1
-//1020 pad  [4]   4*1    4 spare
-
-#define WCB_CNT_PER_PAGE 2
-#define WCB_COUNTERS (WCB_CNT_PER_PAGE * PI_WAVE_COUNT_PAGES)
-#define WCB_CNT_CBS 13
-#define WCB_CNT_OOL 68
-#define WCB_COUNTER_OOL (WCB_CNT_PER_PAGE * WCB_CNT_OOL)
-#define WCB_COUNTER_CBS (WCB_CNT_PER_PAGE * WCB_CNT_CBS)
-#define WCB_CHAIN_CBS   60
-#define WCB_CHAIN_OOL   60
-
-#define CBS_PER_CYCLE ((PULSE_PER_CYCLE*3)+2)
-
-#define NUM_CBS (CBS_PER_CYCLE * bufferCycles)
-//}}}
 
 #define SUPERCYCLE 800
 #define SUPERLEVEL 20000
@@ -699,10 +653,8 @@
 #define DMAI_PAGES (PAGES_PER_BLOCK * bufferBlocks)
 #define DMAO_PAGES (PAGES_PER_BLOCK * PI_WAVE_BLOCKS)
 
-#define NUM_WAVE_OOL (DMAO_PAGES * OOL_PER_OPAGE)
-#define NUM_WAVE_CBS (DMAO_PAGES * CBS_PER_OPAGE)
-
 #define TICKSLOTS 50
+#define SRX_BUF_SIZE 8192
 
 //{{{  open closed
 #define PI_I2C_CLOSED   0
@@ -740,17 +692,11 @@
 //}}}
 
 #define PI_WF_MICROS   1
-
-#define BPD 4
-
-#define MAX_REPORT 250
-#define MAX_SAMPLE 4000
-
 #define DEFAULT_PWM_IDX 5
 
-#define MAX_EMITS (PIPE_BUF / sizeof(gpioReport_t))
-
-#define SRX_BUF_SIZE 8192
+#define PULSE_PER_CYCLE  25
+#define CBS_PER_CYCLE ((PULSE_PER_CYCLE*3)+2)
+#define NUM_CBS (CBS_PER_CYCLE * bufferCycles)
 
 //{{{  i2c
 #define PI_I2C_RETRIES 0x0701
@@ -837,8 +783,6 @@
 #define PI_THREAD_STARTED 1
 #define PI_THREAD_RUNNING 2
 //}}}
-
-#define PI_MAX_PATH 512
 //}}}
 //{{{  typedef, var, const
 //{{{  typedef
@@ -882,43 +826,6 @@ typedef struct
    uint16_t deferOff;
    uint16_t deferRng;
 } gpioInfo_t;
-//}}}
-//{{{
-typedef struct
-{
-   callbk_t func;
-   unsigned ex;
-   void *userdata;
-
-   int      wdSteadyUs;
-   uint32_t wdTick;
-   uint32_t wdLBitV;
-
-   int      nfSteadyUs;
-   int      nfActiveUs;
-   int      nfActive;
-   uint32_t nfTick1;
-   uint32_t nfTick2;
-   uint32_t nfLBitV;
-   uint32_t nfRBitV;
-
-   uint32_t gfSteadyUs;
-   uint8_t  gfInitialised;
-   uint32_t gfTick;
-   uint32_t gfLBitV;
-   uint32_t gfRBitV;
-
-} gpioAlert_t;
-//}}}
-//{{{
-typedef struct
-{
-   callbk_t func;
-   unsigned ex;
-   void *userdata;
-   int ignore;
-   int fired;
-} eventAlert_t;
 //}}}
 //{{{
 typedef struct
@@ -1182,6 +1089,7 @@ static volatile uint32_t pi_dram_bus   = 0x40000000;
 static volatile uint32_t pi_mem_flag   = 0x0C;
 static volatile uint32_t pi_ispi       = 0;
 static volatile uint32_t pi_is_2711    = 0;
+
 static volatile uint32_t clk_osc_freq  = CLK_OSC_FREQ;
 static volatile uint32_t clk_plld_freq = CLK_PLLD_FREQ;
 static volatile uint32_t hw_pwm_max_freq = PI_HW_PWM_MAX_FREQ;
@@ -1193,7 +1101,6 @@ static int libInitialised = 0;
 //{{{  static var - initialise every gpioInitialise
 static struct timespec libStarted;
 
-static int waveClockInited = 0;
 static int PWMClockInited = 0;
 
 static volatile gpioStats_t gpioStats;
@@ -1203,29 +1110,17 @@ static int gpioMaskSet = 0;
 //{{{  static var - initialise if not libInitialised
 static uint64_t gpioMask;
 
-static rawWave_t wf[3][PI_WAVE_MAX_PULSES];
-
 static int wfc[3]={0, 0, 0};
 
 static int wfcur=0;
 
-static wfStats_t wfStats=
-{
-   0, 0, PI_WAVE_MAX_MICROS,
-   0, 0, PI_WAVE_MAX_PULSES,
-   0, 0, (DMAO_PAGES * CBS_PER_OPAGE)
-};
-
-static rawWaveInfo_t waveInfo[PI_MAX_WAVES];
+static wfStats_t wfStats= {
+  0, 0, PI_WAVE_MAX_MICROS,
+  0, 0, PI_WAVE_MAX_PULSES,
+  0, 0, (DMAO_PAGES * CBS_PER_OPAGE)
+  };
 
 static wfRx_t wfRx[PI_MAX_USER_GPIO+1];
-
-static int waveOutBotCB  = PI_WAVE_COUNT_PAGES*CBS_PER_OPAGE;
-static int waveOutBotOOL = PI_WAVE_COUNT_PAGES*OOL_PER_OPAGE;
-static int waveOutTopOOL = NUM_WAVE_OOL;
-static int waveOutCount = 0;
-
-static uint32_t *waveEndPtr = NULL;
 
 static volatile uint32_t alertBits   = 0;
 static volatile uint32_t monitorBits = 0;
@@ -1236,12 +1131,6 @@ static volatile uint32_t wdogBits    = 0;
 
 
 static volatile int runState = PI_STARTING;
-
-static gpioAlert_t      gpioAlert  [PI_MAX_USER_GPIO+1];
-
-static eventAlert_t     eventAlert [PI_MAX_EVENT+1];
-
-static gpioISR_t        gpioISR    [PI_MAX_GPIO+1];
 
 static gpioGetSamples_t gpioGetSamples;
 
@@ -1260,13 +1149,8 @@ static gpioTimer_t      gpioTimer  [PI_MAX_TIMER+1];
 static int pwmFreq[PWM_FREQS];
 //}}}
 //{{{  static var - reset after gpioTerminated
-/* resources which must be released on gpioTerminate */
-static FILE * inpFifo = NULL;
-static FILE * outFifo = NULL;
-
-static int fdLock       = -1;
+// resources which must be released on gpioTerminate */
 static int fdMem        = -1;
-static int fdSock       = -1;
 static int fdPmap       = -1;
 static int fdMbox       = -1;
 
@@ -1300,19 +1184,18 @@ static uint32_t hw_pwm_freq[2];
 static uint32_t hw_pwm_duty[2];
 static uint32_t hw_pwm_real_range[2];
 
-static volatile gpioCfg_t gpioCfg =
-{
-   PI_DEFAULT_BUFFER_MILLIS,
-   PI_DEFAULT_CLK_MICROS,
-   PI_DEFAULT_CLK_PERIPHERAL,
-   PI_DEFAULT_DMA_NOT_SET, /* primary DMA */
-   PI_DEFAULT_DMA_NOT_SET, /* secondary DMA */
-   PI_DEFAULT_IF_FLAGS,
-   PI_DEFAULT_MEM_ALLOC_MODE,
-   0, /* dbgLevel */
-   0, /* alertFreq */
-   0, /* internals */
-};
+static volatile gpioCfg_t gpioCfg = {
+  PI_DEFAULT_BUFFER_MILLIS,
+  PI_DEFAULT_CLK_MICROS,
+  PI_DEFAULT_CLK_PERIPHERAL,
+  PI_DEFAULT_DMA_NOT_SET, /* primary DMA */
+  PI_DEFAULT_DMA_NOT_SET, /* secondary DMA */
+  PI_DEFAULT_IF_FLAGS,
+  PI_DEFAULT_MEM_ALLOC_MODE,
+  0, /* dbgLevel */
+  0, /* alertFreq */
+  0, /* internals */
+  };
 //}}}
 //{{{  static var - no initialisation
 static unsigned bufferBlocks; /* number of blocks in buffer */
@@ -1434,14 +1317,7 @@ static const uint16_t pwmRealRange[PWM_FREQS]=
     800, 1000, 1250, 2000, 2500, 4000, 5000, 10000, 20000};
 //}}}
 //}}}
-//{{{  prototypes
-static void intNotifyBits();
-static void initHWClk (int clkCtl, int clkDiv, int clkSrc, int divI, int divF, int MASH);
-static void initDMAgo (volatile uint32_t  *dmaAddr, uint32_t cbAddr);
 
-int gpioWaveTxStart (unsigned wave_mode); /* deprecated */
-static void closeOrphanedNotifications (int slot, int fd);
-//}}}
 //{{{  helpers
 //{{{
 static char* myTimeStamp() {
@@ -1819,21 +1695,6 @@ static void myGpioSetServo (unsigned gpio, int oldVal, int newVal)
 //}}}
 
 //{{{
-static void myCreatePipe (char* name, int perm)
-{
-   unlink(name);
-
-   mkfifo(name, perm);
-
-   if (chmod(name, perm) < 0)
-   {
-      DBG(DBG_ALWAYS, "Can't set permissions (%d) for %s, %m", perm, name);
-      return;
-   }
-}
-//}}}
-
-//{{{
 static int myI2CGetPar (char* inBuf, int* inPos, int inLen, int* esc)
 {
    int bytes;
@@ -2063,684 +1924,6 @@ static int mbDMAAlloc (DMAMem_t *DMAMemP, unsigned size, uint32_t pi_mem_flag)
 }
 //}}}
 //}}}
-//{{{  wave
-//{{{
-rawCbs_t * rawWaveCBAdr (int cbNum)
-{
-   int page, slot;
-
-   page = cbNum/CBS_PER_OPAGE;
-   slot = cbNum%CBS_PER_OPAGE;
-
-   return &dmaOVirt[page]->cb[slot];
-}
-//}}}
-
-//{{{
-static uint32_t waveCbPOadr (int pos)
-{
-   int page, slot;
-
-   page = pos/CBS_PER_OPAGE;
-   slot = pos%CBS_PER_OPAGE;
-
-   //cast twice to suppress compiler warning, I belive this cast is ok
-   //because dmaOBus contains bus addresses, not virtual addresses.
-   return (uint32_t)(uintptr_t) &dmaOBus[page]->cb[slot];
-}
-//}}}
-//{{{
-static void waveOOLPageSlot (int pos, int *page, int *slot)
-{
-   *page = pos/OOL_PER_OPAGE;
-   *slot = pos%OOL_PER_OPAGE;
-}
-//}}}
-//{{{
-static void waveSetOOL (int pos, uint32_t OOL)
-{
-   int page, slot;
-
-   waveOOLPageSlot(pos, &page, &slot);
-
-   dmaOVirt[page]->OOL[slot] = OOL;
-}
-//}}}
-//{{{
-static uint32_t waveOOLPOadr (int pos)
-{
-   int page, slot;
-
-   waveOOLPageSlot(pos, &page, &slot);
-
-   //cast twice to suppress compiler warning, I belive this cast is ok
-   //because dmaOBus contains bus addresses, not virtual addresses.
-   return (uint32_t)(uintptr_t) &dmaOBus[page]->OOL[slot];
-}
-//}}}
-//{{{
-static void waveBitDelay
-   (unsigned baud, unsigned bits, unsigned stops, unsigned *bitDelay)
-{
-   unsigned fullBit, last, diff, t, i;
-
-   /* scaled 1000X */
-
-   fullBit = 1000000000 / baud;
-   last = 0;
-
-   for (i=0; i<=bits; i++)
-   {
-      t = (((i+1)*fullBit)+500)/1000;
-      diff = t - last;
-      last = t;
-      bitDelay[i] = diff;
-   }
-
-   t = (((bits+1)*fullBit) + ((stops*fullBit)/2) + 500)/1000;
-   diff = t - last;
-   bitDelay[i] = diff;
-}
-//}}}
-//{{{
-static int waveDelayCBs (uint32_t delay)
-{
-   uint32_t cbs;
-
-   if (!delay) return 0;
-   if (gpioCfg.DMAsecondaryChannel < DMA_LITE_FIRST) return 1;
-   cbs = BPD * delay / DMA_LITE_MAX;
-   if  ((BPD * delay) % DMA_LITE_MAX) cbs++;
-   return cbs;
-}
-//}}}
-//{{{
-static void waveCBsOOLs (int *numCBs, int *numBOOLs, int *numTOOLs)
-{
-   int numCB=0, numBOOL=0, numTOOL=0;
-
-   unsigned i;
-
-   unsigned numWaves;
-
-   rawWave_t *waves;
-
-   numWaves = wfc[wfcur];
-   waves    = wf [wfcur];
-
-   /* delay cb at start of DMA */
-
-   numCB++;
-
-   for (i=0; i<numWaves; i++)
-   {
-      if (waves[i].gpioOn)                 {numBOOL++;}
-      if (waves[i].gpioOff)                {numBOOL++;}
-      if (waves[i].gpioOn || waves[i].gpioOff) {numCB++;}
-      if (waves[i].flags & WAVE_FLAG_READ) {numCB++; numTOOL++;}
-      if (waves[i].flags & WAVE_FLAG_TICK) {numCB++; numTOOL++;}
-
-      numCB += waveDelayCBs(waves[i].usDelay);
-   }
-
-   *numCBs   = numCB;
-   *numBOOLs = numBOOL;
-   *numTOOLs = numTOOL;
-}
-//}}}
-//{{{
-static int wave2Cbs (unsigned wave_mode, int *CB, int *BOOL, int *TOOL,
-                    int numCB, int numBOOL, int numTOOL)
-{
-   int botCB=*CB, botOOL=*BOOL, topOOL=*TOOL;
-
-   int status, s_stride;
-
-   rawCbs_t *p=NULL;
-
-   unsigned i, repeatCB;
-
-   unsigned numWaves;
-
-   unsigned delayCBs, dcb;
-
-   uint32_t delayLeft;
-
-   rawWave_t * waves;
-
-   numWaves = wfc[wfcur];
-   waves    = wf [wfcur];
-
-   /* add delay cb at start of DMA */
-
-   p = rawWaveCBAdr(botCB++);
-
-   /* use the secondary clock */
-
-   if (gpioCfg.clockPeriph != PI_CLOCK_PCM)
-   {
-      p->info = NORMAL_DMA | TIMED_DMA(2);
-      p->dst  = PCM_TIMER;
-   }
-   else
-   {
-      p->info = NORMAL_DMA | TIMED_DMA(5);
-      p->dst  = PWM_TIMER;
-   }
-
-   //cast twice to suppress compiler warning, I belive this cast is ok
-   //because dmaOBus contains bus addresses, not virtual addresses.
-   p->src    = (uint32_t)(uintptr_t) (&dmaOBus[0]->periphData);
-   p->length = BPD * 20 / PI_WF_MICROS; /* 20 micros delay */
-   p->next   = waveCbPOadr(botCB);
-
-   repeatCB = botCB;
-
-   for (i=0; i<numWaves; i++)
-   {
-      if (waves[i].gpioOn && waves[i].gpioOff)
-      /* Use 2-beat burst */
-      {
-         p = rawWaveCBAdr(botCB++);
-
-         p->info   = TWO_BEAT_DMA;
-         p->src    = waveOOLPOadr(botOOL);
-         waveSetOOL(botOOL++, waves[i].gpioOn);
-         s_stride = waveOOLPOadr(botOOL) - p->src;
-         waveSetOOL(botOOL++, waves[i].gpioOff);
-         p->dst    = ((GPIO_BASE + (GPSET0*4)) & 0x00ffffff) | PI_PERI_BUS;
-         p->length = (2<<16) + 4;         // 2 transfers of 4 bytes each
-         p->stride = (12<<16) + s_stride; // d_stride = (GPCLR0-GPSET0)*4 = 12
-         p->next   = waveCbPOadr(botCB);
-      }
-      if (waves[i].gpioOn && !waves[i].gpioOff)
-      {
-         waveSetOOL(botOOL, waves[i].gpioOn);
-
-         p = rawWaveCBAdr(botCB++);
-
-         p->info   = NORMAL_DMA;
-         p->src    = waveOOLPOadr(botOOL++);
-         p->dst    = ((GPIO_BASE + (GPSET0*4)) & 0x00ffffff) | PI_PERI_BUS;
-         p->length = 4;
-         p->next   = waveCbPOadr(botCB);
-      }
-      if (waves[i].gpioOff && !waves[i].gpioOn)
-      {
-         waveSetOOL(botOOL, waves[i].gpioOff);
-
-         p = rawWaveCBAdr(botCB++);
-
-         p->info   = NORMAL_DMA;
-         p->src    = waveOOLPOadr(botOOL++);
-         p->dst    = ((GPIO_BASE + (GPCLR0*4)) & 0x00ffffff) | PI_PERI_BUS;
-         p->length = 4;
-         p->next   = waveCbPOadr(botCB);
-      }
-      if (waves[i].flags & WAVE_FLAG_READ)
-      {
-         p = rawWaveCBAdr(botCB++);
-
-         p->info   = NORMAL_DMA;
-         p->src    = ((GPIO_BASE + (GPLEV0*4)) & 0x00ffffff) | PI_PERI_BUS;
-         p->dst    = waveOOLPOadr(--topOOL);
-         p->length = 4;
-         p->next   = waveCbPOadr(botCB);
-      }
-
-      if (waves[i].flags & WAVE_FLAG_TICK)
-      {
-         p = rawWaveCBAdr(botCB++);
-
-         p->info   = NORMAL_DMA;
-         p->src    = ((SYST_BASE + (SYST_CLO*4)) & 0x00ffffff) | PI_PERI_BUS;
-         p->dst    = waveOOLPOadr(--topOOL);
-         p->length = 4;
-         p->next   = waveCbPOadr(botCB);
-      }
-
-      if (waves[i].usDelay)
-      {
-         delayLeft = waves[i].usDelay;
-
-         delayCBs = waveDelayCBs(delayLeft);
-
-         for (dcb=0; dcb<delayCBs; dcb++)
-         {
-            p = rawWaveCBAdr(botCB++);
-
-            /* use the secondary clock */
-
-            if (gpioCfg.clockPeriph != PI_CLOCK_PCM)
-            {
-               p->info = NORMAL_DMA | TIMED_DMA(2);
-               p->dst  = PCM_TIMER;
-            }
-            else
-            {
-               p->info = NORMAL_DMA | TIMED_DMA(5);
-               p->dst  = PWM_TIMER;
-            }
-
-            //cast twice to suppress compiler warning, I belive this cast is ok
-            //because dmaOBus contains bus addresses, not virtual addresses.
-            p->src = (uint32_t)(uintptr_t) (&dmaOBus[0]->periphData);
-
-            p->length = BPD * delayLeft / PI_WF_MICROS;
-
-            if ((gpioCfg.DMAsecondaryChannel >= DMA_LITE_FIRST) &&
-                (p->length > DMA_LITE_MAX))
-            {
-               p->length = DMA_LITE_MAX;
-            }
-
-            delayLeft -= (p->length / BPD);
-
-            p->next = waveCbPOadr(botCB);
-         }
-      }
-   }
-
-   if (numCB)
-   {
-      /* Pad the wave */
-
-      botCB = *CB + numCB - 1;
-      botOOL = *BOOL + numBOOL - 1;
-      topOOL = *TOOL - numTOOL;
-
-      /* Link the last CB to end of wave */
-
-      p->next = waveCbPOadr(botCB);
-
-      /* Insert sentinel CB at end of DMA */
-
-      p = rawWaveCBAdr(botCB++);
-      p->info   = NORMAL_DMA | DMA_DEST_IGNORE;
-      p->src    = waveOOLPOadr(botOOL++);
-      p->dst    = ((GPIO_BASE + (GPSET0*4)) & 0x00ffffff) | PI_PERI_BUS;
-      p->length = 4;
-      p->next   = 0;
-   }
-
-   if (p != NULL)
-   {
-      if (wave_mode == PI_WAVE_MODE_ONE_SHOT)
-           p->next = 0;
-      else p->next = waveCbPOadr(repeatCB);
-   }
-
-   status = botCB - *CB;
-
-   *CB   = botCB;
-   *BOOL = botOOL;
-   *TOOL = topOOL;
-
-   return status;
-}
-//}}}
-//{{{
-static void waveRxSerial (wfRx_t *w, int level, uint32_t tick)
-{
-   int diffTicks, lastLevel;
-   int newWritePos;
-
-   level = level ^ w->s.invert;
-
-   if (w->s.bit >= 0)
-   {
-      diffTicks = tick - w->s.startBitTick;
-
-      if (level != PI_TIMEOUT)
-      {
-         w->s.level = level;
-         lastLevel = !level;
-      }
-      else lastLevel = w->s.level;
-
-      while ((w->s.bit <= w->s.dataBits) &&
-             (diffTicks > (w->s.nextBitDiff/1000)))
-      {
-         if (w->s.bit)
-         {
-            if (lastLevel) w->s.data |= (1<<(w->s.bit-1));
-         }
-         else w->s.data = 0;
-
-         ++(w->s.bit);
-
-         w->s.nextBitDiff += w->s.fullBit;
-      }
-
-      if (w->s.bit > w->s.dataBits)
-      {
-         memcpy(w->s.buf + w->s.writePos, &w->s.data, w->s.bytes);
-
-         /* don't let writePos catch readPos */
-
-         newWritePos = (w->s.writePos + w->s.bytes) % (w->s.bufSize);
-
-         if (newWritePos != w->s.readPos) w->s.writePos = newWritePos;
-
-         if (level == 0)
-         {
-            gpioSetWatchdog(w->gpio, w->s.timeout);
-            w->s.bit          = 0;
-            w->s.startBitTick = tick;
-            w->s.nextBitDiff  = w->s.halfBit;
-         }
-         else
-         {
-            w->s.bit = -1;
-            gpioSetWatchdog(w->gpio, 0);
-         }
-      }
-   }
-   else
-   {
-      /* start bit if high->low */
-
-      if (level == 0)
-      {
-         gpioSetWatchdog(w->gpio, w->s.timeout);
-         w->s.level        = 0;
-         w->s.bit          = 0;
-         w->s.startBitTick = tick;
-         w->s.nextBitDiff  = w->s.halfBit;
-      }
-   }
-}
-//}}}
-//{{{
-static void waveRxBit (int gpio, int level, uint32_t tick)
-{
-   switch (wfRx[gpio].mode)
-   {
-      case PI_WFRX_SERIAL:
-         waveRxSerial(&wfRx[gpio], level, tick);
-   }
-}
-
-//}}}
-
-//{{{
-int rawWaveAddGeneric (unsigned numIn1, rawWave_t *in1)
-{
-   unsigned inPos1=0, inPos2=0, outPos=0, level = NUM_WAVE_OOL;
-
-   unsigned cbs=0;
-
-   unsigned numIn2, numOut;
-
-   uint32_t tNow, tNext1, tNext2, tDelay, tMax;
-
-   rawWave_t *in2, *out;
-
-   numIn2 = wfc[wfcur];
-   in2    = wf[wfcur];
-
-   numOut = PI_WAVE_MAX_PULSES;
-   out   = wf[1-wfcur];
-
-   tNow = 0;
-   tMax = 0;
-
-   if (!numIn1) tNext1 = -1; else tNext1 = 0;
-   if (!numIn2) tNext2 = -1; else tNext2 = 0;
-
-   while (((inPos1<numIn1) || (inPos2<numIn2)) && (outPos<numOut))
-   {
-      if (tNext1 < tNext2)
-      {
-         /* pulse 1 due */
-
-         if (tNow < tNext1)
-         {
-            /* extend previous delay */
-            out[outPos-1].usDelay += (tNext1 - tNow);
-            tNow = tNext1;
-         }
-
-         out[outPos].gpioOn  = in1[inPos1].gpioOn;
-         out[outPos].gpioOff = in1[inPos1].gpioOff;
-         out[outPos].flags   = in1[inPos1].flags;
-
-         tNext1 = tNow + in1[inPos1].usDelay; ++inPos1;
-         if (tMax < tNext1) tMax = tNext1;
-      }
-      else if (tNext2 < tNext1)
-      {
-         /* pulse 2 due */
-
-         if (tNow < tNext2)
-         {
-            /* extend previous delay */
-            out[outPos-1].usDelay += (tNext2 - tNow);
-            tNow = tNext2;
-         }
-
-         out[outPos].gpioOn  = in2[inPos2].gpioOn;
-         out[outPos].gpioOff = in2[inPos2].gpioOff;
-         out[outPos].flags   = in2[inPos2].flags;
-
-         tNext2 = tNow + in2[inPos2].usDelay; ++inPos2;
-         if (tMax < tNext2) tMax = tNext2;
-      }
-      else
-      {
-         /* pulse 1 and 2 both due */
-
-         if (tNow < tNext1)
-         {
-            /* extend previous delay */
-            out[outPos-1].usDelay += (tNext1 - tNow);
-            tNow = tNext1;
-         }
-
-         out[outPos].gpioOn  = in1[inPos1].gpioOn  | in2[inPos2].gpioOn;
-         out[outPos].gpioOff = in1[inPos1].gpioOff | in2[inPos2].gpioOff;
-         out[outPos].flags   = in1[inPos1].flags   | in2[inPos2].flags;
-
-         tNext1 = tNow + in1[inPos1].usDelay; ++inPos1;
-         tNext2 = tNow + in2[inPos2].usDelay; ++inPos2;
-         if (tMax < tNext1) tMax = tNext1;
-         if (tMax < tNext2) tMax = tNext2;
-      }
-
-      if (tNext1 <= tNext2) { tDelay = tNext1 - tNow; tNow = tNext1; }
-      else                  { tDelay = tNext2 - tNow; tNow = tNext2; }
-
-      out[outPos].usDelay = tDelay;
-
-      cbs += waveDelayCBs(tDelay);
-
-      if (out[outPos].gpioOn || out[outPos].gpioOff) cbs++;
-
-      if (out[outPos].flags & WAVE_FLAG_READ)
-      {
-         cbs++; /* one cb if read */
-         --level;
-      }
-
-      if (out[outPos].flags & WAVE_FLAG_TICK)
-      {
-         cbs++; /* one cb if tick */
-         --level;
-      }
-
-      outPos++;
-
-      if (inPos1 >= numIn1) tNext1 = -1;
-      if (inPos2 >= numIn2) tNext2 = -1;
-
-   }
-
-   if (tNow < tMax)
-   {
-      /* extend previous delay */
-      out[outPos-1].usDelay += (tMax - tNow);
-      tNow = tMax;
-   }
-
-   if ((outPos < numOut) && (outPos < level))
-   {
-      wfStats.micros = tNow;
-
-      if (tNow > wfStats.highMicros) wfStats.highMicros = tNow;
-
-      wfStats.pulses = outPos;
-
-      if (outPos > wfStats.highPulses) wfStats.highPulses = outPos;
-
-      wfStats.cbs    = cbs;
-
-      if (cbs > wfStats.highCbs) wfStats.highCbs = cbs;
-
-      wfc[1-wfcur] = outPos;
-      wfcur = 1 - wfcur;
-
-      return outPos;
-   }
-   else return PI_TOO_MANY_PULSES;
-}
-//}}}
-//}}}
-//{{{  bit bang i2c
-//{{{
-static int read_SDA (wfRx_t* w)
-{
-   myGpioSetMode(w->I.SDA, PI_INPUT);
-   return myGpioRead(w->I.SDA);
-}
-//}}}
-//{{{
-static void set_SDA (wfRx_t* w)
-{
-   myGpioSetMode(w->I.SDA, PI_INPUT);
-}
-//}}}
-//{{{
-static void clear_SDA (wfRx_t* w)
-{
-   myGpioSetMode(w->I.SDA, PI_OUTPUT);
-   myGpioWrite(w->I.SDA, 0);
-}
-//}}}
-//{{{
-static void clear_SCL (wfRx_t* w)
-{
-   myGpioSetMode(w->I.SCL, PI_OUTPUT);
-   myGpioWrite(w->I.SCL, 0);
-}
-//}}}
-
-//{{{
-static void I2C_delay (wfRx_t* w)
-{
-   myGpioDelay(w->I.delay);
-}
-//}}}
-//{{{
-static void I2C_clock_stretch (wfRx_t* w)
-{
-   uint32_t now, max_stretch=100000;
-
-   myGpioSetMode(w->I.SCL, PI_INPUT);
-   now = gpioTick();
-   while ((myGpioRead(w->I.SCL) == 0) && ((gpioTick()-now) < max_stretch));
-}
-//}}}
-//{{{
-static void I2CStart (wfRx_t* w)
-{
-   if (w->I.started)
-   {
-      set_SDA(w);
-      I2C_delay(w);
-      I2C_clock_stretch(w);
-      I2C_delay(w);
-   }
-
-   clear_SDA(w);
-   I2C_delay(w);
-   clear_SCL(w);
-   I2C_delay(w);
-
-   w->I.started = 1;
-}
-//}}}
-//{{{
-static void I2CStop( wfRx_t* w)
-{
-   clear_SDA(w);
-   I2C_delay(w);
-   I2C_clock_stretch(w);
-   I2C_delay(w);
-   set_SDA(w);
-   I2C_delay(w);
-
-   w->I.started = 0;
-}
-//}}}
-//{{{
-static void I2CPutBit (wfRx_t* w, int bit)
-{
-   if (bit) set_SDA(w);
-   else     clear_SDA(w);
-
-   I2C_delay(w);
-   I2C_clock_stretch(w);
-   I2C_delay(w);
-   clear_SCL(w);
-}
-//}}}
-//{{{
-static int I2CGetBit (wfRx_t* w)
-{
-   int bit;
-
-   set_SDA(w); /* let SDA float */
-   I2C_delay(w);
-   I2C_clock_stretch(w);
-   bit = read_SDA(w);
-   I2C_delay(w);
-   clear_SCL(w);
-
-   return bit;
-}
-//}}}
-//{{{
-static int I2CPutByte (wfRx_t* w, int byte)
-{
-   int bit, nack;
-
-   for(bit=0; bit<8; bit++)
-   {
-      I2CPutBit(w, byte & 0x80);
-      byte <<= 1;
-   }
-
-   nack = I2CGetBit(w);
-
-   return nack;
-}
-//}}}
-//{{{
-static uint8_t I2CGetByte (wfRx_t* w, int nack)
-{
-   int bit, byte=0;
-
-   for (bit=0; bit<8; bit++)
-   {
-      byte = (byte << 1) | I2CGetBit(w);
-   }
-
-   I2CPutBit(w, nack);
-
-   return byte;
-}
-//}}}
-//}}}
 //{{{  dma
 //{{{
 static rawCbs_t * dmaCB2adr(int pos)
@@ -2762,93 +1945,6 @@ static void dmaCbPrint(int pos)
 
    fprintf(stderr, "i=%x s=%x d=%x len=%x s=%x nxt=%x\n",
       p->info, p->src, p->dst, p->length, p->stride, p->next);
-}
-//}}}
-//{{{
-static int dmaNowAtOCB()
-{
-   unsigned cb;
-   unsigned page;
-   uint32_t cbAddr;
-
-   cbAddr = dmaOut[DMA_CONBLK_AD];
-
-   if (!cbAddr) return -PI_NO_TX_WAVE;
-
-   page = 0;
-
-   /* which page are we dma'ing? */
-
-   while (1)
-   {
-      //cast twice to suppress compiler warning, I belive this cast is ok
-      //because dmaIbus contains bus addresses, not user addresses. --plugwash
-      cb = (cbAddr - ((int)(uintptr_t)dmaOBus[page])) / 32;
-
-      if (cb < CBS_PER_OPAGE) return (page*CBS_PER_OPAGE) + cb;
-
-      if (page++ >= DMAO_PAGES) break;
-   }
-
-   /* Try twice */
-
-   cbAddr = dmaOut[DMA_CONBLK_AD];
-
-   if (!cbAddr) return -PI_NO_TX_WAVE;
-
-   page = 0;
-
-   /* which page are we dma'ing? */
-
-   while (1)
-   {
-      //cast twice to suppress compiler warning, I belive this cast is ok
-      //because dmaIbus contains bus addresses, not user addresses. --plugwash
-      cb = (cbAddr - ((int)(uintptr_t)dmaOBus[page])) / 32;
-
-      if (cb < CBS_PER_OPAGE) return (page*CBS_PER_OPAGE) + cb;
-
-      if (page++ >= DMAO_PAGES) break;
-   }
-
-   return -PI_WAVE_NOT_FOUND;
-}
-//}}}
-//{{{
-unsigned rawWaveCB()
-{
-   unsigned cb;
-   static unsigned lastPage=0;
-   unsigned page;
-   uint32_t cbAddr;
-
-   cbAddr = dmaOut[DMA_CONBLK_AD];
-
-   if (!cbAddr) return -1;
-
-   page = lastPage;
-
-   /* which page are we dma'ing? */
-
-   while (1)
-   {
-      //cast twice to suppress compiler warning, I belive this cast is ok
-      //because dmaIbus contains bus addresses, not user addresses. --plugwash
-      cb = (cbAddr - ((int)(uintptr_t)dmaOBus[page])) / 32;
-
-      if (cb < CBS_PER_OPAGE)
-      {
-         lastPage = page;
-
-         return (page*CBS_PER_OPAGE) + cb;
-      }
-
-      if (page++ >= DMAO_PAGES) page=0;
-
-      if (page == lastPage) break;
-   }
-
-   return 0;
 }
 //}}}
 
@@ -3050,56 +2146,6 @@ static void dmaInitCbs()
 //}}}
 
 //{{{
-static void switchFunctionOff (unsigned gpio)
-{
-   switch (gpioInfo[gpio].is)
-   {
-      case GPIO_SERVO:
-         /* switch servo off */
-         myGpioSetServo(gpio, gpioInfo[gpio].width, 0);
-         gpioInfo[gpio].width = 0;
-         break;
-
-      case GPIO_PWM:
-         /* switch pwm off */
-         myGpioSetPwm(gpio, gpioInfo[gpio].width, 0);
-         gpioInfo[gpio].width = 0;
-         break;
-
-      case GPIO_HW_CLK:
-         /* No longer disable clock hardware, doing that was a bug. */
-         gpioInfo[gpio].width = 0;
-         break;
-
-      case GPIO_HW_PWM:
-         /* No longer disable PWM hardware, doing that was a bug. */
-         gpioInfo[gpio].width = 0;
-         break;
-   }
-}
-//}}}
-//{{{
-static void stopHardwarePWM()
-{
-   unsigned i, pwm;
-
-   for (i=0; i<= PI_MAX_GPIO; i++)
-   {
-      if (gpioInfo[i].is == GPIO_HW_PWM)
-      {
-         pwm = (PWMDef[i] >> 4) & 3;
-
-         if (pwm == 0) pwmReg[PWM_CTL] &= (~PWM_CTL_PWEN1);
-         else          pwmReg[PWM_CTL] &= (~PWM_CTL_PWEN2);
-
-         gpioInfo[i].width = 0;
-         gpioInfo[i].is = GPIO_UNDEFINED;
-      }
-   }
-}
-//}}}
-
-//{{{
 static void sigHandler (int signum)
 {
    if ((signum >= PI_MIN_SIGNUM) && (signum <= PI_MAX_SIGNUM))
@@ -3175,111 +2221,15 @@ static void sigSetHandler()
 }
 
 //}}}
-//{{{
-static void* pthTimerTick (void* x)
-{
-   gpioTimer_t *tp;
-   struct timespec req, rem;
-
-   tp = x;
-
-   while (1)
-   {
-      req.tv_sec  = tp->millis / THOUSAND;
-      req.tv_nsec = (tp->millis % THOUSAND) * THOUSAND * THOUSAND;
-
-      while (nanosleep(&req, &rem))
-      {
-         req.tv_sec  = rem.tv_sec;
-         req.tv_nsec = rem.tv_nsec;
-      }
-
-      if (tp->ex) (tp->func)(tp->userdata);
-      else        (tp->func)();
-   }
-
-   return 0;
-}
-//}}}
-//{{{
-static void initCheckLockFile()
-{
-   int fd;
-   int count;
-   int pid;
-   int err;
-   int delete;
-   char str[20];
-
-   fd = open(PI_LOCKFILE, O_RDONLY);
-
-   if (fd != -1)
-   {
-      DBG(DBG_STARTUP, "lock file exists");
-      delete = 1;
-
-      count = read(fd, str, sizeof(str)-1);
-
-      if (count)
-      {
-         pid = atoi(str);
-         err = kill(pid, 0);
-         if (!err) delete = 0; /* process still exists */
-         DBG(DBG_STARTUP, "lock file pid=%d err=%d", pid, err);
-      }
-
-      close(fd);
-      DBG(DBG_STARTUP, "lock file delete=%d", delete);
-
-      if (delete) unlink(PI_LOCKFILE);
-   }
-}
-//}}}
-//{{{
-static int initGrabLockFile()
-{
-   int fd;
-   int lockResult;
-   char pidStr[20];
-
-   initCheckLockFile();
-
-   /* try to grab the lock file */
-
-   fd = open(PI_LOCKFILE, O_WRONLY|O_CREAT|O_EXCL|O_TRUNC, 0644);
-
-   if (fd != -1)
-   {
-      lockResult = flock(fd, LOCK_EX|LOCK_NB);
-
-      if(lockResult == 0)
-      {
-         sprintf(pidStr, "%d\n", (int)getpid());
-
-         if (write(fd, pidStr, strlen(pidStr)) == -1)
-         {
-            /* ignore errors */
-         }
-      }
-      else
-      {
-         close(fd);
-         return -1;
-      }
-   }
-
-   return fd;
-}
 //}}}
 
-//{{{  init helpers
+//{{{  init 
 //{{{
 static uint32_t* initMapMem (int fd, uint32_t addr, uint32_t len) {
 
   return (uint32_t*) mmap (0, len, PROT_READ|PROT_WRITE|PROT_EXEC, MAP_SHARED|MAP_LOCKED, fd, addr);
   }
 //}}}
-
 //{{{
 static int initCheckPermitted()
 {
@@ -3309,7 +2259,6 @@ static int initCheckPermitted()
    return 0;
 }
 //}}}
-
 //{{{
 static int initPeripherals() {
 
@@ -3378,7 +2327,6 @@ static int initPeripherals() {
   return 0;
   }
 //}}}
-
 //{{{
 static int initZaps (int pmapFd, void* virtualBase, int  basePage, int  pages)
 {
@@ -3439,7 +2387,6 @@ static int initZaps (int pmapFd, void* virtualBase, int  basePage, int  pages)
    return status;
 }
 //}}}
-
 //{{{
 static int initPagemapBlock (int block) {
 
@@ -3482,7 +2429,6 @@ static int initPagemapBlock (int block) {
   return 0;
   }
 //}}}
-
 //{{{
 static int initMboxBlock (int block)
 {
@@ -3654,7 +2600,6 @@ static int initAllocDMAMem()
    return 0;
 }
 //}}}
-
 //{{{
 static void initPWM (unsigned bits) {
 
@@ -3723,7 +2668,6 @@ static void initPCM (unsigned bits) {
   dmaIVirt[0]->periphData = 0x0F;
   }
 //}}}
-
 //{{{
 static void initHWClk (int clkCtl, int clkDiv, int clkSrc, int divI, int divF, int MASH) {
 
@@ -3792,7 +2736,6 @@ static void initClock (int mainClock) {
   myGpioDelay (2000);
 }
 //}}}
-
 //{{{
 static void initKillDMA (volatile uint32_t* dmaAddr) {
 
@@ -3816,7 +2759,6 @@ static void initDMAgo (volatile uint32_t* dmaAddr, uint32_t cbAddr) {
   dmaAddr[DMA_CS] = DMA_WAIT_ON_WRITES | DMA_PANIC_PRIORITY(8) | DMA_PRIORITY(8) | DMA_ACTIVE;
   }
 //}}}
-
 //{{{
 static void initClearGlobals() {
 
@@ -3856,7 +2798,6 @@ static void initClearGlobals() {
   for (i=0; i<=PI_MAX_USER_GPIO; i++) {
     wfRx[i].mode = PI_WFRX_NONE;
     pthread_mutex_init (&wfRx[i].mutex, NULL);
-    gpioAlert[i].func = NULL;
     }
 
   for (i=0; i<=PI_MAX_GPIO; i++) {
@@ -3882,24 +2823,13 @@ static void initClearGlobals() {
     gpioTimer[i].func = NULL;
     }
 
-  for (i=0; i<=PI_MAX_EVENT; i++) {
-    eventAlert[i].func = NULL;
-    eventAlert[i].ignore = 0;
-    eventAlert[i].fired = 0;
-    }
-
   /* calculate the usable PWM frequencies */
   for (i=0; i<PWM_FREQS; i++) {
     pwmFreq[i]= (1000000.0/ ((float)PULSE_PER_CYCLE * gpioCfg.clockMicros * pwmCycles[i])) + 0.5;
     DBG(DBG_STARTUP, "f%d is %d", i, pwmFreq[i]);
     }
 
-  inpFifo = NULL;
-  outFifo = NULL;
-
-  fdLock       = -1;
   fdMem        = -1;
-  fdSock       = -1;
 
   dmaMboxBlk = MAP_FAILED;
   dmaPMapBlk = MAP_FAILED;
@@ -3916,25 +2846,12 @@ static void initClearGlobals() {
   spiReg  = MAP_FAILED;
   }
 //}}}
-
 //{{{
 static void initReleaseResources()
 {
    int i;
 
    DBG(DBG_STARTUP, "");
-
-   /* shut down running threads */
-
-   for (i=0; i<=PI_MAX_GPIO; i++)
-   {
-      if (gpioISR[i].pth)
-      {
-         /* destroy thread, unexport GPIO */
-
-         gpioSetISRFunc(i, 0, 0, NULL);
-      }
-   }
 
    for (i=0; i<=PI_MAX_TIMER; i++)
    {
@@ -4018,37 +2935,10 @@ static void initReleaseResources()
 
    dmaMboxBlk = MAP_FAILED;
 
-   if (inpFifo != NULL)
-   {
-      fclose(inpFifo);
-      unlink(PI_INPFIFO);
-      inpFifo = NULL;
-   }
-
-   if (outFifo != NULL)
-   {
-      fclose(outFifo);
-      unlink(PI_OUTFIFO);
-      outFifo = NULL;
-   }
-
    if (fdMem != -1)
    {
       close(fdMem);
       fdMem = -1;
-   }
-
-   if (fdLock != -1)
-   {
-      close(fdLock);
-      unlink(PI_LOCKFILE);
-      fdLock = -1;
-   }
-
-   if (fdSock != -1)
-   {
-      close(fdSock);
-      fdSock = -1;
    }
 
    if (fdPmap != -1)
@@ -4067,13 +2957,11 @@ static void initReleaseResources()
    gpioStats.dmaInitCbsCount = 0;
 }
 //}}}
-//}}}
 //{{{
-int initInitialise() {
+static int initInitialise() {
 
   DBG(DBG_STARTUP, "");
 
-  waveClockInited = 0;
   PWMClockInited = 0;
   clock_gettime (CLOCK_REALTIME, &libStarted);
   unsigned rev = gpioHardwareRevision();
@@ -4081,10 +2969,6 @@ int initInitialise() {
   initClearGlobals();
   if (initCheckPermitted() < 0)
     return PI_INIT_FAILED;
-
-  fdLock = initGrabLockFile();
-  if (fdLock < 0)
-    SOFT_ERROR(PI_INIT_FAILED, "Can't lock %s", PI_LOCKFILE);
 
   if (!gpioMaskSet) {
      //{{{  get gpioMask
@@ -4142,10 +3026,8 @@ int initInitialise() {
      }
      //}}}
 
-  #ifndef EMBEDDED_IN_VM
-    if (!(gpioCfg.internals & PI_CFG_NOSIGHANDLER))
-      sigSetHandler();
-  #endif
+  if (!(gpioCfg.internals & PI_CFG_NOSIGHANDLER))
+    sigSetHandler();
 
   if (initPeripherals() < 0)
     return PI_INIT_FAILED;
@@ -4185,16 +3067,16 @@ int initInitialise() {
   }
 //}}}
 //}}}
-
 //{{{
 unsigned gpioVersion() {
 
-  DBG(DBG_USER, "");
+  DBG (DBG_USER, "");
   return PIGPIO_VERSION;
   }
 //}}}
 //{{{
 unsigned gpioHardwareRevision() {
+//{{{  description
 // 2 2  2  2 2 2  1 1 1 1  1 1 1 1  1 1 0 0 0 0 0 0  0 0 0 0
 // 5 4  3  2 1 0  9 8 7 6  5 4 3 2  1 0 9 8 7 6 5 4  3 2 1 0
 // W W  S  M M M  B B B B  P P P P  T T T T T T T T  R R R R
@@ -4205,6 +3087,8 @@ unsigned gpioHardwareRevision() {
 // P  0=2835, 1=2836, 2=2837 3=2711
 // T  0=A 1=B 2=A+ 3=B+ 4=Pi2B 5=Alpha 6=CM1 8=Pi3B 9=Zero a=CM3 c=Zero W d=3B+ e=3A+ 10=CM3+ 11=4B
 // R  PCB board revision
+//}}}
+
   static unsigned rev = 0;
 
   char buf[512];
@@ -4326,7 +3210,7 @@ int gpioInitialise() {
   if (libInitialised)
     return PIGPIO_VERSION;
 
-  DBG(DBG_STARTUP, "not initialised, initialising");
+  DBG (DBG_STARTUP, "not initialised, initialising");
 
   runState = PI_STARTING;
 
@@ -4347,191 +3231,31 @@ int gpioInitialise() {
 //{{{
 void gpioTerminate() {
 
-   int i;
-   DBG(DBG_USER, "");
+  DBG(DBG_USER, "");
 
-   if (!libInitialised)
-     return;
+  if (!libInitialised)
+    return;
 
-   DBG(DBG_STARTUP, "initialised, terminating");
+  DBG(DBG_STARTUP, "initialised, terminating");
 
-   runState = PI_ENDING;
+  runState = PI_ENDING;
 
-   gpioMaskSet = 0;
+  gpioMaskSet = 0;
 
-   /* reset DMA */
-   if (dmaReg != MAP_FAILED)
-   {
-      initKillDMA(dmaIn);
-      initKillDMA(dmaOut);
-   }
-
-#ifndef EMBEDDED_IN_VM
-   if ((gpioCfg.internals & PI_CFG_STATS) &&
-       (!(gpioCfg.internals & PI_CFG_NOSIGHANDLER)))
-   {
-      fprintf(stderr,
-         "\n#####################################################\n");
-      fprintf(stderr, "pigpio version=%d internals=%X\n",
-         PIGPIO_VERSION, gpioCfg.internals);
-
-      fprintf(stderr,
-         "micros=%d allocMode=%d dmaInitCbs=%d DMARestarts=%d\n",
-         gpioCfg.clockMicros, gpioCfg.memAllocMode,
-         gpioStats.dmaInitCbsCount, gpioStats.DMARestarts);
-
-      fprintf(stderr,
-         "samples %u maxSamples %u maxEmit %u emitFrags %u\n",
-         gpioStats.numSamples, gpioStats.maxSamples,
-         gpioStats.maxEmit, gpioStats.emitFrags);
-
-      fprintf(stderr, "cbTicks %d, cbCalls %u\n",
-         gpioStats.cbTicks, gpioStats.cbCalls);
-
-      fprintf(stderr, "pipe: good %u, short %u, would block %u\n",
-         gpioStats.goodPipeWrite, gpioStats.shortPipeWrite,
-         gpioStats.wouldBlockPipeWrite);
-
-      fprintf(stderr, "alertTicks %u, lateTicks %u, moreToDo %u\n",
-         gpioStats.alertTicks, gpioStats.lateTicks, gpioStats.moreToDo);
-
-      for (i=0; i< TICKSLOTS; i++)
-         fprintf(stderr, "%9u ", gpioStats.diffTick[i]);
-
-      fprintf(stderr,
-         "\n#####################################################\n\n\n");
-   }
-
-#endif
-
-   initReleaseResources();
-   fflush(NULL);
-   libInitialised = 0;
-}
-//}}}
-
-//{{{  utils
-//{{{
-int getBitInBytes (int bitPos, char* buf, int numBits) {
-
-  if (bitPos < numBits) {
-    int bufp = bitPos / 8;
-    int bitp = 7 - (bitPos % 8);
-    if (buf[bufp] & (1 << bitp))
-      return 1;
+  /* reset DMA */
+  if (dmaReg != MAP_FAILED) {
+    initKillDMA(dmaIn);
+    initKillDMA(dmaOut);
     }
 
-  return 0;
+
+  initReleaseResources();
+  fflush(NULL);
+  libInitialised = 0;
   }
 //}}}
-//{{{
-void putBitInBytes (int bitPos, char* buf, int bit) {
 
-  int bufp = bitPos / 8;
-  int bitp = 7 - (bitPos % 8);
-
-  if (bit)
-    buf[bufp] |= 1 << bitp;
-   else
-    buf[bufp] &= ~(1 << bitp);
-  }
-//}}}
-//{{{
-uint32_t rawWaveGetOOL (int pos) {
-
-  int page, slot;
-  if ((pos >= 0) && (pos < NUM_WAVE_OOL)) {
-    waveOOLPageSlot(pos, &page, &slot);
-    return (dmaOVirt[page]->OOL[slot]);
-    }
-
-  return -1;
-  }
-//}}}
-//{{{
-void rawWaveSetOOL (int pos, uint32_t value) {
-
-  int page, slot;
-
-  if ((pos >= 0) && (pos < NUM_WAVE_OOL)) {
-    waveOOLPageSlot(pos, &page, &slot);
-    dmaOVirt[page]->OOL[slot] = value;
-    }
-  }
-//}}}
-//{{{
-uint32_t rawWaveGetOut (int pos) {
-
-  int page, slot;
-
-  if ((pos >= 0) && (pos < NUM_WAVE_OOL)) {
-    waveOOLPageSlot(pos, &page, &slot);
-    return (dmaOVirt[page]->OOL[slot]);
-    }
-
-  return -1;
-  }
-//}}}
-//{{{
-void rawWaveSetOut (int pos, uint32_t value) {
-
-  int page, slot;
-
-  if ((pos >= 0) && (pos < NUM_WAVE_OOL)) {
-    waveOOLPageSlot(pos, &page, &slot);
-    dmaOVirt[page]->OOL[slot] = value;
-    }
-  }
-//}}}
-//{{{
-uint32_t rawWaveGetIn (int pos) {
-
-  int page, slot;
-
-  if ((pos >= 0) && (pos < NUM_WAVE_OOL)) {
-    waveOOLPageSlot((NUM_WAVE_OOL-1)-pos, &page, &slot);
-    return (dmaOVirt[page]->OOL[slot]);
-    }
-
-  return -1;
-  }
-//}}}
-//{{{
-void rawWaveSetIn (int pos, uint32_t value) {
-
-  int page, slot;
-  if ((pos >= 0) && (pos < NUM_WAVE_OOL)) {
-    waveOOLPageSlot((NUM_WAVE_OOL-1)-pos, &page, &slot);
-    dmaOVirt[page]->OOL[slot] = value;
-    }
-  }
-//}}}
-//{{{
-rawWaveInfo_t rawWaveInfo (int wave_id) {
-
-  rawWaveInfo_t dummy = {0, 0, 0, 0, 0, 0, 0, 0};
-
-  if ((wave_id >=0) && (wave_id < PI_MAX_WAVES))
-    return waveInfo[wave_id];
-  else
-    return dummy;
-  }
-//}}}
-//{{{
-void rawDumpWave() {
-
-  unsigned numWaves = wfc[wfcur];
-  rawWave_t* waves = wf [wfcur];
-
-  unsigned t = 0;
-  for (int i = 0; i < numWaves; i++) {
-    fprintf(stderr, "%10u %08X %08X %08X %10u\n", t, waves[i].gpioOn, waves[i].gpioOff, waves[i].flags, waves[i].usDelay);
-    t += waves[i].usDelay;
-    }
-  }
-//}}}
-//}}}
-//{{{  time
+// time
 //{{{
 double time_time()
 {
@@ -4648,8 +3372,38 @@ uint32_t gpioTick() {
   return systReg[SYST_CLO];
   }
 //}}}
-//}}}
+
 //{{{  gpio
+//{{{
+static void switchFunctionOff (unsigned gpio)
+{
+   switch (gpioInfo[gpio].is)
+   {
+      case GPIO_SERVO:
+         /* switch servo off */
+         myGpioSetServo(gpio, gpioInfo[gpio].width, 0);
+         gpioInfo[gpio].width = 0;
+         break;
+
+      case GPIO_PWM:
+         /* switch pwm off */
+         myGpioSetPwm(gpio, gpioInfo[gpio].width, 0);
+         gpioInfo[gpio].width = 0;
+         break;
+
+      case GPIO_HW_CLK:
+         /* No longer disable clock hardware, doing that was a bug. */
+         gpioInfo[gpio].width = 0;
+         break;
+
+      case GPIO_HW_PWM:
+         /* No longer disable PWM hardware, doing that was a bug. */
+         gpioInfo[gpio].width = 0;
+         break;
+   }
+}
+//}}}
+
 //{{{
 int gpioSetMode (unsigned gpio, unsigned mode)
 {
@@ -4850,7 +3604,7 @@ int gpioWrite_Bits_32_53_Set (uint32_t bits) {
 void fastGpioWrite_Bits_0_31_Clear (uint32_t bits) { *(gpioReg + GPCLR0) = bits; }
 void fastGpioWrite_Bits_0_31_Set (uint32_t bits) { *(gpioReg + GPSET0) = bits; }
 
-//{{{  gpio pwm
+// pwm
 //{{{
 int gpioPWM (unsigned gpio, unsigned val)
 {
@@ -5118,1302 +3872,7 @@ int gpioGetServoPulsewidth (unsigned gpio)
    return gpioInfo[gpio].width;
 }
 //}}}
-//}}}
-//{{{  gpio wave
-//{{{
-int gpioWaveClear()
-{
-   DBG(DBG_USER, "");
 
-   CHECK_INITED;
-
-   wfc[0] = 0;
-   wfc[1] = 0;
-   wfc[2] = 0;
-
-   wfcur = 0;
-
-   wfStats.micros = 0;
-   wfStats.pulses = 0;
-   wfStats.cbs    = 0;
-
-   waveOutBotCB  = PI_WAVE_COUNT_PAGES*CBS_PER_OPAGE;
-   waveOutBotOOL = PI_WAVE_COUNT_PAGES*OOL_PER_OPAGE;
-   waveOutTopOOL = NUM_WAVE_OOL;
-
-   waveOutCount = 0;
-
-   waveEndPtr = NULL;
-
-   return 0;
-}
-//}}}
-//{{{
-int gpioWaveAddNew()
-{
-   DBG(DBG_USER, "");
-
-   CHECK_INITED;
-
-   wfc[0] = 0;
-   wfc[1] = 0;
-   wfc[2] = 0;
-
-   wfcur = 0;
-
-   wfStats.micros = 0;
-   wfStats.pulses = 0;
-   wfStats.cbs    = 0;
-
-   return 0;
-}
-//}}}
-//{{{
-int gpioWaveAddGeneric (unsigned numPulses, gpioPulse_t* pulses)
-{
-   int p;
-
-   DBG(DBG_USER, "numPulses=%u pulses=%08"PRIXPTR, numPulses, (uintptr_t)pulses);
-
-   CHECK_INITED;
-
-   if (numPulses > PI_WAVE_MAX_PULSES)
-      SOFT_ERROR(PI_TOO_MANY_PULSES, "bad number of pulses (%d)", numPulses);
-
-   if (!pulses) SOFT_ERROR(PI_BAD_POINTER, "bad (NULL) pulses pointer");
-
-   for (p=0; p<numPulses; p++)
-   {
-      wf[2][p].gpioOff = pulses[p].gpioOff;
-      wf[2][p].gpioOn  = pulses[p].gpioOn;
-      wf[2][p].usDelay = pulses[p].usDelay;
-      wf[2][p].flags   = 0;
-   }
-
-   return rawWaveAddGeneric(numPulses, wf[2]);
-}
-//}}}
-//{{{
-int gpioWaveAddSerial
-   (unsigned gpio,
-    unsigned baud,
-    unsigned data_bits,
-    unsigned stop_bits,
-    unsigned offset,
-    unsigned numBytes,
-    char     *bstr)
-{
-   int i, b, p, lev, c, v;
-
-   uint16_t *wstr = (uint16_t *)bstr;
-   uint32_t *lstr = (uint32_t *)bstr;
-
-   unsigned bitDelay[32];
-
-   DBG(DBG_USER,
-      "gpio=%d baud=%d bits=%d stops=%d offset=%d numBytes=%d str=[%s]",
-      gpio, baud, data_bits, stop_bits, offset,
-      numBytes, myBuf2Str(numBytes, (char *)bstr));
-
-   CHECK_INITED;
-
-   if (gpio > PI_MAX_USER_GPIO)
-      SOFT_ERROR(PI_BAD_USER_GPIO, "bad gpio (%d)", gpio);
-
-   if ((baud < PI_WAVE_MIN_BAUD) || (baud > PI_WAVE_MAX_BAUD))
-      SOFT_ERROR(PI_BAD_WAVE_BAUD, "bad baud rate (%d)", baud);
-
-   if ((data_bits < PI_MIN_WAVE_DATABITS) ||
-       (data_bits > PI_MAX_WAVE_DATABITS))
-      SOFT_ERROR(PI_BAD_DATABITS, "bad number of databits (%d)", data_bits);
-
-   if ((stop_bits < PI_MIN_WAVE_HALFSTOPBITS) ||
-       (stop_bits > PI_MAX_WAVE_HALFSTOPBITS))
-      SOFT_ERROR(PI_BAD_STOPBITS,
-         "bad number of (half) stop bits (%d)", stop_bits);
-
-   if (gpio > PI_MAX_USER_GPIO)
-      SOFT_ERROR(PI_BAD_USER_GPIO, "bad gpio (%d)", gpio);
-
-   if (numBytes > PI_WAVE_MAX_CHARS)
-      SOFT_ERROR(PI_TOO_MANY_CHARS, "too many chars (%d)", numBytes);
-
-   if (offset > PI_WAVE_MAX_MICROS)
-      SOFT_ERROR(PI_BAD_SER_OFFSET, "offset too large (%d)", offset);
-
-   if (data_bits > 8) numBytes /= 2;
-   if (data_bits > 16) numBytes /= 2;
-
-   if (!numBytes) return 0;
-
-   waveBitDelay(baud, data_bits, stop_bits, bitDelay);
-
-   p = 0;
-
-   wf[2][p].gpioOn  = (1<<gpio);
-   wf[2][p].gpioOff = 0;
-   wf[2][p].flags   = 0;
-
-   if (offset > bitDelay[0]) wf[2][p].usDelay = offset;
-   else                      wf[2][p].usDelay = bitDelay[0];
-
-   for (i=0; i<numBytes; i++)
-   {
-      p++;
-
-      /* start bit */
-
-      wf[2][p].gpioOn = 0;
-      wf[2][p].gpioOff = (1<<gpio);
-      wf[2][p].usDelay = bitDelay[0];
-      wf[2][p].flags   = 0;
-
-      lev = 0;
-
-      if      (data_bits <  9) c = bstr[i];
-      else if (data_bits < 17) c = wstr[i];
-      else                  c = lstr[i];
-
-      for (b=0; b<data_bits; b++)
-      {
-         if (c & (1<<b)) v=1; else v=0;
-
-         if (v == lev) wf[2][p].usDelay += bitDelay[b+1];
-         else
-         {
-            p++;
-
-            lev = v;
-
-            if (lev)
-            {
-               wf[2][p].gpioOn  = (1<<gpio);
-               wf[2][p].gpioOff = 0;
-               wf[2][p].flags   = 0;
-            }
-            else
-            {
-               wf[2][p].gpioOn  = 0;
-               wf[2][p].gpioOff = (1<<gpio);
-               wf[2][p].flags   = 0;
-            }
-
-            wf[2][p].usDelay = bitDelay[b+1];
-         }
-      }
-
-      /* stop bit */
-
-      if (lev) wf[2][p].usDelay += bitDelay[data_bits+1];
-      else
-      {
-         p++;
-
-         wf[2][p].gpioOn  = (1<<gpio);
-         wf[2][p].gpioOff = 0;
-         wf[2][p].usDelay = bitDelay[data_bits+1];
-         wf[2][p].flags   = 0;
-      }
-   }
-
-   p++;
-
-   wf[2][p].gpioOn  = (1<<gpio);
-   wf[2][p].gpioOff = 0;
-   wf[2][p].usDelay = bitDelay[0];
-   wf[2][p].flags   = 0;
-
-   return rawWaveAddGeneric(p, wf[2]);
-}
-//}}}
-//{{{
-int rawWaveAddSPI(
-   rawSPI_t *spi,
-   unsigned offset,
-   unsigned spiSS,
-   char *buf,
-   unsigned spiTxBits,
-   unsigned spiBitFirst,
-   unsigned spiBitLast,
-   unsigned spiBits)
-{
-   int p, bit, dbv, halfbit;
-   int rising_edge[2], read_cycle[2];
-   uint32_t on_bits, off_bits;
-   int tx_bit_pos;
-
-   DBG(DBG_USER,
-      "spi=%08"PRIXPTR" off=%d spiSS=%d tx=%08"PRIXPTR", num=%d fb=%d lb=%d spiBits=%d",
-      (uintptr_t)spi, offset, spiSS, (uintptr_t)buf, spiTxBits,
-      spiBitFirst, spiBitLast, spiBits);
-
-   CHECK_INITED;
-
-   if (spiSS > PI_MAX_USER_GPIO)
-      SOFT_ERROR(PI_BAD_USER_GPIO, "bad gpio (%d)", spiSS);
-
-   /*
-   CPOL CPHA
-    0    0   read rising/write falling
-    0    1   read falling/write rising
-    1    0   read falling/write rising
-    1    1   read rising/write falling
-   */
-
-   if (spi->clk_pol) {rising_edge[0] = 0; rising_edge[1] = 1;}
-   else              {rising_edge[0] = 1; rising_edge[1] = 0;}
-
-   if (spi->clk_pha) {read_cycle[0] = 0; read_cycle[1] = 1;}
-   else              {read_cycle[0] = 1; read_cycle[1] = 0;}
-
-   p = 0;
-
-   if (offset)
-   {
-      wf[2][p].gpioOn  = 0;
-      wf[2][p].gpioOff = 0;
-      wf[2][p].flags   = 0;
-      wf[2][p].usDelay = offset;
-      p++;
-   }
-
-   on_bits = 0;
-   off_bits = 0;
-
-   tx_bit_pos = 0;
-
-   /* preset initial mosi bit */
-
-   if (getBitInBytes(tx_bit_pos, buf, spiTxBits))
-   {
-      on_bits  |= (1<<(spi->mosi));
-      dbv = 1;
-   }
-   else
-   {
-      off_bits |= (1<<(spi->mosi));
-      dbv = 0;
-   }
-
-   if (!spi->clk_pha) tx_bit_pos ++;
-
-   if (spi->ss_pol) off_bits |= (1<<spiSS);
-   else             on_bits  |= (1<<spiSS);
-
-   if (spi->clk_pol) on_bits  |= (1<<(spi->clk));
-   else              off_bits |= (1<<(spi->clk));
-
-   wf[2][p].gpioOn  = on_bits;
-   wf[2][p].gpioOff = off_bits;
-   wf[2][p].flags   = 0;
-
-   if (spi->clk_us > spi->ss_us) wf[2][p].usDelay = spi->clk_us;
-   else                          wf[2][p].usDelay = spi->ss_us;
-
-   p++;
-
-   for (bit=1; bit<=spiBits; bit++)
-   {
-      for (halfbit=0; halfbit<2; halfbit++)
-      {
-         wf[2][p].usDelay = spi->clk_us;
-         wf[2][p].flags = 0;
-
-         on_bits = 0;
-         off_bits = 0;
-
-         if (read_cycle[halfbit])
-         {
-            if ((bit>=spiBitFirst) && (bit<=spiBitLast))
-               wf[2][p].flags = WAVE_FLAG_READ;
-         }
-         else
-         {
-            if (getBitInBytes(tx_bit_pos, buf, spiTxBits))
-            {
-               if (!dbv) on_bits  |= (1<<(spi->mosi));
-               dbv = 1;
-            }
-            else
-            {
-               if (dbv) off_bits |= (1<<(spi->mosi));
-               dbv = 0;
-            }
-
-            ++tx_bit_pos;
-         }
-
-         if (rising_edge[halfbit]) on_bits  |= (1<<(spi->clk));
-         else                      off_bits |= (1<<(spi->clk));
-
-         wf[2][p].gpioOn = on_bits;
-         wf[2][p].gpioOff = off_bits;
-
-         p++;
-      }
-   }
-
-   on_bits = 0;
-   off_bits = 0;
-
-   if (spi->ss_pol) on_bits  |= (1<<spiSS);
-   else             off_bits |= (1<<spiSS);
-
-   wf[2][p].gpioOn  = on_bits;
-   wf[2][p].gpioOff = off_bits;
-   wf[2][p].flags   = 0;
-   wf[2][p].usDelay = 0;
-
-   p++;
-
-   return rawWaveAddGeneric(p, wf[2]);
-}
-//}}}
-//{{{
-int gpioWaveCreate()
-{
-   int i, wid;
-   int numCB, numBOOL, numTOOL;
-   int CB, BOOL, TOOL;
-
-   DBG(DBG_USER, "");
-
-   CHECK_INITED;
-
-   if (wfc[wfcur] == 0) return PI_EMPTY_WAVEFORM;
-
-   /* What resources are needed? */
-
-      waveCBsOOLs(&numCB, &numBOOL, &numTOOL);
-
-   wid = -1;
-
-   /* Is there an exact fit with a deleted wave. */
-
-   for (i=0; i<waveOutCount; i++)
-   {
-      if (waveInfo[i].deleted             &&
-         (waveInfo[i].numCB   == numCB)   &&
-         (waveInfo[i].numBOOL == numBOOL) &&
-         (waveInfo[i].numTOOL == numTOOL))
-      {
-         /* Reuse the deleted waves resources. */
-         wid = i;
-         break;
-      }
-   }
-
-   if (wid == -1)
-   {
-      /* Are there enough spare resources? */
-
-      if ((numCB+waveOutBotCB) > NUM_WAVE_CBS)
-         return PI_TOO_MANY_CBS;
-
-      if ((numBOOL+waveOutBotOOL) > (waveOutTopOOL-numTOOL))
-         return PI_TOO_MANY_OOL;
-
-      if (wid >= PI_MAX_WAVES)
-         return PI_NO_WAVEFORM_ID;
-
-      wid = waveOutCount++;
-
-      waveInfo[wid].botCB  = waveOutBotCB;
-      waveInfo[wid].topCB  = waveOutBotCB + numCB -1;
-      waveInfo[wid].botOOL = waveOutBotOOL;
-      waveInfo[wid].topOOL = waveOutTopOOL;
-      waveInfo[wid].numCB = numCB;
-      waveInfo[wid].numBOOL = numBOOL;
-      waveInfo[wid].numTOOL = numTOOL;
-
-      waveOutBotCB += numCB;
-      waveOutBotOOL += numBOOL;
-      waveOutTopOOL -= numTOOL;
-   }
-
-   /* Must be room if got this far. */
-
-   CB   = waveInfo[wid].botCB;
-   BOOL = waveInfo[wid].botOOL;
-   TOOL = waveInfo[wid].topOOL;
-
-   wave2Cbs(PI_WAVE_MODE_ONE_SHOT, &CB, &BOOL, &TOOL, 0, 0, 0);
-
-   /* Sanity check. */
-
-   if ( (numCB   != (CB-waveInfo[wid].botCB))    ||
-        (numBOOL != (BOOL-waveInfo[wid].botOOL)) ||
-        (numTOOL != (waveInfo[wid].topOOL-TOOL)) )
-   {
-      DBG(DBG_ALWAYS, "ERROR wid=%d CBs %d=%d BOOL %d=%d TOOL %d=%d", wid,
-         numCB,   CB-waveInfo[wid].botCB,
-         numBOOL, BOOL-waveInfo[wid].botOOL,
-         numTOOL, waveInfo[wid].topOOL-TOOL);
-   }
-
-   DBG(DBG_USER, "Wave Stats: wid=%d CBs %d BOOL %d TOOL %d", wid,
-      numCB, numBOOL, numTOOL);
-
-   waveInfo[wid].deleted = 0;
-
-   /* Consume waves. */
-
-   wfc[0] = 0;
-   wfc[1] = 0;
-   wfc[2] = 0;
-
-   wfcur = 0;
-
-   return wid;
-}
-//}}}
-//{{{
-int gpioWaveCreatePad (int pctCB, int pctBOOL, int pctTOOL)
-{
-   int i, wid;
-   int numCB, numBOOL, numTOOL;
-   int CB, BOOL, TOOL;
-
-   DBG(DBG_USER, "%d, %d, %d", pctCB, pctBOOL, pctTOOL);
-
-   CHECK_INITED;
-
-   if (pctCB < 0 || pctCB > 100)
-      SOFT_ERROR(PI_BAD_PARAM, "bad wave param, pctCB=(%d)", pctCB);
-   if (pctBOOL < 0 || pctBOOL > 100)
-      SOFT_ERROR(PI_BAD_PARAM, "bad wave param, pctBOOL=(%d)", pctBOOL);
-   if (pctTOOL < 0 || pctTOOL > 100)
-      SOFT_ERROR(PI_BAD_PARAM, "bad wave param, pctTOOL=(%d)", pctTOOL);
-
-   if (wfc[wfcur] == 0) return PI_EMPTY_WAVEFORM;
-
-   /* What resources are needed? */
-   waveCBsOOLs(&numCB, &numBOOL, &numTOOL);
-
-   /* Amount of pad required */
-   CB = (NUM_WAVE_CBS - PI_WAVE_COUNT_PAGES*CBS_PER_OPAGE) * pctCB / 100;
-   BOOL = (NUM_WAVE_OOL - PI_WAVE_COUNT_PAGES*OOL_PER_OPAGE) * pctBOOL /100;
-   TOOL = (NUM_WAVE_OOL - PI_WAVE_COUNT_PAGES*OOL_PER_OPAGE) * pctTOOL /100;
-
-   /* Reject if wave is too big */
-   if (numCB > CB) return PI_TOO_MANY_CBS;
-   if (numBOOL > BOOL) return PI_TOO_MANY_OOL;
-   if (numTOOL > TOOL) return PI_TOO_MANY_OOL;
-
-   /* Set the padding */
-   numCB = CB;
-   numBOOL = BOOL;
-   numTOOL = TOOL;
-
-
-   wid = -1;
-
-   /* Is there an exact fit with a deleted wave. */
-
-   for (i=0; i<waveOutCount; i++)
-   {
-      if (waveInfo[i].deleted             &&
-         (waveInfo[i].numCB   == numCB)   &&
-         (waveInfo[i].numBOOL == numBOOL) &&
-         (waveInfo[i].numTOOL == numTOOL))
-      {
-         /* Reuse the deleted waves resources. */
-         wid = i;
-         break;
-      }
-   }
-
-   if (wid == -1)
-   {
-      /* Are there enough spare resources? */
-
-      if ((numCB+waveOutBotCB) > NUM_WAVE_CBS)
-         return PI_TOO_MANY_CBS;
-
-      if ((numBOOL+waveOutBotOOL) > (waveOutTopOOL-numTOOL))
-         return PI_TOO_MANY_OOL;
-
-      if (wid >= PI_MAX_WAVES)
-         return PI_NO_WAVEFORM_ID;
-
-      wid = waveOutCount++;
-
-      waveInfo[wid].botCB  = waveOutBotCB;
-      waveInfo[wid].topCB  = waveOutBotCB + numCB -1;
-      waveInfo[wid].botOOL = waveOutBotOOL;
-      waveInfo[wid].topOOL = waveOutTopOOL;
-      waveInfo[wid].numCB = numCB;
-      waveInfo[wid].numBOOL = numBOOL;
-      waveInfo[wid].numTOOL = numTOOL;
-
-      waveOutBotCB += numCB;
-      waveOutBotOOL += numBOOL;
-      waveOutTopOOL -= numTOOL;
-   }
-
-   /* Must be room if got this far. */
-
-   CB   = waveInfo[wid].botCB;
-   BOOL = waveInfo[wid].botOOL;
-   TOOL = waveInfo[wid].topOOL;
-
-   wave2Cbs(PI_WAVE_MODE_ONE_SHOT, &CB, &BOOL, &TOOL, numCB, numBOOL, numTOOL);
-
-   /* Sanity check. */
-
-   if ( (numCB   != (CB-waveInfo[wid].botCB))    ||
-        (numBOOL != (BOOL-waveInfo[wid].botOOL)) ||
-        (numTOOL != (waveInfo[wid].topOOL-TOOL)) )
-   {
-      DBG(DBG_ALWAYS, "ERROR wid=%d CBs %d=%d BOOL %d=%d TOOL %d=%d", wid,
-         numCB,   CB-waveInfo[wid].botCB,
-         numBOOL, BOOL-waveInfo[wid].botOOL,
-         numTOOL, waveInfo[wid].topOOL-TOOL);
-   }
-
-   DBG(DBG_USER, "Wave padding: wid=%d CBs %d BOOL %d TOOL %d", wid,
-      numCB, numBOOL, numTOOL);
-
-   waveInfo[wid].deleted = 0;
-
-   /* Consume waves. */
-
-   wfc[0] = 0;
-   wfc[1] = 0;
-   wfc[2] = 0;
-
-   wfcur = 0;
-
-   return wid;
-}
-//}}}
-//{{{
-int gpioWaveDelete (unsigned wave_id)
-{
-   DBG(DBG_USER, "wave id=%d", wave_id);
-
-   CHECK_INITED;
-
-   if ((wave_id >= waveOutCount) || waveInfo[wave_id].deleted)
-      SOFT_ERROR(PI_BAD_WAVE_ID, "bad wave id (%d)", wave_id);
-
-   waveInfo[wave_id].deleted = 1;
-
-   if (wave_id == (waveOutCount-1))
-   {
-      /* top wave deleted, garbage collect any other deleted waves */
-
-      while ((wave_id > 0) && (waveInfo[wave_id-1].deleted)) --wave_id;
-
-      waveOutBotCB  = waveInfo[wave_id].botCB;
-      waveOutBotOOL = waveInfo[wave_id].botOOL;
-      waveOutTopOOL = waveInfo[wave_id].topOOL;
-
-      waveOutCount = wave_id;
-   }
-
-   return 0;
-}
-//}}}
-//{{{
-int gpioWaveTxStart (unsigned wave_mode)
-{
-   /* This function is deprecated and has been removed. */
-
-   CHECK_INITED;
-
-   SOFT_ERROR(PI_DEPRECATED, "deprected function removed");
-}
-//}}}
-//{{{
-int gpioWaveTxSend (unsigned wave_id, unsigned wave_mode)
-{
-   rawCbs_t *p=NULL;
-
-   DBG(DBG_USER, "wave_id=%d wave_mode=%d", wave_id, wave_mode);
-
-   CHECK_INITED;
-
-   if ((wave_id >= waveOutCount) || waveInfo[wave_id].deleted)
-      SOFT_ERROR(PI_BAD_WAVE_ID, "bad wave id (%d)", wave_id);
-
-   if (wave_mode > PI_WAVE_MODE_REPEAT_SYNC)
-      SOFT_ERROR(PI_BAD_WAVE_MODE, "bad wave mode (%d)", wave_mode);
-
-   if (!waveClockInited)
-   {
-      stopHardwarePWM();
-      initClock(0); /* initialise secondary clock */
-      waveClockInited = 1;
-      PWMClockInited = 0;
-   }
-
-   if (wave_mode < PI_WAVE_MODE_ONE_SHOT_SYNC) initKillDMA(dmaOut);
-
-   p = rawWaveCBAdr(waveInfo[wave_id].topCB);
-
-   if ((wave_mode & 1) == PI_WAVE_MODE_ONE_SHOT)
-      p->next = 0;
-   else
-      p->next = waveCbPOadr(waveInfo[wave_id].botCB+1);
-
-   if (waveEndPtr && (wave_mode > PI_WAVE_MODE_REPEAT))
-   {
-      *waveEndPtr = waveCbPOadr(waveInfo[wave_id].botCB+1);
-
-      if (!dmaOut[DMA_CONBLK_AD])
-      {
-         initDMAgo((uint32_t *)dmaOut, waveCbPOadr(waveInfo[wave_id].botCB));
-      }
-   }
-   else
-   {
-      initDMAgo((uint32_t *)dmaOut, waveCbPOadr(waveInfo[wave_id].botCB));
-   }
-
-   waveEndPtr = &p->next;
-
-   /* for compatability with the deprecated gpioWaveTxStart return the
-      number of cbs
-   */
-   return (waveInfo[wave_id].topCB - waveInfo[wave_id].botCB) + 1;
-}
-//}}}
-
-// chain
-//{{{
-static int chainGetCB (int n)
-{
-   int block, index;
-
-   if (n < (WCB_CHAIN_CBS * PI_WAVE_COUNT_PAGES))
-   {
-      block = n / WCB_CHAIN_CBS;
-      index = n % WCB_CHAIN_CBS;
-      return (block*CBS_PER_OPAGE) + WCB_COUNTER_CBS + index;
-   }
-   return -1;
-}
-//}}}
-//{{{
-static void chainSetVal (int n, uint32_t val)
-{
-   int block, index;
-   uint32_t *p;
-
-   if (n < (WCB_CHAIN_OOL * PI_WAVE_COUNT_PAGES))
-   {
-      block = n / WCB_CHAIN_OOL;
-      index = n % WCB_CHAIN_OOL;
-      p = (uint32_t *) dmaOVirt[block] + (WCB_COUNTER_CBS+WCB_CHAIN_CBS) * 8;
-      p[index] = val;
-   }
-}
-//}}}
-
-//{{{
-static uint32_t chainGetValPadr (int n)
-{
-   int block, index;
-   uint32_t *p;
-
-   if (n < (WCB_CHAIN_OOL * PI_WAVE_COUNT_PAGES))
-   {
-      block = n / WCB_CHAIN_OOL;
-      index = n % WCB_CHAIN_OOL;
-      p = (uint32_t *) dmaOBus[block] + (WCB_COUNTER_CBS+WCB_CHAIN_CBS) * 8;
-      //cast twice to suppress warning, I belive this is ok as dmaOBus
-      //contains bus addresses not virtual addresses.
-      return (uint32_t)(uintptr_t) (p + index);
-   }
-   return 0;
-}
-//}}}
-
-//{{{
-static uint32_t chainGetCntVal (int counter, int slot)
-{
-   uint32_t *p;
-   int page, offset;
-   page = counter / 2;
-   offset = (counter % 2 ? WCB_COUNTER_OOL : 0);
-   p = (uint32_t *) dmaOVirt[page] + (WCB_COUNTER_CBS+WCB_CHAIN_CBS) * 8;
-   return p[WCB_CHAIN_OOL+ offset + slot];
-}
-//}}}
-//{{{
-static void chainSetCntVal (int counter, int slot, uint32_t value)
-{
-   uint32_t *p;
-   int page, offset;
-   page = counter / 2;
-   offset = (counter % 2 ? WCB_COUNTER_OOL : 0);
-   p = (uint32_t *) dmaOVirt[page] + (WCB_COUNTER_CBS+WCB_CHAIN_CBS) * 8;
-   p[WCB_CHAIN_OOL + offset + slot] = value;
-}
-//}}}
-//{{{
-static uint32_t chainGetCntValPadr (int counter, int slot)
-{
-   uint32_t *p;
-   int page, offset;
-   page = counter / 2;
-   offset = (counter % 2 ? WCB_COUNTER_OOL : 0);
-   p = (uint32_t *) dmaOBus[page] + (WCB_COUNTER_CBS+WCB_CHAIN_CBS) * 8;
-   //cast twice to suppress warning, I belive this is ok as dmaOBus
-   //contains bus addresses not virtual addresses. --plugwash
-   return (uint32_t)(uintptr_t)(p + WCB_CHAIN_OOL + offset + slot);
-}
-//}}}
-//{{{
-static int chainGetCntCB (int counter)
-{
-   int page, offset;
-   page = counter / 2;
-   offset = (counter % 2 ? WCB_CNT_CBS : 0);
-   return ((page * CBS_PER_OPAGE) + offset);
-}
-//}}}
-//{{{
-static void chainMakeCounter (unsigned counter, unsigned blklen, unsigned blocks, unsigned count, uint32_t repeat, uint32_t next)
-{
-   rawCbs_t *p=NULL;
-
-   int b, baseCB, dig;
-   uint32_t nxt;
-
-   int botCB;
-
-   botCB  = chainGetCntCB(counter);
-
-   baseCB = botCB;
-
-   /* set up all the OOLs */
-   for (b=0; b < (blocks*(blklen+1)); b++) chainSetCntVal(counter, b, repeat);
-
-   for (b=0; b<blocks; b++)
-      chainSetCntVal(counter,
-         ((b*(blklen+1))+blklen),
-         waveCbPOadr(baseCB+((b*3)+3)));
-
-   for (b=0; b<blocks; b++)
-   {
-      /* copy BOTTOM to NEXT */
-
-      p = rawWaveCBAdr(botCB++);
-
-      p->info = NORMAL_DMA;
-
-      p->src = chainGetCntValPadr(counter, b*(blklen+1));
-      p->dst = (waveCbPOadr(botCB+1) + 20);
-
-      p->length = 4;
-      p->next   = waveCbPOadr(botCB);
-
-      /* copy BOTTOM to TOP */
-
-      p = rawWaveCBAdr(botCB++);
-
-      p->info   = NORMAL_DMA;
-
-      p->src = chainGetCntValPadr(counter, b*(blklen+1));
-      p->dst = chainGetCntValPadr(counter, (b*(blklen+1))+blklen);
-
-      p->length = 4;
-      p->next   = waveCbPOadr(botCB);
-
-      /* shift all down one */
-
-      p = rawWaveCBAdr(botCB++);
-
-      p->info   = NORMAL_DMA|DMA_SRC_INC|DMA_DEST_INC;
-
-      p->src = chainGetCntValPadr(counter, ((b*(blklen+1))+1));
-      p->dst = chainGetCntValPadr(counter, ((b*(blklen+1))+0));
-
-      p->length = blklen*4;
-      p->next   = repeat;
-   }
-
-   /* reset the counter */
-
-   p = rawWaveCBAdr(botCB);
-
-   p->info = NORMAL_DMA|DMA_SRC_INC|DMA_DEST_INC;
-
-   p->src = chainGetCntValPadr(counter, blocks*(blklen+1));
-   p->dst = chainGetCntValPadr(counter, 0);
-
-   p->length = blocks*(blklen+1)*4;
-   p->next   = next;
-
-   b = 0;
-
-   while (count && (b<blocks))
-   {
-      dig = count % blklen;
-      count /= blklen;
-
-      if (count) nxt = chainGetCntVal(counter, (b*(blklen+1))+blklen);
-      else       nxt = waveCbPOadr(botCB);
-
-      chainSetCntVal(counter, b*(blklen+1)+dig, nxt);
-
-      b++;
-   }
-
-   /* copy all the OOLs */
-   for (b=0; b < (blocks*(blklen+1)); b++)
-      chainSetCntVal(
-         counter, b+(blocks*(blklen+1)), chainGetCntVal(counter, b));
-}
-//}}}
-
-//{{{
-int gpioWaveChain (char* buf, unsigned bufSize)
-{
-   unsigned blklen=16, blocks=4;
-   int cb, chaincb;
-   rawCbs_t *p;
-   int i, wid, cmd, loop, counters;
-   unsigned cycles, delayCBs, dcb, delayLeft;
-   uint32_t repeat, next, *endPtr;
-   int stk_pos[10], stk_lev=0;
-
-   cb = 0;
-   loop = -1;
-
-   DBG(DBG_USER, "bufSize=%d [%s]", bufSize, myBuf2Str(bufSize, buf));
-
-   CHECK_INITED;
-
-   if (!waveClockInited)
-   {
-      stopHardwarePWM();
-      initClock(0); /* initialise secondary clock */
-      waveClockInited = 1;
-      PWMClockInited = 0;
-   }
-
-   initKillDMA(dmaOut);
-
-   waveEndPtr = NULL;
-   endPtr = NULL;
-
-   /* add delay cb at start of DMA */
-
-   p = rawWaveCBAdr(chainGetCB(cb++));
-
-   /* use the secondary clock */
-
-   if (gpioCfg.clockPeriph != PI_CLOCK_PCM)
-   {
-      p->info = NORMAL_DMA | TIMED_DMA(2);
-      p->dst  = PCM_TIMER;
-   }
-   else
-   {
-      p->info = NORMAL_DMA | TIMED_DMA(5);
-      p->dst  = PWM_TIMER;
-   }
-
-   //cast twice to suppress warning, I belive this is ok as dmaOBus
-   //contains bus addresses not virtual addresses. --plugwash
-   p->src    = (uint32_t)(uintptr_t) (&dmaOBus[0]->periphData);
-   p->length = BPD * 20 / PI_WF_MICROS; /* 20 micros delay */
-   p->next   = waveCbPOadr(chainGetCB(cb));
-
-   counters = 0;
-   wid = -1;
-
-   i = 0;
-
-   while (i<bufSize)
-   {
-      wid = (unsigned)buf[i];
-
-      if (wid == 255) /* wave command */
-      {
-         if ((i+2) > bufSize)
-            SOFT_ERROR(PI_BAD_CHAIN_CMD,
-               "incomplete chain command (at %d)", i);
-
-         cmd = buf[i+1];
-
-         if (cmd == 0) /* loop begin */
-         {
-            if (stk_lev >= (sizeof(stk_pos)/sizeof(int)))
-               SOFT_ERROR(PI_CHAIN_NESTING,
-                  "chain counters nested too deep (at %d)", i);
-
-            stk_pos[stk_lev++] = cb;
-
-            i += 2;
-         }
-         else if (cmd == 1) /* loop end */
-         {
-            if (counters >= WCB_COUNTERS)
-               SOFT_ERROR(PI_CHAIN_COUNTER,
-                  "too many chain counters (at %d)", i);
-
-            if ((i+4) > bufSize)
-               SOFT_ERROR(PI_BAD_CHAIN_CMD,
-                  "incomplete chain command (at %d)", i);
-
-            loop = 0;
-            if (--stk_lev >= 0) loop = stk_pos[stk_lev];
-
-            if ((loop < 1) || (loop == cb))
-               SOFT_ERROR(PI_BAD_CHAIN_LOOP,
-                  "empty chain loop (at %d)", i);
-
-            cycles = ((unsigned)buf[i+3] <<  8) + (unsigned)buf[i+2];
-
-            i += 4;
-
-            if (cycles > PI_MAX_WAVE_CYCLES)
-               SOFT_ERROR(PI_CHAIN_LOOP_CNT,
-                  "bad chain loop count (%d)", cycles);
-
-            if (cycles == 0)
-            {
-               /* Skip the complete loop block.  Change
-                  the next pointing to the start of the
-                  loop block to the current cb.
-               */
-               p = rawWaveCBAdr(chainGetCB(loop));
-               p->next = waveCbPOadr(chainGetCB(cb));
-            }
-            else if (cycles == 1)
-            {
-               /* Nothing to do, no need for a counter. */
-            }
-            else
-            {
-               chaincb = chainGetCB(cb++);
-               if (chaincb < 0)
-                  SOFT_ERROR(PI_CHAIN_TOO_BIG, "chain is too long (%d)", cb);
-
-               p = rawWaveCBAdr(chaincb);
-
-               repeat = waveCbPOadr(chainGetCB(loop));
-
-                /* Need to check next cb as well. */
-
-               chaincb = chainGetCB(cb);
-
-               if (chaincb < 0)
-                  SOFT_ERROR(PI_CHAIN_TOO_BIG, "chain is too long (%d)", cb);
-
-               next = waveCbPOadr(chainGetCB(cb));
-
-               /* dummy src and dest */
-               p->info = NORMAL_DMA;
-               //cast twice to suppress warning, I belive this is ok as dmaOBus
-               //contains bus addresses not virtual addresses. --plugwash
-               p->src = (uint32_t)(uintptr_t) (&dmaOBus[0]->periphData);
-               p->dst = (uint32_t)(uintptr_t) (&dmaOBus[0]->periphData);
-               p->length = 4;
-               p->next = waveCbPOadr(chainGetCntCB(counters));
-
-               chainMakeCounter(counters, blklen, blocks,
-                            cycles-1, repeat, next);
-
-               counters++;
-            }
-         }
-         else if (cmd == 2) /* delay us */
-         {
-            if ((i+4) > bufSize)
-               SOFT_ERROR(PI_BAD_CHAIN_CMD,
-                  "incomplete chain command (at %d)", i);
-
-            cycles = ((unsigned)buf[i+3] <<  8) + (unsigned)buf[i+2];
-
-            i += 4;
-
-            if (cycles > PI_MAX_WAVE_DELAY)
-               SOFT_ERROR(PI_BAD_CHAIN_DELAY,
-                  "bad chain delay micros (%d)", cycles);
-
-            if (cycles)
-            {
-               delayLeft = cycles;
-               delayCBs = waveDelayCBs(delayLeft);
-               for (dcb=0; dcb<delayCBs; dcb++)
-               {
-                  chaincb = chainGetCB(cb++);
-
-                  if (chaincb < 0)
-                     SOFT_ERROR(
-                        PI_CHAIN_TOO_BIG, "chain is too long (%d)", cb);
-
-                  p = rawWaveCBAdr(chaincb);
-
-                  /* use the secondary clock */
-
-                  if (gpioCfg.clockPeriph != PI_CLOCK_PCM)
-                  {
-                     p->info = NORMAL_DMA | TIMED_DMA(2);
-                     p->dst  = PCM_TIMER;
-                  }
-                  else
-                  {
-                     p->info = NORMAL_DMA | TIMED_DMA(5);
-                     p->dst  = PWM_TIMER;
-                  }
-
-                  //cast twice to suppress warning, I belive this is ok as dmaOBus
-                  //contains bus addresses not virtual addresses. --plugwash
-                  p->src = (uint32_t)(uintptr_t) (&dmaOBus[0]->periphData);
-
-                  p->length = BPD * delayLeft / PI_WF_MICROS;
-
-                  if ((gpioCfg.DMAsecondaryChannel >= DMA_LITE_FIRST) &&
-                      (p->length > DMA_LITE_MAX))
-                  {
-                     p->length = DMA_LITE_MAX;
-                  }
-
-                  delayLeft -= (p->length / BPD);
-
-                  p->next = waveCbPOadr(chainGetCB(cb));
-               }
-            }
-         }
-         else if (cmd == 3) /* repeat loop forever */
-         {
-            i += 2;
-
-            loop = 0;
-            if (--stk_lev >= 0) loop = stk_pos[stk_lev];
-
-            if ((loop < 1) || (loop == cb))
-               SOFT_ERROR(PI_BAD_CHAIN_LOOP,
-                  "empty chain loop (at %d)", i);
-
-            chaincb = chainGetCB(cb++);
-            if (chaincb < 0)
-               SOFT_ERROR(PI_CHAIN_TOO_BIG, "chain is too long (%d)", cb);
-
-            if (i < bufSize)
-               SOFT_ERROR(PI_BAD_FOREVER,
-                  "loop forever must be last command");
-
-            p = rawWaveCBAdr(chaincb);
-
-            /* dummy src and dest */
-            p->info = NORMAL_DMA;
-            //cast twice to suppress warning, I belive this is ok as dmaOBus
-            //contains bus addresses not virtual addresses. --plugwash
-            p->src = (uint32_t)(uintptr_t) (&dmaOBus[0]->periphData);
-            p->dst = (uint32_t)(uintptr_t) (&dmaOBus[0]->periphData);
-            p->length = 4;
-            p->next = waveCbPOadr(chainGetCB(loop));
-            endPtr = &p->next;
-         }
-         else
-            SOFT_ERROR(PI_BAD_CHAIN_CMD,
-               "unknown chain command (255 %d)", cmd);
-      }
-      else if ((wid >= waveOutCount) || waveInfo[wid].deleted)
-         SOFT_ERROR(PI_BAD_WAVE_ID, "undefined wave (%d)", wid);
-      else
-      {
-         chaincb = chainGetCB(cb++);
-
-         if (chaincb < 0)
-            SOFT_ERROR(PI_CHAIN_TOO_BIG, "chain is too long (%d)", cb);
-
-         p = rawWaveCBAdr(chaincb);
-
-         chaincb = chainGetCB(cb);
-
-         if (chaincb < 0)
-            SOFT_ERROR(PI_CHAIN_TOO_BIG, "chain is too long (%d)", cb);
-
-         chainSetVal(cb-1, waveCbPOadr(chaincb));
-
-         /* patch next of wid topCB to next cb */
-
-         p->info   = NORMAL_DMA;
-         p->src    = chainGetValPadr(cb-1); /* this next */
-         p->dst    = waveCbPOadr(waveInfo[wid].topCB) + 20; /* wid next */
-         p->length = 4;
-         p->next   = waveCbPOadr(waveInfo[wid].botCB+1);
-
-         i += 1;
-      }
-   }
-
-   chaincb = chainGetCB(cb++);
-
-   if (chaincb < 0)
-      SOFT_ERROR(PI_CHAIN_TOO_BIG, "chain is too long (%d)", cb);
-
-   p = rawWaveCBAdr(chaincb);
-
-   p->info   = NORMAL_DMA;
-
-   //cast twice to suppress warning, I belive this is ok as dmaOBus
-   //contains bus addresses not virtual addresses. --plugwash
-   p->src    = (uint32_t)(uintptr_t) (&dmaOBus[0]->periphData);
-   p->dst    = (uint32_t)(uintptr_t) (&dmaOBus[0]->periphData);
-   p->length = 4;
-   p->next = 0;
-
-   if (!endPtr) endPtr = &p->next;
-
-   initDMAgo((uint32_t *)dmaOut, waveCbPOadr(chainGetCB(0)));
-
-   waveEndPtr = endPtr;
-
-   return 0;
-}
-//}}}
-
-//{{{
-int gpioWaveTxBusy()
-{
-   DBG(DBG_USER, "");
-
-   CHECK_INITED;
-
-   if (dmaOut[DMA_CONBLK_AD])
-      return 1;
-   else
-      return 0;
-}
-//}}}
-//{{{
-int gpioWaveTxAt()
-{
-   int i, cb;
-
-   DBG(DBG_USER, "");
-
-   CHECK_INITED;
-
-   cb = dmaNowAtOCB();
-
-   if (cb < 0) return -cb;
-
-   for (i=0; i<PI_MAX_WAVES; i++)
-   {
-      if ( !waveInfo[i].deleted &&
-          (cb >= waveInfo[i].botCB) &&
-          (cb <= waveInfo[i].topCB) ) return i;
-   }
-
-   return PI_WAVE_NOT_FOUND;
-}
-//}}}
-//{{{
-int gpioWaveTxStop()
-{
-   DBG(DBG_USER, "");
-
-   CHECK_INITED;
-
-   initKillDMA(dmaOut);
-
-   waveEndPtr = NULL;
-
-   return 0;
-}
-//}}}
-
-//{{{
-int gpioWaveGetMicros()
-{
-   DBG(DBG_USER, "");
-
-   CHECK_INITED;
-
-   return wfStats.micros;
-}
-//}}}
-//{{{
-int gpioWaveGetHighMicros()
-{
-   DBG(DBG_USER, "");
-
-   CHECK_INITED;
-
-   return wfStats.highMicros;
-}
-//}}}
-//{{{
-int gpioWaveGetMaxMicros()
-{
-   DBG(DBG_USER, "");
-
-   CHECK_INITED;
-
-   return wfStats.maxMicros;
-}
-//}}}
-//{{{
-int gpioWaveGetPulses()
-{
-   DBG(DBG_USER, "");
-
-   CHECK_INITED;
-
-   return wfStats.pulses;
-}
-//}}}
-//{{{
-int gpioWaveGetHighPulses()
-{
-   DBG(DBG_USER, "");
-
-   CHECK_INITED;
-
-   return wfStats.highPulses;
-}
-//}}}
-//{{{
-int gpioWaveGetMaxPulses()
-{
-   DBG(DBG_USER, "");
-
-   CHECK_INITED;
-
-   return wfStats.maxPulses;
-}
-//}}}
-//{{{
-int gpioWaveGetCbs()
-{
-   DBG(DBG_USER, "");
-
-   CHECK_INITED;
-
-   return wfStats.cbs;
-}
-//}}}
-//{{{
-int gpioWaveGetHighCbs()
-{
-   DBG(DBG_USER, "");
-
-   CHECK_INITED;
-
-   return wfStats.highCbs;
-}
-//}}}
-//{{{
-int gpioWaveGetMaxCbs()
-{
-   DBG(DBG_USER, "");
-
-   CHECK_INITED;
-
-   return wfStats.maxCbs;
-}
-//}}}
-//}}}
 //{{{
 int gpioSetPad (unsigned pad, unsigned padStrength)
 {
@@ -6461,6 +3920,143 @@ int gpioGetPad (unsigned pad)
 //}}}
 //}}}
 //{{{  i2c
+// bit bang i2c
+//{{{
+static int read_SDA (wfRx_t* w)
+{
+   myGpioSetMode(w->I.SDA, PI_INPUT);
+   return myGpioRead(w->I.SDA);
+}
+//}}}
+//{{{
+static void set_SDA (wfRx_t* w)
+{
+   myGpioSetMode(w->I.SDA, PI_INPUT);
+}
+//}}}
+//{{{
+static void clear_SDA (wfRx_t* w)
+{
+   myGpioSetMode(w->I.SDA, PI_OUTPUT);
+   myGpioWrite(w->I.SDA, 0);
+}
+//}}}
+//{{{
+static void clear_SCL (wfRx_t* w)
+{
+   myGpioSetMode(w->I.SCL, PI_OUTPUT);
+   myGpioWrite(w->I.SCL, 0);
+}
+//}}}
+
+//{{{
+static void I2C_delay (wfRx_t* w)
+{
+   myGpioDelay(w->I.delay);
+}
+//}}}
+//{{{
+static void I2C_clock_stretch (wfRx_t* w)
+{
+   uint32_t now, max_stretch=100000;
+
+   myGpioSetMode(w->I.SCL, PI_INPUT);
+   now = gpioTick();
+   while ((myGpioRead(w->I.SCL) == 0) && ((gpioTick()-now) < max_stretch));
+}
+//}}}
+//{{{
+static void I2CStart (wfRx_t* w)
+{
+   if (w->I.started)
+   {
+      set_SDA(w);
+      I2C_delay(w);
+      I2C_clock_stretch(w);
+      I2C_delay(w);
+   }
+
+   clear_SDA(w);
+   I2C_delay(w);
+   clear_SCL(w);
+   I2C_delay(w);
+
+   w->I.started = 1;
+}
+//}}}
+//{{{
+static void I2CStop( wfRx_t* w)
+{
+   clear_SDA(w);
+   I2C_delay(w);
+   I2C_clock_stretch(w);
+   I2C_delay(w);
+   set_SDA(w);
+   I2C_delay(w);
+
+   w->I.started = 0;
+}
+//}}}
+//{{{
+static void I2CPutBit (wfRx_t* w, int bit)
+{
+   if (bit) set_SDA(w);
+   else     clear_SDA(w);
+
+   I2C_delay(w);
+   I2C_clock_stretch(w);
+   I2C_delay(w);
+   clear_SCL(w);
+}
+//}}}
+//{{{
+static int I2CGetBit (wfRx_t* w)
+{
+   int bit;
+
+   set_SDA(w); /* let SDA float */
+   I2C_delay(w);
+   I2C_clock_stretch(w);
+   bit = read_SDA(w);
+   I2C_delay(w);
+   clear_SCL(w);
+
+   return bit;
+}
+//}}}
+//{{{
+static int I2CPutByte (wfRx_t* w, int byte)
+{
+   int bit, nack;
+
+   for(bit=0; bit<8; bit++)
+   {
+      I2CPutBit(w, byte & 0x80);
+      byte <<= 1;
+   }
+
+   nack = I2CGetBit(w);
+
+   return nack;
+}
+//}}}
+//{{{
+static uint8_t I2CGetByte (wfRx_t* w, int nack)
+{
+   int bit, byte=0;
+
+   for (bit=0; bit<8; bit++)
+   {
+      byte = (byte << 1) | I2CGetBit(w);
+   }
+
+   I2CPutBit(w, nack);
+
+   return byte;
+}
+//}}}
+
+// external
 //{{{
 int i2cWriteQuick(unsigned handle, unsigned bit)
 {
@@ -7649,8 +5245,6 @@ int bscXfer (bsc_xfer_t* xfer)
 
    CHECK_INITED;
 
-   eventAlert[PI_EVENT_BSC].ignore = 1;
-
    if (xfer->control)
    {
       /*
@@ -7704,12 +5298,11 @@ int bscXfer (bsc_xfer_t* xfer)
          active = bscsReg[BSC_FR] & (BSC_FR_RXBUSY | BSC_FR_TXBUSY);
       }
 
-      if (active) myGpioSleep(0, 20);
+      if (active) 
+        myGpioSleep(0, 20);
    }
 
    bscFR = bscsReg[BSC_FR] & 0xffff;
-
-   eventAlert[PI_EVENT_BSC].ignore = 0;
 
    return (copied<<16) | bscFR;
 }
@@ -8883,8 +6476,6 @@ int gpioSerialReadOpen (unsigned gpio, unsigned baud, unsigned data_bits)
    else if (data_bits < 17) wfRx[gpio].s.bytes = 2;
    else                  wfRx[gpio].s.bytes = 4;
 
-   gpioSetAlertFunc(gpio, waveRxBit);
-
    return 0;
 }
 //}}}
@@ -8979,8 +6570,6 @@ int gpioSerialReadClose (unsigned gpio)
 
          gpioSetWatchdog(gpio, 0); /* switch off timeouts */
 
-         gpioSetAlertFunc(gpio, NULL); /* cancel alert */
-
          wfRx[gpio].mode = PI_WFRX_NONE;
 
          break;
@@ -8988,1301 +6577,5 @@ int gpioSerialReadClose (unsigned gpio)
 
    return 0;
 }
-
-
-/* ----------------------------------------------------------------------- */
-
-static int intEventSetFunc(
-   unsigned event,
-   void *   f,
-   int      user,
-   void *   userdata)
-{
-   DBG(DBG_INTERNAL, "event=%d function=%08"PRIXPTR", user=%d, userdata=%08"PRIXPTR,
-      event, (uintptr_t)f, user, (uintptr_t)userdata);
-
-   eventAlert[event].ex = user;
-   eventAlert[event].userdata = userdata;
-
-   eventAlert[event].func = f;
-
-   return 0;
-}
 //}}}
-//}}}
-
-//{{{
-int eventSetFunc (unsigned event, eventFunc_t f)
-{
-   DBG(DBG_USER, "event=%d function=%08"PRIXPTR, event, (uintptr_t)f);
-
-   CHECK_INITED;
-
-   if (event > PI_MAX_EVENT)
-      SOFT_ERROR(PI_BAD_EVENT_ID, "bad event (%d)", event);
-
-   intEventSetFunc(event, f, 0, NULL);
-
-   return 0;
-}
-//}}}
-//{{{
-int eventSetFuncEx (unsigned event, eventFuncEx_t f, void* userdata)
-{
-   DBG(DBG_USER, "event=%d function=%08"PRIxPTR" userdata=%08"PRIxPTR,
-      event, (uintptr_t)f, (uintptr_t)userdata);
-
-   CHECK_INITED;
-
-   if (event > PI_MAX_EVENT)
-      SOFT_ERROR(PI_BAD_EVENT_ID, "bad event (%d)", event);
-
-   intEventSetFunc(event, f, 1, userdata);
-
-   return 0;
-}
-//}}}
-//{{{
-int eventMonitor (unsigned handle, uint32_t bits)
-{
-   DBG(DBG_USER, "handle=%d bits=%08X", handle, bits);
-
-   CHECK_INITED;
-
-   if (handle >= PI_NOTIFY_SLOTS)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if (gpioNotify[handle].state <= PI_NOTIFY_CLOSING)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   gpioNotify[handle].eventBits  = bits;
-
-   return 0;
-}
-
-//}}}
-//{{{
-int eventTrigger (unsigned event)
-{
-   DBG(DBG_USER, "event=%d", event);
-
-   CHECK_INITED;
-
-   if (event > PI_MAX_EVENT)
-      SOFT_ERROR(PI_BAD_EVENT_ID, "bad event (%d)", event);
-
-   eventAlert[event].fired = 1;
-
-   return 0;
-}
-//}}}
-
-//{{{
-static int intGpioSetAlertFunc (unsigned gpio, void* f, int user, void* userdata)
-{
-   DBG(DBG_INTERNAL, "gpio=%d function=%08"PRIXPTR", user=%d, userdata=%08"PRIXPTR,
-      gpio, (uintptr_t)f, user, (uintptr_t)userdata);
-
-   gpioAlert[gpio].ex = user;
-   gpioAlert[gpio].userdata = userdata;
-
-   gpioAlert[gpio].func = f;
-
-   if (f)
-   {
-      alertBits |= BIT;
-   }
-   else
-   {
-      alertBits &= ~BIT;
-   }
-
-   monitorBits = alertBits | notifyBits | gpioGetSamples.bits;
-
-   return 0;
-}
-//}}}
-//{{{
-int gpioSetAlertFunc (unsigned gpio, gpioAlertFunc_t f)
-{
-   DBG(DBG_USER, "gpio=%d function=%08"PRIXPTR, gpio, (uintptr_t)f);
-
-   CHECK_INITED;
-
-   if (gpio > PI_MAX_USER_GPIO)
-      SOFT_ERROR(PI_BAD_USER_GPIO, "bad gpio (%d)", gpio);
-
-   intGpioSetAlertFunc(gpio, f, 0, NULL);
-
-   return 0;
-}
-//}}}
-//{{{
-int gpioSetAlertFuncEx (unsigned gpio, gpioAlertFuncEx_t f, void* userdata)
-{
-   DBG(DBG_USER, "gpio=%d function=%08"PRIXPTR" userdata=%08"PRIXPTR,
-      gpio, (uintptr_t)f, (uintptr_t)userdata);
-
-   CHECK_INITED;
-
-   if (gpio > PI_MAX_USER_GPIO)
-      SOFT_ERROR(PI_BAD_USER_GPIO, "bad gpio (%d)", gpio);
-
-   intGpioSetAlertFunc(gpio, f, 1, userdata);
-
-   return 0;
-}
-//}}}
-
-//{{{
-static void* pthISRThread (void* x)
-{
-   gpioISR_t *isr = x;
-   int fd;
-   int retval;
-   uint32_t tick;
-   int level;
-   uint32_t levels;
-   struct pollfd pfd;
-   char buf[64];
-
-   DBG(DBG_USER, "gpio=%d edge=%d timeout=%d f=%"PRIxPTR" u=%d data=%"PRIxPTR,
-      isr->gpio, isr->edge, isr->timeout, (uintptr_t)isr->func,
-      isr->ex, (uintptr_t)isr->userdata);
-
-   sprintf(buf, "/sys/class/gpio/gpio%d/value", isr->gpio);
-
-   isr->fd = -1; /* no fd assigned */
-
-   if ((fd = open(buf, O_RDONLY)) < 0)
-   {
-      DBG(DBG_ALWAYS, "gpio %d not exported", isr->gpio);
-      return NULL;
-   }
-
-   isr->fd = fd; /* store fd so it can be closed */
-
-   pfd.fd = fd;
-
-   pfd.events = POLLPRI;
-
-   lseek(fd, 0, SEEK_SET);    /* consume any prior interrupt */
-   if (read(fd, buf, sizeof buf) == -1) { /* ignore errors */ }
-
-   while (1)
-   {
-      retval = poll(&pfd, 1, isr->timeout); /* wait for interrupt */
-
-      tick = systReg[SYST_CLO];
-
-      levels = *(gpioReg + GPLEV0);
-
-      if (retval >= 0)
-      {
-         lseek(fd, 0, SEEK_SET);    /* consume interrupt */
-         if (read(fd, buf, sizeof buf) == -1) { /* ignore errors */ }
-
-         if (retval)
-         {
-            if (levels & (1<<isr->gpio)) level = PI_ON; else level = PI_OFF;
-         }
-         else level = PI_TIMEOUT;
-
-         if (isr->ex) (isr->func)(isr->gpio, level, tick, isr->userdata);
-         else         (isr->func)(isr->gpio, level, tick);
-      }
-   }
-
-   return NULL;
-}
-//}}}
-//{{{
-static int intGpioSetISRFunc (unsigned gpio, unsigned edge, int timeout, void* f, int user, void* userdata)
-{
-   char buf[64];
-
-   char *edge_str[]={"rising\n", "falling\n", "both\n"};
-   int fd;
-   int err;
-
-   DBG(DBG_INTERNAL,
-      "gpio=%d edge=%d timeout=%d function=%08"PRIXPTR" user=%d userdata=%08"PRIXPTR,
-      gpio, edge, timeout, (uintptr_t)f, user, (uintptr_t)userdata);
-
-   if (f)
-   {
-      if (!gpioISR[gpio].inited) /* export gpio if unexported */
-      {
-         fd = open("/sys/class/gpio/export", O_WRONLY);
-         if (fd < 0) return PI_BAD_ISR_INIT;
-
-         /* ignore write fail if already exported */
-         sprintf(buf, "%d\n", gpio);
-         err = write(fd, buf, strlen(buf));
-         close(fd);
-
-         sprintf(buf, "/sys/class/gpio/gpio%d/direction", gpio);
-         fd = open(buf, O_WRONLY);
-         if (fd < 0) return PI_BAD_ISR_INIT;
-
-         err = write(fd, "in\n", 3);
-         close(fd);
-         if (err != 3) return PI_BAD_ISR_INIT;
-
-         gpioISR[gpio].gpio = gpio;
-         gpioISR[gpio].edge = -1;
-         gpioISR[gpio].timeout = -1;
-
-         gpioISR[gpio].inited = 1;
-      }
-
-      if (gpioISR[gpio].edge != edge)
-      {
-         sprintf(buf, "/sys/class/gpio/gpio%d/edge", gpio);
-         fd = open(buf, O_WRONLY);
-         if (fd < 0) return PI_BAD_ISR_INIT;
-
-         err = write(fd, edge_str[edge], strlen(edge_str[edge]));
-         close(fd);
-         if (err != strlen(edge_str[edge])) return PI_BAD_ISR_INIT;
-
-         gpioISR[gpio].edge = edge;
-
-         if (gpioISR[gpio].pth != NULL)
-            pthread_kill(*gpioISR[gpio].pth, SIGCHLD);
-      }
-
-      if (timeout <= 0) timeout = -1;
-      if (gpioISR[gpio].timeout != timeout)
-      {
-         gpioISR[gpio].timeout = timeout;
-
-         if (gpioISR[gpio].pth != NULL)
-            pthread_kill(*gpioISR[gpio].pth, SIGCHLD);
-      }
-
-      gpioISR[gpio].func = f;
-      gpioISR[gpio].ex = user;
-      gpioISR[gpio].userdata = userdata;
-
-      if (gpioISR[gpio].pth == NULL)
-         gpioISR[gpio].pth = gpioStartThread(pthISRThread, &gpioISR[gpio]);
-   }
-   else /* null function, delete ISR, unexport gpio */
-   {
-      if (gpioISR[gpio].pth) /* delete any existing ISR */
-      {
-         gpioStopThread(gpioISR[gpio].pth);
-
-         if (gpioISR[gpio].fd >= 0)
-         {
-            close(gpioISR[gpio].fd);
-            gpioISR[gpio].fd = -1;
-         }
-
-         gpioISR[gpio].func = NULL;
-         gpioISR[gpio].pth = NULL;
-      }
-
-      if (gpioISR[gpio].inited) /* unexport the gpio */
-      {
-         fd = open("/sys/class/gpio/unexport", O_WRONLY);
-         if (fd < 0) return PI_BAD_ISR_INIT;
-         sprintf(buf, "%d\n", gpio);
-         err = write(fd, buf, strlen(buf));
-         close(fd);
-         if (err != strlen(buf)) return PI_BAD_ISR_INIT;
-         gpioISR[gpio].inited = 0;
-      }
-   }
-
-   return 0;
-}
-//}}}
-//{{{
-int gpioSetISRFunc (unsigned gpio, unsigned edge, int timeout, gpioISRFunc_t f)
-{
-   DBG(DBG_USER, "gpio=%d edge=%d timeout=%d function=%08"PRIXPTR,
-      gpio, edge, timeout, (uintptr_t)f);
-
-   CHECK_INITED;
-
-   if (gpio > PI_MAX_GPIO)
-      SOFT_ERROR(PI_BAD_GPIO, "bad gpio (%d)", gpio);
-
-   if (edge > EITHER_EDGE)
-      SOFT_ERROR(PI_BAD_EDGE, "bad ISR edge (%d)", edge);
-
-   return intGpioSetISRFunc(gpio, edge, timeout, f, 0, NULL);
-}
-//}}}
-//{{{
-int gpioSetISRFuncEx (unsigned gpio, unsigned edge, int timeout, gpioAlertFuncEx_t f, void* userdata)
-{
-   DBG(DBG_USER, "gpio=%d edge=%d timeout=%d function=%08"PRIXPTR" userdata=%08"PRIXPTR,
-      gpio, edge, timeout, (uintptr_t)f, (uintptr_t)userdata);
-
-   CHECK_INITED;
-
-   if (gpio > PI_MAX_GPIO)
-      SOFT_ERROR(PI_BAD_GPIO, "bad gpio (%d)", gpio);
-
-   if (edge > EITHER_EDGE)
-      SOFT_ERROR(PI_BAD_EDGE, "bad ISR edge (%d)", edge);
-
-   return intGpioSetISRFunc(gpio, edge, timeout, f, 1, userdata);
-}
-//}}}
-
-//{{{  notify
-//{{{
-static void closeOrphanedNotifications (int slot, int fd)
-{
-   int i;
-
-   /* Check for and close any orphaned notifications. */
-
-   for (i=0; i<PI_NOTIFY_SLOTS; i++)
-   {
-      if ((i != slot) &&
-          (gpioNotify[i].state >= PI_NOTIFY_OPENED) &&
-          (gpioNotify[i].fd == fd))
-      {
-         DBG(DBG_USER, "closed orphaned fd=%d (handle=%d)", fd, i);
-         gpioNotify[i].state = PI_NOTIFY_CLOSED;
-         intNotifyBits();
-      }
-   }
-}
-//}}}
-//{{{
-static void notifyMutex (int lock)
-{
-   static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-   if (lock) pthread_mutex_lock(&mutex);
-   else      pthread_mutex_unlock(&mutex);
-}
-//}}}
-//{{{
-int gpioNotifyOpenWithSize (int bufSize)
-{
-   int i, slot, fd;
-   char name[32];
-
-   DBG(DBG_USER, "bufSize=%d", bufSize);
-
-   CHECK_INITED;
-
-   slot = -1;
-
-   notifyMutex(1);
-
-   for (i=0; i<PI_NOTIFY_SLOTS; i++)
-   {
-      if (gpioNotify[i].state == PI_NOTIFY_CLOSED)
-      {
-         slot = i;
-         gpioNotify[slot].state = PI_NOTIFY_RESERVED;
-         break;
-      }
-   }
-
-   notifyMutex(0);
-
-   if (slot < 0) SOFT_ERROR(PI_NO_HANDLE, "no handle");
-
-   sprintf(name, "/dev/pigpio%d", slot);
-
-   myCreatePipe(name, 0664);
-
-   fd = open(name, O_RDWR|O_NONBLOCK);
-
-   if (fd < 0)
-   {
-      gpioNotify[slot].state = PI_NOTIFY_CLOSED;
-      SOFT_ERROR(PI_BAD_PATHNAME, "open %s failed (%m)", name);
-   }
-
-   if (bufSize != 0)
-   {
-      i = fcntl(fd, F_SETPIPE_SZ, bufSize);
-      if (i != bufSize)
-      {
-         gpioNotify[slot].state = PI_NOTIFY_CLOSED;
-         SOFT_ERROR(PI_BAD_PATHNAME,
-            "fcntl %s size %d failed (%m)", name, bufSize);
-      }
-   }
-
-   gpioNotify[slot].seqno = 0;
-   gpioNotify[slot].bits  = 0;
-   gpioNotify[slot].fd    = fd;
-   gpioNotify[slot].pipe  = 1;
-   gpioNotify[slot].max_emits  = MAX_EMITS;
-   gpioNotify[slot].lastReportTick = gpioTick();
-   gpioNotify[i].state = PI_NOTIFY_OPENED;
-
-   closeOrphanedNotifications(slot, fd);
-
-   return slot;
-}
-//}}}
-//{{{
-int gpioNotifyOpen()
-{
-   return gpioNotifyOpenWithSize(0);
-}
-//}}}
-
-//{{{
-static void intNotifyBits()
-{
-   int i;
-   uint32_t bits;
-
-   bits = 0;
-
-   for (i=0; i<PI_NOTIFY_SLOTS; i++)
-   {
-      if (gpioNotify[i].state == PI_NOTIFY_RUNNING)
-      {
-         bits |= gpioNotify[i].bits;
-      }
-   }
-
-   notifyBits = bits;
-
-   monitorBits = alertBits | notifyBits | gpioGetSamples.bits;
-}
-//}}}
-//{{{
-int gpioNotifyBegin (unsigned handle, uint32_t bits)
-{
-   DBG(DBG_USER, "handle=%d bits=%08X", handle, bits);
-
-   CHECK_INITED;
-
-   if (handle >= PI_NOTIFY_SLOTS)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if (gpioNotify[handle].state <= PI_NOTIFY_CLOSING)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   gpioNotify[handle].bits  = bits;
-
-   gpioNotify[handle].state = PI_NOTIFY_RUNNING;
-
-   intNotifyBits();
-
-   return 0;
-}
-//}}}
-//{{{
-int gpioNotifyPause (unsigned handle)
-{
-   DBG(DBG_USER, "handle=%d", handle);
-
-   CHECK_INITED;
-
-   if (handle >= PI_NOTIFY_SLOTS)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if (gpioNotify[handle].state <= PI_NOTIFY_CLOSING)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   gpioNotify[handle].bits  = 0;
-
-   gpioNotify[handle].state = PI_NOTIFY_PAUSED;
-
-   intNotifyBits();
-
-   return 0;
-}
-//}}}
-//{{{
-int gpioNotifyClose (unsigned handle)
-{
-   char fifo[32];
-
-   DBG(DBG_USER, "handle=%d", handle);
-
-   CHECK_INITED;
-
-   if (handle >= PI_NOTIFY_SLOTS)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if (gpioNotify[handle].state <= PI_NOTIFY_CLOSING)
-      SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   gpioNotify[handle].bits  = 0;
-
-   gpioNotify[handle].state = PI_NOTIFY_CLOSING;
-
-   intNotifyBits();
-
-   if (gpioCfg.ifFlags & PI_DISABLE_ALERT)
-   {
-      if (gpioNotify[handle].pipe)
-      {
-         DBG(DBG_INTERNAL, "close notify pipe %d", gpioNotify[handle].fd);
-         close(gpioNotify[handle].fd);
-
-         sprintf(fifo, "/dev/pigpio%d", handle);
-
-         unlink(fifo);
-      }
-
-      gpioNotify[handle].state = PI_NOTIFY_CLOSED;
-   }
-   else
-   {
-      /* actual close done in alert thread */
-   }
-
-   return 0;
-}
-//}}}
-//}}}
-
-//{{{
-int gpioTrigger (unsigned gpio, unsigned pulseLen, unsigned level)
-{
-   DBG(DBG_USER, "gpio=%d pulseLen=%d level=%d", gpio, pulseLen, level);
-
-   CHECK_INITED;
-
-   if (gpio > PI_MAX_USER_GPIO)
-      SOFT_ERROR(PI_BAD_USER_GPIO, "bad gpio (%d)", gpio);
-
-   if (level > PI_ON)
-      SOFT_ERROR(PI_BAD_LEVEL, "gpio %d, bad level (%d)", gpio, level);
-
-   if ((pulseLen > PI_MAX_BUSY_DELAY) || (!pulseLen))
-      SOFT_ERROR(PI_BAD_PULSELEN,
-         "gpio %d, bad pulseLen (%d)", gpio, pulseLen);
-
-   if (level == PI_OFF) *(gpioReg + GPCLR0 + BANK) = BIT;
-   else                 *(gpioReg + GPSET0 + BANK) = BIT;
-
-   myGpioDelay(pulseLen);
-
-   if (level != PI_OFF) *(gpioReg + GPCLR0 + BANK) = BIT;
-   else                 *(gpioReg + GPSET0 + BANK) = BIT;
-
-   return 0;
-}
-//}}}
-//{{{
-int gpioSetWatchdog (unsigned gpio, unsigned timeout)
-{
-   DBG(DBG_USER, "gpio=%d timeout=%d", gpio, timeout);
-
-   CHECK_INITED;
-
-   if (gpio > PI_MAX_USER_GPIO)
-      SOFT_ERROR(PI_BAD_USER_GPIO, "bad gpio (%d)", gpio);
-
-   if (timeout > PI_MAX_WDOG_TIMEOUT)
-      SOFT_ERROR(PI_BAD_WDOG_TIMEOUT,
-         "gpio %d, bad timeout (%d)", gpio, timeout);
-
-   gpioAlert[gpio].wdTick   = systReg[SYST_CLO];
-   gpioAlert[gpio].wdSteadyUs = timeout*1000;
-
-   if (timeout) wdogBits |= (1<<gpio);
-   else         wdogBits &= (~(1<<gpio));
-
-   return 0;
-}
-//}}}
-//{{{
-int gpioNoiseFilter (unsigned gpio, unsigned steady, unsigned active)
-{
-   DBG(DBG_USER, "gpio=%d steady=%d active=%d", gpio, steady, active);
-
-   CHECK_INITED;
-
-   if (gpio > PI_MAX_USER_GPIO)
-      SOFT_ERROR(PI_BAD_USER_GPIO, "bad gpio (%d)", gpio);
-
-   if (steady > PI_MAX_STEADY)
-      SOFT_ERROR(PI_BAD_FILTER, "bad steady (%d)", steady);
-
-   if (active > PI_MAX_ACTIVE)
-      SOFT_ERROR(PI_BAD_FILTER, "bad active (%d)", active);
-
-   gpioAlert[gpio].nfTick1  = systReg[SYST_CLO];
-   gpioAlert[gpio].nfTick2  = gpioAlert[gpio].nfTick1;
-   gpioAlert[gpio].nfSteadyUs = steady;
-   gpioAlert[gpio].nfActiveUs = active;
-   gpioAlert[gpio].nfActive   = 0;
-
-   if (steady) nFilterBits |= (1<<gpio);
-   else        nFilterBits &= (~(1<<gpio));
-
-   return 0;
-}
-//}}}
-//{{{
-int gpioGlitchFilter (unsigned gpio, unsigned steady)
-{
-   DBG(DBG_USER, "gpio=%d steady=%d", gpio, steady);
-
-   CHECK_INITED;
-
-   if (gpio > PI_MAX_USER_GPIO)
-      SOFT_ERROR(PI_BAD_USER_GPIO, "bad gpio (%d)", gpio);
-
-   if (steady > PI_MAX_STEADY)
-      SOFT_ERROR(PI_BAD_FILTER, "bad steady (%d)", steady);
-
-   if (steady)
-   {
-      /* Initialise values next time we process alerts */
-      gpioAlert[gpio].gfInitialised = 0;
-   }
-
-   gpioAlert[gpio].gfSteadyUs = steady;
-
-   if (steady) gFilterBits |= (1<<gpio);
-   else        gFilterBits &= (~(1<<gpio));
-
-   return 0;
-}
-//}}}
-//{{{
-int gpioSetGetSamplesFunc (gpioGetSamplesFunc_t f, uint32_t bits)
-{
-   DBG(DBG_USER, "function=%08"PRIXPTR" bits=%08X", (uintptr_t)f, bits);
-
-   CHECK_INITED;
-
-   gpioGetSamples.ex       = 0;
-   gpioGetSamples.userdata = NULL;
-   gpioGetSamples.func     = f;
-
-   if (f) gpioGetSamples.bits = bits;
-   else   gpioGetSamples.bits = 0;
-
-   monitorBits = alertBits | notifyBits | gpioGetSamples.bits;
-
-   return 0;
-}
-//}}}
-//{{{
-int gpioSetGetSamplesFuncEx (gpioGetSamplesFuncEx_t f, uint32_t bits, void* userdata)
-{
-   DBG(DBG_USER, "function=%08"PRIXPTR" bits=%08X", (uintptr_t)f, bits);
-
-   CHECK_INITED;
-
-   gpioGetSamples.ex       = 1;
-   gpioGetSamples.userdata = userdata;
-   gpioGetSamples.func     = f;
-
-   if (f) gpioGetSamples.bits = bits;
-   else   gpioGetSamples.bits = 0;
-
-   monitorBits = alertBits | notifyBits | gpioGetSamples.bits;
-
-   return 0;
-}
-//}}}
-
-//{{{
-static int intGpioSetTimerFunc (unsigned id, unsigned millis, void* f, int user, void* userdata)
-{
-   pthread_attr_t pthAttr;
-
-   DBG(DBG_INTERNAL, "id=%d millis=%d function=%08"PRIXPTR" user=%d userdata=%08"PRIXPTR,
-      id, millis, (uintptr_t)f, user, (uintptr_t)userdata);
-
-   gpioTimer[id].id   = id;
-
-   if (f)
-   {
-      gpioTimer[id].func     = f;
-      gpioTimer[id].ex       = user;
-      gpioTimer[id].userdata = userdata;
-      gpioTimer[id].millis   = millis;
-
-      if (!gpioTimer[id].running)
-      {
-         if (pthread_attr_init(&pthAttr))
-            SOFT_ERROR(PI_TIMER_FAILED,
-               "pthread_attr_init failed (%m)");
-
-         if (pthread_attr_setstacksize(&pthAttr, STACK_SIZE))
-            SOFT_ERROR(PI_TIMER_FAILED,
-               "pthread_attr_setstacksize failed (%m)");
-
-         if (pthread_create(
-            &gpioTimer[id].pthId, &pthAttr, pthTimerTick, &gpioTimer[id]))
-               SOFT_ERROR(PI_TIMER_FAILED,
-                  "timer %d, create failed (%m)", id);
-
-         gpioTimer[id].running = 1;
-      }
-   }
-   else
-   {
-      if (gpioTimer[id].running)
-      {
-
-         /* destroy thread */
-
-         if (pthread_self() == gpioTimer[id].pthId)
-         {
-            gpioTimer[id].running = 0;
-            gpioTimer[id].func    = 0;
-            pthread_exit(NULL);
-         }
-         else
-         {
-            if (pthread_cancel(gpioTimer[id].pthId))
-               SOFT_ERROR(PI_TIMER_FAILED, "timer %d, cancel failed (%m)", id);
-
-            if (pthread_join(gpioTimer[id].pthId, NULL))
-               SOFT_ERROR(PI_TIMER_FAILED, "timer %d, join failed (%m)", id);
-
-            gpioTimer[id].running = 0;
-            gpioTimer[id].func    = 0;
-         }
-      }
-   }
-
-   return 0;
-}
-//}}}
-//{{{
-int gpioSetTimerFunc (unsigned id, unsigned millis, gpioTimerFunc_t f)
-{
-   DBG(DBG_USER, "id=%d millis=%d function=%08"PRIXPTR, id, millis, (uintptr_t)f);
-
-   CHECK_INITED;
-
-   if (id > PI_MAX_TIMER)
-      SOFT_ERROR(PI_BAD_TIMER, "bad timer id (%d)", id);
-
-   if ((millis < PI_MIN_MS) || (millis > PI_MAX_MS))
-      SOFT_ERROR(PI_BAD_MS, "timer %d, bad millis (%d)", id, millis);
-
-   intGpioSetTimerFunc(id, millis, f, 0, NULL);
-
-   return 0;
-}
-//}}}
-//{{{
-int gpioSetTimerFuncEx (unsigned id, unsigned millis, gpioTimerFuncEx_t f, void* userdata)
-{
-   DBG(DBG_USER, "id=%d millis=%d function=%08"PRIXPTR", userdata=%08"PRIXPTR,
-      id, millis, (uintptr_t)f, (uintptr_t)userdata);
-
-   CHECK_INITED;
-
-   if (id > PI_MAX_TIMER)
-      SOFT_ERROR(PI_BAD_TIMER, "bad timer id (%d)", id);
-
-   if ((millis < PI_MIN_MS) || (millis > PI_MAX_MS))
-      SOFT_ERROR(PI_BAD_MS, "timer %d, bad millis (%d)", id, millis);
-
-   intGpioSetTimerFunc(id, millis, f, 1, userdata);
-
-   return 0;
-}
-//}}}
-//{{{
-pthread_t* gpioStartThread (gpioThreadFunc_t f, void *userdata)
-{
-   pthread_t *pth;
-   pthread_attr_t pthAttr;
-
-   DBG(DBG_USER, "f=%08"PRIXPTR", userdata=%08"PRIXPTR, (uintptr_t)f, (uintptr_t)userdata);
-
-   CHECK_INITED_RET_NULL_PTR;
-
-   pth = malloc(sizeof(pthread_t));
-
-   if (pth)
-   {
-      if (pthread_attr_init(&pthAttr))
-      {
-         free(pth);
-         SOFT_ERROR(NULL, "pthread_attr_init failed");
-      }
-
-      if (pthread_attr_setstacksize(&pthAttr, STACK_SIZE))
-      {
-         free(pth);
-         SOFT_ERROR(NULL, "pthread_attr_setstacksize failed");
-      }
-
-      if (pthread_create(pth, &pthAttr, f, userdata))
-      {
-         free(pth);
-         SOFT_ERROR(NULL, "pthread_create failed");
-      }
-   }
-   return pth;
-}
-//}}}
-//{{{
-void gpioStopThread (pthread_t* pth)
-{
-   DBG(DBG_USER, "pth=%08"PRIXPTR, (uintptr_t)pth);
-
-   CHECK_INITED_RET_NIL;
-
-   if (pth)
-   {
-      if (pthread_self() == *pth)
-      {
-         free(pth);
-         pthread_exit(NULL);
-      }
-      else
-      {
-         pthread_cancel(*pth);
-         pthread_join(*pth, NULL);
-         free(pth);
-      }
-   }
-}
-//}}}
-//{{{
-int gpioSetSignalFunc (unsigned signum, gpioSignalFunc_t f)
-{
-   DBG(DBG_USER, "signum=%d function=%08"PRIXPTR, signum, (uintptr_t)f);
-
-   CHECK_INITED;
-
-   if (signum > PI_MAX_SIGNUM)
-      SOFT_ERROR(PI_BAD_SIGNUM, "bad signum (%d)", signum);
-
-   gpioSignal[signum].ex = 0;
-   gpioSignal[signum].userdata = NULL;
-
-   gpioSignal[signum].func = f;
-
-   return 0;
-}
-//}}}
-//{{{
-int gpioSetSignalFuncEx (unsigned signum, gpioSignalFuncEx_t f, void* userdata)
-{
-   DBG(DBG_USER, "signum=%d function=%08"PRIXPTR" userdata=%08"PRIXPTR,
-      signum, (uintptr_t)f, (uintptr_t)userdata);
-
-   CHECK_INITED;
-
-   if (signum > PI_MAX_SIGNUM)
-      SOFT_ERROR(PI_BAD_SIGNUM, "bad signum (%d)", signum);
-
-   gpioSignal[signum].ex = 1;
-   gpioSignal[signum].userdata = userdata;
-
-   gpioSignal[signum].func = f;
-
-   return 0;
-}
-//}}}
-
-//{{{
-static int chooseBestClock (clkInf_t* clkInf, unsigned f, unsigned numc, unsigned* cf)
-{
-   int c, valid;
-   double fdiv, offby, best_offby;
-   unsigned div, frac;
-
-   valid = 0;
-   best_offby = 0;
-
-   for (c=0; c<numc; c++)
-   {
-      fdiv = (double)cf[c] / (double)f;
-      if (f < PI_MASH_MAX_FREQ)
-      {
-         fdiv += (0.5 / 4096.0);
-         div = fdiv;
-         frac = (fdiv - div) * 4096.0;
-      }
-      else
-      {
-         fdiv += 0.5;
-         div = fdiv;
-         frac = 0;
-      }
-
-      if ((div > 1) && (div < 4096))
-      {
-         offby = f - (cf[c] / (div + (frac / 4096.0)));
-         if (offby < 0) offby = - offby;
-         if ((!valid) || (offby <= best_offby))
-         {
-            valid = 1;
-            clkInf->div = div;
-            clkInf->frac = frac;
-            clkInf->clock = c;
-            best_offby = offby;
-         }
-      }
-   }
-   return valid;
-}
-//}}}
-//{{{
-int gpioHardwareClock (unsigned gpio, unsigned frequency)
-{
-   int cctl[] = {CLK_GP0_CTL, CLK_GP1_CTL, CLK_GP2_CTL};
-   int cdiv[] = {CLK_GP0_DIV, CLK_GP1_DIV, CLK_GP2_DIV};
-   int csrc[CLK_SRCS] = {CLK_CTL_SRC_OSC, CLK_CTL_SRC_PLLD};
-   uint32_t cfreq[CLK_SRCS]={clk_osc_freq, clk_plld_freq};
-   unsigned clock, mode, mash;
-   int password = 0;
-   double f;
-   clkInf_t clkInf={0,0,0};
-
-   DBG(DBG_USER, "gpio=%d frequency=%d", gpio, frequency);
-
-   CHECK_INITED;
-
-   if ((gpio >> 24) == 0x5A) password = 1;
-
-   gpio &= 0xFFFFFF;
-
-   if (gpio > PI_MAX_GPIO)
-      SOFT_ERROR(PI_BAD_GPIO, "bad gpio (%d)", gpio);
-
-   if (!clkDef[gpio])
-      SOFT_ERROR(PI_NOT_HCLK_GPIO, "bad gpio for clock (%d)", gpio);
-
-   if (((frequency < hw_clk_min_freq) ||
-        (frequency > hw_clk_max_freq)) &&
-        (frequency))
-      SOFT_ERROR(PI_BAD_HCLK_FREQ,
-         "bad hardware clock frequency %d-%d: (%d)",
-            hw_clk_min_freq, hw_clk_max_freq, frequency);
-
-   clock = (clkDef[gpio] >> 4) & 3;
-
-   if ((clock == 1) && (!password))
-      SOFT_ERROR(PI_BAD_HCLK_PASS,
-         "Need password to use clock 1 (%d)", gpio);
-
-   mode  = clkDef[gpio] & 7;
-   mash = frequency < PI_MASH_MAX_FREQ ? 1 : 0;
-
-   if (frequency)
-   {
-      if (chooseBestClock(&clkInf, frequency, CLK_SRCS, cfreq))
-      {
-         if (clkInf.frac == 0) mash = 0;
-
-         initHWClk(cctl[clock], cdiv[clock],
-            csrc[clkInf.clock], clkInf.div, clkInf.frac, mash);
-
-         myGpioSetMode(gpio, mode);
-
-         gpioInfo[gpio].is = GPIO_HW_CLK;
-
-         f = (double) cfreq[clkInf.clock] /
-           ((double)clkInf.div + ((double)clkInf.frac / 4096.0));
-
-         hw_clk_freq[clock] = (f + 0.5);
-
-         DBG(DBG_USER, "cf=%d div=%d frac=%d mash=%d",
-            cfreq[clkInf.clock], clkInf.div, clkInf.frac, mash);
-      }
-      else
-      {
-         SOFT_ERROR(PI_BAD_HCLK_FREQ,
-            "bad hardware clock frequency %d-%d: (%d)",
-               hw_clk_min_freq, hw_clk_max_freq, frequency);
-      }
-   }
-   else
-   {
-      /* frequency 0, stop clock */
-      clkReg[cctl[clock]] = BCM_PASSWD | CLK_CTL_KILL;
-
-      if (gpioInfo[gpio].is == GPIO_HW_CLK)
-         gpioInfo[gpio].is = GPIO_UNDEFINED;
-   }
-
-   return 0;
-}
-//}}}
-//{{{
-int gpioHardwarePWM (unsigned gpio, unsigned frequency, unsigned dutycycle)
-{
-   uint32_t old_PWM_CTL;
-   unsigned pwm, mode;
-   uint32_t real_range, real_dutycycle;
-
-   DBG(DBG_USER, "gpio=%d  frequency=%d dutycycle=%d",
-      gpio, frequency, dutycycle);
-
-   CHECK_INITED;
-
-   if (gpio > PI_MAX_GPIO)
-      SOFT_ERROR(PI_BAD_GPIO, "bad gpio (%d)", gpio);
-
-   if (!PWMDef[gpio])
-      SOFT_ERROR(PI_NOT_HPWM_GPIO, "bad gpio for PWM (%d)", gpio);
-
-   if (dutycycle > PI_HW_PWM_RANGE)
-      SOFT_ERROR(PI_BAD_HPWM_DUTY, "bad PWM dutycycle (%d)", dutycycle);
-
-   if (((frequency < PI_HW_PWM_MIN_FREQ) ||
-        (frequency > hw_pwm_max_freq)) &&
-        (frequency))
-      SOFT_ERROR(PI_BAD_HPWM_FREQ,
-         "bad hardware PWM frequency %d-%d: (%d)",
-            PI_HW_PWM_MIN_FREQ, hw_pwm_max_freq, frequency);
-
-
-   if (gpioCfg.clockPeriph == PI_CLOCK_PWM)
-      SOFT_ERROR(PI_HPWM_ILLEGAL, "illegal, PWM in use for main clock");
-
-   pwm = (PWMDef[gpio] >> 4) & 3;
-   mode  = PWMDef[gpio] & 7;
-
-   if (frequency)
-   {
-      real_range = ((double)clk_plld_freq / (2.0 * frequency)) + 0.5;
-      real_dutycycle = ((uint64_t)dutycycle * real_range) / PI_HW_PWM_RANGE;
-
-      /* record the set PWM frequency and dutycycle */
-
-      hw_pwm_freq[pwm] =
-         ((double)clk_plld_freq / ( 2.0 * real_range)) + 0.5;
-
-      hw_pwm_duty[pwm]  = dutycycle;
-
-      hw_pwm_real_range[pwm] = real_range;
-
-      /* Abort any waveform transmission in progress */
-
-      if (gpioWaveTxBusy()) gpioWaveTxStop();
-
-      waveClockInited = 0;
-
-      /* preserve channel enable only and mark space mode */
-
-      old_PWM_CTL = pwmReg[PWM_CTL] &
-         (PWM_CTL_PWEN1 | PWM_CTL_MSEN1 | PWM_CTL_PWEN2 | PWM_CTL_MSEN2);
-
-      if (!PWMClockInited)
-      {
-         pwmReg[PWM_CTL] = 0;
-
-         myGpioDelay(10);
-
-         initHWClk(CLK_PWMCTL, CLK_PWMDIV, CLK_CTL_SRC_PLLD, 2, 0, 0);
-
-         PWMClockInited = 1;
-      }
-
-      if (pwm == 0)
-      {
-         pwmReg[PWM_RNG1] = real_range;
-         myGpioDelay(10);
-         pwmReg[PWM_DAT1] = real_dutycycle;
-         myGpioDelay(10);
-
-         pwmReg[PWM_CTL] = (old_PWM_CTL | PWM_CTL_PWEN1 | PWM_CTL_MSEN1);
-      }
-      else
-      {
-         pwmReg[PWM_RNG2] = real_range;
-         myGpioDelay(10);
-         pwmReg[PWM_DAT2] = real_dutycycle;
-         myGpioDelay(10);
-
-         pwmReg[PWM_CTL] = (old_PWM_CTL | PWM_CTL_PWEN2 | PWM_CTL_MSEN2);
-      }
-
-      if (gpioInfo[gpio].is != GPIO_HW_PWM)
-      {
-         switchFunctionOff(gpio);
-
-         myGpioSetMode(gpio, mode);
-
-         gpioInfo[gpio].is = GPIO_HW_PWM;
-      }
-   }
-   else
-   {
-      /* frequency 0, stop PWM */
-
-      if (gpioInfo[gpio].is == GPIO_HW_PWM)
-      {
-         if (pwm == 0) pwmReg[PWM_CTL] &= (~PWM_CTL_PWEN1);
-         else          pwmReg[PWM_CTL] &= (~PWM_CTL_PWEN2);
-
-         gpioInfo[gpio].is = GPIO_UNDEFINED;
-      }
-   }
-
-   return 0;
-}
-
-//}}}
-
-//{{{
-/* ----------------------------------------------------------------------- */
-
-int gpioCfgBufferSize (unsigned millis)
-{
-   DBG(DBG_USER, "millis=%d", millis);
-
-   CHECK_NOT_INITED;
-
-   if ((millis < PI_BUF_MILLIS_MIN) || (millis > PI_BUF_MILLIS_MAX))
-      SOFT_ERROR(PI_BAD_BUF_MILLIS, "bad millis (%d)", millis);
-
-   gpioCfg.bufferMilliseconds = millis;
-
-   return 0;
-}
-//}}}
-//{{{
-/* ----------------------------------------------------------------------- */
-
-int gpioCfgClock (unsigned micros, unsigned peripheral, unsigned source)
-{
-   DBG(DBG_USER, "micros=%d peripheral=%d", micros, peripheral);
-
-   CHECK_NOT_INITED;
-
-   if ((micros < 1) || (micros > 10))
-      SOFT_ERROR(PI_BAD_CLK_MICROS, "bad micros (%d)", micros);
-
-   if (!clkCfg[micros].valid)
-      SOFT_ERROR(PI_BAD_CLK_MICROS, "bad micros (%d)", micros);
-
-   if (peripheral > PI_CLOCK_PCM)
-      SOFT_ERROR(PI_BAD_CLK_PERIPH, "bad peripheral (%d)", peripheral);
-
-   gpioCfg.clockMicros = micros;
-   gpioCfg.clockPeriph = peripheral;
-
-   return 0;
-}
-
-//}}}
-//{{{
-int gpioCfgDMAchannel (unsigned DMAchannel)
-{
-   DBG(DBG_USER, "channel=%d", DMAchannel);
-
-   CHECK_NOT_INITED;
-
-   if ((DMAchannel < PI_MIN_DMA_CHANNEL) || (DMAchannel > PI_MAX_DMA_CHANNEL))
-      SOFT_ERROR(PI_BAD_CHANNEL, "bad channel (%d)", DMAchannel);
-
-   gpioCfg.DMAprimaryChannel = DMAchannel;
-
-   return 0;
-}
-//}}}
-//{{{
-int gpioCfgDMAchannels (unsigned primaryChannel, unsigned secondaryChannel)
-{
-   DBG(DBG_USER, "primary channel=%d, secondary channel=%d",
-      primaryChannel, secondaryChannel);
-
-   CHECK_NOT_INITED;
-
-   if (primaryChannel > PI_MAX_DMA_CHANNEL)
-      SOFT_ERROR(PI_BAD_PRIM_CHANNEL, "bad primary channel (%d)",
-         primaryChannel);
-
-   if ((secondaryChannel > PI_MAX_DMA_CHANNEL) ||
-         ((secondaryChannel == primaryChannel) &&
-            (secondaryChannel != PI_DEFAULT_DMA_NOT_SET)))
-      SOFT_ERROR(PI_BAD_SECO_CHANNEL, "bad secondary channel (%d)",
-         secondaryChannel);
-
-   gpioCfg.DMAprimaryChannel   = primaryChannel;
-   gpioCfg.DMAsecondaryChannel = secondaryChannel;
-
-   return 0;
-}
-//}}}
-//{{{
-int gpioCfgMemAlloc (unsigned memAllocMode)
-{
-   DBG(DBG_USER, "memAllocMode=%d", memAllocMode);
-
-   CHECK_NOT_INITED;
-
-   if (memAllocMode > PI_MEM_ALLOC_MAILBOX)
-      SOFT_ERROR(
-         PI_BAD_MALLOC_MODE, "bad mem alloc mode (%d)", memAllocMode);
-
-   gpioCfg.memAllocMode = memAllocMode;
-
-   return 0;
-}
-//}}}
-
-//{{{
-uint32_t gpioCfgGetInternals()
-{
-   return gpioCfg.internals;
-}
-//}}}
-//{{{
-int gpioCfgSetInternals (uint32_t cfgVal)
-{
-   gpioCfg.internals = cfgVal;
-   gpioCfg.dbgLevel = cfgVal & 0xF;
-   gpioCfg.alertFreq = (cfgVal>>4) & 0xF;
-   return 0;
-}
-//}}}
-
-//{{{
-int gpioCustom1 (unsigned arg1, unsigned arg2, char* argx, unsigned count) {
-
-  int i;
-
-  unsigned max;
-
-  DBG(DBG_USER, "arg1=%d arg2=%d count=%d [%s]",
-     arg1, arg2, count, myBuf2Str(count, argx));
-
-  CHECK_INITED;
-
-  /* for dummy just return max parameter */
-  if (arg1 > arg2) max = arg1; else max = arg2;
-
-  for (i=0; i<count; i++) if (argx[i] > max) max = argx[i];
-
-  return max;
-  }
-//}}}
-//{{{
-int gpioCustom2 (unsigned arg1, char* argx, unsigned count, char* retBuf, unsigned retMax) {
-
-  int i, j, t;
-
-  DBG(DBG_USER, "arg1=%d count=%d [%s] retMax=%d",
-     arg1, count, myBuf2Str(count, argx), retMax);
-
-  CHECK_INITED;
-
-  /* for dummy just return argx reversed */
-  if (count > retMax) count = retMax;
-
-  for (i=0, j=count-1; i<=j; i++, j--) {
-    /* t used as argx and retBuf may be the same buffer */
-    t = argx[i];
-    retBuf[i] = argx[j];
-    retBuf[j] = t;
-    }
-
-  return count;
-  }
 //}}}

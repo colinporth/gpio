@@ -360,7 +360,6 @@ int main (int numArgs, char* args[]) {
     case 9341: lcd = new cLcd9341 (rotate, info, mode, spiSpeed); break; // 30000000
     default: exit(1);
     }
-
   if (!lcd->initialise())
     return 0;
 
