@@ -1,9 +1,7 @@
 // pigpio.h
 #pragma once
-//{{{  includes
 #include <stdint.h>
-#include <pthread.h>
-//}}}
+
 //{{{  defines
 #define PIGPIO_VERSION 77
 
@@ -471,33 +469,26 @@
 
 //}}}
 
-#define PI_LOCKFILE "/var/run/pigpio.pid"
-#define PI_I2C_COMBINED "/sys/module/i2c_bcm2708/parameters/combined"
-//}}}
-//{{{
-#ifdef __cplusplus
-  extern "C" {
-#endif
+//#define PI_I2C_COMBINED "/sys/module/i2c_bcm2708/parameters/combined"
 //}}}
 
-//{{{  struct pi_i2c_msg_t
-typedef struct {
+constexpr int kBscFifoSize = 512;
+//{{{
+struct bsc_xfer_t {
+  uint32_t control;         // Write
+  int rxCnt;                // Read only
+  char rxBuf[kBscFifoSize]; // Read only
+  int txCnt;                // Write
+  char txBuf[kBscFifoSize]; // Write
+  };
+//}}}
+//{{{
+struct pi_i2c_msg_t {
   uint16_t addr;  // slave address
   uint16_t flags;
   uint16_t len;   // msg length
   uint8_t* buf;   // pointer to msg data
-  } pi_i2c_msg_t;
-//}}}
-
-#define BSC_FIFO_SIZE 512
-//{{{  struct bsc_xfer_t
-typedef struct {
-  uint32_t control;          // Write
-  int rxCnt;                 // Read only
-  char rxBuf[BSC_FIFO_SIZE]; // Read only
-  int txCnt;                 // Write
-  char txBuf[BSC_FIFO_SIZE]; // Write
-  } bsc_xfer_t;
+  };
 //}}}
 
 uint32_t gpioHardwareRevision();
@@ -605,10 +596,4 @@ int gpioSerialReadOpen (uint32_t user_gpio, uint32_t baud, uint32_t data_bits);
 int gpioSerialReadInvert (uint32_t user_gpio, uint32_t invert);
 int gpioSerialRead (uint32_t user_gpio, void* buf, size_t bufSize);
 int gpioSerialReadClose (uint32_t user_gpio);
-//}}}
-
-//{{{
-#ifdef __cplusplus
-  }
-#endif
 //}}}

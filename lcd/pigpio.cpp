@@ -1,4 +1,4 @@
-// pigpio.c - lightweight pigpio
+// pigpio.cpp - lightweight pigpio
 //{{{  bits
  // 0 GPFSEL0   GPIO Function Select 0
  // 1 GPFSEL1   GPIO Function Select 1
@@ -104,8 +104,6 @@
 // 6 C3  System Timer Compare 3
 //}}}
 //{{{  includes
-#define _GNU_SOURCE
-
 #include <stdio.h>
 #include <string.h>
 #include <strings.h>
@@ -132,6 +130,7 @@
 #include <arpa/inet.h>
 
 #include "pigpio.h"
+#include "../../shared/utils/cLog.h"
 //}}}
 //{{{  defines
 #define THOUSAND 1000
@@ -141,33 +140,11 @@
 #define BANK (gpio >> 5)
 #define BIT  (1 << (gpio & 0x1F))
 
-//{{{  dbg_level
-#define DBG_MIN_LEVEL 0
-#define DBG_ALWAYS    0
-#define DBG_STARTUP   1
-#define DBG_DMACBS    2
-#define DBG_SCRIPT    3
-#define DBG_USER      4
-#define DBG_INTERNAL  5
-#define DBG_SLOW_TICK 6
-#define DBG_FAST_TICK 7
-#define DBG_MAX_LEVEL 8
-//}}}
-//{{{
-#define DO_DBG(level, format, arg...) { \
-  if ((gpioCfg.dbgLevel >= level) && (!(gpioCfg.internals & PI_CFG_NOSIGHANDLER)))  \
-    fprintf(stderr, "%s %s: " format "\n" , myTimeStamp(), __FUNCTION__ , ## arg);  \
+#define LOG_ERROR(format, arg...)     \
+  {                                    \
+  cLog::log (LOGINFO, format, ## arg); \
+  return -1;                           \
   }
-//}}}
-#define DBG(level, format, arg...) DO_DBG(level, format, ## arg)
-//{{{
-#define SOFT_ERROR(x, format, arg...)  \
-  do { \
-    DBG(DBG_ALWAYS, format, ## arg); \
-    return x; \
-    } while (0);
-//}}}
-
 //{{{
 #define TIMER_ADD(a, b, result) \
   do {  \
@@ -180,7 +157,7 @@
     } while (0)
 //}}}
 //{{{
-#define TIMER_SUB(a, b, result)        \
+#define TIMER_SUB(a, b, result) \
    do                                                              \
    {                                                               \
       (result)->tv_sec =  (a)->tv_sec  - (b)->tv_sec;              \
@@ -685,9 +662,6 @@
 
 #define MB_IOCTL _IOWR(MB_DEV_MAJOR, 0, char *)
 
-#define MB_DEV1 "/dev/vcio"
-#define MB_DEV2 "/dev/pigpio-mb"
-
 #define BUS_TO_PHYS(x) ((x)&~0xC0000000)
 
 #define MB_END_TAG 0
@@ -719,52 +693,15 @@
 //}}}
 //{{{  typedef
 typedef void (*callbk_t) ();
-//{{{  struct gpioSignal_t
-typedef struct {
+//{{{
+struct gpioSignal_t {
   callbk_t func;
   uint32_t ex;
   void* userdata;
-  } gpioSignal_t;
+  };
 //}}}
-
-//{{{  struct rawCbs_t
-typedef struct { /* linux/arch/arm/mach-bcm2708/include/mach/dma.h */
-  uint32_t info;
-  uint32_t src;
-  uint32_t dst;
-  uint32_t length;
-  uint32_t stride;
-  uint32_t next;
-  uint32_t pad[2];
-  } rawCbs_t;
-//}}}
-//{{{  struct dmaPage_t
-typedef struct {
-  rawCbs_t cb[128];
- } dmaPage_t;
-//}}}
-//{{{  struct dmaIPage_t
-typedef struct {
-  rawCbs_t cb[CBS_PER_IPAGE];
-  uint32_t level[LVS_PER_IPAGE];
-  uint32_t gpioOff[OFF_PER_IPAGE];
-  uint32_t tick[TCK_PER_IPAGE];
-  uint32_t gpioOn[ON_PER_IPAGE];
-  uint32_t periphData;
-  uint32_t pad[PAD_PER_IPAGE];
-  } dmaIPage_t;
-//}}}
-//{{{  struct dmaOPage_t
-typedef struct {
-  rawCbs_t cb     [CBS_PER_OPAGE];
-  uint32_t OOL    [OOL_PER_OPAGE];
-  uint32_t periphData;
-  } dmaOPage_t;
-
-//}}}
-
-//{{{  struct gpioInfo_t
-typedef struct {
+//{{{
+struct gpioInfo_t {
   uint8_t  is;
   uint8_t  pad;
   uint16_t width;
@@ -772,18 +709,18 @@ typedef struct {
   uint16_t freqIdx;
   uint16_t deferOff;
   uint16_t deferRng;
-  } gpioInfo_t;
+  };
 //}}}
-//{{{  struct gpioGetSamples_t
-typedef struct {
+//{{{
+struct gpioGetSamples_t {
   callbk_t func;
   uint32_t ex;
   void* userdata;
   uint32_t bits;
-  } gpioGetSamples_t;
+  };
 //}}}
-//{{{  struct gpioTimer_t
-typedef struct {
+//{{{
+struct gpioTimer_t {
   callbk_t func;
   uint32_t ex;
   void* userdata;
@@ -791,40 +728,76 @@ typedef struct {
   uint32_t running;
   uint32_t millis;
   pthread_t pthId;
-  } gpioTimer_t;
+  };
 //}}}
 
-//{{{  struct clkCfg_t
-typedef struct {
+//{{{
+struct rawCbs_t {
+// linux/arch/arm/mach-bcm2708/include/mach/dma.h */
+  uint32_t info;
+  uint32_t src;
+  uint32_t dst;
+  uint32_t length;
+  uint32_t stride;
+  uint32_t next;
+  uint32_t pad[2];
+  };
+//}}}
+//{{{
+struct dmaPage_t {
+  rawCbs_t cb[128];
+  };
+//}}}
+//{{{
+struct dmaIPage_t {
+  rawCbs_t cb[CBS_PER_IPAGE];
+  uint32_t level[LVS_PER_IPAGE];
+  uint32_t gpioOff[OFF_PER_IPAGE];
+  uint32_t tick[TCK_PER_IPAGE];
+  uint32_t gpioOn[ON_PER_IPAGE];
+  uint32_t periphData;
+  uint32_t pad[PAD_PER_IPAGE];
+  } ;
+//}}}
+//{{{
+struct dmaOPage_t {
+  rawCbs_t cb     [CBS_PER_OPAGE];
+  uint32_t OOL    [OOL_PER_OPAGE];
+  uint32_t periphData;
+  };
+//}}}
+
+//{{{
+struct clkCfg_t {
   uint16_t valid;
   uint16_t servoIdx;
-  } clkCfg_t;
+  };
 //}}}
-//{{{  struct i2cInfo_t
-typedef struct {
+//{{{
+struct i2cInfo_t {
   uint16_t state;
   int16_t  fd;
   uint32_t addr;
   uint32_t flags;
   uint32_t funcs;
-  } i2cInfo_t;
+  };
 //}}}
-//{{{  struct serInfo_t
-typedef struct {
+//{{{
+struct serInfo_t {
   uint16_t state;
   int16_t  fd;
   uint32_t flags;
-  } serInfo_t;
+  };
 //}}}
-//{{{  struct spiInfo_t
-typedef struct {
+//{{{
+struct spiInfo_t {
   uint16_t state;
   uint32_t speed;
   uint32_t flags;
-  } spiInfo_t;
+  };
 //}}}
-//{{{  struct gpioCfg_t
-typedef struct {
+//{{{
+struct gpioCfg_t {
   uint32_t bufferMilliseconds;
   uint32_t clockMicros;
   uint32_t clockPeriph;
@@ -832,18 +805,13 @@ typedef struct {
   uint32_t DMAsecondaryChannel;
   uint32_t ifFlags;
   uint32_t memAllocMode;
-  uint32_t dbgLevel;
   uint32_t alertFreq;
   uint32_t internals;
-      /*
-      0-3: dbgLevel
-      4-7: alertFreq
-      */
-  } gpioCfg_t;
+  };
 //}}}
 
-//{{{  struct wfStats_t
-typedef struct {
+//{{{
+struct wfStats_t {
   uint32_t micros;
   uint32_t highMicros;
   uint32_t maxMicros;
@@ -853,10 +821,10 @@ typedef struct {
   uint32_t cbs;
   uint32_t highCbs;
   uint32_t maxCbs;
-  } wfStats_t;
+  };
 //}}}
-//{{{  struct wfRxSerial_t
-typedef struct {
+//{{{
+struct wfRxSerial_t {
   char*    buf;
   uint32_t bufSize;
   int      readPos;
@@ -872,20 +840,20 @@ typedef struct {
   int      level;
   int      dataBits; /* 1-32 */
   int      invert; /* 0, 1 */
-  } wfRxSerial_t;
+  };
 //}}}
-//{{{  struct wfRxI2C_t
-typedef struct {
+//{{{
+struct wfRxI2C_t {
   int SDA;
   int SCL;
   int delay;
   int SDAMode;
   int SCLMode;
   int started;
-  } wfRxI2C_t;
+  };
 //}}}
-//{{{  struct wfRxSPI_t
-typedef struct {
+//{{{
+struct wfRxSPI_t {
   int CS;
   int MISO;
   int MOSI;
@@ -897,20 +865,22 @@ typedef struct {
   int MOSIMode;
   int CSMode;
   int SCLKMode;
-  } wfRxSPI_t;
+  };
 //}}}
-//{{{  struct wfRx_t
-typedef struct {
-  int      mode;
-  int      gpio;
+//{{{
+struct wfRx_t {
+  int mode;
+  int gpio;
   uint32_t baud;
+
   pthread_mutex_t mutex;
+
   union {
     wfRxSerial_t s;
     wfRxI2C_t    I;
     wfRxSPI_t    S;
     };
-  } wfRx_t;
+  };
 //}}}
 
 //{{{
@@ -925,30 +895,30 @@ struct my_smbus_ioctl_data {
   uint8_t read_write;
   uint8_t command;
   uint32_t size;
-  union my_smbus_data *data;
+  union my_smbus_data* data;
   };
 //}}}
-//{{{  struct my_i2c_rdwr_ioctl_data_t
-typedef struct {
-  pi_i2c_msg_t* msgs; /* pointers to pi_i2c_msgs */
-  uint32_t     nmsgs; /* number of pi_i2c_msgs */
-  } my_i2c_rdwr_ioctl_data_t;
+//{{{
+struct my_i2c_rdwr_ioctl_data_t {
+  pi_i2c_msg_t* msgs; // pointers to pi_i2c_msgs
+  uint32_t     nmsgs; // number of pi_i2c_msgs
+  };
 //}}}
 
-//{{{  struct clkInf_t
-typedef struct {
+//{{{
+struct clkInf_t {
   uint32_t div;
   uint32_t frac;
   uint32_t clock;
-  } clkInf_t;
+  };
 //}}}
-//{{{  struct DMAMem_t
-typedef struct {
-  uint32_t  handle;        /* mbAllocateMemory() */
-  uintptr_t bus_addr;      /* mbLockMemory() */
-  uintptr_t* virtual_addr; /* mbMapMem() */
-  uint32_t  size;          /* in bytes */
-  } DMAMem_t;
+//{{{
+struct DMAMem_t {
+  uint32_t   handle;       // mbAllocateMemory()
+  uintptr_t  bus_addr;     // mbLockMemory()
+  uintptr_t* virtual_addr; // mbMapMem()
+  uint32_t   size;         // in bytes
+  };
 //}}}
 //}}}
 //{{{  static var
@@ -1042,7 +1012,6 @@ static volatile gpioCfg_t gpioCfg = {
   PI_DEFAULT_DMA_NOT_SET, /* secondary DMA */
   PI_DEFAULT_IF_FLAGS,
   PI_DEFAULT_MEM_ALLOC_MODE,
-  0, /* dbgLevel */
   0, /* alertFreq */
   0, /* internals */
   };
@@ -1171,26 +1140,6 @@ static const uint16_t pwmRealRange[PWM_FREQS] = {
 //}}}
 //}}}
 
-//{{{  helpers
-//{{{
-static char* myTimeStamp() {
-
-  static struct timeval last;
-  static char buf[32];
-
-  struct timeval now;
-  gettimeofday(&now, NULL);
-
-  if (now.tv_sec != last.tv_sec) {
-    struct tm tmp;
-    localtime_r(&now.tv_sec, &tmp);
-    strftime(buf, sizeof(buf), "%F %T", &tmp);
-    last.tv_sec = now.tv_sec;
-    }
-
-  return buf;
-  }
-//}}}
 //{{{
 static void sigHandler (int signum) {
 
@@ -1205,24 +1154,13 @@ static void sigHandler (int signum) {
     else {
       switch (signum) {
         case SIGUSR1:
-          if (gpioCfg.dbgLevel > DBG_MIN_LEVEL)
-            --gpioCfg.dbgLevel;
-          else
-            gpioCfg.dbgLevel = DBG_MIN_LEVEL;
-          DBG (DBG_USER, "Debug level %d\n", gpioCfg.dbgLevel);
           break;
 
         case SIGUSR2:
-          if (gpioCfg.dbgLevel < DBG_MAX_LEVEL)
-            ++gpioCfg.dbgLevel;
-          else
-            gpioCfg.dbgLevel = DBG_MAX_LEVEL;
-          DBG (DBG_USER, "Debug level %d\n", gpioCfg.dbgLevel);
           break;
 
         case SIGPIPE:
         case SIGWINCH:
-          DBG (DBG_USER, "signal %d ignored", signum);
           break;
 
         case SIGCHLD:
@@ -1230,7 +1168,7 @@ static void sigHandler (int signum) {
           break;
 
         default:
-          DBG (DBG_ALWAYS, "Unhandled signal %d, terminating\n", signum);
+          cLog::log (LOGINFO, "Unhandled signal %d, terminating\n", signum);
           gpioTerminate();
           exit (-1);
         }
@@ -1239,7 +1177,7 @@ static void sigHandler (int signum) {
 
   else {
     // exit
-    DBG (DBG_ALWAYS, "Unhandled signal %d, terminating\n", signum);
+    cLog::log (LOGINFO,  "Unhandled signal %d, terminating\n", signum);
     gpioTerminate();
     exit (-1);
     }
@@ -1256,7 +1194,6 @@ static void sigSetHandler() {
     }
   }
 //}}}
-
 //{{{
 static void flushMemory() {
 
@@ -1267,9 +1204,8 @@ static void flushMemory() {
                       MAP_SHARED | MAP_ANONYMOUS |MAP_NORESERVE | MAP_LOCKED,
                       -1, 0);
 
-  if (dummy == MAP_FAILED) {
-    DBG (DBG_STARTUP, "mmap dummy failed (%m)");
-    }
+  if (dummy == MAP_FAILED)
+    cLog::log (LOGINFO,  "mmap dummy failed (%m)");
   else {
     memset (dummy, val++, (FLUSH_PAGES*PAGE_SIZE));
     memset (dummy, val++, (FLUSH_PAGES*PAGE_SIZE));
@@ -1277,157 +1213,119 @@ static void flushMemory() {
     }
   }
 //}}}
-
-// mailbox
+//{{{  mailbox
 //{{{
-/*
-https://github.com/raspberrypi/firmware/wiki/Mailbox-property-interface
-*/
-static int mbCreate (char* dev)
-{
-   /* <0 error */
+static int mbCreate (char* dev) {
+// https://github.com/raspberrypi/firmware/wiki/Mailbox-property-interface
 
-   unlink(dev);
-
-   return mknod(dev, S_IFCHR|0600, makedev(MB_DEV_MAJOR, 0));
-}
+  unlink (dev);
+  return mknod (dev, S_IFCHR | 0600, makedev (MB_DEV_MAJOR, 0));
+  }
 //}}}
 //{{{
-static int mbOpen()
-{
-   /* <0 error */
+static int mbOpen() {
 
-   int fd;
+  int fd = open ("/dev/vcio", 0);
+  if (fd < 0) {
+    const char* mb2 = "/dev/pigpio-mb";
+    mbCreate ((char*)mb2);
+    fd = open (mb2, 0);
+    }
 
-   fd = open(MB_DEV1, 0);
-
-   if (fd < 0)
-   {
-      mbCreate(MB_DEV2);
-      fd = open(MB_DEV2, 0);
-   }
-   return fd;
-}
+  return fd;
+  }
 //}}}
-//{{{
-static void mbClose (int fd)
-{
-   close(fd);
-}
-//}}}
+static int mbProperty (int fd, void* buf) { return ioctl (fd, MB_IOCTL, buf); }
+static void mbClose (int fd) { close(fd); }
 
 //{{{
-static int mbProperty (int fd, void* buf)
-{
-   return ioctl(fd, MB_IOCTL, buf);
-}
+static uint32_t mbAllocateMemory (int fd, uint32_t size, uint32_t align, uint32_t flags) {
+
+  int i = 1;
+
+  uint32_t p[32];
+  p[i++] = MB_PROCESS_REQUEST;
+  p[i++] = MB_ALLOCATE_MEMORY_TAG;
+  p[i++] = 12;
+  p[i++] = 12;
+  p[i++] = size;
+  p[i++] = align;
+  p[i++] = flags;
+  p[i++] = MB_END_TAG;
+  p[0] = i * sizeof (*p);
+
+  mbProperty (fd, p);
+
+  return p[5];
+  }
 //}}}
 //{{{
-static uint32_t mbAllocateMemory (int fd, uint32_t size, uint32_t align, uint32_t flags)
-{
-   int i=1;
-   uint32_t p[32];
+static uint32_t mbLockMemory (int fd, uint32_t handle) {
 
-   p[i++] = MB_PROCESS_REQUEST;
-   p[i++] = MB_ALLOCATE_MEMORY_TAG;
-   p[i++] = 12;
-   p[i++] = 12;
-   p[i++] = size;
-   p[i++] = align;
-   p[i++] = flags;
-   p[i++] = MB_END_TAG;
-   p[0] = i*sizeof(*p);
+  int i = 1;
+  uint32_t p[32];
+  p[i++] = MB_PROCESS_REQUEST;
+  p[i++] = MB_LOCK_MEMORY_TAG;
+  p[i++] = 4;
+  p[i++] = 4;
+  p[i++] = handle;
+  p[i++] = MB_END_TAG;
+  p[0] = i * sizeof (*p);
+  mbProperty (fd, p);
 
-   mbProperty(fd, p);
-
-   return p[5];
-}
+  return p[5];
+  }
 //}}}
 //{{{
-static uint32_t mbLockMemory (int fd, uint32_t handle)
-{
-   int i=1;
-   uint32_t p[32];
+static uint32_t mbUnlockMemory (int fd, uint32_t handle) {
 
-   p[i++] = MB_PROCESS_REQUEST;
-   p[i++] = MB_LOCK_MEMORY_TAG;
-   p[i++] = 4;
-   p[i++] = 4;
-   p[i++] = handle;
-   p[i++] = MB_END_TAG;
-   p[0] = i*sizeof(*p);
+  int i = 1;
+  uint32_t p[32];
+  p[i++] = MB_PROCESS_REQUEST;
+  p[i++] = MB_UNLOCK_MEMORY_TAG;
+  p[i++] = 4;
+  p[i++] = 4;
+  p[i++] = handle;
+  p[i++] = MB_END_TAG;
+  p[0] = i * sizeof (*p);
+  mbProperty (fd, p);
 
-   mbProperty(fd, p);
-
-   return p[5];
-}
+  return p[5];
+  }
 //}}}
 //{{{
-static uint32_t mbUnlockMemory (int fd, uint32_t handle)
-{
-   int i=1;
-   uint32_t p[32];
+static uint32_t mbReleaseMemory (int fd, uint32_t handle) {
 
-   p[i++] = MB_PROCESS_REQUEST;
-   p[i++] = MB_UNLOCK_MEMORY_TAG;
-   p[i++] = 4;
-   p[i++] = 4;
-   p[i++] = handle;
-   p[i++] = MB_END_TAG;
-   p[0] = i*sizeof(*p);
+  int i = 1;
+  uint32_t p[32];
+  p[i++] = MB_PROCESS_REQUEST;
+  p[i++] = MB_RELEASE_MEMORY_TAG;
+  p[i++] = 4;
+  p[i++] = 4;
+  p[i++] = handle;
+  p[i++] = MB_END_TAG;
+  p[0] = i * sizeof (*p);
+  mbProperty (fd, p);
 
-   mbProperty(fd, p);
-
-   return p[5];
-}
+  return p[5];
+  }
 //}}}
 //{{{
-static uint32_t mbReleaseMemory (int fd, uint32_t handle)
-{
-   int i=1;
-   uint32_t p[32];
-
-   p[i++] = MB_PROCESS_REQUEST;
-   p[i++] = MB_RELEASE_MEMORY_TAG;
-   p[i++] = 4;
-   p[i++] = 4;
-   p[i++] = handle;
-   p[i++] = MB_END_TAG;
-   p[0] = i*sizeof(*p);
-
-   mbProperty(fd, p);
-
-   return p[5];
-}
+static void* mbMapMem (uint32_t base, uint32_t size) {
+  return mmap (0, size, PROT_READ | PROT_WRITE, MAP_SHARED, fdMem, base);
+  }
 //}}}
+static int mbUnmapMem (void* addr, uint32_t size) { return munmap (addr, size); }
 //{{{
-static void* mbMapMem (uint32_t base, uint32_t size)
-{
-   void *mem = nullptr;
+static void mbDMAFree (DMAMem_t* DMAMemP) {
 
-   mem = mmap(0, size, PROT_READ|PROT_WRITE, MAP_SHARED, fdMem, base);
-
-   return mem;
-}
-//}}}
-//{{{
-static int mbUnmapMem (void* addr, uint32_t size)
-{
-   /* 0 okay, -1 fail */
-   return munmap(addr, size);
-}
-//}}}
-//{{{
-static void mbDMAFree (DMAMem_t* DMAMemP)
-{
-   if (DMAMemP->handle)
-   {
-      mbUnmapMem(DMAMemP->virtual_addr, DMAMemP->size);
-      mbUnlockMemory(fdMbox, DMAMemP->handle);
-      mbReleaseMemory(fdMbox, DMAMemP->handle);
-      DMAMemP->handle = 0;
-   }
-}
+  if (DMAMemP->handle) {
+    mbUnmapMem (DMAMemP->virtual_addr, DMAMemP->size);
+    mbUnlockMemory (fdMbox, DMAMemP->handle);
+    mbReleaseMemory (fdMbox, DMAMemP->handle);
+    DMAMemP->handle = 0;
+    }
+  }
 //}}}
 //{{{
 static int mbDMAAlloc (DMAMem_t* DMAMemP, uint32_t size, uint32_t pi_mem_flag) {
@@ -1444,8 +1342,8 @@ static int mbDMAAlloc (DMAMem_t* DMAMemP, uint32_t size, uint32_t pi_mem_flag) {
   return 0;
   }
 //}}}
-
-// dma
+//}}}
+//{{{  dma
 //{{{
 static rawCbs_t* dmaCB2adr (int pos) {
 
@@ -1611,7 +1509,7 @@ static void dmaInitCbs() {
   int b = -1;
   int level = 0;
 
-  for (int cycle = 0; cycle < bufferCycles; cycle++) {
+  for (int cycle = 0; cycle < (int)bufferCycles; cycle++) {
     b++;
     dmaGpioOnCb (b, cycle%SUPERCYCLE); /* gpio on slot */
     b++;
@@ -1633,6 +1531,7 @@ static void dmaInitCbs() {
   }
 //}}}
 //}}}
+
 //{{{  time
 //{{{
 static void myGpioSleep (int seconds, int micros) {
@@ -1692,9 +1591,6 @@ int gpioTime (uint32_t timetype, int* seconds, int* micros) {
 
   struct timespec ts;
 
-  if (timetype > PI_TIME_ABSOLUTE)
-    SOFT_ERROR (PI_BAD_TIMETYPE, "bad timetype (%d)", timetype);
-
   if (timetype == PI_TIME_ABSOLUTE) {
     clock_gettime (CLOCK_REALTIME, &ts);
     *seconds = ts.tv_sec;
@@ -1712,15 +1608,6 @@ int gpioTime (uint32_t timetype, int* seconds, int* micros) {
 //}}}
 //{{{
 int gpioSleep (uint32_t timetype, int seconds, int micros) {
-
-  if (timetype > PI_TIME_ABSOLUTE)
-    SOFT_ERROR (PI_BAD_TIMETYPE, "bad timetype (%d)", timetype);
-
-  if (seconds < 0)
-    SOFT_ERROR (PI_BAD_SECONDS, "bad seconds (%d)", seconds);
-
-  if ((micros < 0) || (micros > 999999))
-    SOFT_ERROR (PI_BAD_MICROS, "bad micros (%d)", micros);
 
   struct timespec ts;
   ts.tv_sec = seconds;
@@ -1831,7 +1718,7 @@ static void initClearGlobals() {
 static int initCheckPermitted() {
 
   if (!pi_ispi) {
-    DBG (DBG_ALWAYS,
+    cLog::log (LOGINFO,
          "\n" \
          "+---------------------------------------------------------+\n" \
          "|Sorry, this system does not appear to be a raspberry pi. |\n" \
@@ -1841,7 +1728,7 @@ static int initCheckPermitted() {
     }
 
   if ((fdMem = open("/dev/mem", O_RDWR | O_SYNC) ) < 0) {
-    DBG (DBG_ALWAYS,
+    cLog::log (LOGINFO,
          "\n" \
          "+---------------------------------------------------------+\n" \
          "|Sorry, you don't have permission to run this program.    |\n" \
@@ -1864,11 +1751,11 @@ static int initPeripherals() {
 
   gpioReg = initMapMem (fdMem, GPIO_BASE, GPIO_LEN);
   if (gpioReg == nullptr)
-    SOFT_ERROR (PI_INIT_FAILED, "mmap gpio failed (%m)");
+    LOG_ERROR ("mmap gpio failed (%m)");
 
   dmaReg = initMapMem (fdMem, DMA_BASE, DMA_LEN);
   if (dmaReg == nullptr)
-    SOFT_ERROR (PI_INIT_FAILED, "mmap dma failed (%m)");
+    LOG_ERROR ("mmap dma failed (%m)");
 
   // we should know if we are running on a BCM2711 by now
   if (gpioCfg.DMAprimaryChannel == PI_DEFAULT_DMA_NOT_SET) {
@@ -1890,35 +1777,35 @@ static int initPeripherals() {
 
   clkReg = initMapMem (fdMem, CLK_BASE,  CLK_LEN);
   if (clkReg == nullptr)
-    SOFT_ERROR (PI_INIT_FAILED, "mmap clk failed (%m)");
+    LOG_ERROR ("mmap clk failed (%m)");
 
   systReg = initMapMem (fdMem, SYST_BASE,  SYST_LEN);
   if (systReg == nullptr)
-    SOFT_ERROR (PI_INIT_FAILED, "mmap syst failed (%m)");
+    LOG_ERROR ("mmap syst failed (%m)");
 
   spiReg = initMapMem (fdMem, SPI_BASE,  SPI_LEN);
   if (spiReg == nullptr)
-    SOFT_ERROR (PI_INIT_FAILED, "mmap spi failed (%m)");
+    LOG_ERROR ("mmap spi failed (%m)");
 
   pwmReg = initMapMem (fdMem, PWM_BASE,  PWM_LEN);
   if (pwmReg == nullptr)
-    SOFT_ERROR (PI_INIT_FAILED, "mmap pwm failed (%m)");
+    LOG_ERROR ("mmap pwm failed (%m)");
 
   pcmReg = initMapMem (fdMem, PCM_BASE,  PCM_LEN);
   if (pcmReg == nullptr)
-    SOFT_ERROR (PI_INIT_FAILED, "mmap pcm failed (%m)");
+    LOG_ERROR ("mmap pcm failed (%m)");
 
   auxReg = initMapMem (fdMem, AUX_BASE,  AUX_LEN);
   if (auxReg == nullptr)
-    SOFT_ERROR (PI_INIT_FAILED, "mmap aux failed (%m)");
+    LOG_ERROR ("mmap aux failed (%m)");
 
   padsReg = initMapMem (fdMem, PADS_BASE,  PADS_LEN);
   if (padsReg == nullptr)
-    SOFT_ERROR (PI_INIT_FAILED, "mmap pads failed (%m)");
+    LOG_ERROR ("mmap pads failed (%m)");
 
   bscsReg = initMapMem (fdMem, BSCS_BASE,  BSCS_LEN);
   if (bscsReg == nullptr)
-    SOFT_ERROR (PI_INIT_FAILED, "mmap bscs failed (%m)");
+    LOG_ERROR ("mmap bscs failed (%m)");
 
   return 0;
   }
@@ -1929,17 +1816,16 @@ static int initZaps (int pmapFd, void* virtualBase, int  basePage, int  pages) {
 
   int status = 0;
   uintptr_t pageAdr = (uintptr_t) dmaVirt[basePage];
-  uintptr_t index = ((uintptr_t)virtualBase / PAGE_SIZE) * 8;
-
+  off_t index = ((off_t)virtualBase / PAGE_SIZE) * 8;
   off_t offset = lseek (pmapFd, index, SEEK_SET);
   if (offset != index)
-    SOFT_ERROR (PI_INIT_FAILED, "lseek pagemap failed (%m)");
+    LOG_ERROR ("lseek pagemap failed (%m)");
 
   for (int n = 0; n < pages; n++) {
     uint64_t pa;
     ssize_t t = read (pmapFd, &pa, sizeof(pa));
     if (t != sizeof(pa))
-      SOFT_ERROR (PI_INIT_FAILED, "read pagemap failed (%m)");
+      LOG_ERROR ("read pagemap failed (%m)");
 
     uint32_t physical = 0x3FFFFFFF & (PAGE_SIZE * (pa & 0xFFFFFFFF));
     if (physical) {
@@ -1967,7 +1853,7 @@ static int initPagemapBlock (int block) {
                                                     PROT_READ | PROT_WRITE,
                                                     MAP_SHARED | MAP_ANONYMOUS|MAP_NORESERVE|MAP_LOCKED, -1, 0);
   if (dmaPMapBlk[block] == nullptr)
-    SOFT_ERROR (PI_INIT_FAILED, "mmap dma block %d failed (%m)", block);
+    LOG_ERROR ("mmap dma block %d failed (%m)", block);
 
   // force allocation of physical memory
   memset ((void*)dmaPMapBlk[block], 0xAA, (PAGES_PER_BLOCK*PAGE_SIZE));
@@ -1978,7 +1864,7 @@ static int initPagemapBlock (int block) {
                                        PROT_READ | PROT_WRITE,
                                        MAP_SHARED | MAP_ANONYMOUS | MAP_NORESERVE | MAP_LOCKED, -1, 0);
   if (dmaVirt[pageNum] == nullptr)
-    SOFT_ERROR (PI_INIT_FAILED, "mmap dma block %d failed (%m)", block);
+    LOG_ERROR ("mmap dma block %d failed (%m)", block);
 
   munmap (dmaVirt[pageNum], PAGES_PER_BLOCK*PAGE_SIZE);
 
@@ -1993,7 +1879,7 @@ static int initPagemapBlock (int block) {
     }
 
   if (!ok)
-    SOFT_ERROR (PI_INIT_FAILED, "initZaps failed");
+    LOG_ERROR ("initZaps failed");
 
   return 0;
   }
@@ -2003,7 +1889,7 @@ static int initMboxBlock (int block) {
 
   int ok = mbDMAAlloc (&dmaMboxBlk[block], PAGES_PER_BLOCK * PAGE_SIZE, pi_mem_flag);
   if (!ok)
-    SOFT_ERROR (PI_INIT_FAILED, "init mbox zaps failed");
+    LOG_ERROR ("init mbox zaps failed");
 
   uint32_t page = block * PAGES_PER_BLOCK;
   uintptr_t virtualAdr = (uintptr_t)dmaMboxBlk[block].virtual_addr;
@@ -2042,13 +1928,13 @@ static int initAllocDMAMem() {
                                 PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_LOCKED, -1, 0);
 
   if (dmaVirt == nullptr)
-    SOFT_ERROR (PI_INIT_FAILED, "mmap dma virtual failed (%m)");
+    LOG_ERROR ("mmap dma virtual failed (%m)");
 
   dmaBus = (dmaPage_t**)mmap (0, PAGES_PER_BLOCK*(bufferBlocks+PI_WAVE_BLOCKS)*sizeof(dmaPage_t *),
                               PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_LOCKED, -1, 0);
 
   if (dmaBus == nullptr)
-    SOFT_ERROR (PI_INIT_FAILED, "mmap dma bus failed (%m)");
+    LOG_ERROR ("mmap dma bus failed (%m)");
 
   dmaIVirt = (dmaIPage_t**) dmaVirt;
   dmaIBus = (dmaIPage_t**) dmaBus;
@@ -2062,13 +1948,13 @@ static int initAllocDMAMem() {
                                     PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_LOCKED, -1, 0);
 
     if (dmaPMapBlk == nullptr)
-      SOFT_ERROR (PI_INIT_FAILED, "pagemap mmap block failed (%m)");
+      LOG_ERROR ("pagemap mmap block failed (%m)");
 
     fdPmap = open ("/proc/self/pagemap", O_RDONLY);
     if (fdPmap < 0)
-      SOFT_ERROR (PI_INIT_FAILED, "pagemap open failed(%m)");
+      LOG_ERROR ("pagemap open failed(%m)");
 
-    for (int i = 0; i < (bufferBlocks+PI_WAVE_BLOCKS); i++) {
+    for (int i = 0; i < ((int)bufferBlocks+PI_WAVE_BLOCKS); i++) {
       int status = initPagemapBlock(i);
       if (status < 0) {
         close(fdPmap);
@@ -2085,13 +1971,13 @@ static int initAllocDMAMem() {
                                  PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_LOCKED, -1, 0);
 
     if (dmaMboxBlk == nullptr)
-      SOFT_ERROR (PI_INIT_FAILED, "mmap mbox block failed (%m)");
+      LOG_ERROR ("mmap mbox block failed (%m)");
 
     fdMbox = mbOpen();
     if (fdMbox < 0)
-      SOFT_ERROR (PI_INIT_FAILED, "mbox open failed(%m)");
+      LOG_ERROR ("mbox open failed(%m)");
 
-    for (int i = 0; i < (bufferBlocks+PI_WAVE_BLOCKS); i++) {
+    for (int i = 0; i < ((int)bufferBlocks+PI_WAVE_BLOCKS); i++) {
       int status = initMboxBlock (i);
       if (status < 0) {
         mbClose(fdMbox);
@@ -2307,14 +2193,14 @@ static void initReleaseResources() {
   dmaBus = nullptr;
 
   if (dmaVirt != nullptr) {
-    for (int i = 0; i < PAGES_PER_BLOCK * (bufferBlocks + PI_WAVE_BLOCKS); i++)
+    for (int i = 0; i < PAGES_PER_BLOCK * ((int)bufferBlocks + PI_WAVE_BLOCKS); i++)
       munmap(dmaVirt[i], PAGE_SIZE);
     munmap (dmaVirt, PAGES_PER_BLOCK * (bufferBlocks + PI_WAVE_BLOCKS) * sizeof(dmaPage_t *));
     }
   dmaVirt = nullptr;
 
   if (dmaPMapBlk != nullptr) {
-    for (int i = 0; i < (bufferBlocks + PI_WAVE_BLOCKS); i++)
+    for (int i = 0; i < ((int)bufferBlocks + PI_WAVE_BLOCKS); i++)
       munmap(dmaPMapBlk[i], PAGES_PER_BLOCK * PAGE_SIZE);
     munmap(dmaPMapBlk, (bufferBlocks + PI_WAVE_BLOCKS) * sizeof(dmaPage_t *));
     }
@@ -2322,7 +2208,7 @@ static void initReleaseResources() {
 
   if (dmaMboxBlk != nullptr) {
     fdMbox = mbOpen();
-    for (int i = 0; i < (bufferBlocks + PI_WAVE_BLOCKS); i++)
+    for (int i = 0; i < ((int)bufferBlocks + PI_WAVE_BLOCKS); i++)
       mbDMAFree (&dmaMboxBlk[bufferBlocks + PI_WAVE_BLOCKS - i - 1]);
     mbClose (fdMbox);
     munmap (dmaMboxBlk, (bufferBlocks + PI_WAVE_BLOCKS) * sizeof(DMAMem_t));
@@ -2439,9 +2325,9 @@ static int initInitialise() {
 
   pthread_attr_t pthAttr;
   if (pthread_attr_init (&pthAttr))
-    SOFT_ERROR (PI_INIT_FAILED, "pthread_attr_init failed (%m)");
+    LOG_ERROR ("pthread_attr_init failed (%m)");
   if (pthread_attr_setstacksize (&pthAttr, STACK_SIZE))
-    SOFT_ERROR (PI_INIT_FAILED, "pthread_attr_setstacksize failed (%m)");
+    LOG_ERROR ("pthread_attr_setstacksize failed (%m)");
 
   myGpioDelay (1000);
   dmaInitCbs();
@@ -2586,7 +2472,7 @@ uint32_t gpioHardwareRevision() {
       //}}}
       //{{{
       default:
-        DBG (DBG_ALWAYS, "unknown rev code (%x)", rev);
+        cLog::log (LOGINFO, "unknown rev code (%x)", rev);
         rev=0;
         pi_ispi = 0;
         break;
@@ -2658,7 +2544,6 @@ static void mySetGpioOff (uint32_t gpio, int pos) {
 
   int page, slot;
   myOffPageSlot (pos, &page, &slot);
-
   dmaIVirt[page]->gpioOff[slot] |= (1<<gpio);
   }
 //}}}
@@ -2675,7 +2560,6 @@ static void mySetGpioOn (uint32_t gpio, int pos) {
 
   int page = pos / ON_PER_IPAGE;
   int slot = pos % ON_PER_IPAGE;
-
   dmaIVirt[page]->gpioOn[slot] |= (1<<gpio);
   }
 //}}}
@@ -2753,74 +2637,64 @@ static void myGpioSetPwm (uint32_t gpio, int oldVal, int newVal) {
 //{{{
 static void myGpioSetServo (uint32_t gpio, int oldVal, int newVal) {
 
-   int newOff, oldOff, realRange, cycles, i;
-   int deferOff, deferRng;
+  int newOff, oldOff, realRange, cycles, i;
+  int deferOff, deferRng;
 
-   DBG (DBG_INTERNAL, "myGpioSetServo %d from %d to %d", gpio, oldVal, newVal);
+  realRange = pwmRealRange[clkCfg[gpioCfg.clockMicros].servoIdx];
+  cycles    = pwmCycles   [clkCfg[gpioCfg.clockMicros].servoIdx];
 
-   realRange = pwmRealRange[clkCfg[gpioCfg.clockMicros].servoIdx];
-   cycles    = pwmCycles   [clkCfg[gpioCfg.clockMicros].servoIdx];
+  newOff = (newVal * realRange)/20000;
+  oldOff = (oldVal * realRange)/20000;
 
-   newOff = (newVal * realRange)/20000;
-   oldOff = (oldVal * realRange)/20000;
+  deferOff = gpioInfo[gpio].deferOff;
+  deferRng = gpioInfo[gpio].deferRng;
 
-   deferOff = gpioInfo[gpio].deferOff;
-   deferRng = gpioInfo[gpio].deferRng;
+  if (gpioInfo[gpio].deferOff) {
+    for (i=0; i<SUPERLEVEL; i+=deferRng)
+      myClearGpioOff (gpio, i+deferOff);
+     gpioInfo[gpio].deferOff = 0;
+    }
 
-   if (gpioInfo[gpio].deferOff)
-   {
-      for (i=0; i<SUPERLEVEL; i+=deferRng)
-      {
-         myClearGpioOff(gpio, i+deferOff);
+  if (newOff != oldOff) {
+    if (newOff && oldOff)  {
+      /* SERVO CHANGE */
+      for (i = 0; i < SUPERLEVEL; i+=realRange)
+        mySetGpioOff (gpio, i+newOff);
+
+      if (newOff > oldOff) {
+        for (i = 0; i < SUPERLEVEL; i+=realRange)
+          myClearGpioOff (gpio, i+oldOff);
+        }
+      else {
+        gpioInfo[gpio].deferOff = oldOff;
+        gpioInfo[gpio].deferRng = realRange;
+        }
       }
-      gpioInfo[gpio].deferOff = 0;
-   }
+    else if (newOff) {
+      /* SERVO START */
+      for (i = 0; i < SUPERLEVEL; i+=realRange)
+        mySetGpioOff (gpio, i+newOff);
 
-   if (newOff != oldOff)
-   {
-      if (newOff && oldOff)                       /* SERVO CHANGE */
-      {
-         for (i=0; i<SUPERLEVEL; i+=realRange)
-            mySetGpioOff(gpio, i+newOff);
-
-         if (newOff > oldOff)
-         {
-            for (i=0; i<SUPERLEVEL; i+=realRange)
-               myClearGpioOff(gpio, i+oldOff);
-         }
-         else
-         {
-            gpioInfo[gpio].deferOff = oldOff;
-            gpioInfo[gpio].deferRng = realRange;
-         }
+      /* schedule new gpio on */
+      for (i = 0; i < SUPERCYCLE; i+=cycles) 
+        mySetGpioOn(gpio, i);
       }
-      else if (newOff)                            /* SERVO START */
-      {
-         for (i=0; i<SUPERLEVEL; i+=realRange)
-            mySetGpioOff(gpio, i+newOff);
+    else  {
+      /* SERVO STOP */
+      /* deschedule gpio on */
+      for (i = 0; i < SUPERCYCLE; i+=cycles)
+        myClearGpioOn (gpio, i);
 
-         /* schedule new gpio on */
+      /* if in pulse then delay for the last cycle to complete */
+      if (myGpioRead (gpio)) 
+        myGpioDelay (PI_MAX_SERVO_PULSEWIDTH);
 
-         for (i=0; i<SUPERCYCLE; i+=cycles) mySetGpioOn(gpio, i);
+      /* deschedule gpio off */
+      for (i = 0; i < SUPERLEVEL; i+=realRange)
+        myClearGpioOff (gpio, i+oldOff);
       }
-      else                                        /* SERVO STOP */
-      {
-         /* deschedule gpio on */
-
-         for (i=0; i<SUPERCYCLE; i+=cycles)
-            myClearGpioOn(gpio, i);
-
-         /* if in pulse then delay for the last cycle to complete */
-
-         if (myGpioRead(gpio)) myGpioDelay(PI_MAX_SERVO_PULSEWIDTH);
-
-         /* deschedule gpio off */
-
-         for (i=0; i<SUPERLEVEL; i+=realRange)
-            myClearGpioOff(gpio, i+oldOff);
-      }
-   }
-}
+    }
+  }
 //}}}
 //{{{
 static void switchFunctionOff (uint32_t gpio) {
@@ -2855,9 +2729,6 @@ static void switchFunctionOff (uint32_t gpio) {
 //{{{
 int gpioGetMode (uint32_t gpio) {
 
-  if (gpio > PI_MAX_GPIO)
-    SOFT_ERROR (PI_BAD_GPIO, "bad gpio (%d)", gpio);
-
   int reg =  gpio / 10;
   int shift = (gpio % 10) * 3;
   return (gpioReg[reg] >> shift) & 7;
@@ -2866,10 +2737,10 @@ int gpioGetMode (uint32_t gpio) {
 //{{{
 void gpioSetMode (uint32_t gpio, uint32_t mode) {
 
-  int reg   =  gpio/10;
+  int reg =  gpio/10;
   int shift = (gpio%10) * 3;
 
-  int old_mode = (gpioReg[reg] >> shift) & 7;
+  uint32_t old_mode = (gpioReg[reg] >> shift) & 7;
   if (mode != old_mode) {
     switchFunctionOff(gpio);
     gpioInfo[gpio].is = GPIO_UNDEFINED;
@@ -2910,19 +2781,14 @@ void gpioSetPullUpDown (uint32_t gpio, uint32_t pud) {
   }
 //}}}
 //{{{
-int gpioGetPad (uint32_t pad)
-{
-   int strength;
-   if (pad > PI_MAX_PAD)
-      SOFT_ERROR (PI_BAD_PAD, "bad pad (%d)", pad);
+int gpioGetPad (uint32_t pad) {
 
-   strength = padsReg[11+pad] & 7;
+  int strength = padsReg[11+pad] & 7;
+  strength *= 2;
+  strength += 2;
 
-   strength *= 2;
-   strength += 2;
-
-   return strength;
-}
+  return strength;
+  }
 //}}}
 //{{{
 void gpioSetPad (uint32_t pad, uint32_t padStrength) {
@@ -2993,29 +2859,25 @@ void gpioPWM (uint32_t gpio, uint32_t val) {
   }
 //}}}
 //{{{
-int gpioGetPWMdutycycle (uint32_t gpio)
-{
-   uint32_t pwm;
+int gpioGetPWMdutycycle (uint32_t gpio) {
 
-   if (gpio > PI_MAX_USER_GPIO)
-      SOFT_ERROR (PI_BAD_USER_GPIO, "bad gpio (%d)", gpio);
+  uint32_t pwm;
 
-   switch (gpioInfo[gpio].is)
-   {
-      case GPIO_PWM:
-         return gpioInfo[gpio].width;
+  switch (gpioInfo[gpio].is) {
+    case GPIO_PWM:
+      return gpioInfo[gpio].width;
 
-      case GPIO_HW_PWM:
-         pwm = (PWMDef[gpio] >> 4) & 3;
-         return hw_pwm_duty[pwm];
+    case GPIO_HW_PWM:
+      pwm = (PWMDef[gpio] >> 4) & 3;
+      return hw_pwm_duty[pwm];
 
-      case GPIO_HW_CLK:
-         return PI_HW_PWM_RANGE/2;
+    case GPIO_HW_CLK:
+      return PI_HW_PWM_RANGE/2;
 
-      default:
-         SOFT_ERROR (PI_NOT_PWM_GPIO, "not a PWM gpio (%d)", gpio);
-   }
-}
+    default:
+      LOG_ERROR ("not a PWM gpio (%d)", gpio);
+    }
+  }
 //}}}
 
 //{{{
@@ -3039,9 +2901,6 @@ void gpioSetPWMrange (uint32_t gpio, uint32_t range) {
 //{{{
 int gpioGetPWMrange (uint32_t gpio) {
 
-  if (gpio > PI_MAX_USER_GPIO)
-    SOFT_ERROR (PI_BAD_USER_GPIO, "bad gpio (%d)", gpio);
-
   switch (gpioInfo[gpio].is) {
     case GPIO_HW_PWM:
     case GPIO_HW_CLK:
@@ -3053,26 +2912,21 @@ int gpioGetPWMrange (uint32_t gpio) {
   }
 //}}}
 //{{{
-int gpioGetPWMrealRange (uint32_t gpio)
-{
-   uint32_t pwm;
+int gpioGetPWMrealRange (uint32_t gpio) {
 
-   if (gpio > PI_MAX_USER_GPIO)
-      SOFT_ERROR (PI_BAD_USER_GPIO, "bad gpio (%d)", gpio);
+  uint32_t pwm;
+  switch (gpioInfo[gpio].is) {
+    case GPIO_HW_PWM:
+      pwm = (PWMDef[gpio] >> 4) & 3;
+      return hw_pwm_real_range[pwm];
 
-   switch (gpioInfo[gpio].is)
-   {
-      case GPIO_HW_PWM:
-         pwm = (PWMDef[gpio] >> 4) & 3;
-         return hw_pwm_real_range[pwm];
+    case GPIO_HW_CLK:
+       return PI_HW_PWM_RANGE;
 
-      case GPIO_HW_CLK:
-         return PI_HW_PWM_RANGE;
-
-      default:
-         return pwmRealRange[gpioInfo[gpio].freqIdx];
-   }
-}
+    default:
+      return pwmRealRange[gpioInfo[gpio].freqIdx];
+    }
+  }
 //}}}
 
 //{{{
@@ -3081,16 +2935,16 @@ void gpioSetPWMfrequency (uint32_t gpio, uint32_t frequency) {
   int i, width;
   uint32_t diff, best, idx;
 
-  if (frequency > pwmFreq[0])
+  if ((int)frequency > pwmFreq[0])
     idx = 0;
-  else if (frequency < pwmFreq[PWM_FREQS-1])
+  else if ((int)frequency < pwmFreq[PWM_FREQS-1])
     idx = PWM_FREQS-1;
   else {
     best = 100000; /* impossibly high frequency difference */
     idx = 0;
 
     for (i=0; i<PWM_FREQS; i++) {
-      if (frequency > pwmFreq[i])
+      if ((int)frequency > pwmFreq[i])
         diff = frequency - pwmFreq[i];
       else
         diff = pwmFreq[i] - frequency;
@@ -3115,27 +2969,22 @@ void gpioSetPWMfrequency (uint32_t gpio, uint32_t frequency) {
   }
 //}}}
 //{{{
-int gpioGetPWMfrequency (uint32_t gpio)
-{
-   uint32_t pwm, clock;
+int gpioGetPWMfrequency (uint32_t gpio) { 
 
-   if (gpio > PI_MAX_USER_GPIO)
-      SOFT_ERROR (PI_BAD_USER_GPIO, "bad gpio (%d)", gpio);
+  uint32_t pwm, clock;
+  switch (gpioInfo[gpio].is) {
+    case GPIO_HW_PWM:
+      pwm = (PWMDef[gpio] >> 4) & 3;
+      return hw_pwm_freq[pwm];
 
-   switch (gpioInfo[gpio].is)
-   {
-      case GPIO_HW_PWM:
-         pwm = (PWMDef[gpio] >> 4) & 3;
-         return hw_pwm_freq[pwm];
+    case GPIO_HW_CLK:
+      clock = (clkDef[gpio] >> 4) & 3;
+      return hw_clk_freq[clock];
 
-      case GPIO_HW_CLK:
-         clock = (clkDef[gpio] >> 4) & 3;
-         return hw_clk_freq[clock];
-
-      default:
-         return pwmFreq[gpioInfo[gpio].freqIdx];
-   }
-}
+    default:
+      return pwmFreq[gpioInfo[gpio].freqIdx];
+    }
+  }
 //}}}
 
 //{{{
@@ -3153,27 +3002,16 @@ void gpioServo (uint32_t gpio, uint32_t val) {
   gpioInfo[gpio].width = val;
   }
 //}}}
-//{{{
-int gpioGetServoPulsewidth (uint32_t gpio)
-{
-   if (gpio > PI_MAX_USER_GPIO)
-      SOFT_ERROR (PI_BAD_USER_GPIO, "bad gpio (%d)", gpio);
-
-   if (gpioInfo[gpio].is != GPIO_SERVO)
-      SOFT_ERROR (PI_NOT_SERVO_GPIO, "not a servo gpio (%d)", gpio);
-
-   return gpioInfo[gpio].width;
-}
-//}}}
+int gpioGetServoPulsewidth (uint32_t gpio) { return gpioInfo[gpio].width; }
 //}}}
 //{{{  spi
 // internal hw
 //{{{
 static int spiAnyOpen (uint32_t flags) {
 
-  int aux = PI_SPI_FLAGS_GET_AUX_SPI (flags);
+  uint32_t aux = PI_SPI_FLAGS_GET_AUX_SPI (flags);
 
-  for (int i = 0; i<PI_SPI_SLOTS; i++)
+  for (int i = 0; i < PI_SPI_SLOTS; i++)
     if ((spiInfo[i].state == PI_SPI_OPENED) &&
         (PI_SPI_FLAGS_GET_AUX_SPI (spiInfo[i].flags) == aux))
       return 1;
@@ -3506,20 +3344,11 @@ int spiOpen (uint32_t spiChan, uint32_t baud, uint32_t spiFlags) {
   int i;
   if (PI_SPI_FLAGS_GET_AUX_SPI(spiFlags)) {
     if (gpioHardwareRevision() < 16)
-      SOFT_ERROR (PI_NO_AUX_SPI, "no auxiliary SPI on Pi A or B");
+      LOG_ERROR ("no auxiliary SPI on Pi A or B");
     i = PI_NUM_AUX_SPI_CHANNEL;
     }
   else
     i = PI_NUM_STD_SPI_CHANNEL;
-
-  if (spiChan >= i)
-    SOFT_ERROR (PI_BAD_SPI_CHANNEL, "bad spiChan (%d)", spiChan);
-
-  if ((baud < PI_SPI_MIN_BAUD) || (baud > PI_SPI_MAX_BAUD))
-    SOFT_ERROR (PI_BAD_SPI_SPEED, "bad baud (%d)", baud);
-
-  if (spiFlags > (1<<22))
-    SOFT_ERROR (PI_BAD_FLAGS, "bad spiFlags (0x%X)", spiFlags);
 
   if (!spiAnyOpen(spiFlags)) {
     // initialise on first open
@@ -3539,7 +3368,7 @@ int spiOpen (uint32_t spiChan, uint32_t baud, uint32_t spiFlags) {
   pthread_mutex_unlock (&mutex);
 
   if (slot < 0)
-    SOFT_ERROR (PI_NO_HANDLE, "no SPI handles");
+    LOG_ERROR ("no SPI handles");
 
   spiInfo[slot].speed = baud;
   spiInfo[slot].flags = spiFlags | PI_SPI_FLAGS_CHANNEL(spiChan);
@@ -3550,18 +3379,7 @@ int spiOpen (uint32_t spiChan, uint32_t baud, uint32_t spiFlags) {
 //}}}
 //{{{
 int spiRead (uint32_t handle, char* buf, uint32_t count) {
-
-  if (handle >= PI_SPI_SLOTS)
-    SOFT_ERROR (PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-  if (spiInfo[handle].state != PI_SPI_OPENED)
-    SOFT_ERROR (PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-  if (count > PI_MAX_SPI_DEVICE_COUNT)
-    SOFT_ERROR (PI_BAD_SPI_COUNT, "bad count (%d)", count);
-
   spiGo (spiInfo[handle].speed, spiInfo[handle].flags, NULL, buf, count);
-
   return count;
   }
 //}}}
@@ -3613,32 +3431,15 @@ void spiWriteMainFast (uint32_t handle, const uint8_t* buf, uint32_t count) {
 //{{{
 int spiXfer (uint32_t handle, char* txBuf, char* rxBuf, uint32_t count) {
 
-  if (handle >= PI_SPI_SLOTS)
-    SOFT_ERROR(PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-  if (spiInfo[handle].state != PI_SPI_OPENED)
-    SOFT_ERROR (PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-  if (count > PI_MAX_SPI_DEVICE_COUNT)
-    SOFT_ERROR (PI_BAD_SPI_COUNT, "bad count (%d)", count);
-
-  spiGo(spiInfo[handle].speed, spiInfo[handle].flags, txBuf, rxBuf, count);
-
+  spiGo (spiInfo[handle].speed, spiInfo[handle].flags, txBuf, rxBuf, count);
   return count;
   }
 //}}}
 //{{{
 int spiClose (uint32_t handle) {
 
-  if (handle >= PI_SPI_SLOTS)
-    SOFT_ERROR (PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-  if (spiInfo[handle].state != PI_SPI_OPENED)
-    SOFT_ERROR (PI_BAD_HANDLE, "bad handle (%d)", handle);
-
   spiInfo[handle].state = PI_SPI_CLOSED;
-
-  if (!spiAnyOpen(spiInfo[handle].flags))
+  if (!spiAnyOpen (spiInfo[handle].flags))
     spiTerminate (spiInfo[handle].flags); /* terminate on last close */
 
   return 0;
@@ -3804,25 +3605,6 @@ int bbSPIOpen (uint32_t CS, uint32_t MISO, uint32_t MOSI, uint32_t SCLK, uint32_
 
   int valid;
   uint32_t bits;
-
-  if (CS > PI_MAX_USER_GPIO)
-    SOFT_ERROR (PI_BAD_USER_GPIO, "bad CS (%d)", CS);
-
-  if (MISO > PI_MAX_USER_GPIO)
-    SOFT_ERROR (PI_BAD_USER_GPIO, "bad MISO (%d)", MISO);
-
-  if (MOSI > PI_MAX_USER_GPIO)
-    SOFT_ERROR (PI_BAD_USER_GPIO, "bad MOSI (%d)", MOSI);
-
-  if (SCLK > PI_MAX_USER_GPIO)
-    SOFT_ERROR (PI_BAD_USER_GPIO, "bad SCLK (%d)", SCLK);
-
-  if ((baud < PI_BB_SPI_MIN_BAUD) || (baud > PI_BB_SPI_MAX_BAUD))
-    SOFT_ERROR (PI_BAD_SPI_BAUD, "CS %d, bad baud (%d)", CS, baud);
-
-  if (wfRx[CS].mode != PI_WFRX_NONE)
-    SOFT_ERROR (PI_GPIO_IN_USE, "CS %d is already being used, mode %d", CS, wfRx[CS].mode);
-
   valid = 0;
 
   /* check all GPIO unique */
@@ -3844,8 +3626,7 @@ int bbSPIOpen (uint32_t CS, uint32_t MISO, uint32_t MOSI, uint32_t SCLK, uint32_
     }
 
   if (!valid) {
-    SOFT_ERROR (PI_GPIO_IN_USE,
-        "GPIO already being used (%d=%d %d=%d, %d=%d %d=%d)",
+    LOG_ERROR ( "GPIO already being used (%d=%d %d=%d, %d=%d %d=%d)",
          CS,   wfRx[CS].mode,
          MISO, wfRx[MISO].mode,
          MOSI, wfRx[MOSI].mode,
@@ -3897,18 +3678,6 @@ int bbSPIOpen (uint32_t CS, uint32_t MISO, uint32_t MOSI, uint32_t SCLK, uint32_
 //{{{
 int bbSPIXfer (uint32_t CS, char* inBuf, char* outBuf, uint32_t count) {
 
-  if (CS > PI_MAX_USER_GPIO)
-    SOFT_ERROR (PI_BAD_USER_GPIO, "bad gpio (%d)", CS);
-
-  if (wfRx[CS].mode != PI_WFRX_SPI_CS)
-    SOFT_ERROR (PI_NOT_SPI_GPIO, "no SPI on gpio (%d)", CS);
-
-  if (!inBuf || !count)
-    SOFT_ERROR (PI_BAD_POINTER, "input buffer can't be NULL");
-
-  if (!outBuf && count)
-    SOFT_ERROR (PI_BAD_POINTER, "output buffer can't be NULL");
-
   int SCLK = wfRx[CS].S.SCLK;
   wfRx[SCLK].S.CS = CS;
   wfRx[SCLK].baud = wfRx[CS].baud;
@@ -3919,7 +3688,7 @@ int bbSPIXfer (uint32_t CS, char* inBuf, char* outBuf, uint32_t count) {
 
   wfRx_lock (SCLK);
   bbSPIStart (w);
-  for (int pos = 0; pos < count; pos++)
+  for (int pos = 0; pos < (int)count; pos++)
     outBuf[pos] = bbSPIXferByte(w, inBuf[pos]);
   bbSPIStop(w);
   wfRx_unlock(SCLK);
@@ -3931,8 +3700,6 @@ int bbSPIXfer (uint32_t CS, char* inBuf, char* outBuf, uint32_t count) {
 int bbSPIClose (uint32_t CS)
 {
    int SCLK;
-   if (CS > PI_MAX_USER_GPIO)
-      SOFT_ERROR (PI_BAD_USER_GPIO, "bad gpio (%d)", CS);
 
    switch(wfRx[CS].mode)
    {
@@ -3957,9 +3724,7 @@ int bbSPIClose (uint32_t CS)
          break;
 
       default:
-
-         SOFT_ERROR (PI_NOT_SPI_GPIO, "no SPI on gpio (%d)", CS);
-
+         LOG_ERROR ("no SPI on gpio (%d)", CS);
          break;
 
    }
@@ -4011,18 +3776,6 @@ static int mySmbusAccess (int fd, char rw, uint8_t cmd, int size, union my_smbus
 //{{{
 int i2cWriteQuick (uint32_t handle, uint32_t bit) {
 
-  if (handle >= PI_I2C_SLOTS)
-    SOFT_ERROR (PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-  if (i2cInfo[handle].state != PI_I2C_OPENED)
-    SOFT_ERROR (PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-  if ((i2cInfo[handle].funcs & PI_I2C_FUNC_SMBUS_QUICK) == 0)
-    SOFT_ERROR (PI_BAD_SMBUS_CMD, "SMBUS command not supported by driver");
-
-  if (bit > 1)
-    SOFT_ERROR (PI_BAD_PARAM, "bad bit (%d)", bit);
-
   int status = mySmbusAccess (i2cInfo[handle].fd, bit, 0, PI_I2C_SMBUS_QUICK, NULL);
   if (status < 0)
     return PI_I2C_WRITE_FAILED;
@@ -4033,15 +3786,6 @@ int i2cWriteQuick (uint32_t handle, uint32_t bit) {
 
 //{{{
 int i2cReadByte (uint32_t handle) {
-
-  if (handle >= PI_I2C_SLOTS)
-    SOFT_ERROR (PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-  if (i2cInfo[handle].state != PI_I2C_OPENED)
-    SOFT_ERROR (PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-  if ((i2cInfo[handle].funcs & PI_I2C_FUNC_SMBUS_READ_BYTE) == 0)
-    SOFT_ERROR (PI_BAD_SMBUS_CMD, "SMBUS command not supported by driver");
 
   union my_smbus_data data;
   int status = mySmbusAccess (i2cInfo[handle].fd, PI_I2C_SMBUS_READ, 0, PI_I2C_SMBUS_BYTE, &data);
@@ -4055,18 +3799,6 @@ int i2cReadByte (uint32_t handle) {
 //{{{
 int i2cWriteByte (uint32_t handle, uint32_t bVal) {
 
-  if (handle >= PI_I2C_SLOTS)
-    SOFT_ERROR (PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-  if (i2cInfo[handle].state != PI_I2C_OPENED)
-    SOFT_ERROR (PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-  if ((i2cInfo[handle].funcs & PI_I2C_FUNC_SMBUS_WRITE_BYTE) == 0)
-    SOFT_ERROR (PI_BAD_SMBUS_CMD, "SMBUS command not supported by driver");
-
-  if (bVal > 0xFF)
-    SOFT_ERROR (PI_BAD_PARAM, "bad bVal (%d)", bVal);
-
   int status = mySmbusAccess (i2cInfo[handle].fd, PI_I2C_SMBUS_WRITE, bVal, PI_I2C_SMBUS_BYTE, NULL);
   if (status < 0)
     return PI_I2C_WRITE_FAILED;
@@ -4079,21 +3811,7 @@ int i2cWriteByte (uint32_t handle, uint32_t bVal) {
 int i2cReadByteData (uint32_t handle, uint32_t reg)
 {
    union my_smbus_data data;
-   int status;
-
-   if (handle >= PI_I2C_SLOTS)
-      SOFT_ERROR (PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if (i2cInfo[handle].state != PI_I2C_OPENED)
-      SOFT_ERROR (PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if ((i2cInfo[handle].funcs & PI_I2C_FUNC_SMBUS_READ_BYTE_DATA) == 0)
-      SOFT_ERROR (PI_BAD_SMBUS_CMD, "SMBUS command not supported by driver");
-
-   if (reg > 0xFF)
-      SOFT_ERROR (PI_BAD_PARAM, "bad reg (%d)", reg);
-
-   status = mySmbusAccess (i2cInfo[handle].fd, PI_I2C_SMBUS_READ, reg, PI_I2C_SMBUS_BYTE_DATA, &data);
+   int status = mySmbusAccess (i2cInfo[handle].fd, PI_I2C_SMBUS_READ, reg, PI_I2C_SMBUS_BYTE_DATA, &data);
 
    if (status < 0)
       return PI_I2C_READ_FAILED;
@@ -4107,22 +3825,6 @@ int i2cWriteByteData (uint32_t handle, uint32_t reg, uint32_t bVal)
    union my_smbus_data data;
 
    int status;
-
-   if (handle >= PI_I2C_SLOTS)
-      SOFT_ERROR (PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if (i2cInfo[handle].state != PI_I2C_OPENED)
-      SOFT_ERROR (PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if ((i2cInfo[handle].funcs & PI_I2C_FUNC_SMBUS_WRITE_BYTE_DATA) == 0)
-      SOFT_ERROR (PI_BAD_SMBUS_CMD, "SMBUS command not supported by driver");
-
-   if (reg > 0xFF)
-      SOFT_ERROR (PI_BAD_PARAM, "bad reg (%d)", reg);
-
-   if (bVal > 0xFF)
-      SOFT_ERROR (PI_BAD_PARAM, "bad bVal (%d)", bVal);
-
    data.byte = bVal;
 
    status = mySmbusAccess (i2cInfo[handle].fd, PI_I2C_SMBUS_WRITE, reg, PI_I2C_SMBUS_BYTE_DATA, &data);
@@ -4138,21 +3840,7 @@ int i2cWriteByteData (uint32_t handle, uint32_t reg, uint32_t bVal)
 int i2cReadWordData (uint32_t handle, uint32_t reg)
 {
    union my_smbus_data data;
-   int status;
-
-   if (handle >= PI_I2C_SLOTS)
-      SOFT_ERROR (PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if (i2cInfo[handle].state != PI_I2C_OPENED)
-      SOFT_ERROR (PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if ((i2cInfo[handle].funcs & PI_I2C_FUNC_SMBUS_READ_WORD_DATA) == 0)
-      SOFT_ERROR (PI_BAD_SMBUS_CMD, "SMBUS command not supported by driver");
-
-   if (reg > 0xFF)
-      SOFT_ERROR (PI_BAD_PARAM, "bad reg (%d)", reg);
-
-   status = (mySmbusAccess (i2cInfo[handle].fd, PI_I2C_SMBUS_READ, reg, PI_I2C_SMBUS_WORD_DATA, &data));
+   int status = (mySmbusAccess (i2cInfo[handle].fd, PI_I2C_SMBUS_READ, reg, PI_I2C_SMBUS_WORD_DATA, &data));
 
    if (status < 0)
       return PI_I2C_READ_FAILED;
@@ -4166,24 +3854,7 @@ int i2cWriteWordData (uint32_t handle, uint32_t reg, uint32_t wVal)
    union my_smbus_data data;
 
    int status;
-
-   if (handle >= PI_I2C_SLOTS)
-      SOFT_ERROR (PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if (i2cInfo[handle].state != PI_I2C_OPENED)
-      SOFT_ERROR (PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if ((i2cInfo[handle].funcs & PI_I2C_FUNC_SMBUS_WRITE_WORD_DATA) == 0)
-      SOFT_ERROR (PI_BAD_SMBUS_CMD, "SMBUS command not supported by driver");
-
-   if (reg > 0xFF)
-      SOFT_ERROR (PI_BAD_PARAM, "bad reg (%d)", reg);
-
-   if (wVal > 0xFFFF)
-      SOFT_ERROR (PI_BAD_PARAM, "bad wVal (%d)", wVal);
-
    data.word = wVal;
-
    status = mySmbusAccess (i2cInfo[handle].fd, PI_I2C_SMBUS_WRITE, reg, PI_I2C_SMBUS_WORD_DATA, &data);
 
    if (status < 0)
@@ -4195,21 +3866,6 @@ int i2cWriteWordData (uint32_t handle, uint32_t reg, uint32_t wVal)
 
 //{{{
 int i2cProcessCall (uint32_t handle, uint32_t reg, uint32_t wVal) {
-
-  if (handle >= PI_I2C_SLOTS)
-    SOFT_ERROR (PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-  if (i2cInfo[handle].state != PI_I2C_OPENED)
-    SOFT_ERROR (PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-  if ((i2cInfo[handle].funcs & PI_I2C_FUNC_SMBUS_PROC_CALL) == 0)
-    SOFT_ERROR (PI_BAD_SMBUS_CMD, "SMBUS command not supported by driver");
-
-  if (reg > 0xFF)
-    SOFT_ERROR (PI_BAD_PARAM, "bad reg (%d)", reg);
-
-  if (wVal > 0xFFFF)
-    SOFT_ERROR (PI_BAD_PARAM, "bad wVal (%d)", wVal);
 
   union my_smbus_data data;
   data.word = wVal;
@@ -4223,18 +3879,6 @@ int i2cProcessCall (uint32_t handle, uint32_t reg, uint32_t wVal) {
 
 //{{{
 int i2cReadBlockData (uint32_t handle, uint32_t reg, char *buf) {
-
-  if (handle >= PI_I2C_SLOTS)
-    SOFT_ERROR (PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-  if (i2cInfo[handle].state != PI_I2C_OPENED)
-    SOFT_ERROR (PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-  if ((i2cInfo[handle].funcs & PI_I2C_FUNC_SMBUS_READ_BLOCK_DATA) == 0)
-    SOFT_ERROR (PI_BAD_SMBUS_CMD, "SMBUS command not supported by driver");
-
-  if (reg > 0xFF)
-    SOFT_ERROR (PI_BAD_PARAM, "bad reg (%d)", reg);
 
   union my_smbus_data data;
   int status = mySmbusAccess (i2cInfo[handle].fd, PI_I2C_SMBUS_READ, reg, PI_I2C_SMBUS_BLOCK_DATA, &data);
@@ -4253,23 +3897,8 @@ int i2cReadBlockData (uint32_t handle, uint32_t reg, char *buf) {
 //{{{
 int i2cWriteBlockData (uint32_t handle, uint32_t reg, char *buf, uint32_t count) {
 
-  if (handle >= PI_I2C_SLOTS)
-    SOFT_ERROR (PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-  if (i2cInfo[handle].state != PI_I2C_OPENED)
-    SOFT_ERROR (PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-  if ((i2cInfo[handle].funcs & PI_I2C_FUNC_SMBUS_WRITE_BLOCK_DATA) == 0)
-    SOFT_ERROR (PI_BAD_SMBUS_CMD, "SMBUS command not supported by driver");
-
-  if (reg > 0xFF)
-    SOFT_ERROR (PI_BAD_PARAM, "bad reg (%d)", reg);
-
-  if ((count < 1) || (count > 32))
-    SOFT_ERROR (PI_BAD_PARAM, "bad count (%d)", count);
-
   union my_smbus_data data;
-  for (int i = 1; i <= count; i++)
+  for (int i = 1; i <= (int)count; i++)
     data.block[i] = buf[i-1];
   data.block[0] = count;
 
@@ -4287,23 +3916,8 @@ int i2cBlockProcessCall (uint32_t handle, uint32_t reg, char *buf, uint32_t coun
    union my_smbus_data data;
 
    int i, status;
-
-   if (handle >= PI_I2C_SLOTS)
-      SOFT_ERROR (PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if (i2cInfo[handle].state != PI_I2C_OPENED)
-      SOFT_ERROR (PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if ((i2cInfo[handle].funcs & PI_I2C_FUNC_SMBUS_PROC_CALL) == 0)
-      SOFT_ERROR (PI_BAD_SMBUS_CMD, "SMBUS command not supported by driver");
-
-   if (reg > 0xFF)
-      SOFT_ERROR (PI_BAD_PARAM, "bad reg (%d)", reg);
-
-   if ((count < 1) || (count > 32))
-      SOFT_ERROR (PI_BAD_PARAM, "bad count (%d)", count);
-
-   for (i=1; i<=count; i++) data.block[i] = buf[i-1];
+   for (i = 1; i <= (int)count; i++)
+     data.block[i] = buf[i-1];
    data.block[0] = count;
 
    status = mySmbusAccess (i2cInfo[handle].fd, PI_I2C_SMBUS_WRITE, reg, PI_I2C_SMBUS_BLOCK_PROC_CALL, &data);
@@ -4327,21 +3941,6 @@ int i2cReadI2CBlockData (uint32_t handle, uint32_t reg, char *buf, uint32_t coun
 
    int i, status;
    uint32_t size;
-
-   if (handle >= PI_I2C_SLOTS)
-      SOFT_ERROR (PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if (i2cInfo[handle].state != PI_I2C_OPENED)
-      SOFT_ERROR (PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if ((i2cInfo[handle].funcs & PI_I2C_FUNC_SMBUS_READ_I2C_BLOCK) == 0)
-      SOFT_ERROR (PI_BAD_SMBUS_CMD, "SMBUS command not supported by driver");
-
-   if (reg > 0xFF)
-      SOFT_ERROR (PI_BAD_PARAM, "bad reg (%d)", reg);
-
-   if ((count < 1) || (count > 32))
-      SOFT_ERROR (PI_BAD_PARAM, "bad count (%d)", count);
 
    if (count == 32)
       size = PI_I2C_SMBUS_I2C_BLOCK_BROKEN;
@@ -4371,23 +3970,8 @@ int i2cWriteI2CBlockData (uint32_t handle, uint32_t reg, char *buf, uint32_t cou
    union my_smbus_data data;
 
    int i, status;
-
-   if (handle >= PI_I2C_SLOTS)
-      SOFT_ERROR (PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if (i2cInfo[handle].state != PI_I2C_OPENED)
-      SOFT_ERROR (PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if ((i2cInfo[handle].funcs & PI_I2C_FUNC_SMBUS_WRITE_I2C_BLOCK) == 0)
-      SOFT_ERROR (PI_BAD_SMBUS_CMD, "SMBUS command not supported by driver");
-
-   if (reg > 0xFF)
-      SOFT_ERROR (PI_BAD_PARAM, "bad reg (%d)", reg);
-
-   if ((count < 1) || (count > 32))
-      SOFT_ERROR (PI_BAD_PARAM, "bad count (%d)", count);
-
-   for (i=1; i<=count; i++) data.block[i] = buf[i-1];
+   for (i = 1; i <= (int)count; i++)
+     data.block[i] = buf[i-1];
 
    data.block[0] = count;
 
@@ -4403,20 +3987,8 @@ int i2cWriteI2CBlockData (uint32_t handle, uint32_t reg, char *buf, uint32_t cou
 //{{{
 int i2cWriteDevice (uint32_t handle, char *buf, uint32_t count)
 {
-   int bytes;
-
-   if (handle >= PI_I2C_SLOTS)
-      SOFT_ERROR (PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if (i2cInfo[handle].state != PI_I2C_OPENED)
-      SOFT_ERROR (PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if ((count < 1) || (count > PI_MAX_I2C_DEVICE_COUNT))
-      SOFT_ERROR (PI_BAD_PARAM, "bad count (%d)", count);
-
-   bytes = write(i2cInfo[handle].fd, buf, count);
-
-   if (bytes != count)
+   int bytes = write(i2cInfo[handle].fd, buf, count);
+   if (bytes != (int)count)
       return PI_I2C_WRITE_FAILED;
 
    return 0;
@@ -4425,20 +3997,9 @@ int i2cWriteDevice (uint32_t handle, char *buf, uint32_t count)
 //{{{
 int i2cReadDevice (uint32_t handle, char *buf, uint32_t count)
 {
-   int bytes;
+   int bytes = read(i2cInfo[handle].fd, buf, count);
 
-   if (handle >= PI_I2C_SLOTS)
-      SOFT_ERROR (PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if (i2cInfo[handle].state != PI_I2C_OPENED)
-      SOFT_ERROR (PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if ((count < 1) || (count > PI_MAX_I2C_DEVICE_COUNT))
-      SOFT_ERROR (PI_BAD_PARAM, "bad count (%d)", count);
-
-   bytes = read(i2cInfo[handle].fd, buf, count);
-
-   if (bytes != count)
+   if (bytes != (int)count)
       return PI_I2C_READ_FAILED;
 
    return bytes;
@@ -4452,12 +4013,6 @@ int i2cOpen (uint32_t i2cBus, uint32_t i2cAddr, uint32_t i2cFlags)
    char dev[32];
    int i, slot, fd;
    uint32_t funcs;
-
-   if (i2cAddr > PI_MAX_I2C_ADDR)
-      SOFT_ERROR (PI_BAD_I2C_ADDR, "bad I2C address (%d)", i2cAddr);
-
-   if (i2cFlags)
-      SOFT_ERROR (PI_BAD_FLAGS, "bad flags (0x%X)", i2cFlags);
 
    slot = -1;
 
@@ -4475,7 +4030,8 @@ int i2cOpen (uint32_t i2cBus, uint32_t i2cAddr, uint32_t i2cFlags)
 
    pthread_mutex_unlock(&mutex);
 
-   if (slot < 0) SOFT_ERROR (PI_NO_HANDLE, "no I2C handles");
+   if (slot < 0)
+     LOG_ERROR ("no I2C handles");
 
    sprintf(dev, "/dev/i2c-%d", i2cBus);
 
@@ -4519,218 +4075,185 @@ int i2cOpen (uint32_t i2cBus, uint32_t i2cAddr, uint32_t i2cFlags)
 //{{{
 int i2cClose (uint32_t handle)
 {
-   if (handle >= PI_I2C_SLOTS)
-      SOFT_ERROR (PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-   if (i2cInfo[handle].state != PI_I2C_OPENED)
-      SOFT_ERROR (PI_BAD_HANDLE, "bad handle (%d)", handle);
-
    if (i2cInfo[handle].fd >= 0) close(i2cInfo[handle].fd);
-
    i2cInfo[handle].fd = -1;
    i2cInfo[handle].state = PI_I2C_CLOSED;
-
    return 0;
 }
 //}}}
 
 //{{{
-void i2cSwitchCombined (int setting)
-{
-   int fd;
+void i2cSwitchCombined (int setting) {
 
-   fd = open(PI_I2C_COMBINED, O_WRONLY);
-
-   if (fd >= 0)
-   {
-      if (setting)
-      {
-         if (write(fd, "1\n", 2) == -1) { /* ignore errors */ }
+  int fd = open ("/sys/module/i2c_bcm2708/parameters/combined", O_WRONLY);
+  if (fd >= 0) {
+    if (setting) {
+      if (write (fd, "1\n", 2) == -1) {}
       }
-      else
-      {
-         if (write(fd, "0\n", 2) == -1) { /* ignore errors */ }
+    else {
+      if (write (fd, "0\n", 2) == -1) {}
       }
 
-      close(fd);
-   }
-}
+    close(fd);
+    }
+  }
 //}}}
 //{{{
-int i2cSegments (uint32_t handle, pi_i2c_msg_t *segs, uint32_t numSegs)
-{
-   int retval;
-   my_i2c_rdwr_ioctl_data_t rdwr;
+int i2cSegments (uint32_t handle, pi_i2c_msg_t *segs, uint32_t numSegs) {
 
-   if (handle >= PI_I2C_SLOTS)
-      SOFT_ERROR (PI_BAD_HANDLE, "bad handle (%d)", handle);
+  int retval;
+  my_i2c_rdwr_ioctl_data_t rdwr;
+  rdwr.msgs = segs;
+  rdwr.nmsgs = numSegs;
 
-   if (i2cInfo[handle].state != PI_I2C_OPENED)
-      SOFT_ERROR (PI_BAD_HANDLE, "bad handle (%d)", handle);
+  retval = ioctl (i2cInfo[handle].fd, PI_I2C_RDWR, &rdwr);
 
-   if (segs == NULL)
-      SOFT_ERROR (PI_BAD_POINTER, "null segments");
-
-   if (numSegs > PI_I2C_RDRW_IOCTL_MAX_MSGS)
-      SOFT_ERROR (PI_TOO_MANY_SEGS, "too many segments (%d)", numSegs);
-
-   rdwr.msgs = segs;
-   rdwr.nmsgs = numSegs;
-
-   retval = ioctl(i2cInfo[handle].fd, PI_I2C_RDWR, &rdwr);
-
-   if (retval >= 0) return retval;
-   else             return PI_BAD_I2C_SEG;
-}
+  if (retval >= 0)
+    return retval;
+  else
+    return PI_BAD_I2C_SEG;
+  }
 //}}}
 //{{{
-int i2cZip (uint32_t handle, char *inBuf, uint32_t inLen, char *outBuf, uint32_t outLen)
-{
-   int numSegs, inPos, outPos, status, bytes, flags, addr;
-   int esc, setesc;
-   pi_i2c_msg_t segs[PI_I2C_RDRW_IOCTL_MAX_MSGS];
+int i2cZip (uint32_t handle, char *inBuf, uint32_t inLen, char *outBuf, uint32_t outLen) {
 
-   if (handle >= PI_I2C_SLOTS)
-      SOFT_ERROR (PI_BAD_HANDLE, "bad handle (%d)", handle);
+  int bytes;
+  int numSegs = 0;
+  int inPos = 0;
+  int outPos = 0;
+  int status = 0;
+  int addr = i2cInfo[handle].addr;
+  int flags = 0;
+  int esc = 0;
+  int setesc = 0;
+  pi_i2c_msg_t segs[PI_I2C_RDRW_IOCTL_MAX_MSGS];
 
-   if (i2cInfo[handle].state != PI_I2C_OPENED)
-      SOFT_ERROR (PI_BAD_HANDLE, "bad handle (%d)", handle);
+  while (!status && (inPos < (int)inLen)) {
+    switch (inBuf[inPos++]) {
+      //{{{
+      case PI_I2C_END:
+        status = 1;
+        break;
+      //}}}
+      //{{{
+      case PI_I2C_COMBINED_ON:
+        // Run prior transactions before setting combined flag
+        if (numSegs) {
+          status = i2cSegments (handle, segs, numSegs);
+          if (status >= 0)
+            status = 0; //* continue
+          numSegs = 0;
+          }
 
-   if (!inBuf || !inLen)
-      SOFT_ERROR (PI_BAD_POINTER, "input buffer can't be NULL");
-
-   if (!outBuf && outLen)
-      SOFT_ERROR (PI_BAD_POINTER, "output buffer can't be NULL");
-
-   numSegs = 0;
-
-   inPos = 0;
-   outPos = 0;
-   status = 0;
-
-   addr = i2cInfo[handle].addr;
-   flags = 0;
-   esc = 0;
-   setesc = 0;
-
-   while (!status && (inPos < inLen)) {
-      DBG (DBG_INTERNAL, "status=%d inpos=%d inlen=%d cmd=%d addr=%d flags=%x",
-         status, inPos, inLen, inBuf[inPos], addr, flags);
-
-      switch (inBuf[inPos++])
-      {
-         case PI_I2C_END:
-            status = 1;
-            break;
-
-         case PI_I2C_COMBINED_ON:
-            /* Run prior transactions before setting combined flag */
-            if (numSegs)
-            {
-               status = i2cSegments(handle, segs, numSegs);
-               if (status >= 0) status = 0; /* continue */
-               numSegs = 0;
+        i2cSwitchCombined(1);
+        break;
+      //}}}
+      //{{{
+      case PI_I2C_COMBINED_OFF:
+        // Run prior transactions before clearing combined flag
+        if (numSegs) {
+          status = i2cSegments (handle, segs, numSegs);
+          if (status >= 0)
+            status = 0; // continue
+          numSegs = 0;
+          }
+        i2cSwitchCombined(0);
+        break;
+      //}}}
+      //{{{
+      case PI_I2C_ADDR:
+        addr = myI2CGetPar (inBuf, &inPos, inLen, &esc);
+        if (addr < 0)
+          status = PI_BAD_I2C_CMD;
+        break;
+      //}}}
+      //{{{
+      case PI_I2C_FLAGS:
+        // cheat to force two byte flags
+        esc = 1;
+        flags = myI2CGetPar(inBuf, &inPos, inLen, &esc);
+        if (flags < 0)
+          status = PI_BAD_I2C_CMD;
+        break;
+      //}}}
+      //{{{
+      case PI_I2C_ESC:
+        setesc = 1;
+        break;
+      //}}}
+      //{{{
+      case PI_I2C_READ:
+        bytes = myI2CGetPar(inBuf, &inPos, inLen, &esc);
+        if (bytes >= 0) {
+          if ((bytes + outPos) < (int)outLen) {
+            segs[numSegs].addr = addr;
+            segs[numSegs].flags = (flags|1);
+            segs[numSegs].len = bytes;
+            segs[numSegs].buf = (uint8_t *)(outBuf + outPos);
+            outPos += bytes;
+            numSegs++;
+            if (numSegs >= PI_I2C_RDRW_IOCTL_MAX_MSGS) {
+              status = i2cSegments(handle, segs, numSegs);
+              if (status >= 0)
+                status = 0; // continue
+              numSegs = 0;
+              }
             }
-            i2cSwitchCombined(1);
-            break;
+          else
+            status = PI_BAD_I2C_RLEN;
+          }
+        else
+          status = PI_BAD_I2C_RLEN;
+        break;
+      //}}}
+      //{{{
+      case PI_I2C_WRITE:
 
-         case PI_I2C_COMBINED_OFF:
-            /* Run prior transactions before clearing combined flag */
-            if (numSegs)
-            {
-               status = i2cSegments(handle, segs, numSegs);
-               if (status >= 0) status = 0; /* continue */
-               numSegs = 0;
+        bytes = myI2CGetPar(inBuf, &inPos, inLen, &esc);
+        if (bytes >= 0) {
+          if ((bytes + inPos) < (int)inLen) {
+            segs[numSegs].addr = addr;
+            segs[numSegs].flags = (flags&0xfffe);
+            segs[numSegs].len = bytes;
+            segs[numSegs].buf = (uint8_t *)(inBuf + inPos);
+            inPos += bytes;
+            numSegs++;
+            if (numSegs >= PI_I2C_RDRW_IOCTL_MAX_MSGS) {
+              status = i2cSegments(handle, segs, numSegs);
+              if (status >= 0)
+                status = 0; // continue
+              numSegs = 0;
+              }
             }
-            i2cSwitchCombined(0);
-            break;
-
-         case PI_I2C_ADDR:
-            addr = myI2CGetPar(inBuf, &inPos, inLen, &esc);
-            if (addr < 0) status = PI_BAD_I2C_CMD;
-            break;
-
-         case PI_I2C_FLAGS:
-            /* cheat to force two byte flags */
-            esc = 1;
-            flags = myI2CGetPar(inBuf, &inPos, inLen, &esc);
-            if (flags < 0) status = PI_BAD_I2C_CMD;
-            break;
-
-         case PI_I2C_ESC:
-            setesc = 1;
-            break;
-
-         case PI_I2C_READ:
-
-            bytes = myI2CGetPar(inBuf, &inPos, inLen, &esc);
-
-            if (bytes >= 0)
-            {
-               if ((bytes + outPos) < outLen)
-               {
-                  segs[numSegs].addr = addr;
-                  segs[numSegs].flags = (flags|1);
-                  segs[numSegs].len = bytes;
-                  segs[numSegs].buf = (uint8_t *)(outBuf + outPos);
-                  outPos += bytes;
-                  numSegs++;
-                  if (numSegs >= PI_I2C_RDRW_IOCTL_MAX_MSGS)
-                  {
-                     status = i2cSegments(handle, segs, numSegs);
-                     if (status >= 0) status = 0; /* continue */
-                     numSegs = 0;
-                  }
-               }
-               else status = PI_BAD_I2C_RLEN;
-            }
-            else status = PI_BAD_I2C_RLEN;
-            break;
-
-         case PI_I2C_WRITE:
-
-            bytes = myI2CGetPar(inBuf, &inPos, inLen, &esc);
-
-            if (bytes >= 0)
-            {
-               if ((bytes + inPos) < inLen)
-               {
-                  segs[numSegs].addr = addr;
-                  segs[numSegs].flags = (flags&0xfffe);
-                  segs[numSegs].len = bytes;
-                  segs[numSegs].buf = (uint8_t *)(inBuf + inPos);
-                  inPos += bytes;
-                  numSegs++;
-                  if (numSegs >= PI_I2C_RDRW_IOCTL_MAX_MSGS)
-                  {
-                     status = i2cSegments(handle, segs, numSegs);
-                     if (status >= 0) status = 0; /* continue */
-                     numSegs = 0;
-                  }
-               }
-               else status = PI_BAD_I2C_WLEN;
-            }
-            else status = PI_BAD_I2C_WLEN;
-            break;
-
-         default:
-            status = PI_BAD_I2C_CMD;
+          else
+            status = PI_BAD_I2C_WLEN;
+          }
+        else
+           status = PI_BAD_I2C_WLEN;
+        break;
+      //}}}
+      //{{{
+      default:
+        status = PI_BAD_I2C_CMD;
+      //}}}
       }
 
-      if (setesc) esc = 1; else esc = 0;
+    if (setesc)
+      esc = 1;
+    else
+      esc = 0;
+    setesc = 0;
+    }
 
-      setesc = 0;
-   }
+  if (status >= 0)
+     if (numSegs)
+       status = i2cSegments(handle, segs, numSegs);
 
-   if (status >= 0)
-   {
-      if (numSegs) status = i2cSegments(handle, segs, numSegs);
-   }
+  if (status >= 0)
+    status = outPos;
 
-   if (status >= 0) status = outPos;
-
-   return status;
-}
+  return status;
+  }
 //}}}
 
 // internal bitBang
@@ -4871,203 +4394,174 @@ static uint8_t I2CGetByte (wfRx_t* w, int nack)
 
 // external bitBang
 //{{{
-int bbI2COpen (uint32_t SDA, uint32_t SCL, uint32_t baud)
-{
-   if (SDA > PI_MAX_USER_GPIO)
-      SOFT_ERROR (PI_BAD_USER_GPIO, "bad SDA (%d)", SDA);
+int bbI2COpen (uint32_t SDA, uint32_t SCL, uint32_t baud) {
 
-   if (SCL > PI_MAX_USER_GPIO)
-      SOFT_ERROR (PI_BAD_USER_GPIO, "bad SCL (%d)", SCL);
+  wfRx[SDA].gpio = SDA;
+  wfRx[SDA].mode = PI_WFRX_I2C_SDA;
+  wfRx[SDA].baud = baud;
 
-   if ((baud < PI_BB_I2C_MIN_BAUD) || (baud > PI_BB_I2C_MAX_BAUD))
-      SOFT_ERROR (PI_BAD_I2C_BAUD,
-         "SDA %d, bad baud rate (%d)", SDA, baud);
+  wfRx[SDA].I.started = 0;
+  wfRx[SDA].I.SDA = SDA;
+  wfRx[SDA].I.SCL = SCL;
+  wfRx[SDA].I.delay = 500000 / baud;
+  wfRx[SDA].I.SDAMode = gpioGetMode(SDA);
+  wfRx[SDA].I.SCLMode = gpioGetMode(SCL);
 
-   if (wfRx[SDA].mode != PI_WFRX_NONE)
-      SOFT_ERROR (PI_GPIO_IN_USE, "gpio %d is already being used", SDA);
+  wfRx[SCL].gpio = SCL;
+  wfRx[SCL].mode = PI_WFRX_I2C_SCL;
 
-   if ((wfRx[SCL].mode != PI_WFRX_NONE)  || (SCL == SDA))
-      SOFT_ERROR (PI_GPIO_IN_USE, "gpio %d is already being used", SCL);
+  myGpioSetMode(SDA, PI_INPUT);
+  myGpioSetMode(SCL, PI_INPUT);
 
-   wfRx[SDA].gpio = SDA;
-   wfRx[SDA].mode = PI_WFRX_I2C_SDA;
-   wfRx[SDA].baud = baud;
-
-   wfRx[SDA].I.started = 0;
-   wfRx[SDA].I.SDA = SDA;
-   wfRx[SDA].I.SCL = SCL;
-   wfRx[SDA].I.delay = 500000 / baud;
-   wfRx[SDA].I.SDAMode = gpioGetMode(SDA);
-   wfRx[SDA].I.SCLMode = gpioGetMode(SCL);
-
-   wfRx[SCL].gpio = SCL;
-   wfRx[SCL].mode = PI_WFRX_I2C_SCL;
-
-   myGpioSetMode(SDA, PI_INPUT);
-   myGpioSetMode(SCL, PI_INPUT);
-
-   return 0;
-}
+  return 0;
+  }
 //}}}
 //{{{
-int bbI2CClose (uint32_t SDA)
-{
-   if (SDA > PI_MAX_USER_GPIO)
-      SOFT_ERROR (PI_BAD_USER_GPIO, "bad gpio (%d)", SDA);
+int bbI2CClose (uint32_t SDA) {
 
-   switch(wfRx[SDA].mode)
-   {
-      case PI_WFRX_I2C_SDA:
+  switch(wfRx[SDA].mode) {
+    case PI_WFRX_I2C_SDA:
+      myGpioSetMode(wfRx[SDA].I.SDA, wfRx[SDA].I.SDAMode);
+      myGpioSetMode(wfRx[SDA].I.SCL, wfRx[SDA].I.SCLMode);
+      wfRx[wfRx[SDA].I.SDA].mode = PI_WFRX_NONE;
+      wfRx[wfRx[SDA].I.SCL].mode = PI_WFRX_NONE;
+      break;
 
-         myGpioSetMode(wfRx[SDA].I.SDA, wfRx[SDA].I.SDAMode);
-         myGpioSetMode(wfRx[SDA].I.SCL, wfRx[SDA].I.SCLMode);
+    default:
+      LOG_ERROR ("no I2C on gpio (%d)", SDA);
+      break;
+    }
 
-         wfRx[wfRx[SDA].I.SDA].mode = PI_WFRX_NONE;
-         wfRx[wfRx[SDA].I.SCL].mode = PI_WFRX_NONE;
-
-         break;
-
-      default:
-
-         SOFT_ERROR (PI_NOT_I2C_GPIO, "no I2C on gpio (%d)", SDA);
-
-         break;
-
-   }
-
-   return 0;
-}
+  return 0;
+  }
 //}}}
 //{{{
-int bbI2CZip (uint32_t SDA, char *inBuf, uint32_t inLen, char *outBuf, uint32_t outLen)
-{
-   int i, ack, inPos, outPos, status, bytes;
-   int addr, flags, esc, setesc;
-   wfRx_t *w;
+int bbI2CZip (uint32_t SDA, char* inBuf, uint32_t inLen, char* outBuf, uint32_t outLen) {
 
-   if (SDA > PI_MAX_USER_GPIO)
-      SOFT_ERROR (PI_BAD_USER_GPIO, "bad gpio (%d)", SDA);
+  int i, ack, inPos, outPos, status, bytes;
+  int addr, flags, esc, setesc;
+  wfRx_t* w = &wfRx[SDA];
 
-   if (wfRx[SDA].mode != PI_WFRX_I2C_SDA)
-      SOFT_ERROR (PI_NOT_I2C_GPIO, "no I2C on gpio (%d)", SDA);
+  inPos = 0;
+  outPos = 0;
+  status = 0;
+  addr = 0;
+  flags = 0;
+  esc = 0;
+  setesc = 0;
 
-   if (!inBuf || !inLen)
-      SOFT_ERROR (PI_BAD_POINTER, "input buffer can't be NULL");
+  wfRx_lock (SDA);
 
-   if (!outBuf && outLen)
-      SOFT_ERROR (PI_BAD_POINTER, "output buffer can't be NULL");
+  while (!status && (inPos < (int)inLen)) {
+    cLog::log (LOGINFO, "status=%d inpos=%d inlen=%d cmd=%d addr=%d flags=%x",
+                       status, inPos, inLen, inBuf[inPos], addr, flags);
 
-   w = &wfRx[SDA];
+    switch (inBuf[inPos++]) {
+      //{{{
+      case PI_I2C_END:
+        status = 1;
+        break;
+      //}}}
+      //{{{
+      case PI_I2C_START:
+        I2CStart(w);
+        break;
+      //}}}
+      //{{{
+      case PI_I2C_STOP:
+        I2CStop(w);
+        break;
+      //}}}
+      //{{{
+      case PI_I2C_ADDR:
+        addr = myI2CGetPar(inBuf, &inPos, inLen, &esc);
+        if (addr < 0)
+          status = PI_BAD_I2C_CMD;
+        break;
+      //}}}
+      //{{{
+      case PI_I2C_FLAGS:
+        /* cheat to force two byte flags */
+        esc = 1;
+        flags = myI2CGetPar (inBuf, &inPos, inLen, &esc);
+        if (flags < 0)
+          status = PI_BAD_I2C_CMD;
+        break;
+      //}}}
+      //{{{
+      case PI_I2C_ESC:
+        setesc = 1;
+        break;
+      //}}}
+      //{{{
+      case PI_I2C_READ:
+        bytes = myI2CGetPar(inBuf, &inPos, inLen, &esc);
+        if (bytes >= 0)
+          ack = I2CPutByte(w, (addr<<1)|1);
 
-   inPos = 0;
-   outPos = 0;
-   status = 0;
-
-   addr = 0;
-   flags = 0;
-   esc = 0;
-   setesc = 0;
-
-   wfRx_lock(SDA);
-
-   while (!status && (inPos < inLen)) {
-      DBG (DBG_INTERNAL, "status=%d inpos=%d inlen=%d cmd=%d addr=%d flags=%x",
-         status, inPos, inLen, inBuf[inPos], addr, flags);
-
-      switch (inBuf[inPos++]) {
-         case PI_I2C_END:
-            status = 1;
-            break;
-
-         case PI_I2C_START:
-            I2CStart(w);
-            break;
-
-         case PI_I2C_STOP:
-            I2CStop(w);
-            break;
-
-         case PI_I2C_ADDR:
-            addr = myI2CGetPar(inBuf, &inPos, inLen, &esc);
-            if (addr < 0) status = PI_BAD_I2C_CMD;
-            break;
-
-         case PI_I2C_FLAGS:
-            /* cheat to force two byte flags */
-            esc = 1;
-            flags = myI2CGetPar(inBuf, &inPos, inLen, &esc);
-            if (flags < 0) status = PI_BAD_I2C_CMD;
-            break;
-
-         case PI_I2C_ESC:
-            setesc = 1;
-            break;
-
-         case PI_I2C_READ:
-
-            bytes = myI2CGetPar(inBuf, &inPos, inLen, &esc);
-
-            if (bytes >= 0) ack = I2CPutByte(w, (addr<<1)|1);
-
-            if (bytes > 0)
-            {
-               if (!ack)
-               {
-                  if ((bytes + outPos) <= outLen)
-                  {
-                     for (i=0; i<(bytes-1); i++)
-                     {
-                        outBuf[outPos++] = I2CGetByte(w, 0);
-                     }
-                     outBuf[outPos++] = I2CGetByte(w, 1);
-                  }
-                  else status = PI_BAD_I2C_RLEN;
+         if (bytes > 0) {
+           if (!ack) {
+             if ((bytes + outPos) <= (int)outLen) {
+               for (i=0; i<(bytes-1); i++)
+                 outBuf[outPos++] = I2CGetByte(w, 0);
+               outBuf[outPos++] = I2CGetByte(w, 1);
                }
-               else status = PI_I2C_READ_FAILED;
+             else
+               status = PI_BAD_I2C_RLEN;
+             }
+           else
+             status = PI_I2C_READ_FAILED;
+          }
+        else
+          status = PI_BAD_I2C_CMD;
+        break;
+      //}}}
+      //{{{
+      case PI_I2C_WRITE:
+        bytes = myI2CGetPar(inBuf, &inPos, inLen, &esc);
+        if (bytes >= 0)
+          ack = I2CPutByte(w, addr<<1);
+
+        if (bytes > 0) {
+          if (!ack) {
+            if ((bytes + inPos) <= (int)inLen) {
+              for (i=0; i<(bytes-1); i++) {
+                ack = I2CPutByte(w, inBuf[inPos++]);
+                if (ack)
+                  status = PI_I2C_WRITE_FAILED;
+                }
+              ack = I2CPutByte(w, inBuf[inPos++]);
+              }
+            else
+              status = PI_BAD_I2C_WLEN;
             }
-            else status = PI_BAD_I2C_CMD;
-            break;
-
-         case PI_I2C_WRITE:
-
-            bytes = myI2CGetPar(inBuf, &inPos, inLen, &esc);
-
-            if (bytes >= 0) ack = I2CPutByte(w, addr<<1);
-
-            if (bytes > 0)
-            {
-               if (!ack)
-               {
-                  if ((bytes + inPos) <= inLen)
-                  {
-                     for (i=0; i<(bytes-1); i++)
-                     {
-                        ack = I2CPutByte(w, inBuf[inPos++]);
-                        if (ack) status = PI_I2C_WRITE_FAILED;
-                     }
-                     ack = I2CPutByte(w, inBuf[inPos++]);
-                  }
-                  else status = PI_BAD_I2C_WLEN;
-               } else status = PI_I2C_WRITE_FAILED;
-            }
-            else status = PI_BAD_I2C_CMD;
-            break;
-
-         default:
-            status = PI_BAD_I2C_CMD;
+          else
+            status = PI_I2C_WRITE_FAILED;
+          }
+        else
+          status = PI_BAD_I2C_CMD;
+        break;
+      //}}}
+      //{{{
+      default:
+        status = PI_BAD_I2C_CMD;
+      //}}}
       }
 
-      if (setesc) esc = 1; else esc = 0;
+    if (setesc)
+      esc = 1;
+    else
+      esc = 0;
+    setesc = 0;
+    }
 
-      setesc = 0;
-   }
+  wfRx_unlock (SDA);
 
-   wfRx_unlock(SDA);
+  if (status >= 0)
+    status = outPos;
 
-   if (status >= 0) status = outPos;
-
-   return status;
-}
+  return status;
+  }
 //}}}
 
 // bsc mode
@@ -5175,7 +4669,7 @@ int bscXfer (bsc_xfer_t* xfer) {
       active = 1;
       }
 
-    while ((xfer->rxCnt < BSC_FIFO_SIZE) && (!(bscsReg[BSC_FR] & BSC_FR_RXFE))) {
+    while ((xfer->rxCnt < kBscFifoSize) && (!(bscsReg[BSC_FR] & BSC_FR_RXFE))) {
       xfer->rxBuf[xfer->rxCnt++] = bscsReg[BSC_DR];
       active = 1;
       }
@@ -5204,7 +4698,7 @@ int serOpen (char* tty, uint32_t serBaud, uint32_t serFlags) {
   int i, slot;
 
   if (strncmp ("/dev/tty", tty, 8) && strncmp ("/dev/serial", tty, 11))
-    SOFT_ERROR (PI_BAD_SER_DEVICE, "bad device (%s)", tty);
+    LOG_ERROR ("bad device (%s)", tty);
 
   switch (serBaud) {
     case     50: speed =     B50; break;
@@ -5226,11 +4720,11 @@ int serOpen (char* tty, uint32_t serBaud, uint32_t serFlags) {
     case 115200: speed = B115200; break;
     case 230400: speed = B230400; break;
     default:
-      SOFT_ERROR (PI_BAD_SER_SPEED, "bad speed (%d)", serBaud);
+      LOG_ERROR ("bad speed (%d)", serBaud);
     }
 
   if (serFlags)
-   SOFT_ERROR (PI_BAD_FLAGS, "bad flags (0x%X)", serFlags);
+   LOG_ERROR ("bad flags (0x%X)", serFlags);
 
   slot = -1;
   pthread_mutex_lock (&mutex);
@@ -5244,7 +4738,7 @@ int serOpen (char* tty, uint32_t serBaud, uint32_t serFlags) {
   pthread_mutex_unlock(&mutex);
 
   if (slot < 0)
-    SOFT_ERROR (PI_NO_HANDLE, "no serial handles");
+    LOG_ERROR ("no serial handles");
 
   if ((fd = open(tty, O_RDWR | O_NOCTTY | O_NDELAY | O_NONBLOCK)) == -1) {
     serInfo[slot].state = PI_SER_CLOSED;
@@ -5275,12 +4769,6 @@ int serOpen (char* tty, uint32_t serBaud, uint32_t serFlags) {
 //{{{
 int serClose (uint32_t handle) {
 
-  if (handle >= PI_SER_SLOTS)
-    SOFT_ERROR (PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-  if (serInfo[handle].state != PI_SER_OPENED)
-    SOFT_ERROR (PI_BAD_HANDLE, "bad handle (%d)", handle);
-
   if (serInfo[handle].fd >= 0)
     close (serInfo[handle].fd);
 
@@ -5294,15 +4782,6 @@ int serClose (uint32_t handle) {
 //{{{
 int serWriteByte (uint32_t handle, uint32_t bVal) {
 
-  if (handle >= PI_SER_SLOTS)
-    SOFT_ERROR (PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-  if (serInfo[handle].state != PI_SER_OPENED)
-    SOFT_ERROR (PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-  if (bVal > 0xFF)
-    SOFT_ERROR (PI_BAD_PARAM, "bad parameter (%d)", bVal);
-
   char c = bVal;
   if (write (serInfo[handle].fd, &c, 1) != 1)
     return PI_SER_WRITE_FAILED;
@@ -5315,12 +4794,6 @@ int serReadByte (uint32_t handle) {
 
   int r;
   char x;
-
-  if (handle >= PI_SER_SLOTS)
-    SOFT_ERROR (PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-  if (serInfo[handle].state != PI_SER_OPENED)
-    SOFT_ERROR (PI_BAD_HANDLE, "bad handle (%d)", handle);
 
   r = read(serInfo[handle].fd, &x, 1);
   if (r == 1)
@@ -5340,26 +4813,17 @@ int serWrite (uint32_t handle, char *buf, uint32_t count) {
   int written = 0;
   int wrote = 0;
 
-  if (handle >= PI_SER_SLOTS)
-    SOFT_ERROR (PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-  if (serInfo[handle].state != PI_SER_OPENED)
-   SOFT_ERROR (PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-  if (!count)
-    SOFT_ERROR (PI_BAD_PARAM, "bad count (%d)", count);
-
-  while ((written != count) && (wrote >= 0)) {
+  while ((written != (int)count) && (wrote >= 0)) {
     wrote = write(serInfo[handle].fd, buf+written, count-written);
     if (wrote >= 0) {
       written += wrote;
 
-      if (written != count)
+      if (written != (int)count)
         timeSleep (0.05);
       }
     }
 
-  if (written != count)
+  if (written != (int)count)
      return PI_SER_WRITE_FAILED;
   else
      return 0;
@@ -5368,17 +4832,7 @@ int serWrite (uint32_t handle, char *buf, uint32_t count) {
 //{{{
 int serRead (uint32_t handle, char *buf, uint32_t count) {
 
-  if (handle >= PI_SER_SLOTS)
-    SOFT_ERROR (PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-  if (serInfo[handle].state != PI_SER_OPENED)
-    SOFT_ERROR (PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-  if (!count)
-    SOFT_ERROR (PI_BAD_PARAM, "bad count (%d)", count);
-
   int r = read (serInfo[handle].fd, buf, count);
-
   if (r == -1) {
     if (errno == EAGAIN)
       return PI_SER_READ_NO_DATA;
@@ -5386,7 +4840,7 @@ int serRead (uint32_t handle, char *buf, uint32_t count) {
       return PI_SER_READ_FAILED;
     }
   else {
-    if (r < count) buf[r] = 0;
+    if (r < (int)count) buf[r] = 0;
       return r;
     }
   }
@@ -5394,12 +4848,6 @@ int serRead (uint32_t handle, char *buf, uint32_t count) {
 
 //{{{
 int serDataAvailable (uint32_t handle) {
-
-  if (handle >= PI_SER_SLOTS)
-    SOFT_ERROR (PI_BAD_HANDLE, "bad handle (%d)", handle);
-
-  if (serInfo[handle].state != PI_SER_OPENED)
-    SOFT_ERROR (PI_BAD_HANDLE, "bad handle (%d)", handle);
 
   int result;
   if (ioctl (serInfo[handle].fd, FIONREAD, &result) == -1)
@@ -5412,18 +4860,6 @@ int serDataAvailable (uint32_t handle) {
 // bitbang
 //{{{
 int gpioSerialReadOpen (uint32_t gpio, uint32_t baud, uint32_t data_bits) {
-
-  if (gpio > PI_MAX_USER_GPIO)
-    SOFT_ERROR (PI_BAD_USER_GPIO, "bad gpio (%d)", gpio);
-
-  if ((baud < PI_BB_SER_MIN_BAUD) || (baud > PI_BB_SER_MAX_BAUD))
-    SOFT_ERROR (PI_BAD_WAVE_BAUD, "gpio %d, bad baud rate (%d)", gpio, baud);
-
-  if ((data_bits < PI_MIN_WAVE_DATABITS) || (data_bits > PI_MAX_WAVE_DATABITS))
-    SOFT_ERROR (PI_BAD_DATABITS, "gpio %d, bad data bits (%d)", gpio, data_bits);
-
-  if (wfRx[gpio].mode != PI_WFRX_NONE)
-    SOFT_ERROR (PI_GPIO_IN_USE, "gpio %d is already being used", gpio);
 
   int bitTime = (1000 * MILLION) / baud; /* nanos */
   int timeout  = ((data_bits+2) * bitTime)/MILLION; /* millis */
@@ -5458,41 +4894,20 @@ int gpioSerialReadOpen (uint32_t gpio, uint32_t baud, uint32_t data_bits) {
 //{{{
 int gpioSerialReadInvert (uint32_t gpio, uint32_t invert) {
 
-  if (gpio > PI_MAX_USER_GPIO)
-    SOFT_ERROR (PI_BAD_USER_GPIO, "bad gpio (%d)", gpio);
-
-  if (wfRx[gpio].mode != PI_WFRX_SERIAL)
-    SOFT_ERROR (PI_NOT_SERIAL_GPIO, "no serial read on gpio (%d)", gpio);
-
-  if ((invert < PI_BB_SER_NORMAL) ||
-      (invert > PI_BB_SER_INVERT))
-    SOFT_ERROR (PI_BAD_SER_INVERT, "bad invert level for gpio %d (%d)", gpio, invert);
-
   wfRx[gpio].s.invert = invert;
-
   return 0;
   }
 //}}}
 //{{{
 int gpioSerialRead (uint32_t gpio, void *buf, size_t bufSize) {
 
-  uint32_t bytes=0, wpos;
-  volatile wfRx_t *w;
-
-  if (gpio > PI_MAX_USER_GPIO)
-    SOFT_ERROR (PI_BAD_USER_GPIO, "bad gpio (%d)", gpio);
-
-  if (bufSize == 0)
-    SOFT_ERROR (PI_BAD_SERIAL_COUNT, "buffer size can't be zero");
-
-  if (wfRx[gpio].mode != PI_WFRX_SERIAL)
-    SOFT_ERROR (PI_NOT_SERIAL_GPIO, "no serial read on gpio (%d)", gpio);
-
-  w = &wfRx[gpio];
+  uint32_t bytes = 0;
+  uint32_t wpos;
+  volatile wfRx_t* w = &wfRx[gpio];
   if (w->s.readPos != w->s.writePos) {
     wpos = w->s.writePos;
 
-    if (wpos > w->s.readPos)
+    if ((int)wpos > w->s.readPos)
       bytes = wpos - w->s.readPos;
     else
       bytes = w->s.bufSize - w->s.readPos;
@@ -5507,7 +4922,7 @@ int gpioSerialRead (uint32_t gpio, void *buf, size_t bufSize) {
 
     w->s.readPos += bytes;
 
-    if (w->s.readPos >= w->s.bufSize)
+    if (w->s.readPos >= (int)w->s.bufSize)
       w->s.readPos = 0;
     }
 
@@ -5517,12 +4932,9 @@ int gpioSerialRead (uint32_t gpio, void *buf, size_t bufSize) {
 //{{{
 int gpioSerialReadClose (uint32_t gpio) {
 
-  if (gpio > PI_MAX_USER_GPIO)
-    SOFT_ERROR (PI_BAD_USER_GPIO, "bad gpio (%d)", gpio);
-
   switch(wfRx[gpio].mode) {
     case PI_WFRX_NONE:
-      SOFT_ERROR (PI_NOT_SERIAL_GPIO, "no serial read on gpio (%d)", gpio);
+      LOG_ERROR ("no serial read on gpio (%d)", gpio);
       break;
 
     case PI_WFRX_SERIAL:
