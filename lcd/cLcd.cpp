@@ -1518,7 +1518,6 @@ bool cLcd9341::initialise() {
   constexpr uint8_t kMX  = 0x40; // memory column address order swap
   constexpr uint8_t kMV  = 0x20; // memory row column exchange
   constexpr uint8_t kBgr = 0x08;
-
   //constexpr uint8_t kML  = 0x10; // lcd vertical refresh
   //constexpr uint8_t kMH  = 0x04; // lcd horizontal refresh
 
@@ -1578,16 +1577,6 @@ bool cLcd9341::initialise() {
   delayUs (50000);
 
   updateLcd (mSpanAll);
-
-  writeCommand (0x04); // Read display identification information
-  uint8_t buf[4] = { 0, 0, 0, 0 };
-  spiXfer (mSpiHandle, (char*)buf, (char*)buf, 4);
-  cLog::log (LOGINFO, format ("04h - {} {} {} {}", buf[0], buf[1], buf[2], buf[3]));
-
-  writeCommand (0x09); // Read display identification information
-  uint8_t buf1[5] = { 0, 0, 0, 0, 0 };
-  spiXfer (mSpiHandle, (char*)buf1, (char*)buf1, 5);
-  cLog::log (LOGINFO, format ("09h - {} {} {} {} {}", buf1[0], buf1[1], buf1[2], buf1[3], buf1[4]));
 
   return true;
   }

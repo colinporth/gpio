@@ -116,10 +116,10 @@
 #include <signal.h>
 #include <errno.h>
 #include <time.h>
-#include <sys/ioctl.h>
 #include <limits.h>
 #include <pthread.h>
 
+#include <sys/ioctl.h>
 #include <sys/time.h>
 #include <sys/mman.h>
 #include <sys/types.h>
@@ -130,15 +130,12 @@
 #include <arpa/inet.h>
 
 #include "pigpio.h"
+
 #include "../../shared/utils/cLog.h"
 //}}}
 //{{{  defines
-#define THOUSAND 1000
-#define MILLION  1000000
-#define BILLION  1000000000
-
 #define BANK (gpio >> 5)
-#define BIT  (1 << (gpio & 0x1F))
+#define BIT (1 << (gpio & 0x1F))
 
 #define LOG_ERROR(format, arg...)     \
   {                                    \
@@ -150,25 +147,22 @@
   do {  \
     (result)->tv_sec =  (a)->tv_sec  + (b)->tv_sec;  \
     (result)->tv_nsec = (a)->tv_nsec + (b)->tv_nsec; \
-    if ((result)->tv_nsec >= BILLION) {              \
+    if ((result)->tv_nsec >= 1000000000) {           \
       ++(result)->tv_sec;                            \
-      (result)->tv_nsec -= BILLION;                  \
+      (result)->tv_nsec -= 1000000000;               \
       }                                              \
     } while (0)
 //}}}
 //{{{
 #define TIMER_SUB(a, b, result) \
-   do                                                              \
-   {                                                               \
-      (result)->tv_sec =  (a)->tv_sec  - (b)->tv_sec;              \
-      (result)->tv_nsec = (a)->tv_nsec - (b)->tv_nsec;             \
-      if ((result)->tv_nsec < 0)                                   \
-      {                                                            \
-         --(result)->tv_sec;                                       \
-         (result)->tv_nsec += BILLION;                             \
-      }                                                            \
-   }                                                               \
-   while (0)
+  do {                                               \
+    (result)->tv_sec =  (a)->tv_sec  - (b)->tv_sec;  \
+    (result)->tv_nsec = (a)->tv_nsec - (b)->tv_nsec; \
+    if ((result)->tv_nsec < 0) {                     \
+      --(result)->tv_sec;                            \
+      (result)->tv_nsec += 1000000000;               \
+      }                                              \
+   } while (0)
 //}}}
 
 //{{{  base addresses
@@ -370,7 +364,6 @@
 #define PCM_GRAY_CLR   (1<<1)
 #define PCM_GRAY_EN    (1<<0)
 //}}}
-#define BCM_PASSWD  (0x5A<<24)
 //{{{  clk
 #define CLK_CTL_MASH(x)((x)<<9)
 #define CLK_CTL_BUSY    (1 <<7)
@@ -655,8 +648,6 @@
 #define PI_I2C_FUNC_SMBUS_WRITE_I2C_BLOCK  0x08000000
 //}}}
 
-#define PI_MASH_MAX_FREQ 23800000
-#define FLUSH_PAGES 1024
 //{{{  mailbox
 #define MB_DEV_MAJOR 100
 
@@ -690,16 +681,216 @@
 #define PI_SPI_FLAGS_GET_CPOL(x)  ((x)&2)
 #define PI_SPI_FLAGS_GET_CSPOL(x) ((x)&4)
 //}}}
+
+//{{{  wave
+#define PI_WAVE_BLOCKS     4
+#define PI_WAVE_MAX_PULSES (PI_WAVE_BLOCKS * 3000)
+#define PI_WAVE_MAX_CHARS  (PI_WAVE_BLOCKS *  300)
+
+#define PI_BB_I2C_MIN_BAUD     50
+#define PI_BB_I2C_MAX_BAUD 500000
+
+#define PI_BB_SPI_MIN_BAUD     50
+#define PI_BB_SPI_MAX_BAUD 250000
+
+#define PI_BB_SER_MIN_BAUD     50
+#define PI_BB_SER_MAX_BAUD 250000
+
+#define PI_BB_SER_NORMAL 0
+#define PI_BB_SER_INVERT 1
+
+#define PI_WAVE_MIN_BAUD      50
+#define PI_WAVE_MAX_BAUD 1000000
+
+#define PI_SPI_MIN_BAUD     32000
+#define PI_SPI_MAX_BAUD 125000000
+
+#define PI_MIN_WAVE_DATABITS 1
+#define PI_MAX_WAVE_DATABITS 32
+
+#define PI_MIN_WAVE_HALFSTOPBITS 2
+#define PI_MAX_WAVE_HALFSTOPBITS 8
+
+#define PI_WAVE_MAX_MICROS (30 * 60 * 1000000) /* half an hour */
+
+#define PI_MAX_WAVES 250
+
+#define PI_MAX_WAVE_CYCLES 65535
+#define PI_MAX_WAVE_DELAY  65535
+
+#define PI_WAVE_COUNT_PAGES 10
+
+// wave tx mode
+#define PI_WAVE_MODE_ONE_SHOT      0
+#define PI_WAVE_MODE_REPEAT        1
+#define PI_WAVE_MODE_ONE_SHOT_SYNC 2
+#define PI_WAVE_MODE_REPEAT_SYNC   3
+
+// special wave at return values
+#define PI_WAVE_NOT_FOUND  9998 /* Transmitted wave not found. */
+#define PI_NO_TX_WAVE      9999 /* No wave being transmitted. */
+//}}}
+//{{{  error Codes
+#define PI_INIT_FAILED       -1 // gpioInitialise failed
+#define PI_BAD_USER_GPIO     -2 // GPIO not 0-31
+#define PI_BAD_GPIO          -3 // GPIO not 0-53
+#define PI_BAD_MODE          -4 // mode not 0-7
+#define PI_BAD_LEVEL         -5 // level not 0-1
+#define PI_BAD_PUD           -6 // pud not 0-2
+#define PI_BAD_PULSEWIDTH    -7 // pulsewidth not 0 or 500-2500
+#define PI_BAD_DUTYCYCLE     -8 // dutycycle outside set range
+#define PI_BAD_TIMER         -9 // timer not 0-9
+#define PI_BAD_MS           -10 // ms not 10-60000
+#define PI_BAD_TIMETYPE     -11 // timetype not 0-1
+#define PI_BAD_SECONDS      -12 // seconds < 0
+#define PI_BAD_MICROS       -13 // micros not 0-999999
+#define PI_TIMER_FAILED     -14 // gpioSetTimerFunc failed
+#define PI_BAD_WDOG_TIMEOUT -15 // timeout not 0-60000
+#define PI_NO_ALERT_FUNC    -16 // DEPRECATED
+#define PI_BAD_CLK_PERIPH   -17 // clock peripheral not 0-1
+#define PI_BAD_CLK_SOURCE   -18 // DEPRECATED
+#define PI_BAD_CLK_MICROS   -19 // clock micros not 1, 2, 4, 5, 8, or 10
+#define PI_BAD_BUF_MILLIS   -20 // buf millis not 100-10000
+#define PI_BAD_DUTYRANGE    -21 // dutycycle range not 25-40000
+#define PI_BAD_DUTY_RANGE   -21 // DEPRECATED (use PI_BAD_DUTYRANGE)
+#define PI_BAD_SIGNUM       -22 // signum not 0-63
+#define PI_BAD_PATHNAME     -23 // can't open pathname
+#define PI_NO_HANDLE        -24 // no handle available
+#define PI_BAD_HANDLE       -25 // unknown handle
+#define PI_BAD_IF_FLAGS     -26 // ifFlags > 4
+#define PI_BAD_CHANNEL      -27 // DMA channel not 0-15
+#define PI_BAD_PRIM_CHANNEL -27 // DMA primary channel not 0-15
+#define PI_BAD_SOCKET_PORT  -28 // socket port not 1024-32000
+#define PI_BAD_FIFO_COMMAND -29 // unrecognized fifo command
+#define PI_BAD_SECO_CHANNEL -30 // DMA secondary channel not 0-15
+#define PI_NOT_INITIALISED  -31 // function called before gpioInitialise
+#define PI_INITIALISED      -32 // function called after gpioInitialise
+#define PI_BAD_WAVE_MODE    -33 // waveform mode not 0-3
+#define PI_BAD_CFG_INTERNAL -34 // bad parameter in gpioCfgInternals call
+#define PI_BAD_WAVE_BAUD    -35 // baud rate not 50-250K(RX)/50-1M(TX)
+#define PI_TOO_MANY_PULSES  -36 // waveform has too many pulses
+#define PI_TOO_MANY_CHARS   -37 // waveform has too many chars
+#define PI_NOT_SERIAL_GPIO  -38 // no bit bang serial read on GPIO
+#define PI_BAD_SERIAL_STRUC -39 // bad (null) serial structure parameter
+#define PI_BAD_SERIAL_BUF   -40 // bad (null) serial buf parameter
+#define PI_NOT_PERMITTED    -41 // GPIO operation not permitted
+#define PI_SOME_PERMITTED   -42 // one or more GPIO not permitted
+#define PI_BAD_WVSC_COMMND  -43 // bad WVSC subcommand
+#define PI_BAD_WVSM_COMMND  -44 // bad WVSM subcommand
+#define PI_BAD_WVSP_COMMND  -45 // bad WVSP subcommand
+#define PI_BAD_PULSELEN     -46 // trigger pulse length not 1-100
+#define PI_BAD_SCRIPT       -47 // invalid script
+#define PI_BAD_SCRIPT_ID    -48 // unknown script id
+#define PI_BAD_SER_OFFSET   -49 // add serial data offset > 30 minutes
+#define PI_GPIO_IN_USE      -50 // GPIO already in use
+#define PI_BAD_SERIAL_COUNT -51 // must read at least a byte at a time
+#define PI_BAD_PARAM_NUM    -52 // script parameter id not 0-9
+#define PI_DUP_TAG          -53 // script has duplicate tag
+#define PI_TOO_MANY_TAGS    -54 // script has too many tags
+#define PI_BAD_SCRIPT_CMD   -55 // illegal script command
+#define PI_BAD_VAR_NUM      -56 // script variable id not 0-149
+#define PI_NO_SCRIPT_ROOM   -57 // no more room for scripts
+#define PI_NO_MEMORY        -58 // can't allocate temporary memory
+#define PI_SOCK_READ_FAILED -59 // socket read failed
+#define PI_SOCK_WRIT_FAILED -60 // socket write failed
+#define PI_TOO_MANY_PARAM   -61 // too many script parameters (> 10)
+#define PI_NOT_HALTED       -62 // DEPRECATED
+#define PI_SCRIPT_NOT_READY -62 // script initialising
+#define PI_BAD_TAG          -63 // script has unresolved tag
+#define PI_BAD_MICS_DELAY   -64 // bad MICS delay (too large)
+#define PI_BAD_MILS_DELAY   -65 // bad MILS delay (too large)
+#define PI_BAD_WAVE_ID      -66 // non existent wave id
+#define PI_TOO_MANY_CBS     -67 // No more CBs for waveform
+#define PI_TOO_MANY_OOL     -68 // No more OOL for waveform
+#define PI_EMPTY_WAVEFORM   -69 // attempt to create an empty waveform
+#define PI_NO_WAVEFORM_ID   -70 // no more waveforms
+#define PI_I2C_OPEN_FAILED  -71 // can't open I2C device
+#define PI_SER_OPEN_FAILED  -72 // can't open serial device
+#define PI_SPI_OPEN_FAILED  -73 // can't open SPI device
+#define PI_BAD_I2C_BUS      -74 // bad I2C bus
+#define PI_BAD_I2C_ADDR     -75 // bad I2C address
+#define PI_BAD_SPI_CHANNEL  -76 // bad SPI channel
+#define PI_BAD_FLAGS        -77 // bad i2c/spi/ser open flags
+#define PI_BAD_SPI_SPEED    -78 // bad SPI speed
+#define PI_BAD_SER_DEVICE   -79 // bad serial device name
+#define PI_BAD_SER_SPEED    -80 // bad serial baud rate
+#define PI_BAD_PARAM        -81 // bad i2c/spi/ser parameter
+#define PI_I2C_WRITE_FAILED -82 // i2c write failed
+#define PI_I2C_READ_FAILED  -83 // i2c read failed
+#define PI_BAD_SPI_COUNT    -84 // bad SPI count
+#define PI_SER_WRITE_FAILED -85 // ser write failed
+#define PI_SER_READ_FAILED  -86 // ser read failed
+#define PI_SER_READ_NO_DATA -87 // ser read no data available
+#define PI_UNKNOWN_COMMAND  -88 // unknown command
+#define PI_SPI_XFER_FAILED  -89 // spi xfer/read/write failed
+#define PI_BAD_POINTER      -90 // bad (NULL) pointer
+#define PI_NO_AUX_SPI       -91 // no auxiliary SPI on Pi A or B
+#define PI_NOT_PWM_GPIO     -92 // GPIO is not in use for PWM
+#define PI_NOT_SERVO_GPIO   -93 // GPIO is not in use for servo pulses
+#define PI_NOT_HCLK_GPIO    -94 // GPIO has no hardware clock
+#define PI_NOT_HPWM_GPIO    -95 // GPIO has no hardware PWM
+#define PI_BAD_HPWM_FREQ    -96 // invalid hardware PWM frequency
+#define PI_BAD_HPWM_DUTY    -97 // hardware PWM dutycycle not 0-1M
+#define PI_BAD_HCLK_FREQ    -98 // invalid hardware clock frequency
+#define PI_BAD_HCLK_PASS    -99 // need password to use hardware clock 1
+#define PI_HPWM_ILLEGAL    -100 // illegal, PWM in use for main clock
+#define PI_BAD_DATABITS    -101 // serial data bits not 1-32
+#define PI_BAD_STOPBITS    -102 // serial (half) stop bits not 2-8
+#define PI_MSG_TOOBIG      -103 // socket/pipe message too big
+#define PI_BAD_MALLOC_MODE -104 // bad memory allocation mode
+#define PI_TOO_MANY_SEGS   -105 // too many I2C transaction segments
+#define PI_BAD_I2C_SEG     -106 // an I2C transaction segment failed
+#define PI_BAD_SMBUS_CMD   -107 // SMBus command not supported by driver
+#define PI_NOT_I2C_GPIO    -108 // no bit bang I2C in progress on GPIO
+#define PI_BAD_I2C_WLEN    -109 // bad I2C write length
+#define PI_BAD_I2C_RLEN    -110 // bad I2C read length
+#define PI_BAD_I2C_CMD     -111 // bad I2C command
+#define PI_BAD_I2C_BAUD    -112 // bad I2C baud rate, not 50-500k
+#define PI_CHAIN_LOOP_CNT  -113 // bad chain loop count
+#define PI_BAD_CHAIN_LOOP  -114 // empty chain loop
+#define PI_CHAIN_COUNTER   -115 // too many chain counters
+#define PI_BAD_CHAIN_CMD   -116 // bad chain command
+#define PI_BAD_CHAIN_DELAY -117 // bad chain delay micros
+#define PI_CHAIN_NESTING   -118 // chain counters nested too deeply
+#define PI_CHAIN_TOO_BIG   -119 // chain is too long
+#define PI_DEPRECATED      -120 // deprecated function removed
+#define PI_BAD_SER_INVERT  -121 // bit bang serial invert not 0 or 1
+#define PI_BAD_EDGE        -122 // bad ISR edge value, not 0-2
+#define PI_BAD_ISR_INIT    -123 // bad ISR initialisation
+#define PI_BAD_FOREVER     -124 // loop forever must be last command
+#define PI_BAD_FILTER      -125 // bad filter parameter
+#define PI_BAD_PAD         -126 // bad pad number
+#define PI_BAD_STRENGTH    -127 // bad pad drive strength
+#define PI_FIL_OPEN_FAILED -128 // file open failed
+#define PI_BAD_FILE_MODE   -129 // bad file mode
+#define PI_BAD_FILE_FLAG   -130 // bad file flag
+#define PI_BAD_FILE_READ   -131 // bad file read
+#define PI_BAD_FILE_WRITE  -132 // bad file write
+#define PI_FILE_NOT_ROPEN  -133 // file not open for read
+#define PI_FILE_NOT_WOPEN  -134 // file not open for write
+#define PI_BAD_FILE_SEEK   -135 // bad file seek
+#define PI_NO_FILE_MATCH   -136 // no files match pattern
+#define PI_NO_FILE_ACCESS  -137 // no permission to access file
+#define PI_FILE_IS_A_DIR   -138 // file is a directory
+#define PI_BAD_SHELL_STATUS -139 // bad shell return status
+#define PI_BAD_SCRIPT_NAME -140 // bad script name
+#define PI_BAD_SPI_BAUD    -141 // bad SPI baud rate, not 50-500k
+#define PI_NOT_SPI_GPIO    -142 // no bit bang SPI in progress on GPIO
+#define PI_BAD_EVENT_ID    -143 // bad event id
+#define PI_CMD_INTERRUPTED -144 // Used by Python
+#define PI_NOT_ON_BCM2711  -145 // not available on BCM2711
+#define PI_ONLY_ON_BCM2711 -146 // only available on BCM2711
+
+#define PI_PIGIF_ERR_0    -2000
+#define PI_PIGIF_ERR_99   -2099
+
+#define PI_CUSTOM_ERR_0   -3000
+#define PI_CUSTOM_ERR_999 -3999
+
+//}}}
 //}}}
 //{{{  typedef
 typedef void (*callbk_t) ();
-//{{{
-struct gpioSignal_t {
-  callbk_t func;
-  uint32_t ex;
-  void* userdata;
-  };
-//}}}
 //{{{
 struct gpioInfo_t {
   uint8_t  is;
@@ -962,10 +1153,7 @@ static gpioInfo_t gpioInfo[PI_MAX_GPIO+1];
 static i2cInfo_t i2cInfo[PI_I2C_SLOTS];
 static serInfo_t serInfo[PI_SER_SLOTS];
 static spiInfo_t spiInfo[PI_SPI_SLOTS];
-
-static gpioSignal_t gpioSignal[PI_MAX_SIGNUM+1];
 static gpioTimer_t gpioTimer[PI_MAX_TIMER+1];
-
 static int pwmFreq[PWM_FREQS];
 //}}}
 //{{{  static var - reset after gpioTerminated
@@ -1143,48 +1331,16 @@ static const uint16_t pwmRealRange[PWM_FREQS] = {
 //{{{
 static void sigHandler (int signum) {
 
-  if ((signum >= PI_MIN_SIGNUM) && (signum <= PI_MAX_SIGNUM)) {
-    if (gpioSignal[signum].func) {
-     //if (gpioSignal[signum].ex)
-     //  (gpioSignal[signum].func)(signum, gpioSignal[signum].userdata);
-     //else
-     //  (gpioSignal[signum].func)(signum);
-      }
-
-    else {
-      switch (signum) {
-        case SIGUSR1:
-          break;
-
-        case SIGUSR2:
-          break;
-
-        case SIGPIPE:
-        case SIGWINCH:
-          break;
-
-        case SIGCHLD:
-          /* Used to notify threads of events */
-          break;
-
-        default:
-          cLog::log (LOGINFO, "Unhandled signal %d, terminating\n", signum);
-          gpioTerminate();
-          exit (-1);
-        }
-      }
-    }
-
-  else {
-    // exit
-    cLog::log (LOGINFO,  "Unhandled signal %d, terminating\n", signum);
-    gpioTerminate();
-    exit (-1);
-    }
+  cLog::log (LOGINFO,  "Unhandled signal %d, terminating\n", signum);
+  gpioTerminate();
+  exit (-1);
   }
 //}}}
 //{{{
 static void sigSetHandler() {
+
+  #define PI_MIN_SIGNUM 0
+  #define PI_MAX_SIGNUM 63
 
   struct sigaction newSigAction;
   for (int i = PI_MIN_SIGNUM; i <= PI_MAX_SIGNUM; i++) {
@@ -1194,156 +1350,8 @@ static void sigSetHandler() {
     }
   }
 //}}}
-//{{{
-static void flushMemory() {
 
-  static int val = 0;
-
-  void* dummy = mmap (0, (FLUSH_PAGES * PAGE_SIZE),
-                      PROT_READ | PROT_WRITE | PROT_EXEC,
-                      MAP_SHARED | MAP_ANONYMOUS |MAP_NORESERVE | MAP_LOCKED,
-                      -1, 0);
-
-  if (dummy == MAP_FAILED)
-    cLog::log (LOGINFO,  "mmap dummy failed (%m)");
-  else {
-    memset (dummy, val++, (FLUSH_PAGES*PAGE_SIZE));
-    memset (dummy, val++, (FLUSH_PAGES*PAGE_SIZE));
-    munmap (dummy, FLUSH_PAGES*PAGE_SIZE);
-    }
-  }
-//}}}
-//{{{  mailbox
-//{{{
-static int mbCreate (char* dev) {
-// https://github.com/raspberrypi/firmware/wiki/Mailbox-property-interface
-
-  unlink (dev);
-  return mknod (dev, S_IFCHR | 0600, makedev (MB_DEV_MAJOR, 0));
-  }
-//}}}
-//{{{
-static int mbOpen() {
-
-  int fd = open ("/dev/vcio", 0);
-  if (fd < 0) {
-    const char* mb2 = "/dev/pigpio-mb";
-    mbCreate ((char*)mb2);
-    fd = open (mb2, 0);
-    }
-
-  return fd;
-  }
-//}}}
-static int mbProperty (int fd, void* buf) { return ioctl (fd, MB_IOCTL, buf); }
-static void mbClose (int fd) { close(fd); }
-
-//{{{
-static uint32_t mbAllocateMemory (int fd, uint32_t size, uint32_t align, uint32_t flags) {
-
-  int i = 1;
-
-  uint32_t p[32];
-  p[i++] = MB_PROCESS_REQUEST;
-  p[i++] = MB_ALLOCATE_MEMORY_TAG;
-  p[i++] = 12;
-  p[i++] = 12;
-  p[i++] = size;
-  p[i++] = align;
-  p[i++] = flags;
-  p[i++] = MB_END_TAG;
-  p[0] = i * sizeof (*p);
-
-  mbProperty (fd, p);
-
-  return p[5];
-  }
-//}}}
-//{{{
-static uint32_t mbLockMemory (int fd, uint32_t handle) {
-
-  int i = 1;
-  uint32_t p[32];
-  p[i++] = MB_PROCESS_REQUEST;
-  p[i++] = MB_LOCK_MEMORY_TAG;
-  p[i++] = 4;
-  p[i++] = 4;
-  p[i++] = handle;
-  p[i++] = MB_END_TAG;
-  p[0] = i * sizeof (*p);
-  mbProperty (fd, p);
-
-  return p[5];
-  }
-//}}}
-//{{{
-static uint32_t mbUnlockMemory (int fd, uint32_t handle) {
-
-  int i = 1;
-  uint32_t p[32];
-  p[i++] = MB_PROCESS_REQUEST;
-  p[i++] = MB_UNLOCK_MEMORY_TAG;
-  p[i++] = 4;
-  p[i++] = 4;
-  p[i++] = handle;
-  p[i++] = MB_END_TAG;
-  p[0] = i * sizeof (*p);
-  mbProperty (fd, p);
-
-  return p[5];
-  }
-//}}}
-//{{{
-static uint32_t mbReleaseMemory (int fd, uint32_t handle) {
-
-  int i = 1;
-  uint32_t p[32];
-  p[i++] = MB_PROCESS_REQUEST;
-  p[i++] = MB_RELEASE_MEMORY_TAG;
-  p[i++] = 4;
-  p[i++] = 4;
-  p[i++] = handle;
-  p[i++] = MB_END_TAG;
-  p[0] = i * sizeof (*p);
-  mbProperty (fd, p);
-
-  return p[5];
-  }
-//}}}
-//{{{
-static void* mbMapMem (uint32_t base, uint32_t size) {
-  return mmap (0, size, PROT_READ | PROT_WRITE, MAP_SHARED, fdMem, base);
-  }
-//}}}
-static int mbUnmapMem (void* addr, uint32_t size) { return munmap (addr, size); }
-//{{{
-static void mbDMAFree (DMAMem_t* DMAMemP) {
-
-  if (DMAMemP->handle) {
-    mbUnmapMem (DMAMemP->virtual_addr, DMAMemP->size);
-    mbUnlockMemory (fdMbox, DMAMemP->handle);
-    mbReleaseMemory (fdMbox, DMAMemP->handle);
-    DMAMemP->handle = 0;
-    }
-  }
-//}}}
-//{{{
-static int mbDMAAlloc (DMAMem_t* DMAMemP, uint32_t size, uint32_t pi_mem_flag) {
-
-  DMAMemP->size = size;
-  DMAMemP->handle = mbAllocateMemory(fdMbox, size, PAGE_SIZE, pi_mem_flag);
-
-  if (DMAMemP->handle) {
-    DMAMemP->bus_addr = mbLockMemory(fdMbox, DMAMemP->handle);
-    DMAMemP->virtual_addr = (uintptr_t*)mbMapMem(BUS_TO_PHYS(DMAMemP->bus_addr), size);
-    return 1;
-    }
-
-  return 0;
-  }
-//}}}
-//}}}
-//{{{  dma
+//{{{  dma helpers
 //{{{
 static rawCbs_t* dmaCB2adr (int pos) {
 
@@ -1531,8 +1539,137 @@ static void dmaInitCbs() {
   }
 //}}}
 //}}}
+//{{{  mailbox helpers
+//{{{
+static int mbCreate (char* dev) {
+// https://github.com/raspberrypi/firmware/wiki/Mailbox-property-interface
 
-//{{{  time
+  unlink (dev);
+  return mknod (dev, S_IFCHR | 0600, makedev (MB_DEV_MAJOR, 0));
+  }
+//}}}
+//{{{
+static int mbOpen() {
+
+  int fd = open ("/dev/vcio", 0);
+  if (fd < 0) {
+    const char* mb2 = "/dev/pigpio-mb";
+    mbCreate ((char*)mb2);
+    fd = open (mb2, 0);
+    }
+
+  return fd;
+  }
+//}}}
+static int mbProperty (int fd, void* buf) { return ioctl (fd, MB_IOCTL, buf); }
+static void mbClose (int fd) { close(fd); }
+
+//{{{
+static uint32_t mbAllocateMemory (int fd, uint32_t size, uint32_t align, uint32_t flags) {
+
+  int i = 1;
+  uint32_t p[32];
+  p[i++] = MB_PROCESS_REQUEST;
+  p[i++] = MB_ALLOCATE_MEMORY_TAG;
+  p[i++] = 12;
+  p[i++] = 12;
+  p[i++] = size;
+  p[i++] = align;
+  p[i++] = flags;
+  p[i++] = MB_END_TAG;
+  p[0] = i * sizeof (*p);
+
+  mbProperty (fd, p);
+
+  return p[5];
+  }
+//}}}
+//{{{
+static uint32_t mbLockMemory (int fd, uint32_t handle) {
+
+  int i = 1;
+  uint32_t p[32];
+  p[i++] = MB_PROCESS_REQUEST;
+  p[i++] = MB_LOCK_MEMORY_TAG;
+  p[i++] = 4;
+  p[i++] = 4;
+  p[i++] = handle;
+  p[i++] = MB_END_TAG;
+  p[0] = i * sizeof (*p);
+  mbProperty (fd, p);
+
+  return p[5];
+  }
+//}}}
+//{{{
+static uint32_t mbUnlockMemory (int fd, uint32_t handle) {
+
+  int i = 1;
+  uint32_t p[32];
+  p[i++] = MB_PROCESS_REQUEST;
+  p[i++] = MB_UNLOCK_MEMORY_TAG;
+  p[i++] = 4;
+  p[i++] = 4;
+  p[i++] = handle;
+  p[i++] = MB_END_TAG;
+  p[0] = i * sizeof (*p);
+  mbProperty (fd, p);
+
+  return p[5];
+  }
+//}}}
+//{{{
+static uint32_t mbReleaseMemory (int fd, uint32_t handle) {
+
+  int i = 1;
+  uint32_t p[32];
+  p[i++] = MB_PROCESS_REQUEST;
+  p[i++] = MB_RELEASE_MEMORY_TAG;
+  p[i++] = 4;
+  p[i++] = 4;
+  p[i++] = handle;
+  p[i++] = MB_END_TAG;
+  p[0] = i * sizeof (*p);
+  mbProperty (fd, p);
+
+  return p[5];
+  }
+//}}}
+
+//{{{
+static void* mbMapMem (uint32_t base, uint32_t size) {
+  return mmap (0, size, PROT_READ | PROT_WRITE, MAP_SHARED, fdMem, base);
+  }
+//}}}
+static int mbUnmapMem (void* addr, uint32_t size) { return munmap (addr, size); }
+//{{{
+static void mbDMAFree (DMAMem_t* DMAMemP) {
+
+  if (DMAMemP->handle) {
+    mbUnmapMem (DMAMemP->virtual_addr, DMAMemP->size);
+    mbUnlockMemory (fdMbox, DMAMemP->handle);
+    mbReleaseMemory (fdMbox, DMAMemP->handle);
+    DMAMemP->handle = 0;
+    }
+  }
+//}}}
+//{{{
+static int mbDMAAlloc (DMAMem_t* DMAMemP, uint32_t size, uint32_t pi_mem_flag) {
+
+  DMAMemP->size = size;
+  DMAMemP->handle = mbAllocateMemory(fdMbox, size, PAGE_SIZE, pi_mem_flag);
+
+  if (DMAMemP->handle) {
+    DMAMemP->bus_addr = mbLockMemory(fdMbox, DMAMemP->handle);
+    DMAMemP->virtual_addr = (uintptr_t*)mbMapMem(BUS_TO_PHYS(DMAMemP->bus_addr), size);
+    return 1;
+    }
+
+  return 0;
+  }
+//}}}
+//}}}
+//{{{  init helpers
 //{{{
 static void myGpioSleep (int seconds, int micros) {
 
@@ -1555,100 +1692,12 @@ static uint32_t myGpioDelay (uint32_t micros) {
     while ((systReg[SYST_CLO] - start) <= micros) {}
     }
   else
-    myGpioSleep (micros / MILLION, micros % MILLION);
+    myGpioSleep (micros / 1000000, micros % 1000000);
 
   return (systReg[SYST_CLO] - start);
   }
 //}}}
 
-//{{{
-double timeTime() {
-
-  struct timeval tv;
-  gettimeofday (&tv, 0);
-  return (double)tv.tv_sec + ((double)tv.tv_usec / 1E6);
-  }
-//}}}
-//{{{
-void timeSleep (double seconds) {
-
-  struct timespec ts, rem;
-
-  if (seconds > 0.0) {
-    ts.tv_sec = seconds;
-    ts.tv_nsec = (seconds - (double)ts.tv_sec) * 1E9;
-
-    while (clock_nanosleep(CLOCK_REALTIME, 0, &ts, &rem)) {
-      // copy remaining time to ts
-      ts.tv_sec = rem.tv_sec;
-      ts.tv_nsec = rem.tv_nsec;
-      }
-    }
-  }
-//}}}
-//{{{
-int gpioTime (uint32_t timetype, int* seconds, int* micros) {
-
-  struct timespec ts;
-
-  if (timetype == PI_TIME_ABSOLUTE) {
-    clock_gettime (CLOCK_REALTIME, &ts);
-    *seconds = ts.tv_sec;
-    *micros = ts.tv_nsec/1000;
-    }
-  else {
-    clock_gettime (CLOCK_REALTIME, &ts);
-    TIMER_SUB (&ts, &libStarted, &ts);
-    *seconds = ts.tv_sec;
-    *micros = ts.tv_nsec/1000;
-    }
-
-   return 0;
-  }
-//}}}
-//{{{
-int gpioSleep (uint32_t timetype, int seconds, int micros) {
-
-  struct timespec ts;
-  ts.tv_sec = seconds;
-  ts.tv_nsec = micros * 1000;
-
-  struct timespec rem;
-  if (timetype == PI_TIME_ABSOLUTE) {
-    while (clock_nanosleep (CLOCK_REALTIME, TIMER_ABSTIME, &ts, &rem)) {}
-    }
-  else {
-    while (clock_nanosleep (CLOCK_REALTIME, 0, &ts, &rem)) {
-      // copy remaining time to ts
-      ts.tv_sec = rem.tv_sec;
-      ts.tv_nsec = rem.tv_nsec;
-      }
-    }
-
-  return 0;
- }
-//}}}
-//{{{
-uint32_t gpioDelay (uint32_t micros) {
-
-  uint32_t start = systReg[SYST_CLO];
-
-  if (micros <= PI_MAX_BUSY_DELAY)
-    while ((systReg[SYST_CLO] - start) <= micros) {}
-  else
-    gpioSleep (PI_TIME_RELATIVE, (micros/MILLION), (micros%MILLION));
-
-  return systReg[SYST_CLO] - start;
-  }
-//}}}
-//{{{
-uint32_t gpioTick() {
-  return systReg[SYST_CLO];
-  }
-//}}}
-//}}}
-
-//{{{  init
 //{{{
 static void initClearGlobals() {
 
@@ -1682,12 +1731,6 @@ static void initClearGlobals() {
     gpioInfo [i].width = 0;
     gpioInfo [i].range = PI_DEFAULT_DUTYCYCLE_RANGE;
     gpioInfo [i].freqIdx = DEFAULT_PWM_IDX;
-    }
-
-  for (int i = 0; i <= PI_MAX_SIGNUM; i++) {
-    gpioSignal[i].func = NULL;
-    gpioSignal[i].ex = 0;
-    gpioSignal[i].userdata = NULL;
     }
 
   for (int i = 0; i <= PI_MAX_TIMER; i++) {
@@ -2060,6 +2103,8 @@ static void initPCM (uint32_t bits) {
 //{{{
 static void initHWClk (int clkCtl, int clkDiv, int clkSrc, int divI, int divF, int MASH) {
 
+  #define BCM_PASSWD  (0x5A << 24)
+
   // kill the clock if busy, anything else isn't reliable */
   if (clkReg[clkCtl] & CLK_CTL_BUSY) {
     do {
@@ -2139,6 +2184,26 @@ static void initDMAgo (volatile uint32_t* dmaAddr, uint32_t cbAddr) {
 //}}}
 
 //{{{
+static void flushMemory() {
+
+  #define FLUSH_PAGES 1024
+  static int val = 0;
+
+  void* dummy = mmap (0, (FLUSH_PAGES * PAGE_SIZE),
+                      PROT_READ | PROT_WRITE | PROT_EXEC,
+                      MAP_SHARED | MAP_ANONYMOUS | MAP_NORESERVE | MAP_LOCKED,
+                      -1, 0);
+
+  if (dummy == MAP_FAILED)
+    cLog::log (LOGINFO,  "mmap dummy failed (%m)");
+  else {
+    memset (dummy, val++, FLUSH_PAGES * PAGE_SIZE);
+    memset (dummy, val++, FLUSH_PAGES * PAGE_SIZE);
+    munmap (dummy, FLUSH_PAGES * PAGE_SIZE);
+    }
+  }
+//}}}
+//{{{
 static void initReleaseResources() {
 
   for (int i = 0; i <= PI_MAX_TIMER; i++) {
@@ -2151,62 +2216,62 @@ static void initReleaseResources() {
     }
 
   //{{{  release mmap'd memory
-  if (auxReg  != nullptr)
-    munmap((void*)auxReg,  AUX_LEN);
+  if (auxReg)
+    munmap ((void*)auxReg,  AUX_LEN);
   auxReg  = nullptr;
 
-  if (bscsReg != nullptr)
+  if (bscsReg)
     munmap ((void*)bscsReg, BSCS_LEN);
   bscsReg = nullptr;
 
-  if (clkReg  != nullptr)
+  if (clkReg)
     munmap ((void*)clkReg,  CLK_LEN);
   clkReg  = nullptr;
 
-  if (dmaReg  != nullptr)
+  if (dmaReg)
     munmap ((void*)dmaReg,  DMA_LEN);
   dmaReg  = nullptr;
 
-  if (gpioReg != nullptr)
+  if (gpioReg)
     munmap ((void*)gpioReg, GPIO_LEN);
   gpioReg = nullptr;
 
-  if (pcmReg  != nullptr)
+  if (pcmReg)
     munmap ((void*)pcmReg,  PCM_LEN);
   pcmReg  = nullptr;
 
-  if (pwmReg  != nullptr)
+  if (pwmReg)
     munmap ((void*)pwmReg,  PWM_LEN);
   pwmReg  = nullptr;
 
-  if (systReg != nullptr)
+  if (systReg)
     munmap ((void*)systReg, SYST_LEN);
   systReg = nullptr;
 
-  if (spiReg  != nullptr)
+  if (spiReg)
     munmap ((void*)spiReg,  SPI_LEN);
   spiReg  = nullptr;
   //}}}
 
-  if (dmaBus != nullptr)
+  if (dmaBus)
     munmap (dmaBus, PAGES_PER_BLOCK * (bufferBlocks + PI_WAVE_BLOCKS) * sizeof(dmaPage_t *));
   dmaBus = nullptr;
 
-  if (dmaVirt != nullptr) {
+  if (dmaVirt) {
     for (int i = 0; i < PAGES_PER_BLOCK * ((int)bufferBlocks + PI_WAVE_BLOCKS); i++)
       munmap(dmaVirt[i], PAGE_SIZE);
     munmap (dmaVirt, PAGES_PER_BLOCK * (bufferBlocks + PI_WAVE_BLOCKS) * sizeof(dmaPage_t *));
     }
   dmaVirt = nullptr;
 
-  if (dmaPMapBlk != nullptr) {
+  if (dmaPMapBlk) {
     for (int i = 0; i < ((int)bufferBlocks + PI_WAVE_BLOCKS); i++)
       munmap(dmaPMapBlk[i], PAGES_PER_BLOCK * PAGE_SIZE);
     munmap(dmaPMapBlk, (bufferBlocks + PI_WAVE_BLOCKS) * sizeof(dmaPage_t *));
     }
   dmaPMapBlk = nullptr;
 
-  if (dmaMboxBlk != nullptr) {
+  if (dmaMboxBlk) {
     fdMbox = mbOpen();
     for (int i = 0; i < ((int)bufferBlocks + PI_WAVE_BLOCKS); i++)
       mbDMAFree (&dmaMboxBlk[bufferBlocks + PI_WAVE_BLOCKS - i - 1]);
@@ -2299,8 +2364,7 @@ static int initInitialise() {
      }
      //}}}
 
-  if (!(gpioCfg.internals & PI_CFG_NOSIGHANDLER))
-    sigSetHandler();
+  sigSetHandler();
 
   if (initPeripherals() < 0)
     return PI_INIT_FAILED;
@@ -2333,14 +2397,103 @@ static int initInitialise() {
   dmaInitCbs();
   flushMemory();
 
-  // cast twice to suppress compiler warning, I belive this cast
-  // is ok because dmaIBus contains bus addresses, not virtual addresses.
+  // cast twice to suppress compiler warning,
+  // I belive this cast is ok because dmaIBus contains bus addresses, not virtual addresses.
   initDMAgo ((uint32_t*)dmaIn, (uint32_t)(uintptr_t)dmaIBus[0]);
 
   return PIGPIO_VERSION;
   }
 //}}}
 //}}}
+
+//{{{  time
+//{{{
+double timeTime() {
+
+  struct timeval tv;
+  gettimeofday (&tv, 0);
+  return (double)tv.tv_sec + ((double)tv.tv_usec / 1E6);
+  }
+//}}}
+//{{{
+void timeSleep (double seconds) {
+
+  struct timespec ts, rem;
+
+  if (seconds > 0.0) {
+    ts.tv_sec = seconds;
+    ts.tv_nsec = (seconds - (double)ts.tv_sec) * 1E9;
+
+    while (clock_nanosleep(CLOCK_REALTIME, 0, &ts, &rem)) {
+      // copy remaining time to ts
+      ts.tv_sec = rem.tv_sec;
+      ts.tv_nsec = rem.tv_nsec;
+      }
+    }
+  }
+//}}}
+//{{{
+int gpioTime (uint32_t timetype, int* seconds, int* micros) {
+
+  struct timespec ts;
+
+  if (timetype == PI_TIME_ABSOLUTE) {
+    clock_gettime (CLOCK_REALTIME, &ts);
+    *seconds = ts.tv_sec;
+    *micros = ts.tv_nsec/1000;
+    }
+  else {
+    clock_gettime (CLOCK_REALTIME, &ts);
+    TIMER_SUB (&ts, &libStarted, &ts);
+    *seconds = ts.tv_sec;
+    *micros = ts.tv_nsec/1000;
+    }
+
+   return 0;
+  }
+//}}}
+//{{{
+int gpioSleep (uint32_t timetype, int seconds, int micros) {
+
+  struct timespec ts;
+  ts.tv_sec = seconds;
+  ts.tv_nsec = micros * 1000;
+
+  struct timespec rem;
+  if (timetype == PI_TIME_ABSOLUTE) {
+    while (clock_nanosleep (CLOCK_REALTIME, TIMER_ABSTIME, &ts, &rem)) {}
+    }
+  else {
+    while (clock_nanosleep (CLOCK_REALTIME, 0, &ts, &rem)) {
+      // copy remaining time to ts
+      ts.tv_sec = rem.tv_sec;
+      ts.tv_nsec = rem.tv_nsec;
+      }
+    }
+
+  return 0;
+ }
+//}}}
+//{{{
+uint32_t gpioDelay (uint32_t micros) {
+
+  uint32_t start = systReg[SYST_CLO];
+
+  if (micros <= PI_MAX_BUSY_DELAY)
+    while ((systReg[SYST_CLO] - start) <= micros) {}
+  else
+    gpioSleep (PI_TIME_RELATIVE, (micros / 1000000), (micros % 1000000));
+
+  return systReg[SYST_CLO] - start;
+  }
+//}}}
+//{{{
+uint32_t gpioTick() {
+  return systReg[SYST_CLO];
+  }
+//}}}
+//}}}
+
 //{{{
 uint32_t gpioHardwareRevision() {
 //{{{  description
@@ -2499,7 +2652,7 @@ void gpioTerminate() {
   gpioMaskSet = 0;
 
   // reset DMA
-  if (dmaReg != nullptr) {
+  if (dmaReg) {
     initKillDMA (dmaIn);
     initKillDMA (dmaOut);
     }
@@ -2510,7 +2663,7 @@ void gpioTerminate() {
 //}}}
 
 //{{{  gpio
-// internal
+// helpers
 //{{{
 static void myGpioSetMode (uint32_t gpio, uint32_t mode) {
 
@@ -2519,7 +2672,6 @@ static void myGpioSetMode (uint32_t gpio, uint32_t mode) {
   gpioReg[reg] = (gpioReg[reg] & ~(7 << shift)) | (mode << shift);
   }
 //}}}
-
 //{{{
 static int myGpioRead (uint32_t gpio) {
 
@@ -2529,7 +2681,6 @@ static int myGpioRead (uint32_t gpio) {
     return PI_OFF;
   }
 //}}}
-
 //{{{
 static void myGpioWrite (uint32_t gpio, uint32_t level) {
 
@@ -2571,7 +2722,6 @@ static void myClearGpioOn (uint32_t gpio, int pos) {
   dmaIVirt[page]->gpioOn[slot] &= ~(1<<gpio);
   }
 //}}}
-
 //{{{
 static void myGpioSetPwm (uint32_t gpio, int oldVal, int newVal) {
 
@@ -2676,7 +2826,7 @@ static void myGpioSetServo (uint32_t gpio, int oldVal, int newVal) {
         mySetGpioOff (gpio, i+newOff);
 
       /* schedule new gpio on */
-      for (i = 0; i < SUPERCYCLE; i+=cycles) 
+      for (i = 0; i < SUPERCYCLE; i+=cycles)
         mySetGpioOn(gpio, i);
       }
     else  {
@@ -2686,7 +2836,7 @@ static void myGpioSetServo (uint32_t gpio, int oldVal, int newVal) {
         myClearGpioOn (gpio, i);
 
       /* if in pulse then delay for the last cycle to complete */
-      if (myGpioRead (gpio)) 
+      if (myGpioRead (gpio))
         myGpioDelay (PI_MAX_SERVO_PULSEWIDTH);
 
       /* deschedule gpio off */
@@ -2969,7 +3119,7 @@ void gpioSetPWMfrequency (uint32_t gpio, uint32_t frequency) {
   }
 //}}}
 //{{{
-int gpioGetPWMfrequency (uint32_t gpio) { 
+int gpioGetPWMfrequency (uint32_t gpio) {
 
   uint32_t pwm, clock;
   switch (gpioInfo[gpio].is) {
@@ -3005,7 +3155,7 @@ void gpioServo (uint32_t gpio, uint32_t val) {
 int gpioGetServoPulsewidth (uint32_t gpio) { return gpioInfo[gpio].width; }
 //}}}
 //{{{  spi
-// internal hw
+// hw helpers
 //{{{
 static int spiAnyOpen (uint32_t flags) {
 
@@ -3025,34 +3175,33 @@ static void spiInit (uint32_t flags) {
   uint32_t resvd = PI_SPI_FLAGS_GET_RESVD (flags);
   uint32_t cspols = PI_SPI_FLAGS_GET_CSPOLS (flags);
 
-  if (PI_SPI_FLAGS_GET_AUX_SPI(flags)) {
+  if (PI_SPI_FLAGS_GET_AUX_SPI (flags)) {
     // enable module and access to registers
     auxReg[AUX_ENABLES] |= AUXENB_SPI1;
 
     // save original state
-    old_mode_ace0 = gpioGetMode(PI_ASPI_CE0);
-    old_mode_ace1 = gpioGetMode(PI_ASPI_CE1);
-    old_mode_ace2 = gpioGetMode(PI_ASPI_CE2);
-    old_mode_asclk = gpioGetMode(PI_ASPI_SCLK);
-    old_mode_amiso = gpioGetMode(PI_ASPI_MISO);
-    old_mode_amosi = gpioGetMode(PI_ASPI_MOSI);
-
+    old_mode_ace0 = gpioGetMode (PI_ASPI_CE0);
+    old_mode_ace1 = gpioGetMode (PI_ASPI_CE1);
+    old_mode_ace2 = gpioGetMode (PI_ASPI_CE2);
+    old_mode_asclk = gpioGetMode (PI_ASPI_SCLK);
+    old_mode_amiso = gpioGetMode (PI_ASPI_MISO);
+    old_mode_amosi = gpioGetMode (PI_ASPI_MOSI);
     old_spi_cntl0 = auxReg[AUX_SPI0_CNTL0_REG];
     old_spi_cntl1 = auxReg[AUX_SPI0_CNTL1_REG];
 
     // manually control auxiliary SPI chip selects
     if (!(resvd & 1)) {
-      myGpioSetMode (PI_ASPI_CE0,  PI_OUTPUT);
+      myGpioSetMode (PI_ASPI_CE0, PI_OUTPUT);
       myGpioWrite (PI_ASPI_CE0, !(cspols&1));
       }
 
     if (!(resvd & 2)) {
-      myGpioSetMode (PI_ASPI_CE1,  PI_OUTPUT);
+      myGpioSetMode (PI_ASPI_CE1, PI_OUTPUT);
       myGpioWrite (PI_ASPI_CE1, !(cspols&2));
       }
 
     if (!(resvd&4)) {
-      myGpioSetMode (PI_ASPI_CE2,  PI_OUTPUT);
+      myGpioSetMode (PI_ASPI_CE2, PI_OUTPUT);
       myGpioWrite (PI_ASPI_CE2, !(cspols&4));
       }
 
@@ -3063,20 +3212,19 @@ static void spiInit (uint32_t flags) {
     }
   else {
     // save original state
-    old_mode_ce0 = gpioGetMode(PI_SPI_CE0);
-    old_mode_ce1 = gpioGetMode(PI_SPI_CE1);
-    old_mode_sclk = gpioGetMode(PI_SPI_SCLK);
-    old_mode_miso = gpioGetMode(PI_SPI_MISO);
-    old_mode_mosi = gpioGetMode(PI_SPI_MOSI);
-
+    old_mode_ce0 = gpioGetMode (PI_SPI_CE0);
+    old_mode_ce1 = gpioGetMode (PI_SPI_CE1);
+    old_mode_sclk = gpioGetMode (PI_SPI_SCLK);
+    old_mode_miso = gpioGetMode (PI_SPI_MISO);
+    old_mode_mosi = gpioGetMode (PI_SPI_MOSI);
     old_spi_cs = spiReg[SPI_CS];
     old_spi_clk = spiReg[SPI_CLK];
 
     // set gpios to SPI mode
     if (!(resvd & 1))
-      myGpioSetMode (PI_SPI_CE0,  PI_ALT0);
+      myGpioSetMode (PI_SPI_CE0, PI_ALT0);
     if (!(resvd & 2))
-      myGpioSetMode (PI_SPI_CE1,  PI_ALT0);
+      myGpioSetMode (PI_SPI_CE1, PI_ALT0);
 
     myGpioSetMode (PI_SPI_SCLK, PI_ALT0);
     myGpioSetMode (PI_SPI_MISO, PI_ALT0);
@@ -3379,6 +3527,7 @@ int spiOpen (uint32_t spiChan, uint32_t baud, uint32_t spiFlags) {
 //}}}
 //{{{
 int spiRead (uint32_t handle, char* buf, uint32_t count) {
+
   spiGo (spiInfo[handle].speed, spiInfo[handle].flags, NULL, buf, count);
   return count;
   }
@@ -3440,13 +3589,14 @@ int spiClose (uint32_t handle) {
 
   spiInfo[handle].state = PI_SPI_CLOSED;
   if (!spiAnyOpen (spiInfo[handle].flags))
-    spiTerminate (spiInfo[handle].flags); /* terminate on last close */
+    // terminate on last close
+    spiTerminate (spiInfo[handle].flags);
 
   return 0;
   }
 //}}}
 
-// internal bitbang
+// bitbang helpers
 //{{{
 static void wfRx_lock (int i) {
   pthread_mutex_lock (&wfRx[i].mutex);
@@ -3454,149 +3604,108 @@ static void wfRx_lock (int i) {
 //}}}
 //{{{
 static void wfRx_unlock (int i) {
-  pthread_mutex_unlock(&wfRx[i].mutex);
+  pthread_mutex_unlock (&wfRx[i].mutex);
   }
 //}}}
 //{{{
-static void set_CS (wfRx_t* w)
-{
-   myGpioWrite(w->S.CS, PI_SPI_FLAGS_GET_CSPOL(w->S.spiFlags));
-}
+static void set_CS (wfRx_t* w) {
+  myGpioWrite (w->S.CS, PI_SPI_FLAGS_GET_CSPOL(w->S.spiFlags));
+  }
 //}}}
 //{{{
-static void clear_CS (wfRx_t* w)
-{
-   myGpioWrite(w->S.CS, !PI_SPI_FLAGS_GET_CSPOL(w->S.spiFlags));
-}
+static void clear_CS (wfRx_t* w) {
+  myGpioWrite(w->S.CS, !PI_SPI_FLAGS_GET_CSPOL(w->S.spiFlags));
+  }
 //}}}
 //{{{
-static void set_SCLK (wfRx_t* w)
-{
-   myGpioWrite(w->S.SCLK, !PI_SPI_FLAGS_GET_CPOL(w->S.spiFlags));
-}
+static void set_SCLK (wfRx_t* w) {
+  myGpioWrite (w->S.SCLK, !PI_SPI_FLAGS_GET_CPOL (w->S.spiFlags));
+  }
 //}}}
 //{{{
-static void clear_SCLK (wfRx_t* w)
-{
-   myGpioWrite(w->S.SCLK, PI_SPI_FLAGS_GET_CPOL(w->S.spiFlags));
-}
+static void clear_SCLK (wfRx_t* w) {
+  myGpioWrite (w->S.SCLK, PI_SPI_FLAGS_GET_CPOL (w->S.spiFlags));
+  }
 //}}}
 //{{{
-static void SPI_delay (wfRx_t* w)
-{
-   myGpioDelay(w->S.delay);
-}
+static void SPI_delay (wfRx_t* w) {
+  myGpioDelay (w->S.delay);
+  }
 //}}}
 //{{{
-static void bbSPIStart (wfRx_t* w)
-{
-   clear_SCLK(w);
+static void bbSPIStart (wfRx_t* w) {
 
-   SPI_delay(w);
-
-   set_CS(w);
-
-   SPI_delay(w);
-}
+  clear_SCLK(w);
+  SPI_delay(w);
+  set_CS(w);
+  SPI_delay(w);
+  }
 //}}}
 //{{{
-static void bbSPIStop (wfRx_t* w)
-{
-   SPI_delay(w);
+static void bbSPIStop (wfRx_t* w) {
 
-   clear_CS(w);
-
-   SPI_delay(w);
-
-   clear_SCLK(w);
-}
+  SPI_delay(w);
+  clear_CS(w);
+  SPI_delay(w);
+  clear_SCLK(w);
+  }
 //}}}
 //{{{
-static uint8_t bbSPIXferByte (wfRx_t* w, char txByte)
-{
-   uint8_t bit, rxByte=0;
+static uint8_t bbSPIXferByte (wfRx_t* w, char txByte) {
 
-   if (PI_SPI_FLAGS_GET_CPHA(w->S.spiFlags))
-   {
-      /*
-      CPHA = 1
-      write on set clock
-      read on clear clock
-      */
+  uint8_t bit;
+  uint8_t rxByte = 0;
 
-      for (bit=0; bit<8; bit++)
-      {
-         set_SCLK(w);
+  if (PI_SPI_FLAGS_GET_CPHA(w->S.spiFlags)) {
+    // CPHA = 1 write on set clock read on clear clock
+    for (bit = 0; bit < 8; bit++) {
+      set_SCLK(w);
 
-         if (PI_SPI_FLAGS_GET_TX_LSB(w->S.spiFlags))
-         {
-            myGpioWrite(w->S.MOSI, txByte & 0x01);
-            txByte >>= 1;
-         }
-         else
-         {
-            myGpioWrite(w->S.MOSI, txByte & 0x80);
-            txByte <<= 1;
-         }
+      if (PI_SPI_FLAGS_GET_TX_LSB(w->S.spiFlags)) {
+        myGpioWrite (w->S.MOSI, txByte & 0x01);
+        txByte >>= 1;
+        }
+      else {
+        myGpioWrite (w->S.MOSI, txByte & 0x80);
+        txByte <<= 1;
+        }
 
-         SPI_delay(w);
-
-         clear_SCLK(w);
-
-         if (PI_SPI_FLAGS_GET_RX_LSB(w->S.spiFlags))
-         {
-            rxByte = (rxByte >> 1) | myGpioRead(w->S.MISO) << 7;
-         }
-         else
-         {
-            rxByte = (rxByte << 1) | myGpioRead(w->S.MISO);
-         }
-
-         SPI_delay(w);
+      SPI_delay (w);
+      clear_SCLK (w);
+      if (PI_SPI_FLAGS_GET_RX_LSB (w->S.spiFlags))
+        rxByte = (rxByte >> 1) | myGpioRead (w->S.MISO) << 7;
+      else
+        rxByte = (rxByte << 1) | myGpioRead (w->S.MISO);
+      SPI_delay(w);
       }
-   }
-   else
-   {
-      /*
-      CPHA = 0
-      read on set clock
-      write on clear clock
-      */
+    }
 
-      for (bit=0; bit<8; bit++)
-      {
-         if (PI_SPI_FLAGS_GET_TX_LSB(w->S.spiFlags))
-         {
-            myGpioWrite(w->S.MOSI, txByte & 0x01);
-            txByte >>= 1;
-         }
-         else
-         {
-            myGpioWrite(w->S.MOSI, txByte & 0x80);
-            txByte <<= 1;
-         }
+  else {
+    // CPHA = 0 read on set clock write on clear clock
+    for (bit=0; bit<8; bit++) {
+      if (PI_SPI_FLAGS_GET_TX_LSB (w->S.spiFlags)) {
+        myGpioWrite (w->S.MOSI, txByte & 0x01);
+        txByte >>= 1;
+        }
+      else {
+        myGpioWrite (w->S.MOSI, txByte & 0x80);
+        txByte <<= 1;
+        }
 
-         SPI_delay(w);
+      SPI_delay(w);
+      set_SCLK(w);
+      if (PI_SPI_FLAGS_GET_RX_LSB (w->S.spiFlags))
+        rxByte = (rxByte >> 1) | myGpioRead (w->S.MISO) << 7;
+      else
+        rxByte = (rxByte << 1) | myGpioRead (w->S.MISO);
 
-         set_SCLK(w);
-
-         if (PI_SPI_FLAGS_GET_RX_LSB(w->S.spiFlags))
-         {
-            rxByte = (rxByte >> 1) | myGpioRead(w->S.MISO) << 7;
-         }
-         else
-         {
-            rxByte = (rxByte << 1) | myGpioRead(w->S.MISO);
-         }
-
-         SPI_delay(w);
-
-         clear_SCLK(w);
+      SPI_delay (w);
+      clear_SCLK (w);
       }
-   }
+    }
 
-   return rxByte;
-}
+  return rxByte;
+  }
 //}}}
 
 // external bitBang
@@ -3610,7 +3719,7 @@ int bbSPIOpen (uint32_t CS, uint32_t MISO, uint32_t MOSI, uint32_t SCLK, uint32_
   /* check all GPIO unique */
   bits = (1<<CS) | (1<<MISO) | (1<<MOSI) | (1<<SCLK);
 
-  if (__builtin_popcount(bits) == 4) {
+  if (__builtin_popcount (bits) == 4) {
     if ((wfRx[MISO].mode == PI_WFRX_NONE) &&
         (wfRx[MOSI].mode == PI_WFRX_NONE) &&
         (wfRx[SCLK].mode == PI_WFRX_NONE)) {
@@ -3627,29 +3736,24 @@ int bbSPIOpen (uint32_t CS, uint32_t MISO, uint32_t MOSI, uint32_t SCLK, uint32_
 
   if (!valid) {
     LOG_ERROR ( "GPIO already being used (%d=%d %d=%d, %d=%d %d=%d)",
-         CS,   wfRx[CS].mode,
-         MISO, wfRx[MISO].mode,
-         MOSI, wfRx[MOSI].mode,
-         SCLK, wfRx[SCLK].mode);
+         CS,   wfRx[CS].mode, MISO, wfRx[MISO].mode, MOSI, wfRx[MOSI].mode, SCLK, wfRx[SCLK].mode);
     }
 
   wfRx[CS].mode = PI_WFRX_SPI_CS;
   wfRx[CS].baud = baud;
-
   wfRx[CS].S.CS = CS;
   wfRx[CS].S.SCLK = SCLK;
-
   wfRx[CS].S.CSMode = gpioGetMode(CS);
   wfRx[CS].S.delay = (500000 / baud) - 1;
   wfRx[CS].S.spiFlags = spiFlags;
 
-  /* preset CS to off */
+  // preset CS to off
   if (PI_SPI_FLAGS_GET_CSPOL(spiFlags))
-    gpioWrite(CS, 0); /* active high */
+    gpioWrite(CS, 0); // active high
   else
-    gpioWrite(CS, 1); /* active low */
+    gpioWrite(CS, 1); // active low
 
-  /* The SCLK entry is used to store full information */
+  // The SCLK entry is used to store full information */
   if (valid == 1) { /* first time GPIO for SPI */
     wfRx[SCLK].S.usage = 1;
 
@@ -3734,7 +3838,7 @@ int bbSPIClose (uint32_t CS)
 //}}}
 //}}}
 //{{{  i2c
-// internal hw
+// hw helpers
 //{{{
 static int myI2CGetPar (char* inBuf, int* inPos, int inLen, int* esc) {
 
@@ -3808,60 +3912,53 @@ int i2cWriteByte (uint32_t handle, uint32_t bVal) {
 //}}}
 
 //{{{
-int i2cReadByteData (uint32_t handle, uint32_t reg)
-{
-   union my_smbus_data data;
-   int status = mySmbusAccess (i2cInfo[handle].fd, PI_I2C_SMBUS_READ, reg, PI_I2C_SMBUS_BYTE_DATA, &data);
+int i2cReadByteData (uint32_t handle, uint32_t reg) {
 
-   if (status < 0)
-      return PI_I2C_READ_FAILED;
+  union my_smbus_data data;
+  int status = mySmbusAccess (i2cInfo[handle].fd, PI_I2C_SMBUS_READ, reg, PI_I2C_SMBUS_BYTE_DATA, &data);
+  if (status < 0)
+    return PI_I2C_READ_FAILED;
 
-   return 0xFF & data.byte;
-}
+  return 0xFF & data.byte;
+  }
 //}}}
 //{{{
-int i2cWriteByteData (uint32_t handle, uint32_t reg, uint32_t bVal)
-{
-   union my_smbus_data data;
+int i2cWriteByteData (uint32_t handle, uint32_t reg, uint32_t bVal) {
 
-   int status;
-   data.byte = bVal;
+  union my_smbus_data data;
 
-   status = mySmbusAccess (i2cInfo[handle].fd, PI_I2C_SMBUS_WRITE, reg, PI_I2C_SMBUS_BYTE_DATA, &data);
+  data.byte = bVal;
 
-   if (status < 0)
-      return PI_I2C_WRITE_FAILED;
+  int status = mySmbusAccess (i2cInfo[handle].fd, PI_I2C_SMBUS_WRITE, reg, PI_I2C_SMBUS_BYTE_DATA, &data);
+  if (status < 0)
+    return PI_I2C_WRITE_FAILED;
 
-   return status;
-}
+  return status;
+  }
 //}}}
 
 //{{{
-int i2cReadWordData (uint32_t handle, uint32_t reg)
-{
-   union my_smbus_data data;
-   int status = (mySmbusAccess (i2cInfo[handle].fd, PI_I2C_SMBUS_READ, reg, PI_I2C_SMBUS_WORD_DATA, &data));
+int i2cReadWordData (uint32_t handle, uint32_t reg) {
 
-   if (status < 0)
-      return PI_I2C_READ_FAILED;
+  union my_smbus_data data;
+  int status = (mySmbusAccess (i2cInfo[handle].fd, PI_I2C_SMBUS_READ, reg, PI_I2C_SMBUS_WORD_DATA, &data));
+  if (status < 0)
+    return PI_I2C_READ_FAILED;
 
-   return 0xFFFF & data.word;
-}
+  return 0xFFFF & data.word;
+  }
 //}}}
 //{{{
-int i2cWriteWordData (uint32_t handle, uint32_t reg, uint32_t wVal)
-{
-   union my_smbus_data data;
+int i2cWriteWordData (uint32_t handle, uint32_t reg, uint32_t wVal) {
 
-   int status;
-   data.word = wVal;
-   status = mySmbusAccess (i2cInfo[handle].fd, PI_I2C_SMBUS_WRITE, reg, PI_I2C_SMBUS_WORD_DATA, &data);
+  union my_smbus_data data;
+  data.word = wVal;
+  int status = mySmbusAccess (i2cInfo[handle].fd, PI_I2C_SMBUS_WRITE, reg, PI_I2C_SMBUS_WORD_DATA, &data);
+  if (status < 0)
+     return PI_I2C_WRITE_FAILED;
 
-   if (status < 0)
-      return PI_I2C_WRITE_FAILED;
-
-   return status;
-}
+  return status;
+  }
 //}}}
 
 //{{{
@@ -3878,7 +3975,7 @@ int i2cProcessCall (uint32_t handle, uint32_t reg, uint32_t wVal) {
 //}}}
 
 //{{{
-int i2cReadBlockData (uint32_t handle, uint32_t reg, char *buf) {
+int i2cReadBlockData (uint32_t handle, uint32_t reg, char* buf) {
 
   union my_smbus_data data;
   int status = mySmbusAccess (i2cInfo[handle].fd, PI_I2C_SMBUS_READ, reg, PI_I2C_SMBUS_BLOCK_DATA, &data);
@@ -3895,7 +3992,7 @@ int i2cReadBlockData (uint32_t handle, uint32_t reg, char *buf) {
   }
 //}}}
 //{{{
-int i2cWriteBlockData (uint32_t handle, uint32_t reg, char *buf, uint32_t count) {
+int i2cWriteBlockData (uint32_t handle, uint32_t reg, char* buf, uint32_t count) {
 
   union my_smbus_data data;
   for (int i = 1; i <= (int)count; i++)
@@ -3911,175 +4008,155 @@ int i2cWriteBlockData (uint32_t handle, uint32_t reg, char *buf, uint32_t count)
 //}}}
 
 //{{{
-int i2cBlockProcessCall (uint32_t handle, uint32_t reg, char *buf, uint32_t count)
-{
-   union my_smbus_data data;
+int i2cBlockProcessCall (uint32_t handle, uint32_t reg, char* buf, uint32_t count) {
 
-   int i, status;
-   for (i = 1; i <= (int)count; i++)
-     data.block[i] = buf[i-1];
-   data.block[0] = count;
+  union my_smbus_data data;
+  for (int i = 1; i <= (int)count; i++)
+    data.block[i] = buf[i-1];
+  data.block[0] = count;
 
-   status = mySmbusAccess (i2cInfo[handle].fd, PI_I2C_SMBUS_WRITE, reg, PI_I2C_SMBUS_BLOCK_PROC_CALL, &data);
-   if (status < 0)
-     return PI_I2C_READ_FAILED;
-   else {
-     if (data.block[0] <= PI_I2C_SMBUS_BLOCK_MAX) {
-       for (i=0; i<data.block[0]; i++) buf[i] = data.block[i+1];
-       return data.block[0];
-       }
-     else
-       return PI_I2C_READ_FAILED;
+  int status = mySmbusAccess (i2cInfo[handle].fd, PI_I2C_SMBUS_WRITE, reg, PI_I2C_SMBUS_BLOCK_PROC_CALL, &data);
+  if (status < 0)
+    return PI_I2C_READ_FAILED;
+  else {
+    if (data.block[0] <= PI_I2C_SMBUS_BLOCK_MAX) {
+      for (int i = 0; i < data.block[0]; i++)
+        buf[i] = data.block[i+1];
+      return data.block[0];
+      }
+    else
+      return PI_I2C_READ_FAILED;
     }
   }
 //}}}
 
 //{{{
-int i2cReadI2CBlockData (uint32_t handle, uint32_t reg, char *buf, uint32_t count)
-{
-   union my_smbus_data data;
+int i2cReadI2CBlockData (uint32_t handle, uint32_t reg, char* buf, uint32_t count) {
 
-   int i, status;
-   uint32_t size;
+  uint32_t size = count == 32 ? PI_I2C_SMBUS_I2C_BLOCK_BROKEN : PI_I2C_SMBUS_I2C_BLOCK_DATA;
 
-   if (count == 32)
-      size = PI_I2C_SMBUS_I2C_BLOCK_BROKEN;
-   else
-      size = PI_I2C_SMBUS_I2C_BLOCK_DATA;
+  union my_smbus_data data;
+  data.block[0] = count;
 
-   data.block[0] = count;
+  int status = mySmbusAccess (i2cInfo[handle].fd, PI_I2C_SMBUS_READ, reg, size, &data);
+  if (status < 0)
+     return PI_I2C_READ_FAILED;
 
-   status = mySmbusAccess (i2cInfo[handle].fd, PI_I2C_SMBUS_READ, reg, size, &data);
-
-   if (status < 0)
+  else {
+    if (data.block[0] <= PI_I2C_SMBUS_I2C_BLOCK_MAX) {
+      for (int i = 0; i < data.block[0]; i++)
+        buf[i] = data.block[i+1];
+      return data.block[0];
+      }
+    else
       return PI_I2C_READ_FAILED;
-   else
-   {
-      if (data.block[0] <= PI_I2C_SMBUS_I2C_BLOCK_MAX)
-      {
-         for (i=0; i<data.block[0]; i++) buf[i] = data.block[i+1];
-         return data.block[0];
+    }
+  }
+//}}}
+//{{{
+int i2cWriteI2CBlockData (uint32_t handle, uint32_t reg, char* buf, uint32_t count) {
+
+  union my_smbus_data data;
+  for (int i = 1; i <= (int)count; i++)
+    data.block[i] = buf[i-1];
+  data.block[0] = count;
+
+  int status = mySmbusAccess (i2cInfo[handle].fd, PI_I2C_SMBUS_WRITE, reg, PI_I2C_SMBUS_I2C_BLOCK_BROKEN, &data);
+  if (status < 0)
+    return PI_I2C_WRITE_FAILED;
+
+  return status;
+  }
+//}}}
+
+//{{{
+int i2cWriteDevice (uint32_t handle, char* buf, uint32_t count) {
+
+  int bytes = write (i2cInfo[handle].fd, buf, count);
+  if (bytes != (int)count)
+    return PI_I2C_WRITE_FAILED;
+
+  return 0;
+  }
+//}}}
+//{{{
+int i2cReadDevice (uint32_t handle, char* buf, uint32_t count) {
+
+  int bytes = read (i2cInfo[handle].fd, buf, count);
+  if (bytes != (int)count)
+    return PI_I2C_READ_FAILED;
+
+  return bytes;
+  }
+//}}}
+
+//{{{
+int i2cOpen (uint32_t i2cBus, uint32_t i2cAddr, uint32_t i2cFlags) {
+
+  static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+
+  char dev[32];
+  int fd;
+  uint32_t funcs;
+  int slot = -1;
+
+  int i;
+  pthread_mutex_lock (&mutex);
+  for (i = 0; i < PI_I2C_SLOTS; i++) {
+    if (i2cInfo[i].state == PI_I2C_CLOSED) {
+      slot = i;
+      i2cInfo[slot].state = PI_I2C_RESERVED;
+      break;
       }
-      else return PI_I2C_READ_FAILED;
-   }
-}
-//}}}
-//{{{
-int i2cWriteI2CBlockData (uint32_t handle, uint32_t reg, char *buf, uint32_t count)
-{
-   union my_smbus_data data;
+    }
+  pthread_mutex_unlock (&mutex);
 
-   int i, status;
-   for (i = 1; i <= (int)count; i++)
-     data.block[i] = buf[i-1];
+  if (slot < 0)
+    LOG_ERROR ("no I2C handles");
 
-   data.block[0] = count;
+  sprintf (dev, "/dev/i2c-%d", i2cBus);
+  if ((fd = open(dev, O_RDWR)) < 0) {
+    /* try a modprobe */
+    if (system ("/sbin/modprobe i2c_dev") == -1) { /* ignore errors */}
+    if (system ("/sbin/modprobe i2c_bcm2835") == -1) { /* ignore errors */}
 
-   status = mySmbusAccess (i2cInfo[handle].fd, PI_I2C_SMBUS_WRITE, reg, PI_I2C_SMBUS_I2C_BLOCK_BROKEN, &data);
+    myGpioDelay (100000);
 
-   if (status < 0)
-      return PI_I2C_WRITE_FAILED;
-
-   return status;
-}
-//}}}
-
-//{{{
-int i2cWriteDevice (uint32_t handle, char *buf, uint32_t count)
-{
-   int bytes = write(i2cInfo[handle].fd, buf, count);
-   if (bytes != (int)count)
-      return PI_I2C_WRITE_FAILED;
-
-   return 0;
-}
-//}}}
-//{{{
-int i2cReadDevice (uint32_t handle, char *buf, uint32_t count)
-{
-   int bytes = read(i2cInfo[handle].fd, buf, count);
-
-   if (bytes != (int)count)
-      return PI_I2C_READ_FAILED;
-
-   return bytes;
-}
-//}}}
-
-//{{{
-int i2cOpen (uint32_t i2cBus, uint32_t i2cAddr, uint32_t i2cFlags)
-{
-   static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-   char dev[32];
-   int i, slot, fd;
-   uint32_t funcs;
-
-   slot = -1;
-
-   pthread_mutex_lock(&mutex);
-
-   for (i=0; i<PI_I2C_SLOTS; i++)
-   {
-      if (i2cInfo[i].state == PI_I2C_CLOSED)
-      {
-         slot = i;
-         i2cInfo[slot].state = PI_I2C_RESERVED;
-         break;
-      }
-   }
-
-   pthread_mutex_unlock(&mutex);
-
-   if (slot < 0)
-     LOG_ERROR ("no I2C handles");
-
-   sprintf(dev, "/dev/i2c-%d", i2cBus);
-
-   if ((fd = open(dev, O_RDWR)) < 0)
-   {
-      /* try a modprobe */
-
-      if (system("/sbin/modprobe i2c_dev") == -1) { /* ignore errors */}
-      if (system("/sbin/modprobe i2c_bcm2835") == -1) { /* ignore errors */}
-
-      myGpioDelay(100000);
-
-      if ((fd = open(dev, O_RDWR)) < 0)
-      {
-         i2cInfo[slot].state = PI_I2C_CLOSED;
-         return PI_BAD_I2C_BUS;
-      }
-   }
-
-   if (ioctl(fd, PI_I2C_SLAVE, i2cAddr) < 0)
-   {
-      close(fd);
+    if ((fd = open (dev, O_RDWR)) < 0) {
       i2cInfo[slot].state = PI_I2C_CLOSED;
-      return PI_I2C_OPEN_FAILED;
-   }
+      return PI_BAD_I2C_BUS;
+      }
+    }
 
-   if (ioctl(fd, PI_I2C_FUNCS, &funcs) < 0)
-   {
-      funcs = -1; /* assume all smbus commands allowed */
-   }
+  if (ioctl (fd, PI_I2C_SLAVE, i2cAddr) < 0) {
+    close (fd);
+    i2cInfo[slot].state = PI_I2C_CLOSED;
+    return PI_I2C_OPEN_FAILED;
+     }
 
-   i2cInfo[slot].fd = fd;
-   i2cInfo[slot].addr = i2cAddr;
-   i2cInfo[slot].flags = i2cFlags;
-   i2cInfo[slot].funcs = funcs;
-   i2cInfo[i].state = PI_I2C_OPENED;
+  if (ioctl (fd, PI_I2C_FUNCS, &funcs) < 0)
+    funcs = -1; /* assume all smbus commands allowed */
 
-   return slot;
-}
+  i2cInfo[slot].fd = fd;
+  i2cInfo[slot].addr = i2cAddr;
+  i2cInfo[slot].flags = i2cFlags;
+  i2cInfo[slot].funcs = funcs;
+  i2cInfo[i].state = PI_I2C_OPENED;
+
+  return slot;
+  }
 //}}}
 //{{{
-int i2cClose (uint32_t handle)
-{
-   if (i2cInfo[handle].fd >= 0) close(i2cInfo[handle].fd);
-   i2cInfo[handle].fd = -1;
-   i2cInfo[handle].state = PI_I2C_CLOSED;
-   return 0;
-}
+int i2cClose (uint32_t handle) {
+
+  if (i2cInfo[handle].fd >= 0)
+    close (i2cInfo[handle].fd);
+
+  i2cInfo[handle].fd = -1;
+  i2cInfo[handle].state = PI_I2C_CLOSED;
+
+  return 0;
+  }
 //}}}
 
 //{{{
@@ -4101,12 +4178,10 @@ void i2cSwitchCombined (int setting) {
 //{{{
 int i2cSegments (uint32_t handle, pi_i2c_msg_t *segs, uint32_t numSegs) {
 
-  int retval;
   my_i2c_rdwr_ioctl_data_t rdwr;
   rdwr.msgs = segs;
   rdwr.nmsgs = numSegs;
-
-  retval = ioctl (i2cInfo[handle].fd, PI_I2C_RDWR, &rdwr);
+  int retval = ioctl (i2cInfo[handle].fd, PI_I2C_RDWR, &rdwr);
 
   if (retval >= 0)
     return retval;
@@ -4256,94 +4331,92 @@ int i2cZip (uint32_t handle, char *inBuf, uint32_t inLen, char *outBuf, uint32_t
   }
 //}}}
 
-// internal bitBang
+// bitBang helpers
 //{{{
-static int readSDA (wfRx_t* w)
-{
-   myGpioSetMode(w->I.SDA, PI_INPUT);
-   return myGpioRead(w->I.SDA);
-}
+static int readSDA (wfRx_t* w) {
+
+  myGpioSetMode (w->I.SDA, PI_INPUT);
+  return myGpioRead (w->I.SDA);
+  }
 //}}}
 //{{{
-static void setSDA (wfRx_t* w)
-{
-   myGpioSetMode(w->I.SDA, PI_INPUT);
-}
+static void setSDA (wfRx_t* w) {
+  myGpioSetMode (w->I.SDA, PI_INPUT);
+  }
 //}}}
 //{{{
-static void clearSDA (wfRx_t* w)
-{
-   myGpioSetMode(w->I.SDA, PI_OUTPUT);
-   myGpioWrite(w->I.SDA, 0);
-}
+static void clearSDA (wfRx_t* w) {
+
+  myGpioSetMode (w->I.SDA, PI_OUTPUT);
+  myGpioWrite (w->I.SDA, 0);
+  }
 //}}}
 //{{{
-static void clearSCL (wfRx_t* w)
-{
-   myGpioSetMode(w->I.SCL, PI_OUTPUT);
-   myGpioWrite(w->I.SCL, 0);
-}
+static void clearSCL (wfRx_t* w) {
+  myGpioSetMode (w->I.SCL, PI_OUTPUT);
+  myGpioWrite (w->I.SCL, 0);
+  }
 //}}}
 
 //{{{
-static void I2Cdelay (wfRx_t* w)
-{
-   myGpioDelay(w->I.delay);
-}
+static void I2Cdelay (wfRx_t* w) {
+  myGpioDelay (w->I.delay);
+  }
 //}}}
 //{{{
-static void I2CclockStretch (wfRx_t* w)
-{
-   uint32_t now, max_stretch=100000;
+static void I2CclockStretch (wfRx_t* w) {
 
-   myGpioSetMode(w->I.SCL, PI_INPUT);
-   now = gpioTick();
-   while ((myGpioRead(w->I.SCL) == 0) && ((gpioTick()-now) < max_stretch));
-}
+  uint32_t now;
+  uint32_t max_stretch = 100000;
+
+  myGpioSetMode (w->I.SCL, PI_INPUT);
+  now = gpioTick();
+  while ((myGpioRead(w->I.SCL) == 0) && ((gpioTick() - now) < max_stretch)) {}
+  }
 //}}}
 //{{{
 static void I2CStart (wfRx_t* w) {
 
   if (w->I.started) {
-    setSDA(w);
-    I2Cdelay(w);
-    I2CclockStretch(w);
-    I2Cdelay(w);
+    setSDA (w);
+    I2Cdelay (w);
+    I2CclockStretch (w);
+    I2Cdelay (w);
     }
 
-  clearSDA(w);
-  I2Cdelay(w);
-  clearSCL(w);
-  I2Cdelay(w);
+  clearSDA (w);
+  I2Cdelay (w);
+  clearSCL (w);
+  I2Cdelay (w);
 
   w->I.started = 1;
   }
 //}}}
 //{{{
-static void I2CStop (wfRx_t* w)
-{
-   clearSDA(w);
-   I2Cdelay(w);
-   I2CclockStretch(w);
-   I2Cdelay(w);
-   setSDA(w);
-   I2Cdelay(w);
+static void I2CStop (wfRx_t* w) {
 
-   w->I.started = 0;
-}
+  clearSDA (w);
+  I2Cdelay (w);
+  I2CclockStretch (w);
+  I2Cdelay (w);
+  setSDA (w);
+  I2Cdelay (w);
+
+  w->I.started = 0;
+  }
 //}}}
 //{{{
 static void I2CPutBit (wfRx_t* w, int bit) {
 
   if (bit)
-    setSDA(w);
+    setSDA (w);
   else
-   clearSDA(w);
+   clearSDA (w);
 
-  I2Cdelay(w);
-  I2CclockStretch(w);
-  I2Cdelay(w);
-  clearSCL(w);
+  I2Cdelay (w);
+  I2CclockStretch (w);
+  I2Cdelay (w);
+  clearSCL (w);
   }
 //}}}
 //{{{
@@ -4361,35 +4434,28 @@ static int I2CGetBit (wfRx_t* w) {
   }
 //}}}
 //{{{
-static int I2CPutByte (wfRx_t* w, int byte)
-{
-   int bit, nack;
+static int I2CPutByte (wfRx_t* w, int byte) {
 
-   for(bit=0; bit<8; bit++)
-   {
-      I2CPutBit(w, byte & 0x80);
-      byte <<= 1;
-   }
+  for (int bit = 0; bit < 8; bit++) {
+    I2CPutBit (w, byte & 0x80);
+    byte <<= 1;
+    }
 
-   nack = I2CGetBit(w);
-
-   return nack;
-}
+  int nack = I2CGetBit (w);
+  return nack;
+  }
 //}}}
 //{{{
-static uint8_t I2CGetByte (wfRx_t* w, int nack)
-{
-   int bit, byte=0;
+static uint8_t I2CGetByte (wfRx_t* w, int nack) {
 
-   for (bit=0; bit<8; bit++)
-   {
-      byte = (byte << 1) | I2CGetBit(w);
-   }
+  int byte = 0;
+  for (int bit = 0; bit < 8; bit++)
+    byte = (byte << 1) | I2CGetBit(w);
 
-   I2CPutBit(w, nack);
+  I2CPutBit (w, nack);
 
-   return byte;
-}
+  return byte;
+  }
 //}}}
 
 // external bitBang
@@ -4601,9 +4667,9 @@ static void bscInit (int mode) {
 //{{{
 static void bscTerm (int mode) {
 
-  bscsReg[BSC_CR] = 0; /* clear device */
-  bscsReg[BSC_RSR]=0; /* clear underrun and overrun errors */
-  bscsReg[BSC_SLV]=0; /* clear I2C slave address */
+  bscsReg[BSC_CR] = 0; // clear device
+  bscsReg[BSC_RSR] = 0; // clear underrun and overrun errors
+  bscsReg[BSC_SLV] = 0; // clear I2C slave address
 
   int sda, scl, miso, ce;
   if (pi_is_2711) {
@@ -4619,12 +4685,12 @@ static void bscTerm (int mode) {
     ce = BSC_CE_N;
     }
 
-  gpioSetMode(sda, PI_INPUT);
-  gpioSetMode(scl, PI_INPUT);
+  gpioSetMode (sda, PI_INPUT);
+  gpioSetMode (scl, PI_INPUT);
 
   if (mode > 1) {
-    gpioSetMode(miso, PI_INPUT);
-    gpioSetMode(ce, PI_INPUT);
+    gpioSetMode (miso, PI_INPUT);
+    gpioSetMode (ce, PI_INPUT);
     }
   }
 //}}}
@@ -4861,8 +4927,8 @@ int serDataAvailable (uint32_t handle) {
 //{{{
 int gpioSerialReadOpen (uint32_t gpio, uint32_t baud, uint32_t data_bits) {
 
-  int bitTime = (1000 * MILLION) / baud; /* nanos */
-  int timeout  = ((data_bits+2) * bitTime)/MILLION; /* millis */
+  int bitTime = (1000 * 1000000) / baud; /* nanos */
+  int timeout  = ((data_bits+2) * bitTime)/1000000; /* millis */
   if (timeout < 1)
     timeout = 1;
 
