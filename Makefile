@@ -9,7 +9,7 @@ SRCS      = test.cpp \
 	    lcd/cFrameDiff.cpp \
 	    lcd/cDrawAA.cpp \
 	    lcd/cSnapshot.cpp \
-	    lcd/pigpio.c \
+	    lcd/pigpio.cpp \
 	    fonts/FreeSansBold.cpp \
 	    ../shared/utils/cLog.cpp \
 	    ../shared/fmt/format.cpp \
