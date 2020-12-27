@@ -1585,7 +1585,7 @@ bool cLcd9341::initialise() {
 // protected
 //{{{
 uint32_t cLcd9341::updateLcd (sSpan* spans) {
-// usually many small spans, with the occasional large spans
+// usually many small spans, with the occasional large span
 
   constexpr uint8_t kColumnAddressSetCommand = 0x2A;
   constexpr uint8_t kPageAddressSetCommand = 0x2B;
@@ -1610,7 +1610,6 @@ uint32_t cLcd9341::updateLcd (sSpan* spans) {
 
     //gpioWrite_Bits_0_31_Clear (kRegisterGpio);
     //gpioWrite_Bits_0_31_Set (kRegisterGpio);
-
     gpioWrite (kRegisterGpio, 0);
     spiWriteMainFast (mSpiHandle, &kMemoryWriteCommand, 1);
     gpioWrite (kRegisterGpio, 1);

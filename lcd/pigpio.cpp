@@ -1113,31 +1113,25 @@ struct DMAMem_t {
 //}}}
 //}}}
 //{{{  static var
-//{{{  static var - initialise once then preserve
-static volatile uint32_t piCores       = 0;
-static volatile uint32_t pi_peri_phys  = 0x20000000;
-static volatile uint32_t pi_dram_bus   = 0x40000000;
-static volatile uint32_t pi_mem_flag   = 0x0C;
-static volatile uint32_t pi_ispi       = 0;
-static volatile uint32_t pi_is_2711    = 0;
+static volatile uint32_t piCores = 0;
+static volatile uint32_t pi_peri_phys = 0x20000000;
+static volatile uint32_t pi_dram_bus = 0x40000000;
+static volatile uint32_t pi_mem_flag = 0x0C;
+static volatile uint32_t pi_ispi = 0;
+static volatile uint32_t pi_is_2711 = 0;
 
-static volatile uint32_t clk_osc_freq  = CLK_OSC_FREQ;
+static volatile uint32_t clk_osc_freq = CLK_OSC_FREQ;
 static volatile uint32_t clk_plld_freq = CLK_PLLD_FREQ;
 
 static volatile uint32_t hw_pwm_max_freq = PI_HW_PWM_MAX_FREQ;
 static volatile uint32_t hw_clk_min_freq = PI_HW_CLK_MIN_FREQ;
 static volatile uint32_t hw_clk_max_freq = PI_HW_CLK_MAX_FREQ;
-//}}}
-//{{{  static var - initialise every gpioInitialise
+
 static struct timespec libStarted;
-
 static int PWMClockInited = 0;
-
 static int gpioMaskSet = 0;
-//}}}
-//{{{  static var - initialise if not libInitialised
-static uint64_t gpioMask;
 
+static uint64_t gpioMask;
 static int wfc[3] = {0, 0, 0};
 static int wfcur = 0;
 static wfStats_t wfStats = {
@@ -1148,14 +1142,15 @@ static wfStats_t wfStats = {
 static wfRx_t wfRx[PI_MAX_USER_GPIO+1];
 
 static gpioGetSamples_t gpioGetSamples;
-
 static gpioInfo_t gpioInfo[PI_MAX_GPIO+1];
 static i2cInfo_t i2cInfo[PI_I2C_SLOTS];
 static serInfo_t serInfo[PI_SER_SLOTS];
 static spiInfo_t spiInfo[PI_SPI_SLOTS];
 static gpioTimer_t gpioTimer[PI_MAX_TIMER+1];
 static int pwmFreq[PWM_FREQS];
-//}}}
+
+static uint32_t spiDummyRead;
+
 //{{{  static var - reset after gpioTerminated
 // resources which must be released on gpioTerminate */
 static int fdMem = -1;
@@ -1166,10 +1161,8 @@ static DMAMem_t* dmaMboxBlk = nullptr;
 static uintptr_t** dmaPMapBlk = nullptr;
 static dmaPage_t** dmaVirt = nullptr;
 static dmaPage_t** dmaBus = nullptr;
-
 static dmaIPage_t** dmaIVirt = nullptr;
 static dmaIPage_t** dmaIBus = nullptr;
-
 static dmaOPage_t** dmaOVirt = nullptr;
 static dmaOPage_t** dmaOBus = nullptr;
 
@@ -1205,8 +1198,8 @@ static volatile gpioCfg_t gpioCfg = {
   };
 //}}}
 //{{{  static var - no initialisation
-static uint32_t bufferBlocks; /* number of blocks in buffer */
-static uint32_t bufferCycles; /* number of cycles */
+static uint32_t bufferBlocks; // number of blocks in buffer
+static uint32_t bufferCycles; // number of cycles
 
 static uint32_t spi_dummy;
 
@@ -1231,8 +1224,6 @@ static uint32_t old_spi_cntl1;
 
 static uint32_t bscFR;
 //}}}
-
-static uint32_t spiDummyRead;
 //}}}
 //{{{  static const
 //{{{
@@ -2432,6 +2423,7 @@ void timeSleep (double seconds) {
     }
   }
 //}}}
+
 //{{{
 int gpioTime (uint32_t timetype, int* seconds, int* micros) {
 
@@ -2474,6 +2466,7 @@ int gpioSleep (uint32_t timetype, int seconds, int micros) {
   return 0;
  }
 //}}}
+
 //{{{
 uint32_t gpioDelay (uint32_t micros) {
 
@@ -2534,10 +2527,10 @@ uint32_t gpioHardwareRevision() {
 
   uint32_t rev = 0;
 
-  FILE* filp = fopen ("/proc/cpuinfo", "r");
-  if (filp != NULL) {
+  FILE* file = fopen ("/proc/cpuinfo", "r");
+  if (file != NULL) {
     char buf[512];
-    while (fgets (buf, sizeof(buf), filp) != NULL) {
+    while (fgets (buf, sizeof(buf), file) != NULL) {
       if (!strncasecmp ("revision\t:", buf, 10)) {
         char term;
         if (sscanf (buf+10, "%x%c", &rev, &term) == 2) {
@@ -2546,22 +2539,21 @@ uint32_t gpioHardwareRevision() {
           }
         }
       }
-    fclose (filp);
+    fclose (file);
     }
 
   // (some) arm64 operating systems get revision number here
   if (rev == 0) {
-    filp = fopen ("/proc/device-tree/system/linux,revision", "r");
-
-    if (filp != NULL) {
+    file = fopen ("/proc/device-tree/system/linux,revision", "r");
+    if (file) {
       uint32_t tmp;
-      if (fread (&tmp,1 , 4, filp) == 4) {
+      if (fread (&tmp, 1, 4, file) == 4) {
         // for some reason the value returned by reading this /proc entry seems to be big endian, convert it.
         rev = ntohl (tmp);
         rev &= 0xFFFFFF; // mask out warranty bit
         }
-       }
-    fclose (filp);
+      }
+    fclose (file);
     }
 
   piCores = 0;
@@ -2590,9 +2582,11 @@ uint32_t gpioHardwareRevision() {
       case 0x0: // BCM2835
         pi_ispi = 1;
         piCores = 1;
+
         pi_peri_phys = 0x20000000;
-        pi_dram_bus  = 0x40000000;
-        pi_mem_flag  = 0x0C;
+        pi_dram_bus = 0x40000000;
+        pi_mem_flag = 0x0C;
+
         break;
       //}}}
       case 0x1:      // BCM2836
@@ -2600,9 +2594,11 @@ uint32_t gpioHardwareRevision() {
       case 0x2: // BCM2837
         pi_ispi = 1;
         piCores = 4;
+
         pi_peri_phys = 0x3F000000;
-        pi_dram_bus  = 0xC0000000;
-        pi_mem_flag  = 0x04;
+        pi_dram_bus = 0xC0000000;
+        pi_mem_flag = 0x04;
+
         break;
       //}}}
       //{{{
@@ -2611,9 +2607,9 @@ uint32_t gpioHardwareRevision() {
         piCores = 4;
 
         pi_peri_phys = 0xFE000000;
-        pi_dram_bus  = 0xC0000000;
-        pi_mem_flag  = 0x04;
-        pi_is_2711   = 1;
+        pi_dram_bus = 0xC0000000;
+        pi_mem_flag = 0x04;
+        pi_is_2711 = 1;
 
         clk_osc_freq = CLK_OSC_FREQ_2711;
         clk_plld_freq = CLK_PLLD_FREQ_2711;
@@ -2625,8 +2621,8 @@ uint32_t gpioHardwareRevision() {
       //}}}
       //{{{
       default:
-        cLog::log (LOGINFO, "unknown rev code (%x)", rev);
-        rev=0;
+        cLog::log (LOGINFO, "unknown rev code %x", rev);
+        rev = 0;
         pi_ispi = 0;
         break;
       //}}}
