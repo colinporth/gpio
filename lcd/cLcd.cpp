@@ -8,7 +8,7 @@
 
 #include <byteswap.h>
 
-#include "pigpio.h"
+#include "../pigpio/pigpioLite.h"
 
 #include "../../shared/fmt/format.h"
 #include "../../shared/utils/cLog.h"

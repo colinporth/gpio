@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <string>
 #include "lcd/cPointRect.h"
-#include "lcd/pigpio.h"
+#include "pigpio/pigpioLite.h"
 #include "../shared/utils/utils.h"
 #include "../shared/utils/cLog.h"
 

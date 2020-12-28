@@ -1,4 +1,4 @@
-// pigpio.c
+// pigpioFull.c - original pigpio folded
 //{{{  includes
 #define _GNU_SOURCE
 
@@ -41,7 +41,7 @@
 #include <glob.h>
 #include <arpa/inet.h>
 
-#include "pigpio.h"
+#include "pigpioFull.h"
 #include "command.h"
 //}}}
 //{{{  bits
@@ -8044,8 +8044,6 @@ int gpioWrite_Bits_32_53_Set (uint32_t bits) {
   return 0;
   }
 //}}}
-void fastGpioWrite_Bits_0_31_Clear (uint32_t bits) { *(gpioReg + GPCLR0) = bits; }
-void fastGpioWrite_Bits_0_31_Set (uint32_t bits) { *(gpioReg + GPSET0) = bits; }
 
 //{{{
 int gpioPWM (unsigned gpio, unsigned val)

@@ -129,7 +129,7 @@
 
 #include <arpa/inet.h>
 
-#include "pigpio.h"
+#include "pigpioLite.h"
 
 #include "../../shared/utils/cLog.h"
 //}}}
