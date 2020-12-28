@@ -444,14 +444,14 @@
 #define SPI_CS1     1
 #define SPI_CS2     2
 
-// standard SPI gpios (ALT0) */
+// standard SPI gpios (ALT0)
 #define PI_SPI_CE0   8
 #define PI_SPI_CE1   7
 #define PI_SPI_SCLK 11
 #define PI_SPI_MISO  9
 #define PI_SPI_MOSI 10
 
-// auxiliary SPI gpios (ALT4) */
+// auxiliary SPI gpios (ALT4)
 #define PI_ASPI_CE0  18
 #define PI_ASPI_CE1  17
 #define PI_ASPI_CE2  16
@@ -903,14 +903,6 @@ struct gpioInfo_t {
   };
 //}}}
 //{{{
-struct gpioGetSamples_t {
-  callbk_t func;
-  uint32_t ex;
-  void* userdata;
-  uint32_t bits;
-  };
-//}}}
-//{{{
 struct gpioTimer_t {
   callbk_t func;
   uint32_t ex;
@@ -1141,7 +1133,6 @@ static wfStats_t wfStats = {
   };
 static wfRx_t wfRx[PI_MAX_USER_GPIO+1];
 
-static gpioGetSamples_t gpioGetSamples;
 static gpioInfo_t gpioInfo[PI_MAX_GPIO+1];
 static i2cInfo_t i2cInfo[PI_I2C_SLOTS];
 static serInfo_t serInfo[PI_SER_SLOTS];
@@ -1259,7 +1250,7 @@ CC: 00 CLK0, 01 CLK1, 10 CLK2
 */
 //}}}
 //{{{
-static const clkCfg_t clkCfg[]= {
+static const clkCfg_t clkCfg[] = {
   // valid servo
   { 0,  0}, /*  0 */
   { 1, 17}, /*  1 */
@@ -1322,7 +1313,7 @@ static const uint16_t pwmRealRange[PWM_FREQS] = {
 //{{{
 static void sigHandler (int signum) {
 
-  cLog::log (LOGINFO,  "Unhandled signal %d, terminating\n", signum);
+  cLog::log (LOGINFO, "Unhandled signal %d, terminating\n", signum);
   gpioTerminate();
   exit (-1);
   }
@@ -1634,25 +1625,25 @@ static void* mbMapMem (uint32_t base, uint32_t size) {
 //}}}
 static int mbUnmapMem (void* addr, uint32_t size) { return munmap (addr, size); }
 //{{{
-static void mbDMAFree (DMAMem_t* DMAMemP) {
+static void mbDMAFree (DMAMem_t* DMAMem) {
 
-  if (DMAMemP->handle) {
-    mbUnmapMem (DMAMemP->virtual_addr, DMAMemP->size);
-    mbUnlockMemory (fdMbox, DMAMemP->handle);
-    mbReleaseMemory (fdMbox, DMAMemP->handle);
-    DMAMemP->handle = 0;
+  if (DMAMem->handle) {
+    mbUnmapMem (DMAMem->virtual_addr, DMAMem->size);
+    mbUnlockMemory (fdMbox, DMAMem->handle);
+    mbReleaseMemory (fdMbox, DMAMem->handle);
+    DMAMem->handle = 0;
     }
   }
 //}}}
 //{{{
-static int mbDMAAlloc (DMAMem_t* DMAMemP, uint32_t size, uint32_t pi_mem_flag) {
+static int mbDMAAlloc (DMAMem_t* DMAMem, uint32_t size, uint32_t pi_mem_flag) {
 
-  DMAMemP->size = size;
-  DMAMemP->handle = mbAllocateMemory(fdMbox, size, PAGE_SIZE, pi_mem_flag);
+  DMAMem->size = size;
+  DMAMem->handle = mbAllocateMemory (fdMbox, size, PAGE_SIZE, pi_mem_flag);
 
-  if (DMAMemP->handle) {
-    DMAMemP->bus_addr = mbLockMemory(fdMbox, DMAMemP->handle);
-    DMAMemP->virtual_addr = (uintptr_t*)mbMapMem(BUS_TO_PHYS(DMAMemP->bus_addr), size);
+  if (DMAMem->handle) {
+    DMAMem->bus_addr = mbLockMemory (fdMbox, DMAMem->handle);
+    DMAMem->virtual_addr = (uintptr_t*)mbMapMem (BUS_TO_PHYS (DMAMem->bus_addr), size);
     return 1;
     }
 
@@ -1706,11 +1697,6 @@ static void initClearGlobals() {
   wfStats.cbs        = 0;
   wfStats.highCbs    = 0;
   wfStats.maxCbs     = (PI_WAVE_BLOCKS * PAGES_PER_BLOCK * CBS_PER_OPAGE);
-
-  gpioGetSamples.func = NULL;
-  gpioGetSamples.ex = 0;
-  gpioGetSamples.userdata = NULL;
-  gpioGetSamples.bits = 0;
 
   for (int i = 0; i <= PI_MAX_USER_GPIO; i++) {
     wfRx[i].mode = PI_WFRX_NONE;
@@ -2883,12 +2869,12 @@ int gpioGetMode (uint32_t gpio) {
 //{{{
 void gpioSetMode (uint32_t gpio, uint32_t mode) {
 
-  int reg =  gpio/10;
-  int shift = (gpio%10) * 3;
+  int reg =  gpio / 10;
+  int shift = (gpio % 10) * 3;
 
   uint32_t old_mode = (gpioReg[reg] >> shift) & 7;
   if (mode != old_mode) {
-    switchFunctionOff(gpio);
+    switchFunctionOff (gpio);
     gpioInfo[gpio].is = GPIO_UNDEFINED;
     }
 
@@ -3188,17 +3174,17 @@ static void spiInit (uint32_t flags) {
     // manually control auxiliary SPI chip selects
     if (!(resvd & 1)) {
       myGpioSetMode (PI_ASPI_CE0, PI_OUTPUT);
-      myGpioWrite (PI_ASPI_CE0, !(cspols&1));
+      myGpioWrite (PI_ASPI_CE0, !(cspols & 1));
       }
 
     if (!(resvd & 2)) {
       myGpioSetMode (PI_ASPI_CE1, PI_OUTPUT);
-      myGpioWrite (PI_ASPI_CE1, !(cspols&2));
+      myGpioWrite (PI_ASPI_CE1, !(cspols & 2));
       }
 
     if (!(resvd&4)) {
       myGpioSetMode (PI_ASPI_CE2, PI_OUTPUT);
-      myGpioWrite (PI_ASPI_CE2, !(cspols&4));
+      myGpioWrite (PI_ASPI_CE2, !(cspols & 4));
       }
 
     // set gpios to SPI mode
@@ -3206,6 +3192,7 @@ static void spiInit (uint32_t flags) {
     myGpioSetMode (PI_ASPI_MISO, PI_ALT4);
     myGpioSetMode (PI_ASPI_MOSI, PI_ALT4);
     }
+
   else {
     // save original state
     old_mode_ce0 = gpioGetMode (PI_SPI_CE0);
@@ -3228,20 +3215,21 @@ static void spiInit (uint32_t flags) {
     }
   }
 //}}}
+
 //{{{
 static uint32_t spiTXBits (char* buf, int pos, int bitlen, int msbf) {
 
   uint32_t bits = 0;
   if (buf) {
     if (bitlen <=  8)
-      bits = *((( uint8_t*)buf)+pos);
+      bits = *((( uint8_t*)buf) + pos);
     else if (bitlen <= 16)
-      bits = *(((uint16_t*)buf)+pos);
+      bits = *(((uint16_t*)buf) + pos);
     else
-      bits = *(((uint32_t*)buf)+pos);
+      bits = *(((uint32_t*)buf) + pos);
 
     if (msbf)
-      bits <<= (32-bitlen);
+      bits <<= (32 - bitlen);
     }
 
   return bits;
@@ -3255,11 +3243,11 @@ static void spiRXBits (char *buf, int pos, int bitlen, int msbf, uint32_t bits) 
       bits >>= (32-bitlen);
 
     if (bitlen <=  8)
-      *((( uint8_t*)buf)+pos) = bits;
+      *((( uint8_t*)buf) + pos) = bits;
     else if (bitlen <= 16)
-      *(((uint16_t*)buf)+pos) = bits;
+      *(((uint16_t*)buf) + pos) = bits;
     else
-      *(((uint32_t*)buf)+pos) = bits;
+      *(((uint32_t*)buf) + pos) = bits;
     }
   }
 //}}}
@@ -3283,7 +3271,7 @@ static void spiGoA (uint32_t speed, uint32_t flags, char* txBuf, char* rxBuf, ui
   char bit_or[4] = {0, 1, 1, 0}; // write on rising edge
   char bit_ic[4] = {0, 0, 1, 1}; // invert clock
 
-  int channel = PI_SPI_FLAGS_GET_CHANNEL(flags);
+  int channel = PI_SPI_FLAGS_GET_CHANNEL (flags);
   int mode = PI_SPI_FLAGS_GET_MODE (flags);
   int bitlen = PI_SPI_FLAGS_GET_BITLEN (flags);
   if (!bitlen)
@@ -3295,25 +3283,25 @@ static void spiGoA (uint32_t speed, uint32_t flags, char* txBuf, char* rxBuf, ui
 
   int txmsbf = !PI_SPI_FLAGS_GET_TX_LSB (flags);
   int rxmsbf = !PI_SPI_FLAGS_GET_RX_LSB (flags);
-  int cs = PI_SPI_FLAGS_GET_CSPOLS(flags) & (1<<channel);
+  int cs = PI_SPI_FLAGS_GET_CSPOLS (flags) & (1 << channel);
 
-  uint32_t spiDefaults = AUXSPI_CNTL0_SPEED((125000000/speed)-1)|
-                         AUXSPI_CNTL0_IN_RISING(bit_ir[mode])  |
-                         AUXSPI_CNTL0_OUT_RISING(bit_or[mode]) |
-                         AUXSPI_CNTL0_INVERT_CLK(bit_ic[mode]) |
-                         AUXSPI_CNTL0_MSB_FIRST(txmsbf)        |
-                         AUXSPI_CNTL0_SHIFT_LEN(bitlen);
+  uint32_t spiDefaults = AUXSPI_CNTL0_SPEED ((125000000/speed)-1)|
+                         AUXSPI_CNTL0_IN_RISING (bit_ir[mode])  |
+                         AUXSPI_CNTL0_OUT_RISING (bit_or[mode]) |
+                         AUXSPI_CNTL0_INVERT_CLK (bit_ic[mode]) |
+                         AUXSPI_CNTL0_MSB_FIRST (txmsbf)        |
+                         AUXSPI_CNTL0_SHIFT_LEN (bitlen);
 
   if (!count) {
     auxReg[AUX_SPI0_CNTL0_REG] = AUXSPI_CNTL0_ENABLE | AUXSPI_CNTL0_CLR_FIFOS;
     myGpioDelay (10);
     auxReg[AUX_SPI0_CNTL0_REG] = AUXSPI_CNTL0_ENABLE  | spiDefaults;
-    auxReg[AUX_SPI0_CNTL1_REG] = AUXSPI_CNTL1_MSB_FIRST(rxmsbf);
+    auxReg[AUX_SPI0_CNTL1_REG] = AUXSPI_CNTL1_MSB_FIRST (rxmsbf);
     return;
     }
 
   auxReg[AUX_SPI0_CNTL0_REG] = AUXSPI_CNTL0_ENABLE  | spiDefaults;
-  auxReg[AUX_SPI0_CNTL1_REG] = AUXSPI_CNTL1_MSB_FIRST(rxmsbf);
+  auxReg[AUX_SPI0_CNTL1_REG] = AUXSPI_CNTL1_MSB_FIRST (rxmsbf);
   spiACS(channel, cs);
 
   uint32_t txCnt = 0;
@@ -3336,7 +3324,7 @@ static void spiGoA (uint32_t speed, uint32_t flags, char* txBuf, char* rxBuf, ui
       }
     }
 
-  while ((auxReg[AUX_SPI0_STAT_REG] & AUXSPI_STAT_BUSY)) {}
+  while (auxReg[AUX_SPI0_STAT_REG] & AUXSPI_STAT_BUSY) {}
   spiACS (channel, !cs);
   }
 //}}}
@@ -3450,9 +3438,12 @@ static void spiTerminate (uint32_t flags) {
     auxReg[AUX_ENABLES] &= (~AUXENB_SPI1);
 
     // restore original state
-    if (!(resvd & 1)) myGpioSetMode (PI_ASPI_CE0, old_mode_ace0);
-    if (!(resvd & 2)) myGpioSetMode (PI_ASPI_CE1, old_mode_ace1);
-    if (!(resvd & 4)) myGpioSetMode (PI_ASPI_CE2, old_mode_ace2);
+    if (!(resvd & 1))
+      myGpioSetMode (PI_ASPI_CE0, old_mode_ace0);
+    if (!(resvd & 2))
+      myGpioSetMode (PI_ASPI_CE1, old_mode_ace1);
+    if (!(resvd & 4))
+      myGpioSetMode (PI_ASPI_CE2, old_mode_ace2);
 
     myGpioSetMode (PI_ASPI_SCLK, old_mode_asclk);
     myGpioSetMode (PI_ASPI_MISO, old_mode_amiso);
@@ -3486,7 +3477,7 @@ int spiOpen (uint32_t spiChan, uint32_t baud, uint32_t spiFlags) {
   static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
   int i;
-  if (PI_SPI_FLAGS_GET_AUX_SPI(spiFlags)) {
+  if (PI_SPI_FLAGS_GET_AUX_SPI (spiFlags)) {
     if (gpioHardwareRevision() < 16)
       LOG_ERROR ("no auxiliary SPI on Pi A or B");
     i = PI_NUM_AUX_SPI_CHANNEL;
@@ -3494,7 +3485,7 @@ int spiOpen (uint32_t spiChan, uint32_t baud, uint32_t spiFlags) {
   else
     i = PI_NUM_STD_SPI_CHANNEL;
 
-  if (!spiAnyOpen(spiFlags)) {
+  if (!spiAnyOpen (spiFlags)) {
     // initialise on first open
     spiInit (spiFlags);
     spiGo (baud, spiFlags, NULL, NULL, 0);
@@ -3515,7 +3506,7 @@ int spiOpen (uint32_t spiChan, uint32_t baud, uint32_t spiFlags) {
     LOG_ERROR ("no SPI handles");
 
   spiInfo[slot].speed = baud;
-  spiInfo[slot].flags = spiFlags | PI_SPI_FLAGS_CHANNEL(spiChan);
+  spiInfo[slot].flags = spiFlags | PI_SPI_FLAGS_CHANNEL (spiChan);
   spiInfo[slot].state = PI_SPI_OPENED;
 
   return slot;
@@ -3712,20 +3703,20 @@ int bbSPIOpen (uint32_t CS, uint32_t MISO, uint32_t MOSI, uint32_t SCLK, uint32_
   uint32_t bits;
   valid = 0;
 
-  /* check all GPIO unique */
-  bits = (1<<CS) | (1<<MISO) | (1<<MOSI) | (1<<SCLK);
+  // check all GPIO unique
+  bits = (1 << CS) | (1 << MISO) | (1 << MOSI) | (1 << SCLK);
 
   if (__builtin_popcount (bits) == 4) {
     if ((wfRx[MISO].mode == PI_WFRX_NONE) &&
         (wfRx[MOSI].mode == PI_WFRX_NONE) &&
         (wfRx[SCLK].mode == PI_WFRX_NONE)) {
-      valid = 1; /* first time GPIO used for SPI */
+      valid = 1; // first time GPIO used for SPI
       }
     else {
       if ((wfRx[MISO].mode == PI_WFRX_SPI_MISO) &&
           (wfRx[MOSI].mode == PI_WFRX_SPI_MOSI) &&
           (wfRx[SCLK].mode == PI_WFRX_SPI_SCLK)) {
-        valid = 2; /* new CS for existing SPI GPIO */
+        valid = 2; // new CS for existing SPI GPIO
         }
       }
     }
@@ -3749,8 +3740,9 @@ int bbSPIOpen (uint32_t CS, uint32_t MISO, uint32_t MOSI, uint32_t SCLK, uint32_
   else
     gpioWrite(CS, 1); // active low
 
-  // The SCLK entry is used to store full information */
-  if (valid == 1) { /* first time GPIO for SPI */
+  // The SCLK entry is used to store full information
+  if (valid == 1) {
+    // first time GPIO for SPI
     wfRx[SCLK].S.usage = 1;
 
     wfRx[SCLK].S.SCLKMode = gpioGetMode(SCLK);
@@ -3767,7 +3759,7 @@ int bbSPIOpen (uint32_t CS, uint32_t MISO, uint32_t MOSI, uint32_t SCLK, uint32_
 
     myGpioSetMode(MISO, PI_INPUT);
     myGpioSetMode(SCLK, PI_OUTPUT);
-    gpioWrite(MOSI, 0); /* low output */
+    gpioWrite(MOSI, 0); // low output
     }
   else
     wfRx[SCLK].S.usage++;
@@ -3787,50 +3779,45 @@ int bbSPIXfer (uint32_t CS, char* inBuf, char* outBuf, uint32_t count) {
   wfRx_t* w = &wfRx[SCLK];
 
   wfRx_lock (SCLK);
+
   bbSPIStart (w);
   for (int pos = 0; pos < (int)count; pos++)
     outBuf[pos] = bbSPIXferByte(w, inBuf[pos]);
   bbSPIStop(w);
+
   wfRx_unlock(SCLK);
 
   return count;
   }
 //}}}
 //{{{
-int bbSPIClose (uint32_t CS)
-{
-   int SCLK;
+int bbSPIClose (uint32_t CS) {
 
-   switch(wfRx[CS].mode)
-   {
-      case PI_WFRX_SPI_CS:
+  int SCLK;
+  switch(wfRx[CS].mode) {
+    case PI_WFRX_SPI_CS:
+      myGpioSetMode(wfRx[CS].S.CS, wfRx[CS].S.CSMode);
+      wfRx[CS].mode = PI_WFRX_NONE;
 
-         myGpioSetMode(wfRx[CS].S.CS, wfRx[CS].S.CSMode);
-         wfRx[CS].mode = PI_WFRX_NONE;
+      SCLK = wfRx[CS].S.SCLK;
+      if (--wfRx[SCLK].S.usage <= 0) {
+        myGpioSetMode(wfRx[SCLK].S.MISO, wfRx[SCLK].S.MISOMode);
+        myGpioSetMode(wfRx[SCLK].S.MOSI, wfRx[SCLK].S.MOSIMode);
+        myGpioSetMode(wfRx[SCLK].S.SCLK, wfRx[SCLK].S.SCLKMode);
 
-         SCLK = wfRx[CS].S.SCLK;
+        wfRx[wfRx[SCLK].S.MISO].mode = PI_WFRX_NONE;
+        wfRx[wfRx[SCLK].S.MOSI].mode = PI_WFRX_NONE;
+        wfRx[wfRx[SCLK].S.SCLK].mode = PI_WFRX_NONE;
+        }
+      break;
 
-         if (--wfRx[SCLK].S.usage <= 0)
-         {
-            myGpioSetMode(wfRx[SCLK].S.MISO, wfRx[SCLK].S.MISOMode);
-            myGpioSetMode(wfRx[SCLK].S.MOSI, wfRx[SCLK].S.MOSIMode);
-            myGpioSetMode(wfRx[SCLK].S.SCLK, wfRx[SCLK].S.SCLKMode);
+    default:
+      LOG_ERROR ("no SPI on gpio (%d)", CS);
+      break;
+    }
 
-            wfRx[wfRx[SCLK].S.MISO].mode = PI_WFRX_NONE;
-            wfRx[wfRx[SCLK].S.MOSI].mode = PI_WFRX_NONE;
-            wfRx[wfRx[SCLK].S.SCLK].mode = PI_WFRX_NONE;
-         }
-
-         break;
-
-      default:
-         LOG_ERROR ("no SPI on gpio (%d)", CS);
-         break;
-
-   }
-
-   return 0;
-}
+  return 0;
+  }
 //}}}
 //}}}
 //{{{  i2c
@@ -4923,8 +4910,8 @@ int serDataAvailable (uint32_t handle) {
 //{{{
 int gpioSerialReadOpen (uint32_t gpio, uint32_t baud, uint32_t data_bits) {
 
-  int bitTime = (1000 * 1000000) / baud; /* nanos */
-  int timeout  = ((data_bits+2) * bitTime)/1000000; /* millis */
+  int bitTime = (1000 * 1000000) / baud; // nanos
+  int timeout  = ((data_bits+2) * bitTime)/1000000; // millis
   if (timeout < 1)
     timeout = 1;
 
@@ -4935,8 +4922,8 @@ int gpioSerialReadOpen (uint32_t gpio, uint32_t baud, uint32_t data_bits) {
   wfRx[gpio].s.buf      = (char*)malloc(SRX_BUF_SIZE);
   wfRx[gpio].s.bufSize  = SRX_BUF_SIZE;
   wfRx[gpio].s.timeout  = timeout;
-  wfRx[gpio].s.fullBit  = bitTime;         /* nanos */
-  wfRx[gpio].s.halfBit  = (bitTime/2)+500; /* nanos (500 for rounding) */
+  wfRx[gpio].s.fullBit  = bitTime;         // nanos
+  wfRx[gpio].s.halfBit  = (bitTime/2)+500; // nanos (500 for rounding)
   wfRx[gpio].s.readPos  = 0;
   wfRx[gpio].s.writePos = 0;
   wfRx[gpio].s.bit      = -1;
@@ -4957,11 +4944,12 @@ int gpioSerialReadOpen (uint32_t gpio, uint32_t baud, uint32_t data_bits) {
 int gpioSerialReadInvert (uint32_t gpio, uint32_t invert) {
 
   wfRx[gpio].s.invert = invert;
+
   return 0;
   }
 //}}}
 //{{{
-int gpioSerialRead (uint32_t gpio, void *buf, size_t bufSize) {
+int gpioSerialRead (uint32_t gpio, void* buf, size_t bufSize) {
 
   uint32_t bytes = 0;
   uint32_t wpos;
@@ -4977,7 +4965,7 @@ int gpioSerialRead (uint32_t gpio, void *buf, size_t bufSize) {
     if (bytes > bufSize)
       bytes = bufSize;
 
-    // copy in multiples of the data size in bytes */
+    // copy in multiples of the data size in bytes
     bytes = (bytes / w->s.bytes) * w->s.bytes;
     if (buf)
       memcpy (buf, w->s.buf+w->s.readPos, bytes);

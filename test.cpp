@@ -311,19 +311,24 @@ int main (int numArgs, char* args[]) {
   //{{{  dumb command line option parser
   for (int argIndex = 1; argIndex < numArgs; argIndex++) {
     string str (args[argIndex]);
+
     if (str == "0") rotate = cLcd::e0;
     else if (str == "90") rotate = cLcd::e90;
     else if (str == "180") rotate = cLcd::e180;
     else if (str == "270") rotate = cLcd::e270;
+
     else if (str == "o") info = cLcd::eOverlay;
     else if (str == "a") mode = cLcd::eAll;
     else if (str == "s") mode = cLcd::eSingle;
     else if (str == "c") mode = cLcd::eCoarse;
     else if (str == "e") mode = cLcd::eExact;
+
     else if (str == "1") logLevel = LOGINFO1;
     else if (str == "2") logLevel = LOGINFO2;
+
     else if (str == "r") drawRadial = true;
     else if (str == "d") draw = true;
+
     else if (str == "1289") lcdType = 1289;
     else if (str == "7601") lcdType = 7601;
     else if (str == "7735") lcdType = 7735;
@@ -332,6 +337,7 @@ int main (int numArgs, char* args[]) {
     else if (str == "9341") lcdType = 9341;
     else if (str == "100k") spiSpeed = 100000;
     else if (str == "400k") spiSpeed = 400000;
+
     else if (str == "1m")   spiSpeed = 1000000;
     else if (str == "2m")   spiSpeed = 2000000;
     else if (str == "4m")   spiSpeed = 4000000;
@@ -342,6 +348,7 @@ int main (int numArgs, char* args[]) {
     else if (str == "32m")  spiSpeed = 32000000;
     else if (str == "36m")  spiSpeed = 36000000;
     else if (str == "40m")  spiSpeed = 40000000;
+    else if (str == "44m")  spiSpeed = 44000000;
     else if (str == "48m")  spiSpeed = 48000000;
     else
       cLog::log (LOGERROR, "unrecognised option " + str);

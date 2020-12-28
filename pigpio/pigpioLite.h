@@ -271,10 +271,6 @@ struct pi_i2c_msg_t {
   };
 //}}}
 
-uint32_t gpioHardwareRevision();
-int gpioInitialise();
-void gpioTerminate();
-
 //{{{  time
 int gpioTime (uint32_t timetype, int* seconds, int* micros);
 int gpioSleep (uint32_t timetype, int seconds, int micros);
@@ -283,6 +279,11 @@ uint32_t gpioTick();
 double timeTime();
 void timeSleep (double seconds);
 //}}}
+
+uint32_t gpioHardwareRevision();
+int gpioInitialise();
+void gpioTerminate();
+
 //{{{  gpio
 int gpioGetMode (uint32_t gpio);
 void gpioSetMode (uint32_t gpio, uint32_t mode);
