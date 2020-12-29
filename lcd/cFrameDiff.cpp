@@ -472,6 +472,11 @@ sSpan* cCoarseFrameDiff::diff (uint16_t* frameBuf) {
 sSpan* cExactFrameDiff::diff (uint16_t* frameBuf) {
 // return numSpans
 
+  //constexpr uint32_t kDiffMask = 0xFFFFFFFF;  // all bits
+  //constexpr uint32_t kDiffMask = 0xf79ef79e;  // top 4 bits
+  constexpr uint32_t kDiffMask = 0xe71ce71c;  // top 3 bits
+  //constexpr uint32_t kDiffMask = 0xc618c618;  // top 2 bits
+
   sSpan* spans = mSpans;
   int numSpans = 0;
 
@@ -482,7 +487,6 @@ sSpan* cExactFrameDiff::diff (uint16_t* frameBuf) {
   uint16_t* scanline = frameBuf + y * mWidth;
   uint16_t* prevFrameScanline = mPrevFrameBuf + y * mWidth;
   while (y < mHeight) {
-
     uint16_t* scanlineStart = scanline;
     uint16_t* scanlineEnd = scanline + mWidth;
     while (scanline < scanlineEnd) {
@@ -490,46 +494,48 @@ sSpan* cExactFrameDiff::diff (uint16_t* frameBuf) {
       uint16_t* spanEnd;
       int numConsecutiveUnchangedPixels = 0;
       if (scanline + 1 < scanlineEnd) {
-        uint32_t diff = (*(uint32_t*)scanline) ^ (*(uint32_t*)prevFrameScanline);
+        uint32_t diff = ((*(uint32_t*)scanline) ^ (*(uint32_t*)prevFrameScanline)) & kDiffMask;
         scanline += 2;
         prevFrameScanline += 2;
 
-        if (diff == 0) // Both 1st and 2nd pixels are the same
+        if (!diff) // both 1st,2nd pix same
           continue;
-
-        if ((diff & 0xFFFF) == 0) {
-          //{{{  1st pixels are the same, 2nd pixels are not
-          spanStart = scanline - 1;
-          spanEnd = scanline;
-          }
-          //}}}
-        else {
-          //{{{  1st pixels are different
+        if (diff & 0xFFFF) {
+          //{{{  1st pix diff
           spanStart = scanline - 2;
-          if ((diff & 0xFFFF0000u) != 0) // 2nd pixels are different?
+
+          if (diff & 0xFFFF0000) // 2nd pix diff
             spanEnd = scanline;
+
           else {
             spanEnd = scanline - 1;
             numConsecutiveUnchangedPixels = 1;
             }
           }
           //}}}
-        //{{{  found start of span of different pixels on this scanline, find where it ends
+        else {
+          //{{{  only 2nd pix diff
+          spanStart = scanline - 1;
+          spanEnd = scanline;
+          }
+          //}}}
+
+        //{{{  start of span diff pix, find end
         while (scanline < scanlineEnd) {
-          if (*scanline++ != *prevFrameScanline++) {
+          uint32_t diff = ((*(uint32_t*)scanline++) ^ (*(uint32_t*)prevFrameScanline++)) & kDiffMask;
+          if (diff) {
             spanEnd = scanline;
             numConsecutiveUnchangedPixels = 0;
             }
-          else {
-            if (++numConsecutiveUnchangedPixels > kSpanExactThreshold)
-              break;
-            }
+          else if (++numConsecutiveUnchangedPixels > kSpanExactThreshold)
+            break;
           }
         //}}}
         }
       else {
-       //{{{  handle single last pixel on the row
-       if (*scanline++ == *prevFrameScanline++)
+       //{{{  handle single last pix on the row
+       uint32_t diff = ((*(uint32_t*)scanline++) ^ (*(uint32_t*)prevFrameScanline++)) & kDiffMask;
+       if (!diff)
          break;
 
        spanStart = scanline - 1;
@@ -555,7 +561,6 @@ sSpan* cExactFrameDiff::diff (uint16_t* frameBuf) {
         }
         //}}}
       }
-
     y += yInc;
     }
 
