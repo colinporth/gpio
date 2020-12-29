@@ -479,7 +479,6 @@
 #define AUX_SPI0_CNTL1_REG 33
 #define AUX_SPI0_STAT_REG  34
 #define AUX_SPI0_PEEK_REG  35
-
 #define AUX_SPI0_IO_REG    40
 #define AUX_SPI0_TX_HOLD   44
 
@@ -487,7 +486,6 @@
 #define AUX_SPI1_CNTL1_REG 49
 #define AUX_SPI1_STAT_REG  50
 #define AUX_SPI1_PEEK_REG  51
-
 #define AUX_SPI1_IO_REG    56
 #define AUX_SPI1_TX_HOLD   60
 
@@ -1192,7 +1190,7 @@ static volatile gpioCfg_t gpioCfg = {
 static uint32_t bufferBlocks; // number of blocks in buffer
 static uint32_t bufferCycles; // number of cycles
 
-static uint32_t spi_dummy;
+static uint32_t spiDummy;
 
 static uint32_t old_mode_ce0;
 static uint32_t old_mode_ce1;
@@ -3182,7 +3180,7 @@ static void spiInit (uint32_t flags) {
       myGpioWrite (PI_ASPI_CE1, !(cspols & 2));
       }
 
-    if (!(resvd&4)) {
+    if (!(resvd & 4)) {
       myGpioSetMode (PI_ASPI_CE2, PI_OUTPUT);
       myGpioWrite (PI_ASPI_CE2, !(cspols & 4));
       }
@@ -3216,6 +3214,97 @@ static void spiInit (uint32_t flags) {
   }
 //}}}
 
+//{{{
+static void spiGoS (uint32_t speed, uint32_t flags, char* txBuf, char* rxBuf, uint32_t count) {
+
+  uint32_t channel = PI_SPI_FLAGS_GET_CHANNEL (flags);
+  uint32_t mode   =  PI_SPI_FLAGS_GET_MODE (flags);
+  uint32_t cspols =  PI_SPI_FLAGS_GET_CSPOLS (flags);
+  uint32_t cspol  =  (cspols >> channel) & 1;
+  uint32_t flag3w =  PI_SPI_FLAGS_GET_3WIRE (flags);
+  uint32_t ren3w  =  PI_SPI_FLAGS_GET_3WREN (flags);
+
+  uint32_t spiDefaults = SPI_CS_MODE(mode) | SPI_CS_CSPOLS(cspols) |
+                         SPI_CS_CS(channel) | SPI_CS_CSPOL(cspol) | SPI_CS_CLEAR(3);
+
+  // undocumented, stops inter-byte gap
+  spiReg[SPI_DLEN] = 2;
+
+  // stop
+  spiReg[SPI_CS] = spiDefaults;
+
+  if (!count)
+    return;
+
+  uint32_t cnt4w;
+  uint32_t cnt3w;
+  if (flag3w) {
+    if (ren3w < count) {
+      cnt4w = ren3w;
+      cnt3w = count - ren3w;
+      }
+    else {
+      cnt4w = count;
+      cnt3w = 0;
+      }
+    }
+  else {
+    cnt4w = count;
+    cnt3w = 0;
+    }
+
+  spiReg[SPI_CLK] = 250000000 / speed;
+  spiReg[SPI_CS] = spiDefaults | SPI_CS_TA; /* start */
+
+  uint32_t cnt = cnt4w;
+  uint32_t txCnt = 0;
+  uint32_t rxCnt = 0;
+  while ((txCnt < cnt) || (rxCnt < cnt)) {
+    while ((rxCnt < cnt) && ((spiReg[SPI_CS] & SPI_CS_RXD))) {
+      if (rxBuf)
+        rxBuf[rxCnt] = spiReg[SPI_FIFO];
+      else
+        spiDummy = spiReg[SPI_FIFO];
+      rxCnt++;
+      }
+
+    while ((txCnt < cnt) && ((spiReg[SPI_CS] & SPI_CS_TXD))) {
+      if (txBuf)
+        spiReg[SPI_FIFO] = txBuf[txCnt];
+      else
+        spiReg[SPI_FIFO] = 0;
+      txCnt++;
+      }
+    }
+
+  while (!(spiReg[SPI_CS] & SPI_CS_DONE)) {}
+
+  // switch to 3-wire bus
+  cnt += cnt3w;
+  spiReg[SPI_CS] |= SPI_CS_REN;
+  while ((txCnt < cnt) || (rxCnt < cnt)) {
+    while((rxCnt < cnt) && ((spiReg[SPI_CS] & SPI_CS_RXD))) {
+      if (rxBuf)
+        rxBuf[rxCnt] = spiReg[SPI_FIFO];
+      else
+        spiDummy = spiReg[SPI_FIFO];
+      rxCnt++;
+      }
+
+    while ((txCnt < cnt) && ((spiReg[SPI_CS] & SPI_CS_TXD))) {
+      if (txBuf)
+        spiReg[SPI_FIFO] = txBuf[txCnt];
+      else
+        spiReg[SPI_FIFO] = 0;
+      txCnt++;
+      }
+    }
+
+  while (!(spiReg[SPI_CS] & SPI_CS_DONE)) {}
+  // stop
+  spiReg[SPI_CS] = spiDefaults;
+  }
+//}}}
 //{{{
 static uint32_t spiTXBits (char* buf, int pos, int bitlen, int msbf) {
 
@@ -3285,7 +3374,7 @@ static void spiGoA (uint32_t speed, uint32_t flags, char* txBuf, char* rxBuf, ui
   int rxmsbf = !PI_SPI_FLAGS_GET_RX_LSB (flags);
   int cs = PI_SPI_FLAGS_GET_CSPOLS (flags) & (1 << channel);
 
-  uint32_t spiDefaults = AUXSPI_CNTL0_SPEED ((125000000/speed)-1)|
+  uint32_t spiDefaults = AUXSPI_CNTL0_SPEED ((125000000 / speed) - 1)|
                          AUXSPI_CNTL0_IN_RISING (bit_ir[mode])  |
                          AUXSPI_CNTL0_OUT_RISING (bit_or[mode]) |
                          AUXSPI_CNTL0_INVERT_CLK (bit_ic[mode]) |
@@ -3295,12 +3384,12 @@ static void spiGoA (uint32_t speed, uint32_t flags, char* txBuf, char* rxBuf, ui
   if (!count) {
     auxReg[AUX_SPI0_CNTL0_REG] = AUXSPI_CNTL0_ENABLE | AUXSPI_CNTL0_CLR_FIFOS;
     myGpioDelay (10);
-    auxReg[AUX_SPI0_CNTL0_REG] = AUXSPI_CNTL0_ENABLE  | spiDefaults;
+    auxReg[AUX_SPI0_CNTL0_REG] = AUXSPI_CNTL0_ENABLE | spiDefaults;
     auxReg[AUX_SPI0_CNTL1_REG] = AUXSPI_CNTL1_MSB_FIRST (rxmsbf);
     return;
     }
 
-  auxReg[AUX_SPI0_CNTL0_REG] = AUXSPI_CNTL0_ENABLE  | spiDefaults;
+  auxReg[AUX_SPI0_CNTL0_REG] = AUXSPI_CNTL0_ENABLE | spiDefaults;
   auxReg[AUX_SPI0_CNTL1_REG] = AUXSPI_CNTL1_MSB_FIRST (rxmsbf);
   spiACS(channel, cs);
 
@@ -3309,14 +3398,14 @@ static void spiGoA (uint32_t speed, uint32_t flags, char* txBuf, char* rxBuf, ui
   while ((txCnt < count) || (rxCnt < count)) {
      uint32_t statusReg = auxReg[AUX_SPI0_STAT_REG];
      int rxEmpty = statusReg & AUXSPI_STAT_RX_EMPTY;
-     int txFull = (((statusReg>>28)&15) > 2);
+     int txFull = (((statusReg >> 28) & 15) > 2);
      if (rxCnt < count)
        if (!rxEmpty)
          spiRXBits (rxBuf, rxCnt++, bitlen, rxmsbf, auxReg[AUX_SPI0_IO_REG]);
 
      if (txCnt < count) {
        if (!txFull) {
-         if (txCnt != (count-1))
+         if (txCnt != (count - 1))
            auxReg[AUX_SPI0_TX_HOLD] = spiTXBits (txBuf, txCnt++, bitlen, txmsbf);
          else
            auxReg[AUX_SPI0_IO_REG] = spiTXBits (txBuf, txCnt++, bitlen, txmsbf);
@@ -3326,97 +3415,6 @@ static void spiGoA (uint32_t speed, uint32_t flags, char* txBuf, char* rxBuf, ui
 
   while (auxReg[AUX_SPI0_STAT_REG] & AUXSPI_STAT_BUSY) {}
   spiACS (channel, !cs);
-  }
-//}}}
-//{{{
-static void spiGoS (uint32_t speed, uint32_t flags, char* txBuf, char* rxBuf, uint32_t count) {
-
-  uint32_t channel = PI_SPI_FLAGS_GET_CHANNEL (flags);
-  uint32_t mode   =  PI_SPI_FLAGS_GET_MODE (flags);
-  uint32_t cspols =  PI_SPI_FLAGS_GET_CSPOLS (flags);
-  uint32_t cspol  =  (cspols >> channel) & 1;
-  uint32_t flag3w =  PI_SPI_FLAGS_GET_3WIRE (flags);
-  uint32_t ren3w  =  PI_SPI_FLAGS_GET_3WREN (flags);
-
-  uint32_t spiDefaults = SPI_CS_MODE(mode) | SPI_CS_CSPOLS(cspols) |
-                         SPI_CS_CS(channel) | SPI_CS_CSPOL(cspol) | SPI_CS_CLEAR(3);
-
-  // undocumented, stops inter-byte gap
-  spiReg[SPI_DLEN] = 2;
-
-  // stop
-  spiReg[SPI_CS] = spiDefaults;
-
-  if (!count)
-    return;
-
-  uint32_t cnt4w;
-  uint32_t cnt3w;
-  if (flag3w) {
-    if (ren3w < count) {
-      cnt4w = ren3w;
-      cnt3w = count - ren3w;
-      }
-    else {
-      cnt4w = count;
-      cnt3w = 0;
-      }
-    }
-  else {
-    cnt4w = count;
-    cnt3w = 0;
-    }
-
-  spiReg[SPI_CLK] = 250000000 / speed;
-  spiReg[SPI_CS] = spiDefaults | SPI_CS_TA; /* start */
-
-  uint32_t cnt = cnt4w;
-  uint32_t txCnt = 0;
-  uint32_t rxCnt = 0;
-  while ((txCnt < cnt) || (rxCnt < cnt)) {
-    while ((rxCnt < cnt) && ((spiReg[SPI_CS] & SPI_CS_RXD))) {
-      if (rxBuf)
-        rxBuf[rxCnt] = spiReg[SPI_FIFO];
-      else
-        spi_dummy = spiReg[SPI_FIFO];
-      rxCnt++;
-      }
-
-    while ((txCnt < cnt) && ((spiReg[SPI_CS] & SPI_CS_TXD))) {
-      if (txBuf)
-        spiReg[SPI_FIFO] = txBuf[txCnt];
-      else
-        spiReg[SPI_FIFO] = 0;
-      txCnt++;
-      }
-    }
-
-  while (!(spiReg[SPI_CS] & SPI_CS_DONE)) {}
-
-  // switch to 3-wire bus
-  cnt += cnt3w;
-  spiReg[SPI_CS] |= SPI_CS_REN;
-  while ((txCnt < cnt) || (rxCnt < cnt)) {
-    while((rxCnt < cnt) && ((spiReg[SPI_CS] & SPI_CS_RXD))) {
-      if (rxBuf)
-        rxBuf[rxCnt] = spiReg[SPI_FIFO];
-      else
-        spi_dummy = spiReg[SPI_FIFO];
-      rxCnt++;
-      }
-
-    while ((txCnt < cnt) && ((spiReg[SPI_CS] & SPI_CS_TXD))) {
-      if (txBuf)
-        spiReg[SPI_FIFO] = txBuf[txCnt];
-      else
-        spiReg[SPI_FIFO] = 0;
-      txCnt++;
-      }
-    }
-
-  while (!(spiReg[SPI_CS] & SPI_CS_DONE)) {}
-  // stop
-  spiReg[SPI_CS] = spiDefaults;
   }
 //}}}
 //{{{
@@ -3477,11 +3475,8 @@ int spiOpen (uint32_t spiChan, uint32_t baud, uint32_t spiFlags) {
   static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
   int i;
-  if (PI_SPI_FLAGS_GET_AUX_SPI (spiFlags)) {
-    if (gpioHardwareRevision() < 16)
-      LOG_ERROR ("no auxiliary SPI on Pi A or B");
+  if (PI_SPI_FLAGS_GET_AUX_SPI (spiFlags))
     i = PI_NUM_AUX_SPI_CHANNEL;
-    }
   else
     i = PI_NUM_STD_SPI_CHANNEL;
 
@@ -3531,13 +3526,15 @@ int spiWrite (uint32_t handle, char* buf, uint32_t count) {
   }
 //}}}
 //{{{
-void spiWriteMainFast (uint32_t handle, const uint8_t* buf, uint32_t count) {
+void spiWriteMainFast (const uint8_t* buf, uint32_t count) {
+// write single byte or 16bit frameBuffer using main hw cs
+// - assumes no other use of spi main since spiOpen
 
   spiReg[SPI_CS] |= SPI_CS_TA;
 
   if (count == 1) {
     // single byte
-    spiReg[SPI_FIFO] = *buf++;
+    spiReg[SPI_FIFO] = *buf;
     while (!(spiReg[SPI_CS] & SPI_CS_RXD)) {}
     spiDummyRead = spiReg[SPI_FIFO];
     }
@@ -3562,6 +3559,58 @@ void spiWriteMainFast (uint32_t handle, const uint8_t* buf, uint32_t count) {
         }
       }
     }
+  }
+//}}}
+//{{{
+void spiWriteAuxFast (const uint8_t* buf, uint32_t count) {
+// write single byte or 16bit frameBuffer using aux sw cs2
+// - assumes no other use of spi aux since spiOpen
+
+  auxReg[AUX_SPI0_CNTL0_REG] |= AUXSPI_CNTL0_ENABLE;
+  myGpioWrite (PI_ASPI_CE2, 0);
+
+  if (count == 1) {
+    // single byte
+    auxReg[AUX_SPI0_IO_REG] = (*buf) << 24;
+    while (auxReg[AUX_SPI0_STAT_REG] & AUXSPI_STAT_RX_EMPTY) {}
+    spiDummy = auxReg[AUX_SPI0_IO_REG];
+    }
+
+  else {
+    uint32_t txCount = 0;
+    uint32_t rxCount = 0;
+    while ((txCount < count) || (rxCount < count)) {
+      uint32_t statusReg = auxReg[AUX_SPI0_STAT_REG];
+
+      if (rxCount < count)
+        if (!(statusReg & AUXSPI_STAT_RX_EMPTY)) {
+          // rx not empty, read
+          spiDummy = auxReg[AUX_SPI0_IO_REG];
+          rxCount++;
+          }
+
+      if (txCount < count) {
+        if (((statusReg >> 28) & 15) <= 2) {
+          // tx not full, write
+          uint32_t bits;
+          if (txCount & 1) {
+            bits = (*buf) << 24;
+            buf += 2;
+            }
+          else
+            bits = (*(buf+1)) << 24;
+          txCount++;
+          //if (txCount == count) // last byte, hw cs deassert
+            auxReg[AUX_SPI0_IO_REG] = bits;
+          //else // not last byte, hw cs keep cs asserted
+          //  auxReg[AUX_SPI0_TX_HOLD] = bits;
+          }
+        }
+      }
+    }
+
+  while (auxReg[AUX_SPI0_STAT_REG] & AUXSPI_STAT_BUSY) {}
+  myGpioWrite (PI_ASPI_CE2, 1);
   }
 //}}}
 //{{{

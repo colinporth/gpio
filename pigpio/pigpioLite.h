@@ -320,7 +320,8 @@ int spiOpen (uint32_t spiChan, uint32_t baud, uint32_t spiFlags);
 
 int spiRead (uint32_t handle, char* buf, uint32_t count);
 int spiWrite (uint32_t handle, char* buf, uint32_t count);
-void spiWriteMainFast (uint32_t handle, const uint8_t* buf, uint32_t count);
+void spiWriteMainFast (const uint8_t* buf, uint32_t count);
+void spiWriteAuxFast (const uint8_t* buf, uint32_t count);
 int spiXfer (uint32_t handle, char* txBuf, char* rxBuf, uint32_t count);
 
 int spiClose (uint32_t handle);

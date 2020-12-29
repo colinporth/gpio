@@ -23,15 +23,8 @@ constexpr int kSpiClockXT2406 = 500000;
 
 class cTouchscreen {
 public:
-  //{{{
-  cTouchscreen() {
-    }
-  //}}}
-  //{{{
-  ~cTouchscreen() {
-    spiClose (mSpiHandle);
-    }
-  //}}}
+  cTouchscreen() {}
+  ~cTouchscreen() { spiClose (mSpiHandle); }
 
   //{{{
   void init() {

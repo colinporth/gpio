@@ -1474,8 +1474,40 @@ bool cLcd9341::initialise() {
   gpioSetMode (kRegisterGpio, PI_OUTPUT);
   gpioWrite (kRegisterGpio, 1);
 
-  // mode 0, spi manages ce0 active lo
-  mSpiHandle = spiOpen (0, mSpiSpeed, 0x00);
+  //{{{  spiFlags
+  // 21 20 19 18 17 16 15 14 13 12 11 10  9  8  7  6  5  4  3  2  1  0
+  //  b  b  b  b  b  b  R  T  n  n  n  n  W  A u2 u1 u0 p2 p1 p0  m  m
+
+    //mm defines the SPI mode, modes 1,3 do not appear to work on the auxiliary SPI.
+      //Mode POL PHA
+       //0    0   0
+       //1    0   1
+       //2    1   0
+       //3    1   1
+
+    //px = 0 if CEx is active low (default), 1 = active high.
+
+    //ux = 0 CEx GPIO is reserved for SPI (default), 1 otherwise.
+
+    //A = 0 main SPI, 1 for the auxiliary SPI.
+
+    //W = 0 if the device is not 3-wire, 1 if the device is 3-wire. Main SPI only.
+      //nnnn = number of bytes (0-15) to write before switching MOSI line to MISO to read data.
+             //This field is ignored if W is not set.  Main SPI only.
+
+    //T = 1 if the least significant bit is transmitted on MOSI first
+          //default (0) shifts the most significant bit out first.  Auxiliary SPI only.
+
+    //R = 1 if the least significant bit is received on MISO first
+          //default (0) receives the most significant bit first.  Auxiliary SPI only.
+
+    //bbbbbb = word size in bits (0-32).  The default (0) sets 8 bits per word.  Auxiliary SPI only.
+  //}}}
+  // mode 0, main spi manages ce0 active lo
+  //mSpiHandle = spiOpen (0, mSpiSpeed, 0x00);
+
+  // mode 0, aux spi manages ce2 active lo
+  mSpiHandle = spiOpen (2, mSpiSpeed, 0x0160);
 
   writeCommand (0x01); // rely on software reset, no hw reset
   delayUs (5000);
@@ -1598,25 +1630,29 @@ uint32_t cLcd9341::updateLcd (sSpan* spans) {
 
     //writeCommandMultiData (kColumnAddressSetCommand, (uint8_t*)columnAddressSetParams, 4);
     gpioWrite (kRegisterGpio, 0);
-    spiWriteMainFast (mSpiHandle, &kColumnAddressSetCommand, 1);
+    spiWriteAuxFast (&kColumnAddressSetCommand, 1);
     gpioWrite (kRegisterGpio, 1);
-    spiWriteMainFast (mSpiHandle, (uint8_t*)columnAddressSetParams, 4);
+    spiWriteAuxFast ((uint8_t*)columnAddressSetParams, 4);
 
     //writeCommandMultiData (kPageAddressSetCommand, (uint8_t*)pageAddressSetParams, 4);
     gpioWrite (kRegisterGpio, 0);
-    spiWriteMainFast (mSpiHandle, &kPageAddressSetCommand, 1);
+    spiWriteAuxFast (&kPageAddressSetCommand, 1);
     gpioWrite (kRegisterGpio, 1);
-    spiWriteMainFast (mSpiHandle, (uint8_t*)pageAddressSetParams, 4);
+    spiWriteAuxFast ((uint8_t*)pageAddressSetParams, 4);
 
-    //gpioWrite_Bits_0_31_Clear (kRegisterGpio);
-    //gpioWrite_Bits_0_31_Set (kRegisterGpio);
+    //writeCommand (kMemoryWriteCommand);
+    //uint16_t* src = mFrameBuf + (span->r.top * getWidth()) + span->r.left;
+    //for (int y = 0; y < span->r.getHeight(); y++) {
+    //  writeMultiData ((uint8_t*)src, span->r.getWidth() * 2);
+    //  src += getWidth();
+    //  }
     gpioWrite (kRegisterGpio, 0);
-    spiWriteMainFast (mSpiHandle, &kMemoryWriteCommand, 1);
+    spiWriteAuxFast (&kMemoryWriteCommand, 1);
     gpioWrite (kRegisterGpio, 1);
 
     uint16_t* src = mFrameBuf + (span->r.top * getWidth()) + span->r.left;
     for (int y = 0; y < span->r.getHeight(); y++) {
-      spiWriteMainFast (mSpiHandle, (uint8_t*)src, span->r.getWidth() * 2);
+      spiWriteAuxFast ((uint8_t*)src, span->r.getWidth() * 2);
       src += getWidth();
       }
 
