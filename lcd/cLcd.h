@@ -201,7 +201,7 @@ protected:
 //{{{
 class cLcdSpi : public cLcd {
 public:
-  cLcdSpi (int16_t width, int16_t height, eRotate rotate, eInfo info, eMode mode, int spiSpeed);
+  cLcdSpi (int16_t width, int16_t height, eRotate rotate, eInfo info, eMode mode, int spiSpeed, int registerGpio);
   virtual ~cLcdSpi();
 
 protected:
@@ -213,7 +213,9 @@ protected:
   virtual uint16_t readId() { return 0xFAFF; }
   virtual uint16_t readStatus() { return 0xAA; }
 
-  int mSpiSpeed = 0;
+  const int mSpiSpeed = 0;
+  const int mRegisterGpio = 0;
+
   int mSpiHandle = 0;
   };
 //}}}

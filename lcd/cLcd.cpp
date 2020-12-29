@@ -53,8 +53,9 @@ static FT_Face mFace;
 //          miso - 21  22 - gpio25 reset
 //          sclk - 23  24 - Ce0
 
-constexpr uint8_t kRegisterGpio = 24;  // parallel and spi
-constexpr uint8_t kResetGpio = 25;     // parallel and spi
+constexpr uint8_t kRegisterGpio24 = 24;  // parallel and spi
+constexpr uint8_t kResetGpio25 = 25;     // parallel and spi
+constexpr uint8_t kRegisterGpio26 = 26;  // aux spi choice
 
 constexpr uint8_t k16WriteGpio      = 17;
 constexpr uint8_t k16ReadGpio       = 22;
@@ -608,12 +609,12 @@ double cLcd::timeUs() {
 void cLcd::reset() {
 // reset lcd
 
-  gpioSetMode (kResetGpio, PI_OUTPUT);
-  gpioWrite (kResetGpio, 1);
+  gpioSetMode (kResetGpio25, PI_OUTPUT);
+  gpioWrite (kResetGpio25, 1);
   gpioDelay (1000);
-  gpioWrite (kResetGpio, 0);
+  gpioWrite (kResetGpio25, 0);
   gpioDelay (10000);
-  gpioWrite (kResetGpio, 1);
+  gpioWrite (kResetGpio25, 1);
   gpioDelay (120000);
   }
 //}}}
@@ -667,8 +668,8 @@ bool cLcd1289::initialise() {
   gpioWrite (k16ReadGpio, 1);
 
   // rs
-  gpioSetMode (kRegisterGpio, PI_OUTPUT);
-  gpioWrite (kRegisterGpio, 1);
+  gpioSetMode (kRegisterGpio24, PI_OUTPUT);
+  gpioWrite (kRegisterGpio24, 1);
 
   // 16 d0-d15
   for (int i = 0; i < 16; i++)
@@ -751,7 +752,7 @@ bool cLcd1289::initialise() {
 void cLcd1289::writeCommand (const uint8_t command) {
 // slow down write
 
-  gpioWrite (kRegisterGpio, 0);
+  gpioWrite (kRegisterGpio24, 0);
 
   gpioWrite_Bits_0_31_Clear (~command & k16WriteClrMask); // clear lo data bits + k16WrGpio bit lo
   //gpioWrite_Bits_0_31_Clear (~command & k16WriteClrMask); // clear lo data bits + k16WrGpio bit lo
@@ -764,7 +765,7 @@ void cLcd1289::writeCommand (const uint8_t command) {
   gpioWrite_Bits_0_31_Set (k16WriteMask);                 // write on k16WrGpio rising edge
   gpioWrite_Bits_0_31_Set (k16WriteMask);                 // write on k16WrGpio rising edge
 
-  gpioWrite (kRegisterGpio, 1);
+  gpioWrite (kRegisterGpio24, 1);
   }
 //}}}
 //{{{
@@ -877,8 +878,8 @@ bool cLcd7601::initialise() {
   gpioWrite (k16ReadGpio, 1);
 
   // rs
-  gpioSetMode (kRegisterGpio, PI_OUTPUT);
-  gpioWrite (kRegisterGpio, 1);
+  gpioSetMode (kRegisterGpio24, PI_OUTPUT);
+  gpioWrite (kRegisterGpio24, 1);
 
   // chipSelect
   gpioSetMode (k16ChipSelectGpio, PI_OUTPUT);
@@ -963,7 +964,7 @@ void cLcd7601::setBacklight (bool on) {
 void cLcd7601::writeCommand (const uint8_t command) {
 // slow down write
 
-  gpioWrite (kRegisterGpio, 0);
+  gpioWrite (kRegisterGpio24, 0);
 
   gpioWrite_Bits_0_31_Clear (~command & k16WriteClrMask); // clear lo data bits + k16WrGpio bit lo
   gpioWrite_Bits_0_31_Clear (~command & k16WriteClrMask); // clear lo data bits + k16WrGpio bit lo
@@ -976,7 +977,7 @@ void cLcd7601::writeCommand (const uint8_t command) {
   gpioWrite_Bits_0_31_Set (k16WriteMask);                 // write on k16WrGpio rising edge
   gpioWrite_Bits_0_31_Set (k16WriteMask);                 // write on k16WrGpio rising edge
 
-  gpioWrite (kRegisterGpio, 1);
+  gpioWrite (kRegisterGpio24, 1);
   }
 //}}}
 //{{{
@@ -1134,8 +1135,9 @@ uint32_t cLcd7601::updateLcd (sSpan* spans) {
 // spi data/command pin classes
 //{{{
 //{{{
-cLcdSpi::cLcdSpi (int16_t width, int16_t height, eRotate rotate, eInfo info, eMode mode, int spiSpeed)
-  : cLcd (width, height, rotate, info, mode), mSpiSpeed(spiSpeed) {}
+cLcdSpi::cLcdSpi (int16_t width, int16_t height, eRotate rotate, eInfo info, eMode mode,
+                  int spiSpeed, int registerGpio)
+  : cLcd (width, height, rotate, info, mode), mSpiSpeed(spiSpeed), mRegisterGpio(registerGpio) {}
 //}}}
 //{{{
 cLcdSpi::~cLcdSpi() {
@@ -1147,9 +1149,9 @@ cLcdSpi::~cLcdSpi() {
 //{{{
 void cLcdSpi::writeCommand (const uint8_t command) {
 
-  gpioWrite (kRegisterGpio, 0);
+  gpioWrite (mRegisterGpio, 0);
   spiWrite (mSpiHandle, (char*)(&command), 1);
-  gpioWrite (kRegisterGpio, 1);
+  gpioWrite (mRegisterGpio, 1);
   }
 //}}}
 //{{{
@@ -1185,7 +1187,7 @@ constexpr int16_t kWidth7735 = 128;
 constexpr int16_t kHeight7735 = 160;
 
 cLcd7735::cLcd7735 (eRotate rotate, eInfo info, eMode mode, int spiSpeed)
-  : cLcdSpi (kWidth7735, kHeight7735, rotate, info, mode, spiSpeed) {}
+  : cLcdSpi (kWidth7735, kHeight7735, rotate, info, mode, spiSpeed, kRegisterGpio24) {}
 
 // public
 //{{{
@@ -1196,8 +1198,8 @@ bool cLcd7735::initialise() {
   reset();
 
   // rs
-  gpioSetMode (kRegisterGpio, PI_OUTPUT);
-  gpioWrite (kRegisterGpio, 1);
+  gpioSetMode (mRegisterGpio, PI_OUTPUT);
+  gpioWrite (mRegisterGpio, 1);
 
   // mode 0, spi manages ce0 active lo
   mSpiHandle = spiOpen (0, mSpiSpeed, 0);
@@ -1359,7 +1361,7 @@ constexpr int16_t kHeight9225 = 220;
 
 // public
 cLcd9225::cLcd9225 (eRotate rotate, eInfo info, eMode mode, int spiSpeed)
-  : cLcdSpi(kWidth9225, kHeight9225, rotate, info, mode, spiSpeed) {}
+  : cLcdSpi(kWidth9225, kHeight9225, rotate, info, mode, spiSpeed, kRegisterGpio24) {}
 
 //{{{
 bool cLcd9225::initialise() {
@@ -1369,8 +1371,8 @@ bool cLcd9225::initialise() {
   reset();
 
   // rs
-  gpioSetMode (kRegisterGpio, PI_OUTPUT);
-  gpioWrite (kRegisterGpio, 1);
+  gpioSetMode (mRegisterGpio, PI_OUTPUT);
+  gpioWrite (mRegisterGpio, 1);
 
   // mode 0, spi manages ce0 active lo
   mSpiHandle = spiOpen (0, mSpiSpeed, 0x00);
@@ -1462,7 +1464,7 @@ constexpr int16_t kHeight9341 = 320;
 
 // public
 cLcd9341::cLcd9341 (eRotate rotate, eInfo info, eMode mode, int spiSpeed)
-  : cLcdSpi(kWidth9341, kHeight9341, rotate, info, mode, spiSpeed) {}
+  : cLcdSpi(kWidth9341, kHeight9341, rotate, info, mode, spiSpeed, kRegisterGpio26) {}
 
 //{{{
 bool cLcd9341::initialise() {
@@ -1471,8 +1473,8 @@ bool cLcd9341::initialise() {
     return false;
 
   // registerSelect - data
-  gpioSetMode (kRegisterGpio, PI_OUTPUT);
-  gpioWrite (kRegisterGpio, 1);
+  gpioSetMode (mRegisterGpio, PI_OUTPUT);
+  gpioWrite (mRegisterGpio, 1);
 
   //{{{  spiFlags
   // 21 20 19 18 17 16 15 14 13 12 11 10  9  8  7  6  5  4  3  2  1  0
@@ -1629,15 +1631,15 @@ uint32_t cLcd9341::updateLcd (sSpan* spans) {
     int16_t pageAddressSetParams[2] = { span->r.top, int16_t(span->r.bottom-1) };
 
     //writeCommandMultiData (kColumnAddressSetCommand, (uint8_t*)columnAddressSetParams, 4);
-    gpioWrite (kRegisterGpio, 0);
+    gpioWrite (mRegisterGpio, 0);
     spiWriteAuxFast (&kColumnAddressSetCommand, 1);
-    gpioWrite (kRegisterGpio, 1);
+    gpioWrite (mRegisterGpio, 1);
     spiWriteAuxFast ((uint8_t*)columnAddressSetParams, 4);
 
     //writeCommandMultiData (kPageAddressSetCommand, (uint8_t*)pageAddressSetParams, 4);
-    gpioWrite (kRegisterGpio, 0);
+    gpioWrite (mRegisterGpio, 0);
     spiWriteAuxFast (&kPageAddressSetCommand, 1);
-    gpioWrite (kRegisterGpio, 1);
+    gpioWrite (mRegisterGpio, 1);
     spiWriteAuxFast ((uint8_t*)pageAddressSetParams, 4);
 
     //writeCommand (kMemoryWriteCommand);
@@ -1646,9 +1648,9 @@ uint32_t cLcd9341::updateLcd (sSpan* spans) {
     //  writeMultiData ((uint8_t*)src, span->r.getWidth() * 2);
     //  src += getWidth();
     //  }
-    gpioWrite (kRegisterGpio, 0);
+    gpioWrite (mRegisterGpio, 0);
     spiWriteAuxFast (&kMemoryWriteCommand, 1);
-    gpioWrite (kRegisterGpio, 1);
+    gpioWrite (mRegisterGpio, 1);
 
     uint16_t* src = mFrameBuf + (span->r.top * getWidth()) + span->r.left;
     for (int y = 0; y < span->r.getHeight(); y++) {
