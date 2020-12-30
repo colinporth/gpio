@@ -170,10 +170,13 @@ public:
 protected:
   virtual void writeCommand (const uint8_t command);
   virtual void writeDataWord (const uint16_t data);
-  virtual void writeMultiData (const uint8_t* data, int count);
-  virtual void writeCommandMultiData (const uint8_t command, uint8_t* data, int length);
 
   virtual uint32_t updateLcd (sSpan* spans);
+
+private:
+  void writeMultiData (const uint8_t* data, int count);
+  void writeMultiDataSwap (const uint8_t* data, int count);
+  void writeCommandMultiData (const uint8_t command, uint8_t* data, int length);
   };
 //}}}
 
