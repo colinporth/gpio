@@ -112,9 +112,6 @@ protected:
     }
   //}}}
 
-  virtual uint16_t readId() = 0;
-  virtual uint16_t readStatus() = 0;
-
   virtual uint32_t updateLcd (sSpan* spans) = 0;
 
   // vars
@@ -161,6 +158,25 @@ private:
   };
 //}}}
 
+// parallel 8bit
+//{{{
+class cLcd9341p8 : public cLcd {
+public:
+  cLcd9341p8 (eRotate rotate, eInfo info, eMode mode);
+  virtual ~cLcd9341p8() {}
+
+  virtual bool initialise();
+
+protected:
+  virtual void writeCommand (const uint8_t command);
+  virtual void writeDataWord (const uint16_t data);
+  virtual void writeMultiData (const uint8_t* data, int count);
+  virtual void writeCommandMultiData (const uint8_t command, uint8_t* data, int length);
+
+  virtual uint32_t updateLcd (sSpan* spans);
+  };
+//}}}
+
 // parallel 16bit
 //{{{
 class cLcd7601 : public cLcd {
@@ -174,8 +190,6 @@ public:
 protected:
   virtual void writeCommand (const uint8_t command);
   virtual void writeDataWord (const uint16_t data);
-  virtual uint16_t readId() { return 0xFAFF; }
-  virtual uint16_t readStatus() { return 0xAA; }
 
   virtual uint32_t updateLcd (sSpan* spans);
   };
@@ -189,8 +203,6 @@ public:
 protected:
   virtual void writeCommand (const uint8_t command);
   virtual void writeDataWord (const uint16_t data);
-  virtual uint16_t readId() { return 0xFAFF; }
-  virtual uint16_t readStatus() { return 0xAA; }
 
   virtual bool initialise();
   virtual uint32_t updateLcd (sSpan* spans);
@@ -209,9 +221,6 @@ protected:
   virtual void writeDataWord (const uint16_t data);
   void writeMultiData (uint8_t* data, int length);
   void writeCommandMultiData (const uint8_t command, uint8_t* data, int length);
-
-  virtual uint16_t readId() { return 0xFAFF; }
-  virtual uint16_t readStatus() { return 0xAA; }
 
   const int mSpiSpeed = 0;
   const int mRegisterGpio = 0;
@@ -268,9 +277,6 @@ public:
 protected:
   virtual void writeCommand (const uint8_t command);
   virtual void writeDataWord (const uint16_t data);
-
-  virtual uint16_t readId();
-  virtual uint16_t readStatus();
 
   int mSpiHandle = 0;
   };
