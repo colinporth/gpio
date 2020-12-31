@@ -294,13 +294,10 @@ void gpioSetPullUpDown (uint32_t gpio, uint32_t pud);
 
 int gpioRead (uint32_t gpio);
 uint32_t gpioRead_Bits_0_31();
-uint32_t gpioRead_Bits_32_53();
 
 void gpioWrite (uint32_t gpio, uint32_t level);
 void gpioWrite_Bits_0_31_Clear (uint32_t bits);
-void gpioWrite_Bits_32_53_Clear (uint32_t bits);
 void gpioWrite_Bits_0_31_Set (uint32_t bits);
-void gpioWrite_Bits_32_53_Set (uint32_t bits);
 
 void gpioPWM (uint32_t user_gpio, uint32_t dutycycle);
 

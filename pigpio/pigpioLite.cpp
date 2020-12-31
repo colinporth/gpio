@@ -2653,8 +2653,7 @@ void gpioTerminate() {
   }
 //}}}
 
-//{{{  gpio
-// helpers
+//{{{  gpio helpers
 //{{{
 static void myGpioSetMode (uint32_t gpio, uint32_t mode) {
 
@@ -2865,8 +2864,7 @@ static void switchFunctionOff (uint32_t gpio) {
     }
   }
 //}}}
-
-// external
+//}}}
 //{{{
 int gpioGetMode (uint32_t gpio) {
 
@@ -2953,7 +2951,6 @@ int gpioRead (uint32_t gpio) {
   }
 //}}}
 uint32_t gpioRead_Bits_0_31() { return (*(gpioReg + GPLEV0)); }
-uint32_t gpioRead_Bits_32_53() { return (*(gpioReg + GPLEV1)); }
 
 //{{{
 void gpioWrite (uint32_t gpio, uint32_t level) {
@@ -2978,10 +2975,9 @@ void gpioWrite (uint32_t gpio, uint32_t level) {
   }
 //}}}
 void gpioWrite_Bits_0_31_Clear (uint32_t bits) { *gpioClr0Reg = bits; }
-void gpioWrite_Bits_32_53_Clear (uint32_t bits) { *(gpioReg + GPCLR1) = bits; }
 void gpioWrite_Bits_0_31_Set (uint32_t bits) { *gpioSet0Reg = bits; }
-void gpioWrite_Bits_32_53_Set (uint32_t bits) { *(gpioReg + GPSET1) = bits; }
 
+//{{{  gpio pwm
 // pwm
 //{{{
 void gpioPWM (uint32_t gpio, uint32_t val) {
@@ -3145,6 +3141,7 @@ void gpioServo (uint32_t gpio, uint32_t val) {
 //}}}
 int gpioGetServoPulsewidth (uint32_t gpio) { return gpioInfo[gpio].width; }
 //}}}
+
 //{{{  spi
 // hw helpers
 //{{{
