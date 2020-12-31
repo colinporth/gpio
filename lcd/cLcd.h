@@ -299,3 +299,19 @@ protected:
   virtual uint32_t updateLcd (sSpan* spans);
   };
 //}}}
+//{{{
+class cLcd9341p16 : public cLcd {
+public:
+  cLcd9341p16 (eRotate rotate, eInfo info, eMode mode);
+  virtual ~cLcd9341p16() {}
+
+  virtual bool initialise();
+
+protected:
+  virtual void writeCommand (const uint8_t command);
+  virtual void writeMultiData (const uint8_t* data, int count);
+  void writeMultiDataSwap (const uint8_t* data, int count);
+
+  virtual uint32_t updateLcd (sSpan* spans);
+  };
+//}}}

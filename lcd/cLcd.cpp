@@ -2114,3 +2114,226 @@ uint32_t cLcd9341p8::updateLcd (sSpan* spans) {
   }
 //}}}
 //}}}
+//{{{  cLcd9341p16
+constexpr uint8_t k9341p16CsGpio = 10; // cs
+
+constexpr uint8_t k9341p16WrGpio = 9; // wr
+constexpr uint32_t k9341p16WrMask = 1 << k9341p16WrGpio; // wrGpio mask
+
+constexpr uint8_t k9341p16RsGpio = 8; // rs
+constexpr uint32_t k9341p16RsMask = 1 << k9341p16RsGpio; // rsGpio mask
+
+constexpr uint32_t k9341p16DataMask = 0x000000FF; // 8bitData mask
+constexpr uint32_t k9341p16WrDataMask = k9341p16WrMask | k9341p16DataMask; // wr,8bitData mask
+constexpr uint32_t k9341p16WrRsDataMask = k9341p16WrMask | k9341p16RsMask | k9341p16DataMask; // wr,rs,8bitData mask
+
+// public
+//{{{
+cLcd9341p16::cLcd9341p16 (const eRotate rotate, const eInfo info, const eMode mode)
+  : cLcd(k9341Width, k9341Height, rotate, info, mode) {}
+//}}}
+
+//{{{
+bool cLcd9341p16::initialise() {
+
+  if (!cLcd::initialise())
+    return false;
+
+  // wr - normally hi
+  gpioSetMode (k9341p16WrGpio, PI_OUTPUT);
+  gpioWrite (k9341p16WrGpio, 1);
+
+  // rs - normally hi data
+  gpioSetMode (k9341p16RsGpio, PI_OUTPUT);
+  gpioWrite (k9341p16RsGpio, 1);
+
+  // 8 d0-d7
+  for (int i = 0; i < 8; i++)
+    gpioSetMode (i, PI_OUTPUT);
+  gpioWrite_Bits_0_31_Clear (k9341p16DataMask);
+
+  // chipSelect always lo
+  gpioSetMode (k9341p16CsGpio, PI_OUTPUT);
+  gpioWrite (k9341p16CsGpio, 0);
+
+  writeCommand (0x01); // rely on software reset, no hw reset
+  delayUs (5000);
+
+  writeCommand (0x11); // sleep out
+  delayUs (120000);
+
+  //{{{  power, driver, vcom
+  uint8_t k9341xCF[] = { 0x00, 0x83, 0x30 };
+  writeCommandMultiData (0xCF, k9341xCF, sizeof(k9341xCF)); // Power Control B
+
+  uint8_t k9341xED[] = { 0x64, 0x03, 0x12, 0x81 };
+  writeCommandMultiData (0xED, k9341xED, sizeof(k9341xED)); // Power On Sequence Control
+
+  uint8_t k9341xE8[] = { 0x85, 0x01, 0x79 };
+  writeCommandMultiData (0xE8, k9341xE8, sizeof(k9341xE8)); // Driver Timing Control A
+
+  uint8_t k9341xCB[] = { 0x39, 0x2C, 0x00, 0x34, 0x02 };
+  writeCommandMultiData (0xCB, k9341xCB, sizeof(k9341xCB)); // Driver Timing Control B
+
+  uint8_t k9341xF7 = 0x20;
+  writeCommandMultiData (0xF7, &k9341xF7, 1);  // Pump Ratio Control
+
+  uint8_t k9341xEA[] = { 0x00, 0x00 };
+  writeCommandMultiData (0xEA, k9341xEA, sizeof(k9341xEA)); // Driver Timing Control B
+
+  // 0xC0 Power Control 1 0x23 VRH=4.60V // Set the GVDD level, which is a reference level for the VCOM level and the grayscale voltage level.
+  uint8_t k9341xC1[] = { 0x11 };
+  writeCommandMultiData (0xC1, k9341xC1, sizeof(k9341xC1)); // Power control 2 SAP[2:0];BT[3:0]
+
+  uint8_t k9341xC5[] = { 0x34, 0x3D };
+  writeCommandMultiData (0xC5, k9341xC5, sizeof(k9341xC5)); // VCM control 1
+
+  uint8_t k9341xC7[] = { 0xC0 };
+  writeCommandMultiData (0xC7, k9341xC7, sizeof(k9341xC7)); // VCM control 2
+  //}}}
+
+  //{{{  madctl param
+  constexpr uint8_t kMY  = 0x80; // memory row address order swap
+  constexpr uint8_t kMX  = 0x40; // memory column address order swap
+  constexpr uint8_t kMV  = 0x20; // memory row column exchange
+  constexpr uint8_t kBgr = 0x08;
+  //constexpr uint8_t kML  = 0x10; // lcd vertical refresh
+  //constexpr uint8_t kMH  = 0x04; // lcd horizontal refresh
+
+  uint8_t madParam = 0;
+  switch (mRotate) {
+    case e0:   madParam = kBgr; break;
+    case e180: madParam = kMY | kMX | kBgr; break;
+    case e90:  madParam = kMX | kMV | kBgr; break;
+    case e270: madParam = kMY | kMV | kBgr; break;
+    }
+  //}}}
+  writeCommandMultiData (0x36, &madParam, 1); // MADCTL Memory Access Control ;
+
+  uint8_t k9341x3A = { 0x55 };
+  writeCommandMultiData (0x3A, &k9341x3A, 1); // Pixel format set DPI=16bits/pixel DBI=16bits/pixel
+
+  //{{{
+  // display frame rate in 4-wire SPI "internal clock mode" is computed with the following formula:
+  // frameRate = 615000 / [ (pow(2,DIVA) * (320 + VFP + VBP) * RTNA ]  where
+  // - DIVA is clock division ratio, 0 <= DIVA <= 3; so pow(2,DIVA) is either 1, 2, 4 or 8.
+  // - RTNA specifies the number of clocks assigned to each horizontal scanline, and must follow 16 <= RTNA <= 31.
+  // - VFP is vertical front porch, number of idle sleep scanlines before refreshing a new frame, 2 <= VFP <= 127.
+  // - VBP is vertical back porch, number of idle sleep scanlines after refreshing a new frame, 2 <= VBP <= 127.
+  // Max refresh rate then is with DIVA=0, VFP=2, VBP=2 and RTNA=16:
+  // maxFrameRate = 615000 / (1 * (320 + 2 + 2) * 16) = 118.63 Hz
+  // To get 60fps, set DIVA=0, RTNA=31, VFP=2 and VBP=2:
+  // minFrameRate = 615000 / (8 * (320 + 2 + 2) * 31) = 61.23 Hz
+  // It seems that in internal clock mode, horizontal front and back porch settings (HFP, BFP) are ignored(?)
+  //}}}
+  uint8_t k9341xB1[] = { 0x00, 0x1D };
+  writeCommandMultiData (0xB1, k9341xB1, sizeof(k9341xB1)); // Frame rate 65Hz
+
+  uint8_t k9341xB6[] = { 0x0A, 0xA2, 0x27, 0x00 };
+  writeCommandMultiData (0xB6, k9341xB6, sizeof(k9341xB6)); // Display Function Control
+
+  uint8_t k9341xB7 = 0x07;
+  writeCommandMultiData (0xB7, &k9341xB7, 1); // Entry mode
+
+  //{{{  gamma
+  uint8_t k9341xF2 = 0x08;
+  writeCommandMultiData (0xF2, &k9341xF2, 1); // 3Gamma Function Disable
+
+  uint8_t k9341x26 = 0x01;
+  writeCommandMultiData (0x26, &k9341x26, 1); // Gamma curve selected - Gamma curve 1 (G2.2)
+
+  uint8_t k9341xE0[] = { 0x1f, 0x1a, 0x18, 0x0a, 0x0f, 0x06, 0x45, 0x87, 0x32, 0x0a, 0x07, 0x02, 0x07, 0x05, 0x00 };
+  writeCommandMultiData (0xE0, k9341xE0, sizeof(k9341xE0)); // positive gamma correction
+
+  uint8_t k9341xE1[] = { 0x00, 0x25, 0x27, 0x05, 0x10, 0x09, 0x3a, 0x78, 0x4d, 0x05, 0x18, 0x0d, 0x38, 0x3a, 0x1f };
+  writeCommandMultiData (0xE1, k9341xE1, sizeof(k9341xE1)); // negative gamma correction
+  //}}}
+
+  writeCommand (0x11); // Sleep out
+  delayUs (120000);
+
+  writeCommand (0x29); // Display on
+  delayUs (50000);
+
+  updateLcd (mSpanAll);
+
+  return true;
+  }
+//}}}
+
+// protected
+//{{{
+void cLcd9341p16::writeCommand (const uint8_t command) {
+// exits leaving rs set (params)
+
+  gpioWrite_Bits_0_31_Clear ((~command) & k9341p16WrRsDataMask); // clear wr, rs(command), 8bitData lo bits
+  gpioWrite_Bits_0_31_Set (command);  // set 8bitData hi bits
+  gpioWrite_Bits_0_31_Set (command);  // extend setup time
+  gpioWrite_Bits_0_31_Set (k9341p16RsMask | k9341p16WrMask);  // st rs(data), set wr, 8bitData latched on wr rising edge
+  }
+//}}}
+//{{{
+void cLcd9341p16::writeMultiData (const uint8_t* data, int count) {
+// assumes rs set (params)
+
+  for (int i = 0; i < count; i++) {
+    uint8_t byte = *data++;
+    gpioWrite_Bits_0_31_Clear ((~byte) & k9341p16WrDataMask); // clear wr + 8bitData lo bits
+    gpioWrite_Bits_0_31_Set (byte); // set 8bitData hi bits
+    gpioWrite_Bits_0_31_Set (byte); // extend setup time
+    gpioWrite_Bits_0_31_Set (k9341p16WrMask); // set wr, 8bitData latched on wr rising edge
+    }
+  }
+//}}}
+//{{{
+void cLcd9341p16::writeMultiDataSwap (const uint8_t* data, int count) {
+// assumes rs set (params), count is even
+
+  for (int i = 0; i < count; i += 2) {
+    uint8_t byteMsb = *data++;
+    uint8_t byteLsb = *data++;
+
+    gpioWrite_Bits_0_31_Clear ((~byteLsb) & k9341p16WrDataMask); // clear wr + 8bitData lo bits
+    gpioWrite_Bits_0_31_Set (byteLsb); // set 8bitData hi bits
+    gpioWrite_Bits_0_31_Set (byteLsb); // extend setup time
+    gpioWrite_Bits_0_31_Set (k9341p16WrMask); // set wr, 8bitData latched on wr rising edge
+
+    gpioWrite_Bits_0_31_Clear ((~byteMsb) & k9341p16WrDataMask); // clear wr + 8bitData lo bits
+    gpioWrite_Bits_0_31_Set (byteMsb); // set 8bitData hi bits
+    gpioWrite_Bits_0_31_Set (byteMsb); // extend setup time
+    gpioWrite_Bits_0_31_Set (k9341p16WrMask); // set wr, 8bitData latched on wr rising edge
+    }
+  }
+//}}}
+
+//{{{
+uint32_t cLcd9341p16::updateLcd (sSpan* spans) {
+// usually many small spans, with the occasional large span
+
+  constexpr uint8_t kColumnAddressSetCommand = 0x2A;
+  constexpr uint8_t kPageAddressSetCommand = 0x2B;
+  constexpr uint8_t kMemoryWriteCommand = 0x2C;
+
+  int numPixels = 0;
+  for (sSpan* span = spans; span; span = span->next) {
+    int16_t columnAddressSetParams[2] = { span->r.left, int16_t(span->r.right-1) };
+    int16_t pageAddressSetParams[2] = { span->r.top, int16_t(span->r.bottom-1) };
+
+    writeCommand (kColumnAddressSetCommand);
+    writeMultiDataSwap ((uint8_t*)columnAddressSetParams, 4);
+    writeCommand (kPageAddressSetCommand);
+    writeMultiDataSwap ((uint8_t*)pageAddressSetParams, 4);
+
+    writeCommand (kMemoryWriteCommand);
+    uint16_t* src = mFrameBuf + (span->r.top * getWidth()) + span->r.left;
+    for (int y = 0; y < span->r.getHeight(); y++) {
+      writeMultiDataSwap ((uint8_t*)src, span->r.getWidth() * 2);
+      src += getWidth();
+      }
+    numPixels += span->r.getNumPixels();
+    }
+
+  return numPixels;
+  }
+//}}}
+//}}}

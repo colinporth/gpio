@@ -305,7 +305,7 @@ int main (int numArgs, char* args[]) {
   cLcd::eInfo info = cLcd::eNone;
   cLcd::eMode mode = cLcd::eCoarse;
   eLogLevel logLevel = LOGINFO;
-  int lcdType = 93418;
+  int lcdType = 934116;
   int spiSpeed = 16000000;
 
   //{{{  dumb command line option parser
@@ -366,8 +366,10 @@ int main (int numArgs, char* args[]) {
     case 9320: lcd = new cLcd9320 (rotate, info, mode); break;
     case 9341: lcd = new cLcd9341 (rotate, info, mode, spiSpeed); break; // 30000000
     case 93418: lcd = new cLcd9341p8 (rotate, info, mode); break;
-    default: exit(1);
+    case 934116: lcd = new cLcd9341p16 (rotate, info, mode); break;
+    default: exit(1); 
     }
+
   if (!lcd->initialise())
     return 0;
 
