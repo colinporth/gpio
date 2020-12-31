@@ -2045,7 +2045,7 @@ void cLcd9341p8::writeCommand (const uint8_t command) {
 
   gpioWrite_Bits_0_31_Clear ((~command) & k9341p8WrRsDataMask); // clear wr, rs(command), 8bitData lo bits
   gpioWrite_Bits_0_31_Set (command);  // set 8bitData hi bits
-  gpioWrite_Bits_0_31_Set (command);  // setup
+  gpioWrite_Bits_0_31_Set (command);  // extend setup time
   gpioWrite_Bits_0_31_Set (k9341p8RsMask | k9341p8WrMask);  // st rs(data), set wr, 8bitData latched on wr rising edge
   }
 //}}}
@@ -2057,7 +2057,7 @@ void cLcd9341p8::writeMultiData (const uint8_t* data, int count) {
     uint8_t byte = *data++;
     gpioWrite_Bits_0_31_Clear ((~byte) & k9341p8WrDataMask); // clear wr + 8bitData lo bits
     gpioWrite_Bits_0_31_Set (byte); // set 8bitData hi bits
-    gpioWrite_Bits_0_31_Set (byte); // setup
+    gpioWrite_Bits_0_31_Set (byte); // extend setup time
     gpioWrite_Bits_0_31_Set (k9341p8WrMask); // set wr, 8bitData latched on wr rising edge
     }
   }
@@ -2072,12 +2072,12 @@ void cLcd9341p8::writeMultiDataSwap (const uint8_t* data, int count) {
 
     gpioWrite_Bits_0_31_Clear ((~byteLsb) & k9341p8WrDataMask); // clear wr + 8bitData lo bits
     gpioWrite_Bits_0_31_Set (byteLsb); // set 8bitData hi bits
-    gpioWrite_Bits_0_31_Set (byteLsb); // setup
+    gpioWrite_Bits_0_31_Set (byteLsb); // extend setup time
     gpioWrite_Bits_0_31_Set (k9341p8WrMask); // set wr, 8bitData latched on wr rising edge
 
     gpioWrite_Bits_0_31_Clear ((~byteMsb) & k9341p8WrDataMask); // clear wr + 8bitData lo bits
     gpioWrite_Bits_0_31_Set (byteMsb); // set 8bitData hi bits
-    gpioWrite_Bits_0_31_Set (byteMsb); // setup
+    gpioWrite_Bits_0_31_Set (byteMsb); // extend setup time
     gpioWrite_Bits_0_31_Set (k9341p8WrMask); // set wr, 8bitData latched on wr rising edge
     }
   }
