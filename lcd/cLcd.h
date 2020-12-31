@@ -103,12 +103,19 @@ protected:
   void reset();
 
   virtual void writeCommand (const uint8_t command) = 0;
-  virtual void writeDataWord (const uint16_t data) = 0;
-  //{{{
-  virtual void writeCommandData (const uint8_t command, const uint16_t data) {
+  virtual void writeDataWord (const uint16_t data) {}
+  virtual void writeMultiData (const uint8_t* data, int count) {}
 
+  //{{{
+  void writeCommandData (const uint8_t command, const uint16_t data) {
     writeCommand (command);
     writeDataWord (data);
+    }
+  //}}}
+  //{{{
+  void writeCommandMultiData (const uint8_t command, uint8_t* data, int length) {
+    writeCommand (command);
+    writeMultiData (data, length);
     }
   //}}}
 
@@ -158,61 +165,37 @@ private:
   };
 //}}}
 
-// parallel 8bit
+// spi header classes
 //{{{
-class cLcd9341p8 : public cLcd {
+class cLcdSpiHeader : public cLcd {
 public:
-  cLcd9341p8 (eRotate rotate, eInfo info, eMode mode);
-  virtual ~cLcd9341p8() {}
-
-  virtual bool initialise();
+  cLcdSpiHeader (const int16_t width, const int16_t height, const eRotate rotate, const eInfo info, const eMode mode);
+  virtual ~cLcdSpiHeader();
 
 protected:
   virtual void writeCommand (const uint8_t command);
   virtual void writeDataWord (const uint16_t data);
 
-  virtual uint32_t updateLcd (sSpan* spans);
-
-private:
-  void writeMultiData (const uint8_t* data, int count);
-  void writeMultiDataSwap (const uint8_t* data, int count);
-  void writeCommandMultiData (const uint8_t command, uint8_t* data, int length);
+  int mSpiHandle = 0;
   };
 //}}}
-
-// parallel 16bit
 //{{{
-class cLcd7601 : public cLcd {
+class cLcd9320 : public cLcdSpiHeader {
+// 2.8 inch 1240x320 - HY28A
 public:
-  cLcd7601 (eRotate rotate, eInfo info, eMode mode);
-  virtual ~cLcd7601() {}
+  cLcd9320 (cLcd::eRotate rotate, cLcd::eInfo info, eMode mode);
+  virtual ~cLcd9320() {}
 
-  virtual bool initialise();
   virtual void setBacklight (bool on);
 
-protected:
-  virtual void writeCommand (const uint8_t command);
-  virtual void writeDataWord (const uint16_t data);
-
-  virtual uint32_t updateLcd (sSpan* spans);
-  };
-//}}}
-//{{{
-class cLcd1289 : public cLcd {
-public:
-  cLcd1289 (eRotate rotate, eInfo info, eMode mode);
-  virtual ~cLcd1289() {}
-
-protected:
-  virtual void writeCommand (const uint8_t command);
-  virtual void writeDataWord (const uint16_t data);
-
   virtual bool initialise();
+
+protected:
   virtual uint32_t updateLcd (sSpan* spans);
   };
 //}}}
 
-// spi data/command register
+// spi rs pin classes
 //{{{
 class cLcdSpi : public cLcd {
 public:
@@ -222,8 +205,7 @@ public:
 protected:
   virtual void writeCommand (const uint8_t command);
   virtual void writeDataWord (const uint16_t data);
-  void writeMultiData (uint8_t* data, int length);
-  void writeCommandMultiData (const uint8_t command, uint8_t* data, int length);
+  virtual void writeMultiData (uint8_t* data, int length);
 
   const int mSpiSpeed = 0;
   const int mRegisterGpio = 0;
@@ -270,32 +252,50 @@ protected:
   };
 //}}}
 
-// spi header only
+// parallel classes
 //{{{
-class cLcdSpiHeader : public cLcd {
+class cLcd7601 : public cLcd {
 public:
-  cLcdSpiHeader (const int16_t width, const int16_t height, const eRotate rotate, const eInfo info, const eMode mode);
-  virtual ~cLcdSpiHeader();
+  cLcd7601 (eRotate rotate, eInfo info, eMode mode);
+  virtual ~cLcd7601() {}
+
+  virtual bool initialise();
+  virtual void setBacklight (bool on);
 
 protected:
   virtual void writeCommand (const uint8_t command);
   virtual void writeDataWord (const uint16_t data);
 
-  int mSpiHandle = 0;
+  virtual uint32_t updateLcd (sSpan* spans);
   };
 //}}}
 //{{{
-class cLcd9320 : public cLcdSpiHeader {
-// 2.8 inch 1240x320 - HY28A
+class cLcd1289 : public cLcd {
 public:
-  cLcd9320 (cLcd::eRotate rotate, cLcd::eInfo info, eMode mode);
-  virtual ~cLcd9320() {}
+  cLcd1289 (eRotate rotate, eInfo info, eMode mode);
+  virtual ~cLcd1289() {}
 
-  virtual void setBacklight (bool on);
+protected:
+  virtual void writeCommand (const uint8_t command);
+  virtual void writeDataWord (const uint16_t data);
+
+  virtual bool initialise();
+  virtual uint32_t updateLcd (sSpan* spans);
+  };
+//}}}
+//{{{
+class cLcd9341p8 : public cLcd {
+public:
+  cLcd9341p8 (eRotate rotate, eInfo info, eMode mode);
+  virtual ~cLcd9341p8() {}
 
   virtual bool initialise();
 
 protected:
+  virtual void writeCommand (const uint8_t command);
+  virtual void writeMultiData (const uint8_t* data, int count);
+  void writeMultiDataSwap (const uint8_t* data, int count);
+
   virtual uint32_t updateLcd (sSpan* spans);
   };
 //}}}
