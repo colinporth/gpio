@@ -1160,6 +1160,8 @@ static volatile uint32_t* bscsReg = nullptr;
 static volatile uint32_t* clkReg  = nullptr;
 static volatile uint32_t* dmaReg  = nullptr;
 static volatile uint32_t* gpioReg = nullptr;
+static volatile uint32_t* gpioClr0Reg = nullptr;
+static volatile uint32_t* gpioSet0Reg = nullptr;
 static volatile uint32_t* padsReg = nullptr;
 static volatile uint32_t* pcmReg  = nullptr;
 static volatile uint32_t* pwmReg  = nullptr;
@@ -1726,6 +1728,8 @@ static void initClearGlobals() {
   clkReg  = nullptr;
   dmaReg  = nullptr;
   gpioReg = nullptr;
+  gpioClr0Reg = nullptr;
+  gpioSet0Reg = nullptr;
   pcmReg  = nullptr;
   pwmReg  = nullptr;
   systReg = nullptr;
@@ -1770,6 +1774,8 @@ static int initPeripherals() {
   gpioReg = initMapMem (fdMem, GPIO_BASE, GPIO_LEN);
   if (gpioReg == nullptr)
     LOG_ERROR ("mmap gpio failed (%m)");
+  gpioClr0Reg = gpioReg + GPCLR0;
+  gpioSet0Reg = gpioReg + GPSET0;
 
   dmaReg = initMapMem (fdMem, DMA_BASE, DMA_LEN);
   if (dmaReg == nullptr)
@@ -2210,6 +2216,8 @@ static void initReleaseResources() {
   if (gpioReg)
     munmap ((void*)gpioReg, GPIO_LEN);
   gpioReg = nullptr;
+  gpioClr0Reg = nullptr;
+  gpioSet0Reg = nullptr;
 
   if (pcmReg)
     munmap ((void*)pcmReg,  PCM_LEN);
@@ -2966,9 +2974,9 @@ void gpioWrite (uint32_t gpio, uint32_t level) {
     *(gpioReg + GPSET0 + BANK) = BIT;
   }
 //}}}
-void gpioWrite_Bits_0_31_Clear (uint32_t bits) { *(gpioReg + GPCLR0) = bits; }
-void gpioWrite_Bits_0_31_Set (uint32_t bits) { *(gpioReg + GPSET0) = bits; }
+void gpioWrite_Bits_0_31_Clear (uint32_t bits) { *gpioClr0Reg = bits; }
 void gpioWrite_Bits_32_53_Clear (uint32_t bits) { *(gpioReg + GPCLR1) = bits; }
+void gpioWrite_Bits_0_31_Set (uint32_t bits) { *gpioSet0Reg = bits; }
 void gpioWrite_Bits_32_53_Set (uint32_t bits) { *(gpioReg + GPSET1) = bits; }
 
 // pwm
