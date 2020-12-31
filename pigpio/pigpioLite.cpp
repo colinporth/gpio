@@ -1159,14 +1159,15 @@ static volatile uint32_t* auxReg  = nullptr;
 static volatile uint32_t* bscsReg = nullptr;
 static volatile uint32_t* clkReg  = nullptr;
 static volatile uint32_t* dmaReg  = nullptr;
-static volatile uint32_t* gpioReg = nullptr;
-static volatile uint32_t* gpioClr0Reg = nullptr;
-static volatile uint32_t* gpioSet0Reg = nullptr;
 static volatile uint32_t* padsReg = nullptr;
 static volatile uint32_t* pcmReg  = nullptr;
 static volatile uint32_t* pwmReg  = nullptr;
 static volatile uint32_t* spiReg  = nullptr;
 static volatile uint32_t* systReg = nullptr;
+
+static volatile uint32_t* gpioReg = nullptr;
+static volatile uint32_t* gpioClr0Reg = nullptr;
+static volatile uint32_t* gpioSet0Reg = nullptr;
 
 static volatile uint32_t* dmaIn   = nullptr;
 static volatile uint32_t* dmaOut  = nullptr;
@@ -1720,6 +1721,11 @@ static void initClearGlobals() {
     pwmFreq[i]= (1000000.0 / ((float)PULSE_PER_CYCLE * gpioCfg.clockMicros * pwmCycles[i])) + 0.5;
 
   fdMem = -1;
+
+  gpioReg = nullptr;
+  gpioClr0Reg = nullptr;
+  gpioSet0Reg = nullptr;
+
   dmaMboxBlk = nullptr;
   dmaPMapBlk = nullptr;
   dmaVirt = nullptr;
@@ -1727,9 +1733,6 @@ static void initClearGlobals() {
   auxReg  = nullptr;
   clkReg  = nullptr;
   dmaReg  = nullptr;
-  gpioReg = nullptr;
-  gpioClr0Reg = nullptr;
-  gpioSet0Reg = nullptr;
   pcmReg  = nullptr;
   pwmReg  = nullptr;
   systReg = nullptr;
