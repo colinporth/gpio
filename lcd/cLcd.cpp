@@ -1892,12 +1892,12 @@ uint32_t cLcd7601::updateLcd (sSpan* spans) {
 //}}}
 //}}}
 //{{{  cLcd9341p8
-constexpr uint8_t k9341p8CsGpio = 10; // cs
+constexpr uint8_t k9341p8CsGpio = 18; // cs
 
-constexpr uint8_t k9341p8WrGpio = 9; // wr
+constexpr uint8_t k9341p8WrGpio = 17; // wr
 constexpr uint32_t k9341p8WrMask = 1 << k9341p8WrGpio; // wrGpio mask
 
-constexpr uint8_t k9341p8RsGpio = 8; // rs
+constexpr uint8_t k9341p8RsGpio = 16; // rs
 constexpr uint32_t k9341p8RsMask = 1 << k9341p8RsGpio; // rsGpio mask
 
 constexpr uint32_t k9341p8DataMask = 0x000000FF; // 8bitData mask
@@ -2043,7 +2043,7 @@ bool cLcd9341p8::initialise() {
 void cLcd9341p8::writeCommand (const uint8_t command) {
 // exits leaving rs set (params)
 
-  gpioWrite_Bits_0_31_Clear ((~command) & k9341p8WrRsDataMask); // clear wr, rs(command), 8bitData lo bits
+  gpioWrite_Bits_0_31_Clear (~command & k9341p8WrRsDataMask); // clear wr, rs(command), 8bitData lo bits
   gpioWrite_Bits_0_31_Set (command);  // set 8bitData hi bits
   gpioWrite_Bits_0_31_Set (command);  // extend setup time
   gpioWrite_Bits_0_31_Set (k9341p8RsMask | k9341p8WrMask);  // st rs(data), set wr, 8bitData latched on wr rising edge
@@ -2055,7 +2055,7 @@ void cLcd9341p8::writeMultiData (const uint8_t* data, int count) {
 
   for (int i = 0; i < count; i++) {
     uint8_t byte = *data++;
-    gpioWrite_Bits_0_31_Clear ((~byte) & k9341p8WrDataMask); // clear wr + 8bitData lo bits
+    gpioWrite_Bits_0_31_Clear (~byte & k9341p8WrDataMask); // clear wr + 8bitData lo bits
     gpioWrite_Bits_0_31_Set (byte); // set 8bitData hi bits
     gpioWrite_Bits_0_31_Set (byte); // extend setup time
     gpioWrite_Bits_0_31_Set (k9341p8WrMask); // set wr, 8bitData latched on wr rising edge
@@ -2063,22 +2063,24 @@ void cLcd9341p8::writeMultiData (const uint8_t* data, int count) {
   }
 //}}}
 //{{{
-void cLcd9341p8::writeMultiDataSwap (const uint8_t* data, int count) {
-// assumes rs set (params), count is even
+void cLcd9341p8::writeMultiWordData (const uint16_t* data, int count) {
+// assumes rs set (params)
 
-  for (int i = 0; i < count; i += 2) {
-    uint8_t byteMsb = *data++;
-    uint8_t byteLsb = *data++;
+  for (int i = 0; i < count; i++) {
+    uint16_t word = *data++;
+    uint8_t byte = word >> 8;
 
-    gpioWrite_Bits_0_31_Clear ((~byteLsb) & k9341p8WrDataMask); // clear wr + 8bitData lo bits
-    gpioWrite_Bits_0_31_Set (byteLsb); // set 8bitData hi bits
-    gpioWrite_Bits_0_31_Set (byteLsb); // extend setup time
-    gpioWrite_Bits_0_31_Set (k9341p8WrMask); // set wr, 8bitData latched on wr rising edge
+    // msb first
+    gpioWrite_Bits_0_31_Clear (~byte & k9341p8WrDataMask); // clear wr + 8bitMsb lo bits
+    gpioWrite_Bits_0_31_Set (byte); // set 8bitMsb hi bits
+    gpioWrite_Bits_0_31_Set (byte); // extend setup time
+    gpioWrite_Bits_0_31_Set (k9341p8WrMask); // set wr, 8bitMsb latched on wr rising edge
 
-    gpioWrite_Bits_0_31_Clear ((~byteMsb) & k9341p8WrDataMask); // clear wr + 8bitData lo bits
-    gpioWrite_Bits_0_31_Set (byteMsb); // set 8bitData hi bits
-    gpioWrite_Bits_0_31_Set (byteMsb); // extend setup time
-    gpioWrite_Bits_0_31_Set (k9341p8WrMask); // set wr, 8bitData latched on wr rising edge
+    // lsb second
+    gpioWrite_Bits_0_31_Clear (~word & k9341p8WrDataMask); // clear wr + 8bitLsb lo bits
+    gpioWrite_Bits_0_31_Set (word); // set 8bitLsb hi bits
+    gpioWrite_Bits_0_31_Set (word); // extend setup time
+    gpioWrite_Bits_0_31_Set (k9341p8WrMask); // set wr, 8bitLsb latched on wr rising edge
     }
   }
 //}}}
@@ -2093,18 +2095,18 @@ uint32_t cLcd9341p8::updateLcd (sSpan* spans) {
 
   int numPixels = 0;
   for (sSpan* span = spans; span; span = span->next) {
-    int16_t columnAddressSetParams[2] = { span->r.left, int16_t(span->r.right-1) };
-    int16_t pageAddressSetParams[2] = { span->r.top, int16_t(span->r.bottom-1) };
+    int16_t columnAddressSetParams[2] = { bswap_16(span->r.left), bswap_16(span->r.right-1) };
+    int16_t pageAddressSetParams[2] = { bswap_16(span->r.top), bswap_16(span->r.bottom-1) };
 
     writeCommand (kColumnAddressSetCommand);
-    writeMultiDataSwap ((uint8_t*)columnAddressSetParams, 4);
+    writeMultiData ((uint8_t*)columnAddressSetParams, 4);
     writeCommand (kPageAddressSetCommand);
-    writeMultiDataSwap ((uint8_t*)pageAddressSetParams, 4);
+    writeMultiData ((uint8_t*)pageAddressSetParams, 4);
 
     writeCommand (kMemoryWriteCommand);
     uint16_t* src = mFrameBuf + (span->r.top * getWidth()) + span->r.left;
     for (int y = 0; y < span->r.getHeight(); y++) {
-      writeMultiDataSwap ((uint8_t*)src, span->r.getWidth() * 2);
+      writeMultiWordData (src, span->r.getWidth());
       src += getWidth();
       }
     numPixels += span->r.getNumPixels();
@@ -2115,15 +2117,15 @@ uint32_t cLcd9341p8::updateLcd (sSpan* spans) {
 //}}}
 //}}}
 //{{{  cLcd9341p16
-constexpr uint8_t k9341p16CsGpio = 10; // cs
+constexpr uint8_t k9341p16CsGpio = 18; // cs
 
-constexpr uint8_t k9341p16WrGpio = 9; // wr
+constexpr uint8_t k9341p16WrGpio = 17; // wr
 constexpr uint32_t k9341p16WrMask = 1 << k9341p16WrGpio; // wrGpio mask
 
-constexpr uint8_t k9341p16RsGpio = 8; // rs
+constexpr uint8_t k9341p16RsGpio = 16; // rs
 constexpr uint32_t k9341p16RsMask = 1 << k9341p16RsGpio; // rsGpio mask
 
-constexpr uint32_t k9341p16DataMask = 0x000000FF; // 8bitData mask
+constexpr uint32_t k9341p16DataMask = 0x0000FFFF; // 8bitData mask
 constexpr uint32_t k9341p16WrDataMask = k9341p16WrMask | k9341p16DataMask; // wr,8bitData mask
 constexpr uint32_t k9341p16WrRsDataMask = k9341p16WrMask | k9341p16RsMask | k9341p16DataMask; // wr,rs,8bitData mask
 
@@ -2148,7 +2150,7 @@ bool cLcd9341p16::initialise() {
   gpioWrite (k9341p16RsGpio, 1);
 
   // 8 d0-d7
-  for (int i = 0; i < 8; i++)
+  for (int i = 0; i < 16; i++)
     gpioSetMode (i, PI_OUTPUT);
   gpioWrite_Bits_0_31_Clear (k9341p16DataMask);
 
@@ -2266,10 +2268,19 @@ bool cLcd9341p16::initialise() {
 void cLcd9341p16::writeCommand (const uint8_t command) {
 // exits leaving rs set (params)
 
-  gpioWrite_Bits_0_31_Clear ((~command) & k9341p16WrRsDataMask); // clear wr, rs(command), 8bitData lo bits
-  gpioWrite_Bits_0_31_Set (command);  // set 8bitData hi bits
-  gpioWrite_Bits_0_31_Set (command);  // extend setup time
-  gpioWrite_Bits_0_31_Set (k9341p16RsMask | k9341p16WrMask);  // st rs(data), set wr, 8bitData latched on wr rising edge
+  uint32_t byte = command;
+
+  gpioWrite_Bits_0_31_Clear ((~byte) & k9341p16WrRsDataMask); // clear wr, rs(command), 16bitData lo bits
+
+  gpioWrite_Bits_0_31_Set (byte); // set 16bitData hi bits
+  gpioWrite_Bits_0_31_Set (byte); // extend setup time
+  gpioWrite_Bits_0_31_Set (byte); // extend setup time
+
+  // latch d0-15 on this edge
+  gpioWrite_Bits_0_31_Set (k9341p16WrMask);  // set wr, 16bitData latched on wr rising edge
+  gpioWrite_Bits_0_31_Set (k9341p16WrMask);  // set wr
+  gpioWrite_Bits_0_31_Set (k9341p16RsMask | k9341p16WrMask);  // set rs(data), set wr
+  gpioWrite_Bits_0_31_Set (k9341p16RsMask | k9341p16WrMask);  // set rs(data), set wr
   }
 //}}}
 //{{{
@@ -2277,31 +2288,38 @@ void cLcd9341p16::writeMultiData (const uint8_t* data, int count) {
 // assumes rs set (params)
 
   for (int i = 0; i < count; i++) {
-    uint8_t byte = *data++;
+    uint32_t byte = *data++;
+
     gpioWrite_Bits_0_31_Clear ((~byte) & k9341p16WrDataMask); // clear wr + 8bitData lo bits
+
     gpioWrite_Bits_0_31_Set (byte); // set 8bitData hi bits
     gpioWrite_Bits_0_31_Set (byte); // extend setup time
+    gpioWrite_Bits_0_31_Set (byte); // extend setup time
+
+    // latch data on this edge
     gpioWrite_Bits_0_31_Set (k9341p16WrMask); // set wr, 8bitData latched on wr rising edge
+    gpioWrite_Bits_0_31_Set (k9341p16WrMask); // set wr
+    gpioWrite_Bits_0_31_Set (k9341p16WrMask); // set wr
     }
   }
 //}}}
 //{{{
-void cLcd9341p16::writeMultiDataSwap (const uint8_t* data, int count) {
+void cLcd9341p16::writeMultiWordData (const uint16_t* data, int count) {
 // assumes rs set (params), count is even
 
-  for (int i = 0; i < count; i += 2) {
-    uint8_t byteMsb = *data++;
-    uint8_t byteLsb = *data++;
+  for (int i = 0; i < count; i++) {
+    uint32_t rgb565 = *data++;
 
-    gpioWrite_Bits_0_31_Clear ((~byteLsb) & k9341p16WrDataMask); // clear wr + 8bitData lo bits
-    gpioWrite_Bits_0_31_Set (byteLsb); // set 8bitData hi bits
-    gpioWrite_Bits_0_31_Set (byteLsb); // extend setup time
-    gpioWrite_Bits_0_31_Set (k9341p16WrMask); // set wr, 8bitData latched on wr rising edge
+    gpioWrite_Bits_0_31_Clear ((~rgb565) & k9341p16WrDataMask); // clear wr + 8bitData lo bits
 
-    gpioWrite_Bits_0_31_Clear ((~byteMsb) & k9341p16WrDataMask); // clear wr + 8bitData lo bits
-    gpioWrite_Bits_0_31_Set (byteMsb); // set 8bitData hi bits
-    gpioWrite_Bits_0_31_Set (byteMsb); // extend setup time
+    gpioWrite_Bits_0_31_Set (rgb565); // set 8bitData hi bits
+    gpioWrite_Bits_0_31_Set (rgb565); // set 8bitData hi bits
+    gpioWrite_Bits_0_31_Set (rgb565); // set 8bitData hi bits
+
+    // latch data on this edge
     gpioWrite_Bits_0_31_Set (k9341p16WrMask); // set wr, 8bitData latched on wr rising edge
+    gpioWrite_Bits_0_31_Set (k9341p16WrMask); // set wr
+    gpioWrite_Bits_0_31_Set (k9341p16WrMask); // set wr
     }
   }
 //}}}
@@ -2316,18 +2334,18 @@ uint32_t cLcd9341p16::updateLcd (sSpan* spans) {
 
   int numPixels = 0;
   for (sSpan* span = spans; span; span = span->next) {
-    int16_t columnAddressSetParams[2] = { span->r.left, int16_t(span->r.right-1) };
-    int16_t pageAddressSetParams[2] = { span->r.top, int16_t(span->r.bottom-1) };
+    uint16_t columnAddressSetParams[2] = { bswap_16(span->r.left), bswap_16(span->r.right-1) };
+    uint16_t pageAddressSetParams[2] = { bswap_16(span->r.top), bswap_16(span->r.bottom-1) };
 
     writeCommand (kColumnAddressSetCommand);
-    writeMultiDataSwap ((uint8_t*)columnAddressSetParams, 4);
+    writeMultiData ((uint8_t*)columnAddressSetParams, 4);
     writeCommand (kPageAddressSetCommand);
-    writeMultiDataSwap ((uint8_t*)pageAddressSetParams, 4);
+    writeMultiData ((uint8_t*)pageAddressSetParams, 4);
 
     writeCommand (kMemoryWriteCommand);
     uint16_t* src = mFrameBuf + (span->r.top * getWidth()) + span->r.left;
     for (int y = 0; y < span->r.getHeight(); y++) {
-      writeMultiDataSwap ((uint8_t*)src, span->r.getWidth() * 2);
+      writeMultiWordData (src, span->r.getWidth());
       src += getWidth();
       }
     numPixels += span->r.getNumPixels();

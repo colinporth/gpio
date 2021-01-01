@@ -294,7 +294,7 @@ public:
 protected:
   virtual void writeCommand (const uint8_t command);
   virtual void writeMultiData (const uint8_t* data, int count);
-  void writeMultiDataSwap (const uint8_t* data, int count);
+  void writeMultiWordData (const uint16_t* data, int count);
 
   virtual uint32_t updateLcd (sSpan* spans);
   };
@@ -310,7 +310,7 @@ public:
 protected:
   virtual void writeCommand (const uint8_t command);
   virtual void writeMultiData (const uint8_t* data, int count);
-  void writeMultiDataSwap (const uint8_t* data, int count);
+  void writeMultiWordData (const uint16_t* data, int count);
 
   virtual uint32_t updateLcd (sSpan* spans);
   };

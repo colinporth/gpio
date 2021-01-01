@@ -334,7 +334,8 @@ int main (int numArgs, char* args[]) {
     else if (str == "7735") lcdType = 7735;
     else if (str == "9225") lcdType = 9225;
     else if (str == "9320") lcdType = 9320;
-    else if (str == "9341") lcdType = 9341;
+    else if (str == "9341p8") lcdType = 93418;
+    else if (str == "9341p16") lcdType = 934116;
     else if (str == "100k") spiSpeed = 100000;
     else if (str == "400k") spiSpeed = 400000;
 
@@ -367,14 +368,16 @@ int main (int numArgs, char* args[]) {
     case 9341: lcd = new cLcd9341 (rotate, info, mode, spiSpeed); break; // 30000000
     case 93418: lcd = new cLcd9341p8 (rotate, info, mode); break;
     case 934116: lcd = new cLcd9341p16 (rotate, info, mode); break;
-    default: exit(1); 
+    default: exit(1);
     }
 
   if (!lcd->initialise())
     return 0;
 
-  cTouchscreen* ts = new cTouchscreen();
-  ts->init();
+  cTouchscreen* ts = nullptr;
+  //cTouchscreen* ts = new cTouchscreen();
+  if (ts)
+    ts->init();
 
   lcd->setBacklightOn();
   if (drawRadial) {
@@ -400,7 +403,7 @@ int main (int numArgs, char* args[]) {
           break;
         }
 
-      if (ts->getTouchDown()) {
+      if (ts && ts->getTouchDown()) {
         int16_t x;
         int16_t y;
         int16_t z;
