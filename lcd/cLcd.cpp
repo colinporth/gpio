@@ -1892,16 +1892,14 @@ uint32_t cLcd7601::updateLcd (sSpan* spans) {
 //}}}
 //}}}
 //{{{  cLcd9341p8
-constexpr uint8_t k9341p8CsGpio = 18; // cs
-
-constexpr uint8_t k9341p8WrGpio = 17; // wr
+constexpr uint8_t k9341p8WrGpio = 23; // wr
 constexpr uint32_t k9341p8WrMask = 1 << k9341p8WrGpio; // wrGpio mask
 
-constexpr uint8_t k9341p8RsGpio = 16; // rs
+constexpr uint8_t k9341p8RsGpio = 22; // rs
 constexpr uint32_t k9341p8RsMask = 1 << k9341p8RsGpio; // rsGpio mask
 
-constexpr uint32_t k9341p8DataMask = 0x000000FF; // 8bitData mask
-constexpr uint32_t k9341p8WrDataMask = k9341p8WrMask | k9341p8DataMask; // wr,8bitData mask
+constexpr uint32_t k9341p8DataMask = 0x000030FC; // 8Databit mask - gpio13 gpio12 gpio7 gpio6 gpio5 gpio4 gpio3 gpio2
+constexpr uint32_t k9341p8WrDataMask = k9341p8WrMask | k9341p8DataMask; // wr,8Databit mask
 constexpr uint32_t k9341p8WrRsDataMask = k9341p8WrMask | k9341p8RsMask | k9341p8DataMask; // wr,rs,8bitData mask
 
 // public
@@ -1924,14 +1922,16 @@ bool cLcd9341p8::initialise() {
   gpioSetMode (k9341p8RsGpio, PI_OUTPUT);
   gpioWrite (k9341p8RsGpio, 1);
 
-  // 8 d0-d7
-  for (int i = 0; i < 8; i++)
-    gpioSetMode (i, PI_OUTPUT);
+  // 8bit data output gpio
+  gpioSetMode (2, PI_OUTPUT);
+  gpioSetMode (3, PI_OUTPUT);
+  gpioSetMode (4, PI_OUTPUT);
+  gpioSetMode (5, PI_OUTPUT);
+  gpioSetMode (6, PI_OUTPUT);
+  gpioSetMode (7, PI_OUTPUT);
+  gpioSetMode (12, PI_OUTPUT);
+  gpioSetMode (13, PI_OUTPUT);
   gpioWrite_Bits_0_31_Clear (k9341p8DataMask);
-
-  // chipSelect always lo
-  gpioSetMode (k9341p8CsGpio, PI_OUTPUT);
-  gpioWrite (k9341p8CsGpio, 0);
 
   writeCommand (0x01); // rely on software reset, no hw reset
   delayUs (5000);
@@ -2043,9 +2043,10 @@ bool cLcd9341p8::initialise() {
 void cLcd9341p8::writeCommand (const uint8_t command) {
 // exits leaving rs set (params)
 
-  gpioWrite_Bits_0_31_Clear (~command & k9341p8WrRsDataMask); // clear wr, rs(command), 8bitData lo bits
-  gpioWrite_Bits_0_31_Set (command);  // set 8bitData hi bits
-  gpioWrite_Bits_0_31_Set (command);  // extend setup time
+  uint32_t pins = command | (command << 12);
+  gpioWrite_Bits_0_31_Clear (~pins & k9341p8WrRsDataMask); // clear wr, rs(command), 8bitData lo bits
+  gpioWrite_Bits_0_31_Set (pins);  // set 8bitData hi bits
+  gpioWrite_Bits_0_31_Set (pins);  // extend setup time
   gpioWrite_Bits_0_31_Set (k9341p8RsMask | k9341p8WrMask);  // st rs(data), set wr, 8bitData latched on wr rising edge
   }
 //}}}
@@ -2054,10 +2055,11 @@ void cLcd9341p8::writeMultiData (const uint8_t* data, int count) {
 // assumes rs set (params)
 
   for (int i = 0; i < count; i++) {
-    uint8_t byte = *data++;
-    gpioWrite_Bits_0_31_Clear (~byte & k9341p8WrDataMask); // clear wr + 8bitData lo bits
-    gpioWrite_Bits_0_31_Set (byte); // set 8bitData hi bits
-    gpioWrite_Bits_0_31_Set (byte); // extend setup time
+    uint32_t pins = *data++;
+    pins |= pins << 12;
+    gpioWrite_Bits_0_31_Clear (~pins & k9341p8WrDataMask); // clear wr + 8bitData lo bits
+    gpioWrite_Bits_0_31_Set (pins); // set 8bitData hi bits
+    gpioWrite_Bits_0_31_Set (pins); // extend setup time
     gpioWrite_Bits_0_31_Set (k9341p8WrMask); // set wr, 8bitData latched on wr rising edge
     }
   }
@@ -2065,21 +2067,23 @@ void cLcd9341p8::writeMultiData (const uint8_t* data, int count) {
 //{{{
 void cLcd9341p8::writeMultiWordData (const uint16_t* data, int count) {
 // assumes rs set (params)
+// twiddle 8bit d7.d6.d5.d4.d3.d2.d1.d0 to gpio gpio7.gpio6.gpio5.gpio4.gpio3.gpio2.gpio13.gpio12
+// to avoid spi and ic2 pins
 
   for (int i = 0; i < count; i++) {
-    uint16_t word = *data++;
-    uint8_t byte = word >> 8;
+    uint32_t pins = *data >> 8;
+    pins |= pins << 12;
 
-    // msb first
-    gpioWrite_Bits_0_31_Clear (~byte & k9341p8WrDataMask); // clear wr + 8bitMsb lo bits
-    gpioWrite_Bits_0_31_Set (byte); // set 8bitMsb hi bits
-    gpioWrite_Bits_0_31_Set (byte); // extend setup time
+    gpioWrite_Bits_0_31_Clear (~pins & k9341p8WrDataMask); // clear wr + 8bitMsb lo bits
+    gpioWrite_Bits_0_31_Set (pins); // set 8bitMsb hi bits
+    gpioWrite_Bits_0_31_Set (pins); // extend setup time
     gpioWrite_Bits_0_31_Set (k9341p8WrMask); // set wr, 8bitMsb latched on wr rising edge
 
-    // lsb second
-    gpioWrite_Bits_0_31_Clear (~word & k9341p8WrDataMask); // clear wr + 8bitLsb lo bits
-    gpioWrite_Bits_0_31_Set (word); // set 8bitLsb hi bits
-    gpioWrite_Bits_0_31_Set (word); // extend setup time
+    pins = *data++ & 0xFF;
+    pins |= pins << 12;
+    gpioWrite_Bits_0_31_Clear (~pins & k9341p8WrDataMask); // clear wr + 8bitLsb lo bits
+    gpioWrite_Bits_0_31_Set (pins); // set 8bitLsb hi bits
+    gpioWrite_Bits_0_31_Set (pins); // extend setup time
     gpioWrite_Bits_0_31_Set (k9341p8WrMask); // set wr, 8bitLsb latched on wr rising edge
     }
   }
@@ -2116,7 +2120,7 @@ uint32_t cLcd9341p8::updateLcd (sSpan* spans) {
   }
 //}}}
 //}}}
-//{{{  cLcd9341p16
+//{{{  cLcd9341p16 - never worked, interference on d14,d15 from uart?
 constexpr uint8_t k9341p16CsGpio = 18; // cs
 
 constexpr uint8_t k9341p16WrGpio = 17; // wr

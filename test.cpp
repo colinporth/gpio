@@ -305,7 +305,7 @@ int main (int numArgs, char* args[]) {
   cLcd::eInfo info = cLcd::eNone;
   cLcd::eMode mode = cLcd::eCoarse;
   eLogLevel logLevel = LOGINFO;
-  int lcdType = 934116;
+  int lcdType = 93418;
   int spiSpeed = 16000000;
 
   //{{{  dumb command line option parser
